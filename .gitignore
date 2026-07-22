@@ -36,6 +36,17 @@ yarn-error.log*
 # vercel
 .vercel
 
+# local databases (never commit — these live on Jack's laptop only)
+*.db
+*.sqlite
+*.sqlite3
+
+# local logs and machine-local session/usage state
+*.log
+os-server.log
+.jarvis-session.json
+.brave-usage.json
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

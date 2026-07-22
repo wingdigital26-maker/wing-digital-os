@@ -20,19 +20,26 @@ function getAllFiles(dir: string, files: string[] = []): string[] {
 }
 
 function extractWikilinks(content: string): string[] {
-  const matches = content.matchAll(/\[\[([^\]|#]+)(?:[|#][^\]]*)?\]\]/g);
-  return [...matches].map(m => m[1].trim().toLowerCase());
+  // Match [[link]], [[link|alias]], [[link\|alias]] (escaped pipe in tables)
+  const matches = content.matchAll(/\[\[([^\]|#\\]+)(?:[\\]?[|#][^\]]*)?\]\]/g);
+  return [...matches].map(m => m[1].trim().toLowerCase().replace(/\\/g, ""));
 }
 
 export async function GET() {
   const allFiles = getAllFiles(VAULT);
 
-  // Build name → path map
+  // Build both filename and relative-path lookups
   const nameMap: Record<string, string> = {};
   for (const file of allFiles) {
     const name = path.basename(file, ".md").toLowerCase();
     const rel = path.relative(VAULT, file).replace(/\\/g, "/");
-    nameMap[name] = rel;
+    nameMap[name] = rel;               // e.g. "charles-palma" → "wiki/clients/charles-palma.md"
+    nameMap[rel.replace(".md", "").toLowerCase()] = rel; // e.g. "wiki/clients/charles-palma" → full path
+    // Also index without leading folder for cross-folder links
+    const parts = rel.replace(".md", "").toLowerCase().split("/");
+    if (parts.length > 1) {
+      nameMap[parts.slice(1).join("/")] = rel; // e.g. "clients/charles-palma"
+    }
   }
 
   // Build nodes and links

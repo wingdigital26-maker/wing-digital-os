@@ -1,0 +1,8 @@
+# Jackson Roofing static showcase build
+# NOTE: this site is served under a subpath (/jackson-site/). Search engines
+# only honor robots.txt at the domain root, so on a real deploy the rules
+# below must be merged into the root /robots.txt and the sitemap referenced there.
+User-agent: *
+Allow: /jackson-site/
+
+Sitemap: http://localhost:3000/jackson-site/sitemap.xml

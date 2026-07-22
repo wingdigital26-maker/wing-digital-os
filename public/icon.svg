@@ -1,0 +1,20 @@
+<!--
+  PLACEHOLDER ICON — Replace icon-192.png and icon-512.png with real PNG icons.
+  Use this SVG as reference design: dark background (#0a0a0a) with Wing Digital blue (#10C0F0).
+  Export as PNG at 192x192 and 512x512, name them icon-192.png and icon-512.png in /public.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="80" fill="#0a0a0a"/>
+  <rect x="40" y="40" width="432" height="432" rx="60" fill="#0d1117"/>
+  <text
+    x="256"
+    y="300"
+    font-family="Arial Black, Arial, sans-serif"
+    font-size="180"
+    font-weight="900"
+    fill="#10C0F0"
+    text-anchor="middle"
+    letter-spacing="-8"
+  >WD</text>
+  <rect x="80" y="340" width="352" height="4" rx="2" fill="#10C0F0" opacity="0.4"/>
+</svg>

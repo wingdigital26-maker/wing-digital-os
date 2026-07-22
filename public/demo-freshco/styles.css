@@ -1,0 +1,218 @@
+/* FreshCo Plumbing demo — Wing Digital. Hand-rolled, no frameworks. */
+/* ==========================================================
+   BRAND TOKENS — rebrand = change --brand-hue (and --accent-hue).
+   Every palette color derives its hue from the three hue tokens
+   via oklch(); lightness/chroma stay put, so the whole site
+   re-skins from three numbers. The plain hex block below is the
+   fallback for browsers without oklch support; the @supports
+   block after it overrides with the hue-driven oklch values.
+   ========================================================== */
+:root{
+  --brand-hue:223;   /* teal family */
+  --neutral-hue:250; /* navy / ink family */
+  --accent-hue:70;   /* amber / CTA family */
+  /* hex fallbacks (match the oklch values below) */
+  --navy:#0b2e4f; --navy-deep:#082138; --teal:#0e7490; --teal-deep:#0c617a; --teal-bright:#0ea5a4;
+  --cyan:#22d3ee; --amber:#f59e0b; --amber-deep:#d97706; --amber-hover:#fbbf24;
+  --cta:#b45309; --cta-deep:#92400e;
+  --ink:#1e293b; --slate:#475569; --mist:#f1f7fa; --card:#ffffff; --line:#dbe7ee;
+  --radius:4px; --shadow:0 1px 3px rgba(11,46,79,.08);
+  --font:"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;
+}
+@supports (color: oklch(50% 0.1 200)){
+  :root{
+    --navy:oklch(29.6% .072 calc(var(--neutral-hue) + 1));
+    --navy-deep:oklch(24.2% .054 calc(var(--neutral-hue) - 1));
+    --teal:oklch(52% .094 var(--brand-hue));
+    --teal-deep:oklch(45.9% .083 calc(var(--brand-hue) + 1));
+    --teal-bright:oklch(65.4% .11 calc(var(--brand-hue) - 29));
+    --cyan:oklch(79.7% .134 calc(var(--brand-hue) - 12));
+    --amber:oklch(76.9% .165 var(--accent-hue));
+    --amber-deep:oklch(66.6% .157 calc(var(--accent-hue) - 12));
+    --amber-hover:oklch(83.7% .164 calc(var(--accent-hue) + 14));
+    --cta:oklch(55.5% .146 calc(var(--accent-hue) - 21));
+    --cta-deep:oklch(47.3% .125 calc(var(--accent-hue) - 24));
+    --ink:oklch(27.9% .037 calc(var(--neutral-hue) + 10));
+    --slate:oklch(44.6% .037 calc(var(--neutral-hue) + 7));
+    --mist:oklch(97.2% .008 calc(var(--brand-hue) + 6));
+    --line:oklch(92.1% .016 calc(var(--brand-hue) + 10));
+  }
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:var(--font);color:var(--ink);line-height:1.65;background:#fff;font-size:17px}
+img,svg{max-width:100%;vertical-align:middle}
+a{color:var(--teal);text-decoration:none}
+a:hover{text-decoration:underline}
+a:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--teal-bright);outline-offset:2px}
+.skip{position:absolute;left:-9999px;top:0;z-index:100;background:var(--navy);color:#fff;padding:10px 18px;font-weight:700}
+.skip:focus{left:0}
+.wrap{max-width:1120px;margin:0 auto;padding:0 24px}
+h1,h2,h3{line-height:1.2;color:var(--navy);font-weight:800;letter-spacing:-.01em}
+h1{font-size:clamp(2rem,4.6vw,3.3rem)}
+h2{font-size:clamp(1.5rem,3vw,2.2rem)}
+h3{font-size:1.15rem}
+p{margin-bottom:1rem}
+section{padding:68px 0}
+section.band{padding:60px 0}
+.kicker{display:inline-block;font-size:.8rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--teal);margin-bottom:.6rem}
+.lead{font-size:1.15rem;color:var(--slate);max-width:46rem}
+.center{text-align:center}
+.center .lead{margin-left:auto;margin-right:auto}
+
+/* Buttons */
+.btn{display:inline-block;padding:13px 26px;border-radius:var(--radius);font-weight:700;font-size:1rem;transition:background-color .15s,border-color .15s;text-decoration:none}
+.btn:hover{text-decoration:none}
+.btn-primary{background:var(--cta);color:#fff}
+.btn-primary:hover{background:var(--cta-deep)}
+.btn-ghost{border:2px solid rgba(255,255,255,.7);color:#fff}
+.btn-ghost:hover{border-color:#fff}
+.btn-teal{background:var(--teal);color:#fff}
+.btn-teal:hover{background:var(--teal-deep)}
+.btn-row{display:flex;gap:14px;flex-wrap:wrap;margin-top:1.4rem}
+
+/* Topbar + nav */
+.topbar{background:var(--navy-deep);color:#9fc4d8;font-size:.8rem;padding:7px 0;letter-spacing:.01em}
+.topbar .wrap{display:flex;align-items:center;justify-content:space-between;gap:20px}
+.topbar span{display:flex;align-items:center;gap:8px;white-space:nowrap}
+.topbar a{color:#fff;font-weight:700;letter-spacing:.02em}
+.topbar a:hover{color:var(--cyan);text-decoration:none}
+.topbar .tb-phone{color:var(--amber)}
+.topbar .tb-phone:hover{color:var(--amber-hover)}
+@media(max-width:700px){.topbar .tb-hide{display:none}}
+header.site{position:sticky;top:0;z-index:50;background:#fff;border-bottom:2px solid var(--navy)}
+.nav{display:flex;align-items:center;justify-content:space-between;padding:14px 0;gap:16px}
+.brand{display:flex;align-items:center;gap:10px;text-decoration:none}
+.brand:hover{text-decoration:none}
+.nav-links{display:flex;gap:26px;list-style:none;align-items:center;flex-wrap:wrap}
+.nav-links a{color:var(--ink);font-weight:600;font-size:.97rem}
+.nav-links a:hover{color:var(--teal);text-decoration:none}
+.nav-links a.active{color:var(--teal-bright)}
+.nav-cta{white-space:nowrap;padding:11px 20px;font-size:.92rem}
+.nav-toggle{display:none;background:none;border:0;cursor:pointer;padding:6px}
+@media(max-width:860px){
+  .nav-toggle{display:block}
+  .nav-links{display:none;position:absolute;top:100%;left:0;right:0;background:#fff;flex-direction:column;padding:18px 24px;border-bottom:1px solid var(--line);gap:16px;align-items:flex-start}
+  .nav-links.open{display:flex}
+}
+
+/* Hero */
+.hero{background:linear-gradient(100deg,rgba(6,26,44,.94) 0%,rgba(8,33,56,.86) 45%,rgba(11,46,79,.55) 100%),url("img/hero-plumber.jpg") center/cover no-repeat;color:#fff;padding:104px 0 112px;position:relative;overflow:hidden}
+.hero h1{color:#fff;text-shadow:0 2px 12px rgba(0,0,0,.35)}
+.hero .lead{color:#e2f1f8}
+.hero-grid{display:grid;grid-template-columns:minmax(0,640px);gap:48px;align-items:center}
+.hero-badges{display:flex;gap:18px;flex-wrap:wrap;margin-top:2rem;font-size:.9rem;color:#bde3f0}
+.hero-badges span{display:flex;align-items:center;gap:8px}
+.wave{display:block;margin-bottom:-1px}
+
+/* Cards / grids */
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:26px;margin-top:2.4rem}
+.grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:26px;margin-top:2.4rem}
+@media(max-width:900px){.grid-3{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:620px){.grid-3,.grid-2{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-top:3px solid var(--teal);border-radius:var(--radius);padding:28px 24px;box-shadow:var(--shadow);transition:border-color .15s,box-shadow .15s}
+.card:hover{border-top-color:var(--navy)}
+.card .icon{width:52px;height:52px;border-radius:var(--radius);background:var(--mist);display:flex;align-items:center;justify-content:center;margin-bottom:1rem}
+.card h3{margin-bottom:.5rem}
+.card p{color:var(--slate);font-size:.97rem;margin-bottom:.6rem}
+.card a.more{font-weight:700;font-size:.95rem}
+
+/* Alt band */
+.band{background:var(--mist)}
+.why-item{display:flex;gap:16px;align-items:flex-start;margin-bottom:1.4rem}
+.why-item .dot{flex:0 0 42px;height:42px;border-radius:var(--radius);background:var(--teal);display:flex;align-items:center;justify-content:center}
+.why-item h3{margin-bottom:.2rem}
+.why-item p{color:var(--slate);margin:0;font-size:.96rem}
+
+/* CTA band */
+.cta-band{background:linear-gradient(rgba(8,33,56,.88),rgba(8,33,56,.88)),url("img/tech-tools.jpg") center/cover no-repeat;color:#fff;text-align:center;padding:72px 0}
+.cta-band h2{color:#fff}
+.cta-band p{color:#d7ecf5;max-width:40rem;margin:0 auto 1.2rem}
+.phone-big{font-size:clamp(1.4rem,3.4vw,2rem);font-weight:800;color:#fff;letter-spacing:.02em}
+.phone-big:hover{color:var(--cyan);text-decoration:none}
+
+/* Testimonials */
+.quote-card{background:#fff;border:1px solid var(--line);border-left:3px solid var(--teal);border-radius:var(--radius);padding:26px 24px;box-shadow:var(--shadow)}
+.stars{color:var(--amber);letter-spacing:2px;margin-bottom:.6rem;font-size:1.05rem}
+.quote-card p{color:var(--slate);font-style:italic;font-size:.98rem}
+.quote-card footer{font-weight:700;color:var(--navy);font-style:normal}
+.quote-card footer small{display:block;font-weight:500;color:var(--slate)}
+
+/* Service area */
+.cities{display:flex;flex-wrap:wrap;gap:10px;margin-top:1.4rem}
+.cities span{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:7px 16px;font-weight:600;font-size:.9rem;color:var(--navy)}
+
+/* Forms */
+form.demo{display:grid;gap:16px;margin-top:1.6rem}
+form.demo .row2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:620px){form.demo .row2{grid-template-columns:1fr}}
+form.demo label{font-weight:700;font-size:.9rem;color:var(--navy);display:block;margin-bottom:6px}
+form.demo input,form.demo select,form.demo textarea{width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:var(--radius);font-family:inherit;font-size:1rem;background:#fff}
+form.demo input:focus,form.demo select:focus,form.demo textarea:focus{outline:2px solid var(--teal-bright);border-color:var(--teal-bright)}
+.form-note{font-size:.85rem;color:var(--slate)}
+form.demo .hp{position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden}
+
+/* Page hero (interior) */
+.page-hero{background:linear-gradient(100deg,rgba(6,26,44,.93) 0%,rgba(8,33,56,.85) 50%,rgba(11,46,79,.6) 100%),url("img/plumber-wrench.jpg") center 30%/cover no-repeat;color:#fff;padding:64px 0 72px}
+.page-hero h1{color:#fff}
+.page-hero p{color:#d7ecf5;max-width:44rem}
+.breadcrumbs{font-size:.85rem;color:#9fd3e6;margin-bottom:1rem}
+.breadcrumbs a{color:#7dd3fc}
+
+/* Article / blog */
+article.post{max-width:760px;margin:0 auto}
+article.post h2{margin:2.2rem 0 .8rem}
+article.post h3{margin:1.6rem 0 .5rem}
+article.post ul,article.post ol{margin:0 0 1rem 1.4rem}
+article.post li{margin-bottom:.4rem}
+.post-meta{color:var(--slate);font-size:.9rem;margin-bottom:1.6rem}
+.callout{background:var(--mist);border-left:4px solid var(--teal-bright);padding:18px 22px;margin:1.6rem 0}
+.callout p{margin:0;color:var(--ink)}
+table.data{width:100%;border-collapse:collapse;margin:1.2rem 0;font-size:.95rem}
+table.data th,table.data td{border:1px solid var(--line);padding:10px 14px;text-align:left}
+table.data th{background:var(--mist);color:var(--navy)}
+.table-scroll{overflow-x:auto}
+
+/* FAQ */
+.faq{margin-top:1.6rem}
+.faq details{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:16px 20px;margin-bottom:10px}
+.faq summary{font-weight:700;color:var(--navy);cursor:pointer;font-size:1.02rem}
+.faq details p{margin:.8rem 0 0;color:var(--slate)}
+
+/* Blog cards */
+.post-card{display:flex;flex-direction:column}
+.post-card .tag{font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--teal-bright);margin-bottom:.4rem}
+
+/* Footer */
+footer.site{background:var(--navy-deep);color:#a8c8d8;padding:56px 0 24px;font-size:.94rem}
+.foot-grid{display:grid;grid-template-columns:1.4fr 1fr 1fr 1.2fr;gap:36px;margin-bottom:2.4rem}
+@media(max-width:860px){.foot-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:560px){.foot-grid{grid-template-columns:1fr}}
+footer.site h3{color:#fff;font-size:1rem;margin-bottom:.9rem}
+footer.site ul{list-style:none}
+footer.site li{margin-bottom:.5rem}
+footer.site a{color:#a8c8d8}
+footer.site a:hover{color:var(--cyan)}
+.foot-bottom{border-top:1px solid rgba(255,255,255,.12);padding-top:20px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:.82rem;color:#7fa3b5}
+.emergency-strip{background:var(--amber);color:#3b2503;text-align:center;font-weight:700;padding:8px 16px;font-size:.9rem;letter-spacing:.01em}
+.emergency-strip a{color:#3b2503;text-decoration:underline}
+
+/* Photo band (image left / text right) */
+.split-band{background:var(--navy-deep);color:#cfe4f0}
+.split-band .wrap{display:grid;grid-template-columns:1fr 1.1fr;gap:0;align-items:stretch;padding:0 24px}
+.split-band .split-img{background:url("img/plumber-wrench.jpg") center/cover no-repeat;min-height:340px}
+.split-band .split-copy{padding:56px 0 56px 56px}
+.split-band h2{color:#fff}
+.split-band p{color:#c2dcea}
+@media(max-width:860px){.split-band .wrap{grid-template-columns:1fr}.split-band .split-copy{padding:40px 0}.split-band .split-img{min-height:240px;margin:0 -24px}}
+
+/* Sticky mobile call bar */
+.call-bar{display:none}
+@media(max-width:768px){
+  body{padding-bottom:60px}
+  .call-bar{position:fixed;bottom:0;left:0;right:0;z-index:60;display:flex;height:60px;box-shadow:0 -1px 3px rgba(11,46,79,.18)}
+  .call-bar a{flex:1;display:flex;align-items:center;justify-content:center;gap:9px;font-weight:800;font-size:1rem;color:#fff;text-decoration:none}
+  .call-bar a:hover{text-decoration:none}
+  .call-bar .cb-call{background:var(--cta)}
+  .call-bar .cb-quote{background:var(--navy)}
+}

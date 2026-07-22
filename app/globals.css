@@ -1,23 +1,27 @@
 @import "tailwindcss";
 
 :root {
-  --bg-primary: #0d0e1a;
-  --bg-secondary: #13152b;
-  --bg-card: #1a1d35;
-  --bg-hover: #21264a;
-  --border: #2a2f5a;
-  --accent: #7c6af5;
-  --accent-dim: #4f46a8;
-  --accent-glow: rgba(124, 106, 245, 0.15);
-  --text-primary: #e8eaf6;
-  --text-secondary: #8b90c4;
-  --text-muted: #4a5080;
-  --green: #4ade80;
-  --orange: #fb923c;
-  --red: #f87171;
+  /* Obsidian night — deep neutrals with electric cyan/violet duotone */
+  --bg-primary: #07080f;
+  --bg-secondary: #0b0d17;
+  --bg-card: #10131f;
+  --bg-hover: #171b2c;
+  --border: #1f2437;
+  --accent: #22d3ee;
+  --accent-2: #a78bfa;
+  --accent-dim: #0e7490;
+  --accent-glow: rgba(34, 211, 238, 0.12);
+  --text-primary: #eef1f8;
+  --text-secondary: #9aa3c0;
+  --text-muted: #545d7d;
+  --green: #34d399;
+  --orange: #fbbf24;
+  --red: #fb7185;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { color-scheme: dark; }
 
 body {
   background: var(--bg-primary);
@@ -25,27 +29,192 @@ body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   height: 100vh;
   overflow: hidden;
+  position: relative;
 }
 
-::-webkit-scrollbar { width: 4px; }
+/* Ambient glow — two soft radial blooms + faint grid, fixed behind everything */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 55% 45% at 82% -8%, rgba(167, 139, 250, 0.10), transparent 60%),
+    radial-gradient(ellipse 50% 50% at 8% 108%, rgba(34, 211, 238, 0.08), transparent 60%),
+    linear-gradient(rgba(159, 170, 210, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(159, 170, 210, 0.025) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 44px 44px, 44px 44px;
+}
+
+body > * { position: relative; z-index: 1; }
+
+/* Typography: display font for headings app-wide */
+h1, h2, h3, h4 {
+  font-family: 'Space Grotesk', 'Inter', sans-serif;
+  letter-spacing: -0.01em;
+}
+
+code, pre, kbd { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+
+::selection { background: rgba(34, 211, 238, 0.25); color: var(--text-primary); }
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--border), #2c3352);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--accent-dim); }
 
 a { color: inherit; text-decoration: none; }
 
-.markdown-body h1, .markdown-body h2, .markdown-body h3 { color: var(--text-primary); margin: 1.2em 0 0.5em; font-weight: 700; }
+/* Smooth micro-interactions everywhere */
+button, a, input, select, textarea, [role="button"] {
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease,
+              box-shadow 0.18s ease, transform 0.12s ease, opacity 0.18s ease;
+}
+
+button { cursor: pointer; }
+button:active { transform: scale(0.97); }
+
+input, textarea, select { outline: none; }
+input:focus, textarea:focus, select:focus {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+/* Sidebar gets a glass treatment */
+aside {
+  backdrop-filter: blur(14px);
+  background: linear-gradient(180deg, rgba(11, 13, 23, 0.92), rgba(9, 11, 20, 0.96)) !important;
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.03);
+}
+
+/* Any card-styled element (inline style uses var(--bg-card)) picks up depth via border glow on hover.
+   We can't target inline styles directly, so add a soft global lift to common interactive containers. */
+[style*="--bg-card"] { }
+
+/* Content fade-in when switching views */
+main, section {
+  animation: viewIn 0.28s ease both;
+}
+@keyframes viewIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Subtle pulse utility (used by status dots if any pick it up) */
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 0 0 var(--accent-glow); }
+  50%      { box-shadow: 0 0 0 6px transparent; }
+}
+
+/* ── Skeleton shimmer for loading states ─────────────────────────── */
+.skel {
+  border-radius: 10px;
+  background: linear-gradient(90deg,
+    rgba(255, 255, 255, 0.035) 25%,
+    rgba(34, 211, 238, 0.07) 50%,
+    rgba(255, 255, 255, 0.035) 75%);
+  background-size: 200% 100%;
+  animation: skelShimmer 1.4s ease-in-out infinite;
+}
+@keyframes skelShimmer {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+
+/* ── Live-data indicator: faint cyan pulse ────────────────────────── */
+.live-dot { animation: liveDot 2.4s ease-in-out infinite; }
+@keyframes liveDot {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.45; }
+}
+
+/* ── Glassy top bar + animated accent hairline (signature touch) ─── */
+main > header {
+  background: rgba(11, 13, 23, 0.72) !important;
+  backdrop-filter: blur(16px);
+  position: relative;
+}
+main > header::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: -1px;
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent, rgba(34, 211, 238, 0.55) 30%,
+    rgba(167, 139, 250, 0.45) 60%, transparent);
+  background-size: 200% 100%;
+  animation: hairlineSlide 7s linear infinite;
+  pointer-events: none;
+}
+@keyframes hairlineSlide {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+
+/* ── Staggered card fade-in on view switch ────────────────────────── */
+main > div:last-child > div > * {
+  animation: cardIn 0.38s cubic-bezier(0.22, 0.8, 0.36, 1) backwards;
+}
+main > div:last-child > div > *:nth-child(1) { animation-delay: 0.02s; }
+main > div:last-child > div > *:nth-child(2) { animation-delay: 0.07s; }
+main > div:last-child > div > *:nth-child(3) { animation-delay: 0.12s; }
+main > div:last-child > div > *:nth-child(4) { animation-delay: 0.17s; }
+main > div:last-child > div > *:nth-child(5) { animation-delay: 0.22s; }
+main > div:last-child > div > *:nth-child(6) { animation-delay: 0.27s; }
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ── Mobile (PWA at ~390px) ───────────────────────────────────────── */
+@media (max-width: 640px) {
+  main > div:last-child { padding: 14px !important; }
+  main > header { padding: 12px 14px !important; }
+  main > header h1 { font-size: 15px !important; }
+}
+
+/* Markdown rendering */
+.markdown-body h1, .markdown-body h2, .markdown-body h3 {
+  color: var(--text-primary); margin: 1.2em 0 0.5em; font-weight: 700;
+}
 .markdown-body h1 { font-size: 1.6em; }
-.markdown-body h2 { font-size: 1.25em; color: var(--text-secondary); }
+.markdown-body h2 {
+  font-size: 1.25em;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
 .markdown-body h3 { font-size: 1.05em; }
 .markdown-body p { margin-bottom: 0.9em; color: var(--text-secondary); }
 .markdown-body ul, .markdown-body ol { padding-left: 1.5em; margin-bottom: 0.9em; color: var(--text-secondary); }
 .markdown-body li { margin-bottom: 0.3em; }
-.markdown-body code { background: var(--bg-card); border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px; font-size: 0.85em; color: var(--accent); }
-.markdown-body pre { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 16px; overflow-x: auto; margin-bottom: 1em; }
+.markdown-body code {
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 4px;
+  padding: 2px 6px; font-size: 0.85em; color: var(--accent);
+}
+.markdown-body pre {
+  background: linear-gradient(180deg, var(--bg-card), #0c0f1a);
+  border: 1px solid var(--border); border-radius: 10px; padding: 16px;
+  overflow-x: auto; margin-bottom: 1em;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
 .markdown-body pre code { background: none; border: none; padding: 0; }
-.markdown-body blockquote { border-left: 3px solid var(--accent); padding-left: 16px; margin: 1em 0; color: var(--text-muted); }
+.markdown-body blockquote {
+  border-left: 3px solid var(--accent); padding-left: 16px; margin: 1em 0;
+  color: var(--text-muted);
+  background: linear-gradient(90deg, var(--accent-glow), transparent 40%);
+  border-radius: 0 8px 8px 0;
+}
 .markdown-body hr { border: none; border-top: 1px solid var(--border); margin: 1.5em 0; }
 .markdown-body table { width: 100%; border-collapse: collapse; margin-bottom: 1em; font-size: 13px; }
-.markdown-body th { background: var(--bg-hover); padding: 8px 12px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
+.markdown-body th {
+  background: var(--bg-hover); padding: 8px 12px; text-align: left;
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted);
+}
 .markdown-body td { padding: 8px 12px; border-bottom: 1px solid var(--border); color: var(--text-secondary); }
 .markdown-body strong { color: var(--text-primary); font-weight: 600; }

@@ -1,53 +1,39 @@
 import { NextRequest, NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
+import { listVaultFiles, readVaultFile } from "@/lib/vaultSource";
+
+export const runtime = "nodejs";
 
 const GHL_API_KEY = process.env.GHL_API_KEY!;
 const GHL_LOCATION_ID = process.env.GHL_LOCATION_ID!;
-const VAULT = "C:\\Users\\wjack\\OneDrive\\Documentos\\Obsidian 2.0\\Jacks Ai Brain 2.0";
-const IGNORE = [".obsidian", ".claude", "node_modules", "assets"];
 const MAX_VAULT_RESULTS = 5;
 const MAX_GHL_RESULTS = 5;
 
-function searchVault(query: string): { name: string; path: string; excerpt: string }[] {
+async function searchVault(query: string): Promise<{ name: string; path: string; excerpt: string }[]> {
   const q = query.toLowerCase();
   const results: { name: string; path: string; excerpt: string }[] = [];
 
-  function walk(dir: string) {
-    if (results.length >= MAX_VAULT_RESULTS) return;
-    let entries: fs.Dirent[];
-    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+  const files = await listVaultFiles();
+  for (const rel of files) {
+    if (results.length >= MAX_VAULT_RESULTS) break;
+    const name = (rel.split("/").pop() ?? rel).replace(".md", "");
 
-    for (const entry of entries) {
-      if (results.length >= MAX_VAULT_RESULTS) break;
-      if (IGNORE.includes(entry.name) || entry.name.startsWith(".")) continue;
-      const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) { walk(full); continue; }
-      if (!entry.name.endsWith(".md")) continue;
+    // Match filename first (fastest)
+    if (name.toLowerCase().includes(q)) {
+      results.push({ name, path: rel, excerpt: "Filename match" });
+      continue;
+    }
 
-      const rel = path.relative(VAULT, full).replace(/\\/g, "/");
-      const name = entry.name.replace(".md", "");
-
-      // Match filename first (fastest)
-      if (name.toLowerCase().includes(q)) {
-        results.push({ name, path: rel, excerpt: "Filename match" });
-        continue;
-      }
-
-      // Then scan content -- stop after finding first match
-      try {
-        const content = fs.readFileSync(full, "utf-8");
-        const idx = content.toLowerCase().indexOf(q);
-        if (idx !== -1) {
-          const start = Math.max(0, idx - 60);
-          const excerpt = "..." + content.slice(start, idx + 80).replace(/\n/g, " ").trim() + "...";
-          results.push({ name, path: rel, excerpt });
-        }
-      } catch { continue; }
+    // Then scan content -- stop after finding first match
+    const content = await readVaultFile(rel);
+    if (!content) continue;
+    const idx = content.toLowerCase().indexOf(q);
+    if (idx !== -1) {
+      const start = Math.max(0, idx - 60);
+      const excerpt = "..." + content.slice(start, idx + 80).replace(/\n/g, " ").trim() + "...";
+      results.push({ name, path: rel, excerpt });
     }
   }
 
-  walk(VAULT);
   return results;
 }
 
@@ -75,7 +61,7 @@ export async function GET(req: NextRequest) {
 
   const [contacts, notes] = await Promise.all([
     searchGHL(query),
-    Promise.resolve(searchVault(query)),
+    searchVault(query),
   ]);
 
   return NextResponse.json({ contacts, notes });

@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 import { spawn } from "child_process";
+import { isCloud, PC_REQUIRED_BODY } from "@/lib/runtime";
+
+export const runtime = "nodejs";
 
 // This route is the link between the OS "run agent" button and the real
 // Wing Digital agent scripts. It runs the underlying Python for each agent
@@ -60,6 +63,9 @@ function runPython(args: string[], extraEnv?: Record<string, string>): Promise<{
 }
 
 export async function POST(req: Request) {
+  if (isCloud()) {
+    return NextResponse.json(PC_REQUIRED_BODY, { status: 503 });
+  }
   let agent: string;
   let dryRun = false;
   try {

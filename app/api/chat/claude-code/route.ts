@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { spawn, ChildProcessWithoutNullStreams } from "child_process";
+import { isCloud } from "@/lib/runtime";
+
+export const runtime = "nodejs";
 
 // Persistent bridge to Claude Code (headless stream mode).
 // The process boots ONCE and stays warm; each chat message is written to its stdin
@@ -111,7 +114,30 @@ function ask(bridge: CCBridge, text: string): Promise<{ reply: string }> {
   });
 }
 
+// This route spawns Claude Code with bypassPermissions on the HOST machine — it is
+// effectively remote code execution. Restrict it to local requests so it can never
+// be driven over the internet / a tunnel. Set ALLOW_REMOTE_CLAUDE_CODE=1 to
+// consciously re-enable remote (phone) access if you accept that risk.
+function isLocalRequest(req: NextRequest): boolean {
+  if (process.env.ALLOW_REMOTE_CLAUDE_CODE === "1") return true;
+  const host = (req.headers.get("host") ?? "").split(":")[0].toLowerCase();
+  return host === "localhost" || host === "127.0.0.1" || host === "::1";
+}
+
 export async function POST(req: NextRequest) {
+  if (isCloud()) {
+    return NextResponse.json(
+      { reply: "Claude Code runs on Jack's PC and needs it online.", pcRequired: true, cost: 0, toolCalls: [] },
+      { status: 503 }
+    );
+  }
+  if (!isLocalRequest(req)) {
+    return NextResponse.json(
+      { reply: "This endpoint is restricted to local access.", cost: 0, toolCalls: [] },
+      { status: 403 }
+    );
+  }
+
   const { messages } = await req.json();
   const userMessages = (messages ?? []).filter((m: any) => m.role === "user");
   const last = userMessages[userMessages.length - 1];

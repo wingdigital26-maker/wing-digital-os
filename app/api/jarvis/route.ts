@@ -2,6 +2,10 @@ import { NextRequest } from "next/server";
 import fs from "fs";
 import path from "path";
 import { execFileSync, spawn } from "child_process";
+import { isCloud } from "@/lib/runtime";
+import { VAULT_PATH, listVaultFiles, readVaultFile } from "@/lib/vaultSource";
+
+export const runtime = "nodejs";
 
 // ── Jarvis: agentic assistant for Wing Digital OS ─────────────────────────────
 // Jarvis has FULL-ACCESS tools (Anthropic tool-use / function calling), enabled
@@ -14,8 +18,7 @@ import { execFileSync, spawn } from "child_process";
 
 const MODEL = "claude-sonnet-4-6";
 
-const VAULT_ROOT =
-  "C:\\Users\\wjack\\OneDrive\\Documentos\\Obsidian 2.0\\Jacks Ai Brain 2.0";
+const VAULT_ROOT = VAULT_PATH;
 const VAULT_WIKI = path.join(VAULT_ROOT, "wiki");
 const GHL_CLI_DIR = "C:\\Users\\wjack\\ghl-cli";
 const PROSPECTS_DB = path.join(GHL_CLI_DIR, "prospects.db");
@@ -174,68 +177,34 @@ const TOOLS = [
 
 // ── Tool implementations (ALL READ-ONLY) ──────────────────────────────────────
 
-function toolReadVaultFile(input: { path?: string }): string {
+async function toolReadVaultFile(input: { path?: string }): Promise<string> {
   const rel = (input.path ?? "").replace(/^[/\\]+/, "");
-  const resolved = path.resolve(VAULT_ROOT, rel);
-  // Guardrail: resolved path must stay inside the vault.
-  const rootWithSep = VAULT_ROOT.endsWith(path.sep) ? VAULT_ROOT : VAULT_ROOT + path.sep;
-  if (resolved !== VAULT_ROOT && !resolved.startsWith(rootWithSep)) {
-    return "ERROR: path escapes the vault. Access denied.";
-  }
-  try {
-    const stat = fs.statSync(resolved);
-    if (stat.isDirectory()) {
-      const entries = fs.readdirSync(resolved);
-      return `Directory listing for ${rel || "."}:\n` + entries.join("\n");
-    }
-    let text = fs.readFileSync(resolved, "utf-8");
-    if (text.length > 20000) text = text.slice(0, 20000) + "\n...[truncated]";
-    return text;
-  } catch {
-    return `ERROR: could not read '${rel}'. It may not exist.`;
-  }
+  if (rel.includes("..")) return "ERROR: path escapes the vault. Access denied.";
+  const text = await readVaultFile(rel);
+  if (text === null) return `ERROR: could not read '${rel}'. It may not exist.`;
+  return text.length > 20000 ? text.slice(0, 20000) + "\n...[truncated]" : text;
 }
 
-function toolSearchVault(input: { keyword?: string }): string {
+async function toolSearchVault(input: { keyword?: string }): Promise<string> {
   const keyword = (input.keyword ?? "").trim();
   if (!keyword) return "ERROR: no keyword provided.";
   const needle = keyword.toLowerCase();
   const results: string[] = [];
   const MAX = 40;
 
-  function walk(dir: string) {
-    if (results.length >= MAX) return;
-    let entries: fs.Dirent[];
-    try {
-      entries = fs.readdirSync(dir, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    for (const e of entries) {
-      if (results.length >= MAX) return;
-      const full = path.join(dir, e.name);
-      if (e.isDirectory()) {
-        walk(full);
-      } else if (e.name.endsWith(".md")) {
-        let text: string;
-        try {
-          text = fs.readFileSync(full, "utf-8");
-        } catch {
-          continue;
-        }
-        const lines = text.split(/\r?\n/);
-        for (const line of lines) {
-          if (line.toLowerCase().includes(needle)) {
-            const relPath = path.relative(VAULT_ROOT, full).replace(/\\/g, "/");
-            results.push(`${relPath}: ${line.trim().slice(0, 200)}`);
-            break; // one hit per file keeps results readable
-          }
-        }
+  const files = (await listVaultFiles()).filter((rel) => rel.startsWith("wiki/"));
+  for (const rel of files) {
+    if (results.length >= MAX) break;
+    const text = await readVaultFile(rel);
+    if (!text) continue;
+    for (const line of text.split(/\r?\n/)) {
+      if (line.toLowerCase().includes(needle)) {
+        results.push(`${rel}: ${line.trim().slice(0, 200)}`);
+        break; // one hit per file keeps results readable
       }
     }
   }
 
-  walk(VAULT_WIKI);
   if (results.length === 0) return `No matches for "${keyword}" in the vault wiki.`;
   return `Matches for "${keyword}" (${results.length}${results.length >= MAX ? "+" : ""}):\n` + results.join("\n");
 }
@@ -336,6 +305,9 @@ async function toolQueryGhl(): Promise<string> {
 }
 
 function toolOutreachStatus(): string {
+  if (isCloud()) {
+    return "This reads the local prospects.db via python and needs the PC online. (pcRequired)";
+  }
   const out: Record<string, unknown> = {};
 
   // 1) daily_count.json if it exists (source of truth for "sent today" when present).
@@ -456,6 +428,9 @@ function runPythonInGhlCli(
 }
 
 async function toolRunOutreach(input: { dryRun?: boolean }): Promise<string> {
+  if (isCloud()) {
+    return "Outreach runs the local daily_outreach.py pipeline and needs the PC online. (pcRequired)";
+  }
   const dryRun = input.dryRun !== false; // default true
   const args = ["daily_outreach.py"];
   if (dryRun) args.push("--dry-run");
@@ -482,6 +457,9 @@ const JARVIS_AGENTS: Record<string, { args: string[]; env?: Record<string, strin
 };
 
 async function toolRunAgent(input: { agent?: string; dryRun?: boolean }): Promise<string> {
+  if (isCloud()) {
+    return "Running an agent spawns local python scripts and needs the PC online. (pcRequired)";
+  }
   const agent = String(input.agent ?? "").trim();
   const cfg = JARVIS_AGENTS[agent];
   if (!cfg) {
@@ -600,9 +578,9 @@ async function toolFetchUrl(input: { url?: string }): Promise<string> {
 async function runTool(name: string, input: any): Promise<string> {
   switch (name) {
     case "read_vault_file":
-      return toolReadVaultFile(input ?? {});
+      return await toolReadVaultFile(input ?? {});
     case "search_vault":
-      return toolSearchVault(input ?? {});
+      return await toolSearchVault(input ?? {});
     case "query_ghl":
       return await toolQueryGhl();
     case "outreach_status":

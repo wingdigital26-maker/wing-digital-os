@@ -1,23 +1,7 @@
 import { NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
+import { listVaultFiles, readVaultFile } from "@/lib/vaultSource";
 
-const VAULT = "C:\\Users\\wjack\\OneDrive\\Documentos\\Obsidian 2.0\\Jacks Ai Brain 2.0";
-const IGNORE = [".obsidian", ".claude", "node_modules", "assets"];
-
-function getAllFiles(dir: string, files: string[] = []): string[] {
-  let entries: fs.Dirent[];
-  try { entries = fs.readdirSync(dir, { withFileTypes: true }); }
-  catch { return files; }
-
-  for (const entry of entries) {
-    if (IGNORE.includes(entry.name) || entry.name.startsWith(".")) continue;
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) getAllFiles(full, files);
-    else if (entry.name.endsWith(".md")) files.push(full);
-  }
-  return files;
-}
+export const runtime = "nodejs";
 
 function extractWikilinks(content: string): string[] {
   // Match [[link]], [[link|alias]], [[link\|alias]] (escaped pipe in tables)
@@ -25,31 +9,32 @@ function extractWikilinks(content: string): string[] {
   return [...matches].map(m => m[1].trim().toLowerCase().replace(/\\/g, ""));
 }
 
+function basename(rel: string): string {
+  const file = rel.split("/").pop() ?? rel;
+  return file.replace(/\.md$/, "");
+}
+
 export async function GET() {
-  const allFiles = getAllFiles(VAULT);
+  const allFiles = await listVaultFiles(); // relative paths, "/"-separated
 
   // Build both filename and relative-path lookups
   const nameMap: Record<string, string> = {};
-  for (const file of allFiles) {
-    const name = path.basename(file, ".md").toLowerCase();
-    const rel = path.relative(VAULT, file).replace(/\\/g, "/");
-    nameMap[name] = rel;               // e.g. "charles-palma" → "wiki/clients/charles-palma.md"
-    nameMap[rel.replace(".md", "").toLowerCase()] = rel; // e.g. "wiki/clients/charles-palma" → full path
-    // Also index without leading folder for cross-folder links
+  for (const rel of allFiles) {
+    const name = basename(rel).toLowerCase();
+    nameMap[name] = rel;                                  // "charles-palma" → "wiki/clients/charles-palma.md"
+    nameMap[rel.replace(".md", "").toLowerCase()] = rel;  // "wiki/clients/charles-palma" → full path
     const parts = rel.replace(".md", "").toLowerCase().split("/");
     if (parts.length > 1) {
-      nameMap[parts.slice(1).join("/")] = rel; // e.g. "clients/charles-palma"
+      nameMap[parts.slice(1).join("/")] = rel;            // "clients/charles-palma"
     }
   }
 
-  // Build nodes and links
   const nodes: { id: string; name: string; path: string; group: string }[] = [];
   const links: { source: string; target: string }[] = [];
   const nodeIds = new Set<string>();
 
-  for (const file of allFiles) {
-    const rel = path.relative(VAULT, file).replace(/\\/g, "/");
-    const name = path.basename(file, ".md");
+  for (const rel of allFiles) {
+    const name = basename(rel);
     const group = rel.split("/")[0];
 
     if (!nodeIds.has(rel)) {
@@ -57,8 +42,8 @@ export async function GET() {
       nodeIds.add(rel);
     }
 
-    let content = "";
-    try { content = fs.readFileSync(file, "utf-8"); } catch { continue; }
+    const content = (await readVaultFile(rel)) ?? "";
+    if (!content) continue;
 
     const wikilinks = extractWikilinks(content);
     for (const link of wikilinks) {

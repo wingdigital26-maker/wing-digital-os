@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import { VAULT_PATH as VAULT, readVaultFile } from "@/lib/vaultSource";
+
+export const runtime = "nodejs";
 
 const GHL_KEY = process.env.GHL_API_KEY!;
 const GHL_LOC = process.env.GHL_LOCATION_ID!;
-const VAULT = "C:\\Users\\wjack\\OneDrive\\Documentos\\Obsidian 2.0\\Jacks Ai Brain 2.0";
 
 const GHL_HEADERS = {
   Authorization: `Bearer ${GHL_KEY}`,
@@ -198,10 +200,9 @@ export async function POST(req: NextRequest) {
       }
 
       case "read_vault_note": {
-        const filePath = path.join(VAULT, input.path.replace(/\//g, "\\"));
-        if (!filePath.startsWith(VAULT)) return NextResponse.json({ ok: false, error: "Path not allowed" });
-        if (!fs.existsSync(filePath)) return NextResponse.json({ ok: false, error: "File not found: " + input.path });
-        const content = fs.readFileSync(filePath, "utf-8");
+        if (String(input.path).includes("..")) return NextResponse.json({ ok: false, error: "Path not allowed" });
+        const content = await readVaultFile(input.path);
+        if (content === null) return NextResponse.json({ ok: false, error: "File not found: " + input.path });
         return NextResponse.json({ ok: true, content: content.slice(0, 3000) }); // cap at 3k chars
       }
 

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import fs from "fs";
-import path from "path";
+import { listVaultFiles, readVaultFile } from "@/lib/vaultSource";
+
+export const runtime = "nodejs";
 
 const GHL_API_KEY = process.env.GHL_API_KEY!;
 const GHL_LOCATION_ID = process.env.GHL_LOCATION_ID!;
@@ -13,17 +15,18 @@ const GHL_LOCATION_ID = process.env.GHL_LOCATION_ID!;
 // this location's opportunities at all. The single source of truth Jack maintains is
 // the client notes frontmatter (`mrr:`), the same source /api/clients reads. We sum
 // the `mrr` of every ACTIVE client that has a real numeric retainer on file.
-const CLIENTS_DIR =
-  "C:\\Users\\wjack\\OneDrive\\Documentos\\Obsidian 2.0\\Jacks Ai Brain 2.0\\wiki\\clients";
-
 type ActiveClient = { name: string; value: number; slug: string; status: string };
 
-function readRetainerRoster(): ActiveClient[] {
+async function readRetainerRoster(): Promise<ActiveClient[]> {
   try {
-    const files = fs.readdirSync(CLIENTS_DIR).filter((f) => f.endsWith(".md"));
+    const files = (await listVaultFiles()).filter(
+      (rel) => rel.startsWith("wiki/clients/") && !rel.slice("wiki/clients/".length).includes("/")
+    );
+    if (files.length === 0) throw new Error("no client notes");
     const roster: ActiveClient[] = [];
-    for (const f of files) {
-      const text = fs.readFileSync(path.join(CLIENTS_DIR, f), "utf-8");
+    for (const rel of files) {
+      const f = rel.split("/").pop()!;
+      const text = (await readVaultFile(rel)) ?? "";
       const fm = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
       const kv: Record<string, string> = {};
       if (fm) {
@@ -108,7 +111,7 @@ export async function GET() {
   // Real MRR = sum of confirmed monthly retainers across active clients (see note above).
   // Today this resolves to Jackson Roofing at $700/mo; it grows automatically as Jack adds
   // an `mrr:` value to each active client's notes file. NOT derived from GHL opp values.
-  const retainerRoster = readRetainerRoster();
+  const retainerRoster = await readRetainerRoster();
   const mrr = retainerRoster.reduce((sum, c) => sum + c.value, 0);
 
   // Recent leads (last 10 contacts)

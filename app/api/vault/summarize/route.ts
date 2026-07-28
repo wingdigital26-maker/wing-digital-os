@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import { VAULT_PATH as VAULT } from "@/lib/vaultSource";
 
-const VAULT = "C:\\Users\\wjack\\OneDrive\\Documentos\\Obsidian 2.0\\Jacks Ai Brain 2.0";
+export const runtime = "nodejs";
+
 const HOT_FILE = path.join(VAULT, "wiki", "hot.md");
 
 export async function POST(req: NextRequest) {

@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 import { execFileSync, spawn } from "child_process";
+import { isCloud, PC_REQUIRED_BODY } from "@/lib/runtime";
+
+export const runtime = "nodejs";
 
 // ── Sales / outreach metrics ──────────────────────────────────────────────────
 // Contract (consumed by the dashboard):
@@ -85,6 +88,22 @@ function kickBackgroundRefresh() {
 }
 
 export async function GET() {
+  if (isCloud()) {
+    // Sends come from the local prospects.db + a detached python refresher; both
+    // need the PC. Serve zeros with the pcRequired flag so the dashboard shows a
+    // placeholder instead of treating absent local data as real zeros.
+    return NextResponse.json({
+      ...PC_REQUIRED_BODY,
+      sentToday: 0,
+      queuedToday: 0,
+      sentMonth: 0,
+      queuedMonth: 0,
+      opened: 0,
+      emailStats: null,
+      source: "local-db-unavailable",
+    });
+  }
+
   const now = new Date();
 
   // ── Real sends from prospects.db (waves 1/2 + every daily_outreach send) ─────

@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { readFile } from "fs/promises";
 import path from "path";
+import { isCloud, PC_REQUIRED_BODY } from "@/lib/runtime";
+
+export const runtime = "nodejs";
 
 const AUDIT_DIR = "C:\\Users\\wjack\\Downloads\\wing-audits";
 
@@ -12,6 +15,10 @@ function slug(name: string): string {
 }
 
 export async function GET(req: Request) {
+  if (isCloud()) {
+    // Audit PDFs are generated to a local Downloads folder on Jack's PC.
+    return NextResponse.json(PC_REQUIRED_BODY, { status: 503 });
+  }
   const { searchParams } = new URL(req.url);
   const name = searchParams.get("name");
   if (!name) return NextResponse.json({ error: "name required" }, { status: 400 });

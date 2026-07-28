@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { exec } from "child_process";
 import { promisify } from "util";
+import { isCloud } from "@/lib/runtime";
+
+export const runtime = "nodejs";
 
 const execAsync = promisify(exec);
 
@@ -8,6 +11,11 @@ const execAsync = promisify(exec);
 // Command Center can show whether they are actually running, crashing, or never fired.
 // LastTaskResult 0 = ok, nonzero = crashed. State "Running"/"Ready"/"Queued".
 export async function GET() {
+  if (isCloud()) {
+    // Reads the local Windows Task Scheduler via PowerShell — no equivalent on a
+    // cloud host. Degrade to an empty list with the pcRequired flag.
+    return NextResponse.json({ agents: [], pcRequired: true });
+  }
   // NOTE: for a task that has never run, Windows returns a sentinel LastRunTime of
   // 1999-11-30 (NOT null) together with result 0x41303 (SCHED_S_TASK_HAS_NOT_RUN_YET),
   // so we must null out any pre-2000 date here or the API will misread "never ran" as a crash.

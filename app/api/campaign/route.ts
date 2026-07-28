@@ -1,11 +1,17 @@
 import { NextResponse } from "next/server";
 import { execFile } from "child_process";
 import { promisify } from "util";
+import { isCloud, PC_REQUIRED_BODY } from "@/lib/runtime";
+
+export const runtime = "nodejs";
 
 const execFileAsync = promisify(execFile);
 const GHL_CLI = "C:\\Users\\wjack\\ghl-cli";
 
 export async function GET() {
+  if (isCloud()) {
+    return NextResponse.json({ ...PC_REQUIRED_BODY, cities: [], prospects: [] });
+  }
   try {
     const { stdout } = await execFileAsync(
       "python",

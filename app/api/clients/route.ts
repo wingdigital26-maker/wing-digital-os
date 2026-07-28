@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
+import { listVaultFiles, readVaultFile } from "@/lib/vaultSource";
 
-const CLIENTS_DIR =
-  "C:\\Users\\wjack\\OneDrive\\Documentos\\Obsidian 2.0\\Jacks Ai Brain 2.0\\wiki\\clients";
+export const runtime = "nodejs";
 
 function parseFrontmatter(text: string): Record<string, string> {
   const m = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
@@ -18,9 +16,12 @@ function parseFrontmatter(text: string): Record<string, string> {
 
 export async function GET() {
   try {
-    const files = fs.readdirSync(CLIENTS_DIR).filter(f => f.endsWith(".md"));
-    const clients = files.map(f => {
-      const text = fs.readFileSync(path.join(CLIENTS_DIR, f), "utf-8");
+    const files = (await listVaultFiles()).filter(
+      (rel) => rel.startsWith("wiki/clients/") && !rel.slice("wiki/clients/".length).includes("/")
+    );
+    const clients = await Promise.all(files.map(async rel => {
+      const f = rel.split("/").pop()!;
+      const text = (await readVaultFile(rel)) ?? "";
       const fm = parseFrontmatter(text);
       // pull contact info from the body (first email/phone found)
       const email = text.match(/[\w.+-]+@[\w-]+\.[\w.]+/)?.[0] ?? "";
@@ -45,7 +46,7 @@ export async function GET() {
         ghlLocationId,
         updated: fm["updated"] || fm["date"] || "",
       };
-    });
+    }));
     const totalMrr = clients.reduce((s, c) => s + (c.mrr ?? 0), 0);
     return NextResponse.json({ clients, totalMrr });
   } catch (e: any) {

@@ -1,11 +1,19 @@
 import { NextResponse } from "next/server";
 import { execFile } from "child_process";
 import { promisify } from "util";
+import { isCloud, PC_REQUIRED_BODY } from "@/lib/runtime";
+
+export const runtime = "nodejs";
 
 const execFileAsync = promisify(execFile);
 const GHL_CLI = "C:\\Users\\wjack\\ghl-cli";
 
 export async function GET() {
+  if (isCloud()) {
+    // Local-only: reads prospects.db via python on Jack's PC. Degrade with an
+    // empty list (dashboard-friendly) plus the pcRequired flag.
+    return NextResponse.json({ ...PC_REQUIRED_BODY, prospects: [] });
+  }
   try {
     const { stdout } = await execFileAsync(
       "python",
@@ -25,6 +33,9 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  if (isCloud()) {
+    return NextResponse.json(PC_REQUIRED_BODY, { status: 503 });
+  }
   try {
     const { id, status, notes } = await req.json();
     if (!id || !status) {

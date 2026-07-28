@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import { VAULT_PATH as VAULT } from "@/lib/vaultSource";
 
-const VAULT = "C:\\Users\\wjack\\OneDrive\\Documentos\\Obsidian 2.0\\Jacks Ai Brain 2.0";
+export const runtime = "nodejs";
+
 const COMPETITORS_FILE = path.join(VAULT, "wiki", "concepts", "competitors.md");
 const USAGE_FILE = path.join(process.cwd(), ".brave-usage.json");
 

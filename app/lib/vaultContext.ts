@@ -1,48 +1,45 @@
-import fs from "fs";
-import path from "path";
+import { listVaultFiles, readVaultFile } from "@/lib/vaultSource";
 
-const VAULT = "C:\\Users\\wjack\\OneDrive\\Documentos\\Obsidian 2.0\\Jacks Ai Brain 2.0";
-
-function readFile(filePath: string): string {
-  try { return fs.readFileSync(filePath, "utf-8"); }
-  catch { return ""; }
+// Read every .md directly inside a vault folder (non-recursive), returning
+// { name, content } for non-empty files. Works in both local and GitHub modes.
+async function readFolder(folder: string): Promise<{ name: string; content: string }[]> {
+  const prefix = folder.replace(/\/+$/, "") + "/";
+  const files = (await listVaultFiles()).filter(
+    (rel) => rel.startsWith(prefix) && !rel.slice(prefix.length).includes("/")
+  );
+  const out: { name: string; content: string }[] = [];
+  for (const rel of files) {
+    const content = (await readVaultFile(rel)) ?? "";
+    if (content.trim().length > 0) {
+      out.push({ name: (rel.split("/").pop() ?? rel).replace(".md", ""), content });
+    }
+  }
+  return out;
 }
 
-function readFolder(folderPath: string): { name: string; content: string }[] {
-  try {
-    return fs.readdirSync(folderPath)
-      .filter(f => f.endsWith(".md"))
-      .map(f => ({
-        name: f.replace(".md", ""),
-        content: readFile(path.join(folderPath, f)),
-      }))
-      .filter(f => f.content.trim().length > 0);
-  } catch { return []; }
-}
-
-export function loadPermanentVaultContext(): string {
+export async function loadPermanentVaultContext(): Promise<string> {
   const sections: string[] = [];
 
   // 1. CLAUDE.md -- master schema, read first (same as Claude CLI)
-  const claudeMd = readFile(path.join(VAULT, "CLAUDE.md"));
+  const claudeMd = await readVaultFile("CLAUDE.md");
   if (claudeMd) sections.push(`## CLAUDE.md\n${claudeMd}`);
 
   // 2. Agent context (who Jack is, Wing Digital overview)
-  const agentCtx = readFile(path.join(VAULT, "wiki", "agent-context.md"));
+  const agentCtx = await readVaultFile("wiki/agent-context.md");
   if (agentCtx) sections.push(`## Agent Context\n${agentCtx}`);
 
   // 2. Hot cache (what's happening right now)
-  const hot = readFile(path.join(VAULT, "wiki", "hot.md"));
+  const hot = await readVaultFile("wiki/hot.md");
   if (hot) sections.push(`## Current Focus (hot.md)\n${hot}`);
 
   // 3. Active clients
-  const clients = readFolder(path.join(VAULT, "wiki", "clients"));
+  const clients = await readFolder("wiki/clients");
   if (clients.length > 0) {
     sections.push(`## Clients\n${clients.map(c => `### ${c.name}\n${c.content}`).join("\n\n")}`);
   }
 
   // 4. Campaigns
-  const campaigns = readFolder(path.join(VAULT, "wiki", "campaigns"));
+  const campaigns = await readFolder("wiki/campaigns");
   if (campaigns.length > 0) {
     sections.push(`## Campaigns\n${campaigns.map(c => `### ${c.name}\n${c.content}`).join("\n\n")}`);
   }

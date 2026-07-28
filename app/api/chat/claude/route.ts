@@ -21,7 +21,7 @@ async function executeTool(tool: string, input: any): Promise<string> {
 export async function POST(req: NextRequest) {
   const { messages, vaultContext } = await req.json();
 
-  const permanent = loadPermanentVaultContext();
+  const permanent = await loadPermanentVaultContext();
   const contextParts = [
     permanent ? `### Permanent Context\n${permanent}` : "",
     vaultContext ? `### Attached Notes\n${vaultContext}` : "",

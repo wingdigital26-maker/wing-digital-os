@@ -1034,7 +1034,9 @@ img { max-width: 100%; display: block; }
     // Render the static fallback immediately, then upgrade to live status if the
     // state endpoint responds. If the fetch fails, the fallback stays -- never breaks.
     render(null);
-    fetch('/api/jackson-content',{cache:'no-store'})
+    var _k=new URLSearchParams(window.location.search).get('k');
+    var _q=_k?('?k='+encodeURIComponent(_k)):'';
+    fetch('/api/jackson-content'+_q,{cache:'no-store'})
       .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
       .then(function(d){ if(d&&d.state&&Object.keys(d.state).length) render(d.state); })
       .catch(function(e){ console.warn('[Jackson calendar] live state unavailable, using rhythm fallback:',e); });
@@ -1400,7 +1402,9 @@ img { max-width: 100%; display: block; }
   async function loadData() {
     setLoading();
     try {
-      const res = await fetch('/api/jackson', { cache: 'no-store' });
+      const _k = new URLSearchParams(window.location.search).get('k');
+      const _q = _k ? ('?k=' + encodeURIComponent(_k)) : '';
+      const res = await fetch('/api/jackson' + _q, { cache: 'no-store' });
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const data = await res.json();
       if (data.error) throw new Error(data.error);

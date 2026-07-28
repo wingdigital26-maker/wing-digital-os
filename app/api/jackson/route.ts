@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import { dashboardKeyOk } from "../../lib/dashboardKey";
 
 // ── Jackson Roofing client-facing dashboard data endpoint ────────────────────
 // SECURITY: This route ONLY ever talks to Jackson Roofing's GHL sub-account.
@@ -52,7 +53,12 @@ function makeFetcher(pit: string) {
   };
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  // Public endpoint, but returns a real client's CRM/PII — require the dashboard key.
+  if (!dashboardKeyOk(req)) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
   const pit = getJacksonPit();
   if (!pit) {
     return NextResponse.json(

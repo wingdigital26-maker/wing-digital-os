@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import { dashboardKeyOk } from "../../lib/dashboardKey";
 
 // ── Jackson Roofing content-calendar state endpoint ──────────────────────────
 // Serves the live content-calendar state written by content_engine.py so the
@@ -15,7 +16,11 @@ const STATE_CANDIDATES = [
   path.join(process.cwd(), "..", "ghl-cli", "outreach_logs", "jackson-content-state.json"),
 ];
 
-export async function GET() {
+export async function GET(req: Request) {
+  if (!dashboardKeyOk(req)) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
   for (const p of STATE_CANDIDATES) {
     try {
       const text = fs.readFileSync(p, "utf-8");

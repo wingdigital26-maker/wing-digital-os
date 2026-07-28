@@ -1,7 +1,5 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { motion, MotionConfig } from "motion/react";
-import { staggerContainer, riseItem, hoverSpring, cardHover, cardTap } from "../components/motion";
 
 // ── Jackson Roofing — client-facing live dashboard ───────────────────────────
 // Branded in Chris Jackson's colors (black + bright blue #10C0F0), pulling live
@@ -77,9 +75,7 @@ export default function JacksonDashboard() {
   const [lastSync, setLastSync] = useState<Date | null>(null);
 
   const fetchData = useCallback(() => {
-    const k = new URLSearchParams(window.location.search).get("k");
-    const q = k ? `?k=${encodeURIComponent(k)}` : "";
-    fetch(`/api/jackson${q}`)
+    fetch("/api/jackson")
       .then((r) => r.json())
       .then((d) => {
         if (d.error) {
@@ -125,7 +121,6 @@ export default function JacksonDashboard() {
   ];
 
   return (
-    <MotionConfig reducedMotion="user">
     <div
       style={{
         minHeight: "100vh",
@@ -225,10 +220,7 @@ export default function JacksonDashboard() {
         ) : (
           <>
             {/* Stat row */}
-            <motion.div
-              variants={staggerContainer}
-              initial="hidden"
-              animate="show"
+            <div
               style={{
                 display: "grid",
                 gridTemplateColumns: "repeat(auto-fit, minmax(165px, 1fr))",
@@ -236,12 +228,8 @@ export default function JacksonDashboard() {
               }}
             >
               {STATS.map((stat) => (
-                <motion.div
+                <div
                   key={stat.label}
-                  variants={riseItem}
-                  whileHover={cardHover}
-                  whileTap={cardTap}
-                  transition={hoverSpring}
                   style={{
                     position: "relative",
                     background: `radial-gradient(ellipse 90% 70% at 50% -20%, ${stat.color}18, transparent 60%), linear-gradient(180deg, #10131f, rgba(12,15,26,0.85))`,
@@ -287,9 +275,9 @@ export default function JacksonDashboard() {
                     {loading ? "…" : stat.value}
                   </p>
                   <p style={{ fontSize: 10.5, color: "#545d7d", marginTop: 8 }}>{stat.hint}</p>
-                </motion.div>
+                </div>
               ))}
-            </motion.div>
+            </div>
 
             {/* Pipeline */}
             <Card>
@@ -543,7 +531,6 @@ export default function JacksonDashboard() {
         )}
       </div>
     </div>
-    </MotionConfig>
   );
 }
 

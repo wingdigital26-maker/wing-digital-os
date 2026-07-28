@@ -4,6 +4,7 @@
 // Used by the Command Center + Sales Overview. No external chart libs.
 
 import React from "react";
+import { motion } from "motion/react";
 
 const GROTESK = "'Space Grotesk', sans-serif";
 
@@ -88,7 +89,10 @@ export function KpiCard({
   sub?: string;
 }) {
   return (
-    <div style={{
+    <motion.div
+      variants={{ hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 260, damping: 26 } } }}
+      initial="hidden" animate="show"
+      style={{
       background: `radial-gradient(ellipse 90% 70% at 50% -20%, ${color}14, transparent 60%), linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))`,
       border: "1px solid rgba(255,255,255,0.07)", borderRadius: 14, padding: "16px 18px",
       boxShadow: "0 8px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.04)",
@@ -106,7 +110,7 @@ export function KpiCard({
         <Sparkline data={spark} color={color} width={130} height={30} />
       )}
       {sub && <p style={{ fontSize: 10.5, color: "var(--text-muted)", lineHeight: 1.4 }}>{sub}</p>}
-    </div>
+    </motion.div>
   );
 }
 

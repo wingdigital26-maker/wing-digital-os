@@ -1,7 +1,12 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
+import { motion, AnimatePresence, MotionConfig } from "motion/react";
+import { Bolt, Target, Users, Cpu, Bulb, Plus, Calendar, Note, Sparkles } from "reicon-react";
+import { staggerContainer, riseItem, hoverSpring, cardHover, cardTap } from "./components/motion";
 import { KpiCard, BarChart, FunnelChart, DonutChart, ChartCard, Sparkline, Delta, buildDailySeries } from "./components/Charts";
+
+type IconType = React.ComponentType<{ size?: number; color?: string }>;
 
 const VaultGraph = dynamic(() => import("./components/VaultGraph"), { ssr: false });
 const AgentsView = dynamic(() => import("./components/AgentPanel"), { ssr: false });
@@ -17,28 +22,28 @@ const CampaignBoard = dynamic(() => import("./components/CampaignBoard"), { ssr:
 const ClientsBoard = dynamic(() => import("./components/ClientsBoard"), { ssr: false });
 
 type NavGroup = {
-  id: string; label: string; icon: string;
+  id: string; label: string; icon: IconType;
   subs: { id: string; label: string }[];
 };
 
 const NAV: NavGroup[] = [
   {
-    id: "command", label: "Command Center", icon: "⚡",
+    id: "command", label: "Command Center", icon: Bolt,
     subs: [
       { id: "command", label: "Overview" },
       { id: "personal", label: "Personal" },
     ],
   },
   {
-    id: "sales", label: "Sales", icon: "🎯",
+    id: "sales", label: "Sales", icon: Target,
     subs: [
       { id: "sales-overview", label: "Overview" },
       { id: "coldcalls", label: "Cold Calls" },
     ],
   },
-  { id: "clients", label: "Clients", icon: "👥", subs: [{ id: "clients", label: "Clients" }] },
+  { id: "clients", label: "Clients", icon: Users, subs: [{ id: "clients", label: "Clients" }] },
   {
-    id: "agent", label: "Agents", icon: "🤖",
+    id: "agent", label: "Agents", icon: Cpu,
     subs: [
       { id: "activity", label: "Activity" },
       { id: "agent", label: "Workforce" },
@@ -46,7 +51,7 @@ const NAV: NavGroup[] = [
     ],
   },
   {
-    id: "intel", label: "Intel", icon: "🧠",
+    id: "intel", label: "Intel", icon: Bulb,
     subs: [
       { id: "knowledge", label: "Knowledge Base" },
       { id: "competitors", label: "Competitor Intel" },
@@ -102,6 +107,7 @@ export default function Home() {
   }, [fetchGhl]);
 
   return (
+    <MotionConfig reducedMotion="user">
     <div style={{ display: "flex", height: "100vh", background: "var(--bg-primary)" }}>
 
       {/* Sidebar */}
@@ -148,8 +154,8 @@ export default function Home() {
                 fontSize: 13, fontWeight: isActive ? 600 : 400,
                 transition: "all 0.15s", position: "relative",
               }}>
-                <span style={{ fontSize: 16, flexShrink: 0, position: "relative" }}>
-                  {item.icon}
+                <span style={{ display: "inline-flex", flexShrink: 0, position: "relative", color: "currentColor" }}>
+                  <item.icon size={16} />
                   {hasBadge && (
                     <span style={{
                       position: "absolute", top: -4, right: -6,
@@ -183,8 +189,8 @@ export default function Home() {
           background: "var(--bg-secondary)", flexShrink: 0,
         }}>
           <div>
-            <h1 style={{ fontSize: 18, fontWeight: 700 }}>
-              {groupOf(active).icon}{" "}
+            <h1 style={{ fontSize: 18, fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}>
+              {(() => { const Icon = groupOf(active).icon; return <Icon size={18} />; })()}
               {groupOf(active).label}
             </h1>
             <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
@@ -224,21 +230,31 @@ export default function Home() {
         )}
 
         <div style={{ flex: 1, overflow: "auto", padding: "24px" }}>
-          {active === "command" && <CommandCenter data={ghlData} loading={loading} onSendToAI={sendToAI} />}
-          {active === "sales-overview" && <SalesOverview data={ghlData} loading={loading} />}
-          {active === "coldcalls" && <ColdCallBoard onSendToAI={sendToAI} />}
-          {active === "clients" && <ClientsBoard />}
-          {active === "competitors" && <CompetitorIntel onSendToAI={sendToAI} />}
-          {active === "knowledge" && <KnowledgeBase initialPath={openNotePath} onSendToAI={sendToAI} />}
-          {active === "activity" && <AgentActivity />}
-          {active === "agent" && <><AgentBoard /><AgentsView inject={aiInject} /></>}
-          {active === "trust" && <TrustPanel />}
-          {active === "log" && <ActivityLog />}
-          {active === "personal" && <PersonalSection data={ghlData} />}
+          <AnimatePresence mode="wait">
+            <motion.div key={active}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.25, ease: "easeOut" }}
+            >
+              {active === "command" && <CommandCenter data={ghlData} loading={loading} onSendToAI={sendToAI} />}
+              {active === "sales-overview" && <SalesOverview data={ghlData} loading={loading} />}
+              {active === "coldcalls" && <ColdCallBoard onSendToAI={sendToAI} />}
+              {active === "clients" && <ClientsBoard />}
+              {active === "competitors" && <CompetitorIntel onSendToAI={sendToAI} />}
+              {active === "knowledge" && <KnowledgeBase initialPath={openNotePath} onSendToAI={sendToAI} />}
+              {active === "activity" && <AgentActivity />}
+              {active === "agent" && <><AgentBoard /><AgentsView inject={aiInject} /></>}
+              {active === "trust" && <TrustPanel />}
+              {active === "log" && <ActivityLog />}
+              {active === "personal" && <PersonalSection data={ghlData} />}
+            </motion.div>
+          </AnimatePresence>
         </div>
       </main>
       <FloatingChat />
     </div>
+    </MotionConfig>
   );
 }
 
@@ -557,7 +573,8 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+    <motion.div style={{ display: "flex", flexDirection: "column", gap: 24 }}
+      variants={staggerContainer} initial="hidden" animate="show">
       {/* Toast */}
       {toast && (
         <div style={{ position: "fixed", bottom: 24, right: 24, background: "#4ade80", color: "#07080f", padding: "10px 18px", borderRadius: 10, fontWeight: 700, fontSize: 13, zIndex: 200 }}>
@@ -585,7 +602,7 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
 
       {/* Morning Briefing — hero banner */}
       {!loading && (
-        <div style={{
+        <motion.div variants={riseItem} style={{
           position: "relative",
           background: "linear-gradient(120deg, rgba(34,211,238,0.10), rgba(167,139,250,0.08) 55%, rgba(16,19,31,0.4))",
           border: "1px solid rgba(34,211,238,0.25)",
@@ -682,7 +699,7 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
               ))}
             </div>
           )}
-        </div>
+        </motion.div>
       )}
 
       {/* Dispatch agent briefing */}
@@ -763,7 +780,7 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
             : d.toLocaleDateString("en-US", { weekday: "short" }) + " " + d.toLocaleTimeString("en-US", { hour: "numeric" });
         }
         return (
-          <div style={{
+          <motion.div variants={riseItem} style={{
             background: "linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))",
             border: "1px solid rgba(255,255,255,0.07)", borderRadius: 16, padding: "16px 20px",
             boxShadow: "0 8px 24px rgba(0,0,0,0.25)",
@@ -800,12 +817,12 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
                 ⚠ Some agents are blocked from running on battery — they will queue until plugged in.
               </p>
             )}
-          </div>
+          </motion.div>
         );
       })()}
 
       {/* Stats */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14 }}>
+      <motion.div variants={riseItem} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14 }}>
         {STATS.map((stat: any) => {
           const inner = (
             <>
@@ -826,12 +843,17 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
             cursor: stat.onClick || stat.href ? "pointer" : "default",
             textDecoration: "none", display: "block", overflow: "hidden",
           };
+          const interactive = Boolean(stat.onClick || stat.href);
+          const hover = interactive ? cardHover : undefined;
+          const tap = interactive ? cardTap : undefined;
           if (stat.href) return (
-            <a key={stat.label} href={stat.href} target="_blank" rel="noreferrer" style={baseStyle}>{inner}</a>
+            <motion.a key={stat.label} href={stat.href} target="_blank" rel="noreferrer" style={baseStyle}
+              whileHover={hover} whileTap={tap} transition={hoverSpring}>{inner}</motion.a>
           );
-          return <div key={stat.label} onClick={stat.onClick} style={baseStyle}>{inner}</div>;
+          return <motion.div key={stat.label} onClick={stat.onClick} style={baseStyle}
+            whileHover={hover} whileTap={tap} transition={hoverSpring}>{inner}</motion.div>;
         })}
-      </div>
+      </motion.div>
 
       {/* Week Calendar -- toggle */}
       {showCalendar && !loading && (
@@ -842,20 +864,22 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
         <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", marginRight: 4 }}>Quick</span>
         {[
-          { label: "➕ Add Lead", action: () => setShowAddLead(true), c: "#34d399" },
-          { label: "📅 Calendar", action: () => setShowCalendar(c => !c), c: "#60a5fa" },
-          { label: "📝 New Note", action: () => setShowNewNote(true), c: "#a78bfa" },
-          { label: "🤖 Ask Claude", action: () => onSendToAI("What should I focus on today for Wing Digital?"), c: "#E8692A" },
+          { icon: Plus, label: "Add Lead", action: () => setShowAddLead(true), c: "#34d399" },
+          { icon: Calendar, label: "Calendar", action: () => setShowCalendar(c => !c), c: "#60a5fa" },
+          { icon: Note, label: "New Note", action: () => setShowNewNote(true), c: "#a78bfa" },
+          { icon: Sparkles, label: "Ask Claude", action: () => onSendToAI("What should I focus on today for Wing Digital?"), c: "#E8692A" },
         ].map(btn => (
-          <button key={btn.label} onClick={btn.action} style={{
+          <motion.button key={btn.label} onClick={btn.action}
+            whileHover={cardHover} whileTap={cardTap} transition={hoverSpring} style={{
+            display: "inline-flex", alignItems: "center", gap: 7,
             background: `${btn.c}10`, border: `1px solid ${btn.c}44`,
             borderRadius: 999, padding: "8px 18px", color: "var(--text-primary)",
             fontSize: 12.5, cursor: "pointer", fontWeight: 600,
-          }}>{btn.label}</button>
+          }}><btn.icon size={14} color={btn.c} />{btn.label}</motion.button>
         ))}
       </div>
 
-      <div>
+      <motion.div variants={riseItem}>
         {/* Active Clients */}
         <div style={{
           background: "linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))",
@@ -867,17 +891,18 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
             <p style={{ fontSize: 12, fontWeight: 700, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.07em" }}>Active Clients</p>
           </div>
           {loading ? <Spinner /> : (data?.activeClients?.length ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <motion.div style={{ display: "flex", flexDirection: "column", gap: 8 }}
+              variants={staggerContainer} initial="hidden" animate="show">
               {data.activeClients.slice(0, 50).map((client: any) => (
-                <div key={client.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
+                <motion.div key={client.id} variants={riseItem} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
                   <p style={{ fontSize: 13, fontWeight: 600 }}>{client.name}</p>
                   <span style={{ fontSize: 13, color: "#4ade80", fontWeight: 600 }}>${client.value.toLocaleString()}/mo</span>
-                </div>
+                </motion.div>
               ))}
-            </div>
+            </motion.div>
           ) : <p style={{ color: "var(--text-muted)", fontSize: 13 }}>No won opportunities yet</p>)}
         </div>
-      </div>
+      </motion.div>
 
       {/* Add Lead Modal */}
       {showAddLead && <Modal title="Add Lead to GHL" onClose={() => setShowAddLead(false)}>
@@ -899,7 +924,7 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
         </div>
         <ModalActions onCancel={() => setShowNewNote(false)} onSubmit={submitNote} saving={saving} submitLabel="Save to Vault" />
       </Modal>}
-    </div>
+    </motion.div>
   );
 }
 

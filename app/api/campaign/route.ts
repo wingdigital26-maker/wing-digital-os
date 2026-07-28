@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { execFile } from "child_process";
 import { promisify } from "util";
 import { isCloud, PC_REQUIRED_BODY } from "@/lib/runtime";
+import { readVaultFile } from "@/lib/vaultSource";
 
 export const runtime = "nodejs";
 
@@ -10,6 +11,14 @@ const GHL_CLI = "C:\\Users\\wjack\\ghl-cli";
 
 export async function GET() {
   if (isCloud()) {
+    const snap = await readVaultFile("wiki/state/cloud/campaign.json");
+    if (snap) {
+      try {
+        return NextResponse.json(JSON.parse(snap));
+      } catch {
+        /* fall through */
+      }
+    }
     return NextResponse.json({ ...PC_REQUIRED_BODY, cities: [], prospects: [] });
   }
   try {

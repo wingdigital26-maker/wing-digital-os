@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import { execFileSync, spawn } from "child_process";
 import { isCloud, PC_REQUIRED_BODY } from "@/lib/runtime";
+import { readVaultFile } from "@/lib/vaultSource";
 
 export const runtime = "nodejs";
 
@@ -90,8 +91,17 @@ function kickBackgroundRefresh() {
 export async function GET() {
   if (isCloud()) {
     // Sends come from the local prospects.db + a detached python refresher; both
-    // need the PC. Serve zeros with the pcRequired flag so the dashboard shows a
-    // placeholder instead of treating absent local data as real zeros.
+    // need the PC. In the cloud we serve the latest snapshot that export_cloud_state.py
+    // pushed into the vault (a few minutes behind live). Falls back to a pcRequired
+    // placeholder if no snapshot has synced yet.
+    const snap = await readVaultFile("wiki/state/cloud/sales-metrics.json");
+    if (snap) {
+      try {
+        return NextResponse.json(JSON.parse(snap));
+      } catch {
+        /* fall through to placeholder */
+      }
+    }
     return NextResponse.json({
       ...PC_REQUIRED_BODY,
       sentToday: 0,

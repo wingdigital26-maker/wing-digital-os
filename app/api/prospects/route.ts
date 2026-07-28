@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { execFile } from "child_process";
 import { promisify } from "util";
 import { isCloud, PC_REQUIRED_BODY } from "@/lib/runtime";
+import { readVaultFile } from "@/lib/vaultSource";
 
 export const runtime = "nodejs";
 
@@ -10,8 +11,16 @@ const GHL_CLI = "C:\\Users\\wjack\\ghl-cli";
 
 export async function GET() {
   if (isCloud()) {
-    // Local-only: reads prospects.db via python on Jack's PC. Degrade with an
-    // empty list (dashboard-friendly) plus the pcRequired flag.
+    // Local-only: reads prospects.db via python on Jack's PC. In the cloud we
+    // serve the snapshot export_cloud_state.py pushed into the vault.
+    const snap = await readVaultFile("wiki/state/cloud/prospects.json");
+    if (snap) {
+      try {
+        return NextResponse.json(JSON.parse(snap));
+      } catch {
+        /* fall through */
+      }
+    }
     return NextResponse.json({ ...PC_REQUIRED_BODY, prospects: [] });
   }
   try {

@@ -400,3 +400,8 @@ header.site.scrolled{box-shadow:0 6px 20px rgba(0,0,0,.22)}
 /* Real rig photo in the "our own crews" band; hide the top scroll-progress line */
 .split-band .split-img{background-image:url("img/real-rig.jpg");background-position:center}
 .load-progress{display:none}
+
+/* Trailer spec strip on the pricing section */
+.trailer-spec{display:flex;flex-wrap:wrap;justify-content:center;gap:12px;margin:0 auto 1.8rem;max-width:760px}
+.trailer-spec span{background:var(--navy);color:#eaf5ee;border:1px solid rgba(169,214,201,.25);border-radius:99px;padding:8px 16px;font-size:.9rem;font-family:var(--font-head);text-transform:uppercase;letter-spacing:.06em}
+.trailer-spec span strong{color:var(--teal-bright);font-weight:700}

@@ -14,7 +14,21 @@ export const runtime = "nodejs";
 // saved history in chat_sessions / chat_messages. Free model via Groq.
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 const GROQ_MODEL = "llama-3.3-70b-versatile";
+const GEMINI_URL =
+  "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+const GEMINI_MODEL = "gemini-2.0-flash";
 const CONTEXT_CHAR_BUDGET = 8000;
+
+// Free-model providers, tried in order. If Groq's daily free limit is hit, we
+// fall through to Gemini (separate free quota) so the brain keeps answering.
+function providers() {
+  const list: { name: string; url: string; key: string; model: string }[] = [];
+  if (process.env.GROQ_API_KEY)
+    list.push({ name: "groq", url: GROQ_URL, key: process.env.GROQ_API_KEY, model: GROQ_MODEL });
+  if (process.env.GEMINI_API_KEY)
+    list.push({ name: "gemini", url: GEMINI_URL, key: process.env.GEMINI_API_KEY, model: GEMINI_MODEL });
+  return list;
+}
 const SYSTEM_PROMPT =
   "You are the Wing Digital OS brain. Answer using the provided vault context. " +
   "If the answer isn't in context, say so plainly. Be concise and practical. No em dashes.";
@@ -89,10 +103,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const groqKey = process.env.GROQ_API_KEY;
-  if (!groqKey) {
+  const modelProviders = providers();
+  if (modelProviders.length === 0) {
     return NextResponse.json(
-      { error: "GROQ_API_KEY not configured" },
+      { error: "no model provider configured (set GROQ_API_KEY or GEMINI_API_KEY)" },
       { status: 503 }
     );
   }
@@ -138,35 +152,47 @@ export async function POST(req: Request) {
     { role: "user", content: message },
   ];
 
-  // 4. Call Groq.
+  // 4. Call the free models in order; fall through to the next on any failure
+  //    (e.g. Groq's daily token limit) so the brain keeps answering.
   let answer = "";
-  try {
-    const r = await fetch(GROQ_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${groqKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: GROQ_MODEL,
-        messages,
-        temperature: 0.4,
-        max_tokens: 1200,
-      }),
-    });
-    if (!r.ok) {
-      const detail = await r.text().catch(() => "");
-      return NextResponse.json(
-        { error: "model call failed", detail: detail.slice(0, 300) },
-        { status: 502 }
-      );
+  let usedModel = "";
+  let lastDetail = "";
+  for (const p of modelProviders) {
+    try {
+      const r = await fetch(p.url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${p.key}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: p.model,
+          messages,
+          temperature: 0.4,
+          max_tokens: 1200,
+        }),
+      });
+      if (!r.ok) {
+        lastDetail = (await r.text().catch(() => "")).slice(0, 300);
+        continue; // try the next provider
+      }
+      const data = await r.json();
+      const text = data.choices?.[0]?.message?.content?.trim() ?? "";
+      if (text) {
+        answer = text;
+        usedModel = `${p.name}:${p.model}`;
+        break;
+      }
+    } catch (e) {
+      lastDetail = String(e).slice(0, 300);
     }
-    const data = await r.json();
-    answer = data.choices?.[0]?.message?.content?.trim() ?? "";
-  } catch {
-    return NextResponse.json({ error: "model call failed" }, { status: 502 });
   }
-  if (!answer) answer = "I could not generate a response.";
+  if (!answer) {
+    return NextResponse.json(
+      { error: "all model providers failed (free tiers may be rate-limited; try again shortly)", detail: lastDetail },
+      { status: 502 }
+    );
+  }
 
   // 5. Persist session + messages (service key, stamped with the real user_id).
   // Only when Supabase is configured; if not, still return the answer.
@@ -185,14 +211,14 @@ export async function POST(req: Request) {
         user_id: userId,
         role: "user",
         content: message,
-        model: GROQ_MODEL,
+        model: usedModel,
       });
       await sbInsert("chat_messages", {
         session_id: sessionId,
         user_id: userId,
         role: "assistant",
         content: answer,
-        model: GROQ_MODEL,
+        model: usedModel,
       });
     }
   }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { authToken } from "./app/lib/authToken";
+import { verifySession } from "./app/lib/session";
 
 function isPublicPath(pathname: string): boolean {
   return (
@@ -25,7 +26,7 @@ function isPublicPath(pathname: string): boolean {
   );
 }
 
-export function middleware(req: NextRequest) {
+export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // Static demo sites in public/ have no directory-index resolution in Next;
@@ -52,6 +53,12 @@ export function middleware(req: NextRequest) {
   }
 
   if (isPublicPath(pathname)) return NextResponse.next();
+
+  // NEW (additive): a valid Supabase-auth session cookie grants access. Returns
+  // null if the cookie is absent/invalid or AUTH_SESSION_SECRET is unset, in
+  // which case we fall through to the legacy OS_PASSWORD gate below.
+  const session = await verifySession(req.cookies.get("wingos_session")?.value);
+  if (session) return NextResponse.next();
 
   const password = process.env.OS_PASSWORD;
   if (!password) {

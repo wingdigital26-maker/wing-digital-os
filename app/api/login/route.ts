@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { authToken } from "../../lib/authToken";
+import { signSession } from "../../lib/session";
 
-// Simple in-memory rate limiter (per IP) to stop brute-forcing the single shared
-// password. Persisted on globalThis so it survives Next hot-reloads in dev.
+// Simple in-memory rate limiter (per IP) to stop brute-forcing. Persisted on
+// globalThis so it survives Next hot-reloads in dev.
 declare global {
   // eslint-disable-next-line no-var
   var __loginAttempts: Map<string, { count: number; first: number }> | undefined;
@@ -14,6 +15,8 @@ function attempts() {
   if (!globalThis.__loginAttempts) globalThis.__loginAttempts = new Map();
   return globalThis.__loginAttempts;
 }
+
+const WEEK = 60 * 60 * 24 * 7;
 
 export async function POST(req: Request) {
   const ip =
@@ -29,11 +32,66 @@ export async function POST(req: Request) {
     );
   }
 
-  const { password } = await req.json();
-  if (!process.env.OS_PASSWORD || password !== process.env.OS_PASSWORD) {
+  const fail = () => {
     if (!rec || now - rec.first >= WINDOW_MS) store.set(ip, { count: 1, first: now });
     else rec.count += 1;
     return NextResponse.json({ ok: false }, { status: 401 });
+  };
+
+  const body = await req.json().catch(() => ({}));
+  const { password, email } = body as { password?: string; email?: string };
+
+  // --- NEW: Supabase email + password path (additive) ---
+  // Only engages when an email is supplied AND Supabase env is configured.
+  // Any failure here falls through to the legacy password path below.
+  const sbUrl = process.env.OS_SUPABASE_URL;
+  const anon = process.env.OS_SUPABASE_ANON_KEY;
+  if (email && sbUrl && anon) {
+    try {
+      const r = await fetch(`${sbUrl}/auth/v1/token?grant_type=password`, {
+        method: "POST",
+        headers: { apikey: anon, "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      if (r.ok) {
+        const data = await r.json();
+        const uid: string | undefined = data.user?.id;
+        // Look up the role from profiles (service key, server-side only).
+        let role = "client";
+        const svc = process.env.OS_SUPABASE_SERVICE_KEY;
+        if (svc && uid) {
+          const pr = await fetch(
+            `${sbUrl}/rest/v1/profiles?id=eq.${uid}&select=role`,
+            { headers: { apikey: svc, Authorization: `Bearer ${svc}` } }
+          );
+          if (pr.ok) {
+            const rows = await pr.json();
+            if (rows?.[0]?.role) role = rows[0].role;
+          }
+        }
+        if (uid) {
+          store.delete(ip);
+          const res = NextResponse.json({ ok: true, role });
+          const token = await signSession({ sub: uid, email, role });
+          res.cookies.set("wingos_session", token, {
+            httpOnly: true,
+            sameSite: "lax",
+            maxAge: WEEK,
+            path: "/",
+          });
+          return res;
+        }
+      }
+      // Supabase said no (or gave us no user) -> count as a failed attempt.
+      return fail();
+    } catch {
+      // Network/config problem reaching Supabase -> fall through to legacy path.
+    }
+  }
+
+  // --- LEGACY: shared OS_PASSWORD path (unchanged behavior) ---
+  if (!process.env.OS_PASSWORD || password !== process.env.OS_PASSWORD) {
+    return fail();
   }
 
   store.delete(ip); // success clears the counter
@@ -41,7 +99,7 @@ export async function POST(req: Request) {
   res.cookies.set("wingos_auth", authToken(), {
     httpOnly: true,
     sameSite: "lax",
-    maxAge: 60 * 60 * 24 * 7,
+    maxAge: WEEK,
     path: "/",
   });
   return res;

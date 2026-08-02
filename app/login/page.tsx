@@ -2,6 +2,7 @@
 import { useState } from "react";
 
 export default function Login() {
+  const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -12,7 +13,7 @@ export default function Login() {
     const res = await fetch("/api/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password: pw }),
+      body: JSON.stringify({ email: email.trim(), password: pw }),
     });
     setLoading(false);
     if (res.ok) window.location.href = "/";
@@ -39,10 +40,21 @@ export default function Login() {
         }}>W</div>
         <div>
           <p style={{ fontSize: 18, fontWeight: 700 }}>Wing Digital OS</p>
-          <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>Enter password to continue</p>
+          <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>Sign in to continue</p>
         </div>
         <input
-          type="password" value={pw} autoFocus
+          type="email" value={email} autoFocus autoComplete="username"
+          onChange={e => { setEmail(e.target.value); setError(false); }}
+          onKeyDown={e => e.key === "Enter" && submit()}
+          placeholder="Email (leave blank for password-only)"
+          style={{
+            background: "var(--bg-hover)", border: `1px solid ${error ? "#f87171" : "var(--border)"}`,
+            borderRadius: 10, padding: "12px 14px", color: "var(--text-primary)",
+            fontSize: 14, outline: "none", textAlign: "center",
+          }}
+        />
+        <input
+          type="password" value={pw} autoComplete="current-password"
           onChange={e => { setPw(e.target.value); setError(false); }}
           onKeyDown={e => e.key === "Enter" && submit()}
           placeholder="Password"
@@ -52,7 +64,7 @@ export default function Login() {
             fontSize: 14, outline: "none", textAlign: "center",
           }}
         />
-        {error && <p style={{ fontSize: 12, color: "#f87171" }}>Wrong password</p>}
+        {error && <p style={{ fontSize: 12, color: "#f87171" }}>Wrong email or password</p>}
         <button onClick={submit} disabled={loading || !pw} style={{
           padding: "12px 0", borderRadius: 10, border: "none", cursor: "pointer",
           background: "linear-gradient(135deg, #22d3ee, #0e7490)", color: "#fff",

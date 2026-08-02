@@ -172,6 +172,18 @@ export default function Home() {
           })}
         </nav>
 
+        {/* AI Brain — separate full-page route (chat grounded in the vault) */}
+        <a href="/brain" style={{
+          display: "flex", alignItems: "center", gap: 10,
+          margin: "0 8px 4px", padding: "10px 10px", borderRadius: 8,
+          background: "var(--accent-glow)", border: "1px solid var(--accent)",
+          color: "var(--accent)", textDecoration: "none",
+          fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden",
+        }}>
+          <span style={{ display: "inline-flex", flexShrink: 0 }}><Sparkles size={16} /></span>
+          {sidebarOpen && <span>AI Brain</span>}
+        </a>
+
         <button onClick={() => setSidebarOpen(!sidebarOpen)} style={{
           margin: "8px", padding: "8px", borderRadius: 8, border: "none",
           background: "transparent", color: "var(--text-muted)",

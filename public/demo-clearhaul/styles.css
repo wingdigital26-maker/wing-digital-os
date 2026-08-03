@@ -408,3 +408,27 @@ header.site.scrolled{box-shadow:0 6px 20px rgba(0,0,0,.22)}
 .trailer-spec{display:flex;flex-wrap:wrap;justify-content:center;gap:12px;margin:0 auto 1.8rem;max-width:760px}
 .trailer-spec span{background:var(--navy);color:#eaf5ee;border:1px solid rgba(185,203,230,.25);border-radius:99px;padding:8px 16px;font-size:.9rem;font-family:var(--font-head);text-transform:uppercase;letter-spacing:.06em}
 .trailer-spec span strong{color:var(--teal-bright);font-weight:700}
+
+/* ============================================================
+   PRICE COMPARISON — Heros vs typical franchise hauler
+   ============================================================ */
+.cmp{max-width:780px;margin:2.2rem auto 0;text-align:left}
+.cmp-legend{display:flex;gap:26px;justify-content:center;flex-wrap:wrap;margin-bottom:1.6rem;font-size:.92rem;font-weight:700;color:var(--slate)}
+.cmp-key{display:inline-flex;align-items:center;gap:8px}
+.cmp-key i{width:14px;height:14px;border-radius:3px;display:inline-block}
+.k-heros{background:linear-gradient(90deg,var(--teal),var(--teal-bright))}
+.k-other{background:linear-gradient(90deg,#8a1a28,#b22234)}
+.cmp-row{display:grid;grid-template-columns:104px 1fr;gap:16px;align-items:center;padding:13px 0;border-top:1px solid var(--line)}
+.cmp-row:first-of-type{border-top:0}
+.cmp-size{font-family:var(--font-head);font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--navy);font-size:1rem}
+.cmp-track{display:flex;flex-direction:column;gap:9px;min-width:0}
+.cmp-bar{height:34px;border-radius:7px;display:flex;align-items:center;width:var(--w);min-width:96px;box-shadow:0 2px 8px rgba(6,26,51,.16)}
+.cmp.in .cmp-bar{animation:cmpGrow .9s cubic-bezier(.2,.7,.2,1) both}
+@keyframes cmpGrow{from{width:0}to{width:var(--w)}}
+.cmp-bar b{font-size:.82rem;font-weight:800;white-space:nowrap;padding:0 12px;color:#fff}
+.cmp-bar.heros{background:linear-gradient(90deg,var(--teal),var(--teal-bright))}
+.cmp-bar.other{background:linear-gradient(90deg,#8a1a28,#b22234)}
+.cmp-save{text-align:center;margin-top:2rem;font-size:1.2rem;color:var(--navy)}
+.cmp-save strong{color:var(--teal)}
+.cmp-note{text-align:center;font-size:.82rem;color:var(--slate);margin-top:.6rem;opacity:.85;max-width:44rem;margin-left:auto;margin-right:auto}
+@media(max-width:560px){.cmp-row{grid-template-columns:1fr;gap:8px}.cmp-size{font-size:.92rem}.cmp-bar{height:30px;min-width:88px}.cmp-bar b{font-size:.76rem}}

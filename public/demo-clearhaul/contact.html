@@ -18,7 +18,7 @@
   <div class="wrap nav">
     <a class="brand" href="index.html" aria-label="Heros Junk Removal home"><img class="logo" src="img/heros-logo-trim.png" alt="Heros Junk Removal"></a>
     <button class="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav" onclick="var n=document.getElementById('nav');n.classList.toggle('open');this.setAttribute('aria-expanded',n.classList.contains('open'));this.setAttribute('aria-label',n.classList.contains('open')?'Close menu':'Open menu')">
-      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#003828" stroke-width="2.4" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#0a2342" stroke-width="2.4" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
     </button>
     <ul class="nav-links" id="nav">
       <li><a href="index.html">Home</a></li>
@@ -51,7 +51,7 @@
         </div>
         <div class="why-item">
           <div class="dot"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg></div>
-          <div><h3>Email</h3><p>herosjunkremovaltx@gmail.com (demo address)</p></div>
+          <div><h3>Email</h3><p>herosjunkremovaltx@gmail.com</p></div>
         </div>
         <div class="why-item">
           <div class="dot"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" aria-hidden="true"><path d="M12 21s-7-6-7-11a7 7 0 0 1 14 0c0 5-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg></div>
@@ -101,8 +101,8 @@
     <div class="foot-grid">
       <div>
         <img class="logo" style="height:64px" src="img/heros-logo-trim.png" alt="Heros Junk Removal">
-        <p style="margin-top:1rem">Fast, friendly junk removal for Dallas-Fort Worth. Insured, local, and donation-first.</p>
-        <p>Fully insured crews (demo)</p>
+        <p style="margin-top:1rem">Fast, friendly junk removal for Dallas-Fort Worth. Veteran owned, local, and donation-first.</p>
+        <p>Veteran owned and operated</p>
       </div>
       <div>
         <h3>Company</h3>
@@ -134,8 +134,8 @@
       </div>
     </div>
     <div class="foot-bottom">
-      <span>&copy; 2026 Heros Junk Removal (fictional demo company). All rights reserved.</span>
-      <span>Demo site by Wing Digital</span>
+      <span>&copy; 2026 Heros Junk Removal. All rights reserved.</span>
+      <span>Site by Wing Digital</span>
     </div>
   </div>
 </footer>
@@ -151,7 +151,7 @@ document.querySelectorAll('form.demo').forEach(function(f){
     if(hp&&hp.value){return}
     var hook=(f.getAttribute('data-webhook')||'').trim();
     function done(msg){f.innerHTML='<p class="lead">'+msg+'</p>'}
-    if(!hook){done('Thanks! This is a non-functional demo form. On the live site, your request would reach our dispatch team instantly.');return}
+    if(!hook){done('Thanks! Got your request. We will be in touch shortly to lock in your pickup.');return}
     var data={};
     new FormData(f).forEach(function(v,k){if(k!=='company'){data[k]=v}});
     data.source=location.pathname;

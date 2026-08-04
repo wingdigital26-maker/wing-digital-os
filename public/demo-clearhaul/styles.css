@@ -104,8 +104,8 @@ header.site{position:sticky;top:0;z-index:50;background:#fff;border-bottom:2px s
 
 /* Full-screen homepage hero (hard rule: covers the first screen, simple, logo + image + opening motion) */
 .home-hero{position:relative;overflow:hidden;min-height:100vh;min-height:100svh;display:flex;align-items:center;justify-content:center;color:#fff;padding:110px 0 90px;background:var(--navy-deep)}
-.home-hero::before{content:"";position:absolute;inset:-4%;background:url("img/hero-junk.jpg") center/cover no-repeat;z-index:0}
-.home-hero::after{content:"";position:absolute;inset:0;background:linear-gradient(rgba(6,18,36,.72) 0%,rgba(10,35,66,.78) 55%,rgba(6,20,40,.9) 100%);z-index:1}
+.home-hero::before{content:"";position:absolute;inset:-4%;background:url("img/real-rig.jpg") center/cover no-repeat;z-index:0}
+.home-hero::after{content:"";position:absolute;inset:0;background:linear-gradient(rgba(0,0,0,.32) 0%,rgba(0,0,0,.5) 55%,rgba(0,0,0,.64) 100%);z-index:1}
 .home-hero .wrap{position:relative;z-index:2;text-align:center;max-width:900px}
 .home-hero h1{color:#fff;text-shadow:0 2px 14px rgba(0,0,0,.4)}
 .home-hero .lead{color:#e6eefb;margin-left:auto;margin-right:auto}
@@ -401,7 +401,7 @@ header.site.scrolled{box-shadow:0 6px 20px rgba(0,0,0,.22)}
 .card .post-card .tag,.post-card .tag{color:#16407a}
 
 /* Real rig photo in the "our own crews" band; hide the top scroll-progress line */
-.split-band .split-img{background-image:url("img/real-rig.jpg");background-position:center}
+.split-band .split-img{background-image:url("img/hero-junk.jpg");background-position:center}
 .load-progress{display:none}
 
 /* Trailer spec strip on the pricing section */

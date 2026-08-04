@@ -432,3 +432,8 @@ header.site.scrolled{box-shadow:0 6px 20px rgba(0,0,0,.22)}
 .cmp-save strong{color:var(--teal)}
 .cmp-note{text-align:center;font-size:.82rem;color:var(--slate);margin-top:.6rem;opacity:.85;max-width:44rem;margin-left:auto;margin-right:auto}
 @media(max-width:560px){.cmp-row{grid-template-columns:1fr;gap:8px}.cmp-size{font-size:.92rem}.cmp-bar{height:30px;min-width:88px}.cmp-bar b{font-size:.76rem}}
+
+/* About page photos */
+.about-photo{float:right;width:42%;max-width:330px;border-radius:12px;box-shadow:0 12px 30px rgba(10,35,66,.28);margin:.2rem 0 1rem 1.8rem}
+.about-rig{display:block;width:100%;border-radius:12px;box-shadow:0 12px 30px rgba(10,35,66,.2);margin:1.4rem 0}
+@media(max-width:640px){.about-photo{float:none;width:100%;max-width:none;margin:0 0 1.2rem}}

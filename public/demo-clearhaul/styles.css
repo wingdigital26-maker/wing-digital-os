@@ -437,3 +437,7 @@ header.site.scrolled{box-shadow:0 6px 20px rgba(0,0,0,.22)}
 .about-photo{float:right;width:42%;max-width:330px;border-radius:12px;box-shadow:0 12px 30px rgba(10,35,66,.28);margin:.2rem 0 1rem 1.8rem}
 .about-rig{display:block;width:100%;border-radius:12px;box-shadow:0 12px 30px rgba(10,35,66,.2);margin:1.4rem 0}
 @media(max-width:640px){.about-photo{float:none;width:100%;max-width:none;margin:0 0 1.2rem}}
+
+/* Service card photos (real hauls) */
+.card-photo{display:block;width:calc(100% + 48px);margin:-28px -24px 18px;height:180px;object-fit:cover;background:var(--mist)}
+@media(max-width:600px){.card-photo{height:200px}}

@@ -7,7 +7,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  MissionData, Selection, Dot, MissionStyles, OpsMap, AgentTile, FeedList,
+  MissionData, Selection, Dot, MissionStyles, OpsMap, AgentTile, FeedTicker,
   MissionPanels,
 } from "./MissionControlCore";
 
@@ -76,34 +76,34 @@ export default function MissionOps() {
           {/* Ops map: click an agent or system for its detail panel */}
           <OpsMap agents={data.agents} onSelect={setSelection} />
 
-          <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.6fr) minmax(280px, 1fr)", gap: 16, alignItems: "start" }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.6fr) minmax(280px, 1fr)", gap: 20, alignItems: "start" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 20, minWidth: 0 }}>
               <section>
                 <h2 style={{ fontSize: 11, letterSpacing: "0.14em", color: "var(--text-muted)", marginBottom: 8 }}>SCHEDULED AGENTS</h2>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 10 }}>
                   {scheduled.map(a => <AgentTile key={a.key} a={a} onSelect={setSelection} />)}
                 </div>
               </section>
               <section>
                 <h2 style={{ fontSize: 11, letterSpacing: "0.14em", color: "var(--text-muted)", marginBottom: 8 }}>ON-DEMAND CREW</h2>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 10 }}>
                   {crew.map(a => <AgentTile key={a.key} a={a} onSelect={setSelection} />)}
                 </div>
               </section>
             </div>
 
-            {/* Live feed */}
+            {/* Compact activity ticker; "view all" expands to the full feed */}
             <section style={{
               background: "var(--bg-secondary, #0d1117)",
-              border: "1px solid var(--border, rgba(255,255,255,0.08))",
+              border: "1px solid var(--border, rgba(255,255,255,0.06))",
               borderRadius: 12, padding: "12px 14px",
             }}>
               <h2 style={{ fontSize: 11, letterSpacing: "0.14em", color: "var(--text-muted)", marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>
-                <Dot color="#34d399" pulse /> LIVE ACTIVITY
+                <Dot color="#34d399" pulse /> ACTIVITY
                 <span style={{ marginLeft: "auto", fontFamily: "'JetBrains Mono', monospace", fontSize: 10 }}>refresh 30s</span>
               </h2>
               <div style={{ maxHeight: 520, overflowY: "auto", paddingRight: 6 }}>
-                <FeedList feed={data.feed} limit={30} />
+                <FeedTicker feed={data.feed} />
               </div>
             </section>
           </div>

@@ -9,7 +9,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   MissionData, Selection, Dot, Pill, MissionStyles, OpsMap, AgentTile,
-  FeedList, ClientHealthStrip, MissionPanels,
+  FeedTicker, ClientHealthStrip, MissionPanels,
 } from "../components/MissionControlCore";
 
 const STATUS_COLOR: Record<string, string> = {
@@ -85,17 +85,11 @@ export default function MissionControl() {
           {data.stats.tiles.length > 0 && (
             <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fit, minmax(150px, 1fr))`, gap: 12, marginBottom: 16 }}>
               {data.stats.tiles.map((t) => (
-                <div key={t.label} style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 16px" }}>
-                  <div style={{ fontSize: 10, letterSpacing: "0.12em", color: "var(--text-muted)", textTransform: "uppercase" }}>{t.label}</div>
+                <div key={t.label} style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 16px" }}>
                   <div style={{ fontSize: 26, fontWeight: 700, color: "var(--text-primary)", fontFamily: "'Space Grotesk', sans-serif" }}>{t.value}</div>
-                  {t.sub && <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>{t.sub}</div>}
+                  <div style={{ fontSize: 10, letterSpacing: "0.12em", color: "var(--text-muted)", textTransform: "uppercase" }}>{t.label}</div>
                 </div>
               ))}
-              {data.stats.updated && (
-                <div style={{ alignSelf: "end", fontSize: 10, color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace", padding: 4 }}>
-                  snapshot {data.stats.updated}
-                </div>
-              )}
             </div>
           )}
 
@@ -113,17 +107,17 @@ export default function MissionControl() {
 
           {/* Main grid: agents + focus | feed */}
           <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.6fr) minmax(300px, 1fr)", gap: 16, alignItems: "start" }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 20, minWidth: 0 }}>
               <section>
                 <h2 style={{ fontSize: 11, letterSpacing: "0.14em", color: "var(--text-muted)", marginBottom: 8 }}>SCHEDULED AGENTS</h2>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 10 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 10 }}>
                   {scheduled.map((a) => <AgentTile key={a.key} a={a} onSelect={setSelection} />)}
                 </div>
               </section>
 
               <section>
                 <h2 style={{ fontSize: 11, letterSpacing: "0.14em", color: "var(--text-muted)", marginBottom: 8 }}>ON-DEMAND CREW</h2>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 10 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 10 }}>
                   {crew.map((a) => <AgentTile key={a.key} a={a} onSelect={setSelection} />)}
                 </div>
               </section>
@@ -136,18 +130,18 @@ export default function MissionControl() {
                   </h2>
                   {!data.sources.hot && <div style={{ fontSize: 12, color: "var(--text-muted)" }}>hot.md unavailable</div>}
                   <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.55, marginBottom: 12 }}>
-                    {data.focus.currentFocus.slice(0, 6).map((l, i) => <p key={i} style={{ marginBottom: 4 }}>{l}</p>)}
+                    {data.focus.currentFocus.slice(0, 3).map((l, i) => <p key={i} style={{ marginBottom: 4 }}>{l}</p>)}
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 14 }}>
                     <div>
                       <div style={{ fontSize: 10, letterSpacing: "0.1em", color: "var(--accent-2)", marginBottom: 6 }}>OPEN QUESTIONS</div>
-                      {data.focus.openQuestions.slice(0, 6).map((q, i) => (
+                      {data.focus.openQuestions.slice(0, 3).map((q, i) => (
                         <div key={i} style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 4 }}>? {q}</div>
                       ))}
                     </div>
                     <div>
                       <div style={{ fontSize: 10, letterSpacing: "0.1em", color: "var(--green)", marginBottom: 6 }}>RECENT DECISIONS</div>
-                      {data.focus.recentDecisions.slice(0, 6).map((q, i) => (
+                      {data.focus.recentDecisions.slice(0, 3).map((q, i) => (
                         <div key={i} style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 4 }}>&#10003; {q}</div>
                       ))}
                     </div>
@@ -168,13 +162,13 @@ export default function MissionControl() {
               }}
             >
               <h2 style={{ fontSize: 11, letterSpacing: "0.14em", color: "var(--text-muted)", marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>
-                <Dot color="var(--green)" pulse /> LIVE ACTIVITY
+                <Dot color="var(--green)" pulse /> ACTIVITY
                 <span style={{ marginLeft: "auto", marginRight: 14, fontFamily: "'JetBrains Mono', monospace", fontSize: 10 }}>
                   refresh 30s
                 </span>
               </h2>
               <div className="mc-feed" style={{ maxHeight: "calc(100vh - 140px)", overflowY: "auto", paddingRight: 10 }}>
-                <FeedList feed={data.feed} />
+                <FeedTicker feed={data.feed} />
               </div>
             </section>
           </div>

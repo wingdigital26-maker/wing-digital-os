@@ -30,6 +30,10 @@ export default function JarvisButton() {
   const [voiceOn, setVoiceOn] = useState(false);
   const voiceOnRef = useRef(false);
   const chosenVoiceRef = useRef<SpeechSynthesisVoice | null>(null);
+  // ElevenLabs playback state: current Audio element + speaking indicator.
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioUrlRef = useRef<string | null>(null);
+  const [speaking, setSpeaking] = useState(false);
 
   useEffect(() => { voiceOnRef.current = voiceOn; }, [voiceOn]);
 
@@ -56,23 +60,67 @@ export default function JarvisButton() {
     window.speechSynthesis.onvoiceschanged = pick;
   }, []);
 
-  const speak = useCallback((text: string) => {
+  const stopAudio = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    if (audioUrlRef.current) {
+      URL.revokeObjectURL(audioUrlRef.current);
+      audioUrlRef.current = null;
+    }
+    if (typeof window !== "undefined") window.speechSynthesis?.cancel();
+    setSpeaking(false);
+  }, []);
+
+  // Browser speechSynthesis — fallback path only, if the TTS endpoint errors.
+  const speakFallback = useCallback((clean: string) => {
     if (typeof window === "undefined" || !window.speechSynthesis) return;
-    const clean = text
-      .replace(/```[\s\S]*?```/g, " code block ")
-      .replace(/[#*_`>|]/g, "")
-      .replace(/\s+/g, " ")
-      .trim()
-      .slice(0, 1200);
-    if (!clean) return;
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(clean);
     if (chosenVoiceRef.current) u.voice = chosenVoiceRef.current;
     u.rate = 1.02;
     u.pitch = 0.85;
     u.volume = 1;
+    u.onend = () => setSpeaking(false);
+    u.onerror = () => setSpeaking(false);
+    setSpeaking(true);
     window.speechSynthesis.speak(u);
   }, []);
+
+  // Primary voice path: ElevenLabs via /api/jarvis/tts, with graceful
+  // fallback to speechSynthesis so voice never fully dies.
+  const speak = useCallback(async (text: string) => {
+    const clean = text
+      .replace(/```[\s\S]*?```/g, " code block ")
+      .replace(/[#*_`>|]/g, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 800);
+    if (!clean) return;
+    stopAudio();
+    try {
+      const res = await fetch("/api/jarvis/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: clean }),
+      });
+      if (!res.ok) throw new Error(`TTS ${res.status}`);
+      const blob = await res.blob();
+      if (!blob.size || !voiceOnRef.current) return;
+      const url = URL.createObjectURL(blob);
+      audioUrlRef.current = url;
+      const audio = new Audio(url);
+      audioRef.current = audio;
+      audio.onended = () => { setSpeaking(false); stopAudio(); };
+      audio.onerror = () => { setSpeaking(false); stopAudio(); };
+      setSpeaking(true);
+      await audio.play();
+    } catch {
+      // Endpoint down, quota out, or autoplay blocked: fall back to the browser voice.
+      speakFallback(clean);
+    }
+  }, [stopAudio, speakFallback]);
 
   // Hide on login page
   if (pathname === "/login") return null;
@@ -317,8 +365,9 @@ export default function JarvisButton() {
       } catch {
         /* noop */
       }
+      stopAudio();
     };
-  }, []);
+  }, [stopAudio]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -339,6 +388,10 @@ export default function JarvisButton() {
         .jarvis-dot:nth-child(1) { animation-delay: 0s; }
         .jarvis-dot:nth-child(2) { animation-delay: 0.15s; }
         .jarvis-dot:nth-child(3) { animation-delay: 0.30s; }
+        @keyframes jarvis-speak {
+          0%, 100% { transform: scaleY(0.4); opacity: 0.6; }
+          50% { transform: scaleY(1); opacity: 1; }
+        }
       `}</style>
 
       {/* Floating trigger button */}
@@ -419,6 +472,21 @@ export default function JarvisButton() {
               <span style={{ color: "#10C0F0", fontWeight: 700, fontSize: 15, fontFamily: "Space Grotesk, sans-serif" }}>
                 Jarvis
               </span>
+              {speaking && (
+                <span
+                  title="Jarvis is speaking"
+                  style={{ display: "inline-flex", alignItems: "center", gap: 3 }}
+                >
+                  {[0, 1, 2].map((n) => (
+                    <span key={n} className="jarvis-dot" style={{
+                      width: 3, height: 10, borderRadius: 2, background: "#10C0F0",
+                      display: "inline-block",
+                      animation: "jarvis-speak 0.9s infinite ease-in-out",
+                      animationDelay: `${n * 0.15}s`,
+                    }} />
+                  ))}
+                </span>
+              )}
               {engine && (
                 <span style={{ color: engine === "limited" ? "#fb923c" : "#556", fontSize: 10, fontFamily: "Inter, sans-serif", border: `1px solid ${engine === "limited" ? "rgba(251,146,60,0.4)" : "rgba(16,192,240,0.2)"}`, borderRadius: 6, padding: "1px 6px" }}>
                   {engine === "claude-code" ? "via Claude Code" : engine === "limited" ? "limited mode" : "via API"}
@@ -430,7 +498,7 @@ export default function JarvisButton() {
                 onClick={() => {
                   const next = !voiceOn;
                   setVoiceOn(next);
-                  if (!next && typeof window !== "undefined") window.speechSynthesis?.cancel();
+                  if (!next) stopAudio();
                 }}
                 title={voiceOn ? "Voice replies on" : "Voice replies off"}
                 style={{ background: "none", border: "1px solid rgba(16,192,240,0.25)", borderRadius: 6, color: voiceOn ? "#10C0F0" : "#556", cursor: "pointer", fontSize: 10, padding: "2px 8px", fontFamily: "Inter, sans-serif" }}

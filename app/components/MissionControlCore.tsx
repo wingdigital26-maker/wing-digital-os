@@ -2,8 +2,9 @@
 
 // MISSION CONTROL CORE — shared interactive pieces used by both the embedded
 // MissionOps view (main app Agents section) and the standalone /mission page.
-// Everything here is read-only: click an agent, system, client dot, or feed
-// line and a detail panel opens showing what is going on with it.
+// Design principle: the MAIN VIEW stays calm (name + status + one line), and
+// ALL detail lives in the click-through panels (progressive disclosure).
+// Everything here is read-only.
 
 import { useEffect, useState } from "react";
 
@@ -62,32 +63,59 @@ export interface AgentDetail {
   installed: boolean | null;
   lastRunAt: string | null;
   nextRunAt: string | null;
+  summary?: { what: string; last: string; next: string };
   systems: AgentWire[];
   activity: FeedEntry[];
   artifact: { title: string; lines: string[] } | null;
 }
+export interface ArtifactDetail {
+  id: string;
+  label: string;
+  blurb: string;
+  system: string;
+  producedBy: string;
+  producedByName: string;
+  path: string;
+  available: boolean;
+  updated: string | null;
+  lines: string[];
+}
 
 // ── shared metadata ────────────────────────────────────────────────────────
+// Systems split into precise pieces so the moving parts are visible.
 export const SYSTEMS = [
   { id: "vault", label: "VAULT", color: "#a78bfa", blurb: "The Obsidian brain: log.md, hot.md, state snapshots, client pages. Most agents write their results here." },
-  { id: "ghl", label: "GHL", color: "#fb923c", blurb: "GoHighLevel CRM: contacts, pipelines, conversations, calendars for both accounts." },
-  { id: "email", label: "EMAIL", color: "#22d3ee", blurb: "The cold-email path: the outreach sender and the reply inbox it feeds." },
-  { id: "clients", label: "CLIENTS", color: "#34d399", blurb: "Live client sites and deliverables: Jackson Roofing, Renewal Health, and the health board that watches them." },
-  { id: "schedule", label: "SCHEDULE", color: "#60a5fa", blurb: "The scheduled-tasks runner on Jack's PC that fires the daily and weekly agents." },
+  { id: "ghl-jackson", label: "GHL JACKSON", color: "#fbbf24", blurb: "Jackson Roofing's GoHighLevel account: contacts, pipeline, conversations, calendar." },
+  { id: "ghl-wing", label: "GHL WING", color: "#fb923c", blurb: "Wing Digital's own GoHighLevel account: the outreach CRM, reply inbox, and prospect pipeline." },
+  { id: "email", label: "EMAIL", color: "#22d3ee", blurb: "The cold-email path: the autonomous outreach sender and the inbox it feeds." },
+  { id: "clients", label: "CLIENTS", color: "#34d399", blurb: "Live client deliverables: Jackson Roofing, Renewal Health, and the health board that watches them." },
+  { id: "scheduler", label: "SCHEDULER", color: "#60a5fa", blurb: "The scheduled-tasks runner on Jack's PC that fires the daily and weekly agents." },
+  { id: "website", label: "WEB/SEO", color: "#f472b6", blurb: "The published websites and SEO layer: blog posts, service pages, calendars, rankings." },
+];
+
+// Artifact satellites: the concrete files agents produce (client mirror of the
+// API registry; content comes from /api/mission?artifact=id).
+export const ARTIFACTS = [
+  { id: "health-board", label: "health board", system: "clients", producedBy: "sentinel-daily" },
+  { id: "business-snapshot", label: "biz snapshot", system: "vault", producedBy: "dispatch" },
+  { id: "outreach-snapshot", label: "outreach snap", system: "email", producedBy: "outreach" },
+  { id: "content-calendar", label: "content cal", system: "website", producedBy: "content-engine-weekly" },
+  { id: "prospects-db", label: "prospects.db", system: "ghl-wing", producedBy: "prospector" },
+  { id: "replies-inbox", label: "replies inbox", system: "ghl-wing", producedBy: "reply-triage" },
 ];
 
 export const AGENT_WIRES: Record<string, string[]> = {
-  "sentinel-daily": ["vault", "clients", "schedule"],
-  "chronicler-end-of-day": ["vault", "schedule"],
-  "content-engine-weekly": ["vault", "clients", "schedule"],
-  "renewal-content-weekly": ["vault", "clients", "schedule"],
-  "wing-digital-daily-outreach": ["email", "schedule"],
-  "wing-audit-roofing-batch": ["vault", "ghl"],
-  dispatch: ["vault", "ghl"],
-  prospector: ["vault", "ghl"],
-  outreach: ["email", "ghl"],
-  "reply-triage": ["vault", "ghl", "email"],
-  builder: ["ghl", "clients"],
+  "sentinel-daily": ["vault", "clients", "website", "scheduler"],
+  "chronicler-end-of-day": ["vault", "scheduler"],
+  "content-engine-weekly": ["vault", "clients", "website", "scheduler"],
+  "renewal-content-weekly": ["vault", "clients", "website", "scheduler"],
+  "wing-digital-daily-outreach": ["email", "scheduler"],
+  "wing-audit-roofing-batch": ["vault", "ghl-wing"],
+  dispatch: ["vault", "ghl-jackson", "ghl-wing"],
+  prospector: ["vault", "ghl-wing"],
+  outreach: ["email", "ghl-wing"],
+  "reply-triage": ["vault", "ghl-jackson", "ghl-wing", "email"],
+  builder: ["ghl-jackson", "clients"],
 };
 
 // How each agent shows up in log.md (client-side mirror of the API's matchers,
@@ -132,6 +160,7 @@ export const STATUS_COLOR: Record<string, string> = {
 export type Selection =
   | { type: "agent"; key: string }
   | { type: "system"; id: string }
+  | { type: "artifact"; id: string }
   | { type: "client"; name: string }
   | null;
 
@@ -196,15 +225,56 @@ export function MissionStyles() {
   );
 }
 
-// ── Ops map (SVG, clickable + hover highlighting) ──────────────────────────
+// ── Ops map (SVG, hierarchical: agents ring / systems core / artifact satellites)
+type Hover =
+  | { kind: "agent"; key: string }
+  | { kind: "system"; id: string }
+  | { kind: "artifact"; id: string }
+  | null;
+
 export function OpsMap({ agents, onSelect }: { agents: AgentCard[]; onSelect: (s: Selection) => void }) {
-  const [hover, setHover] = useState<string | null>(null);
-  const W = 900, H = 420;
+  const [hover, setHover] = useState<Hover>(null);
+  const W = 960, H = 500;
   const shown = agents.filter(a => a.enabled);
-  const agentPos = shown.map((a, i) => ({ a, x: (W / (shown.length + 1)) * (i + 1), y: 80 }));
-  const sysPos = SYSTEMS.map((s, i) => ({ s, x: (W / (SYSTEMS.length + 1)) * (i + 1), y: H - 70 }));
+  const agentPos = shown.map((a, i) => {
+    const x = (W / (shown.length + 1)) * (i + 1);
+    // gentle arc: edges sit a bit lower than the middle
+    const t = (i / Math.max(shown.length - 1, 1)) * 2 - 1;
+    return { a, x, y: 66 + t * t * 22 };
+  });
+  const sysPos = SYSTEMS.map((s, i) => ({ s, x: (W / (SYSTEMS.length + 1)) * (i + 1), y: 300 }));
   const sysMap = new Map(sysPos.map(p => [p.s.id, p]));
-  const hoverWires = hover ? new Set(AGENT_WIRES[hover] ?? []) : null;
+  // artifact satellites hang below their parent system; spread siblings apart
+  const artPos = ARTIFACTS.map(art => {
+    const siblings = ARTIFACTS.filter(x => x.system === art.system);
+    const idx = siblings.findIndex(x => x.id === art.id);
+    const sp = sysMap.get(art.system);
+    if (!sp) return null;
+    const off = (idx - (siblings.length - 1) / 2) * 74;
+    return { art, x: sp.x + off, y: 430, color: sp.s.color };
+  }).filter(Boolean) as { art: typeof ARTIFACTS[number]; x: number; y: number; color: string }[];
+
+  // hover relationships
+  const hoverSystems = new Set<string>();
+  const hoverAgents = new Set<string>();
+  const hoverArtifacts = new Set<string>();
+  if (hover?.kind === "agent") {
+    hoverAgents.add(hover.key);
+    for (const s of AGENT_WIRES[hover.key] ?? []) hoverSystems.add(s);
+    for (const art of ARTIFACTS) if (art.producedBy === hover.key) hoverArtifacts.add(art.id);
+  } else if (hover?.kind === "system") {
+    hoverSystems.add(hover.id);
+    for (const a of shown) if ((AGENT_WIRES[a.key] ?? []).includes(hover.id)) hoverAgents.add(a.key);
+    for (const art of ARTIFACTS) if (art.system === hover.id) hoverArtifacts.add(art.id);
+  } else if (hover?.kind === "artifact") {
+    const art = ARTIFACTS.find(x => x.id === hover.id);
+    if (art) {
+      hoverArtifacts.add(art.id);
+      hoverSystems.add(art.system);
+      hoverAgents.add(art.producedBy);
+    }
+  }
+  const hovering = hover !== null;
 
   return (
     <div style={{
@@ -212,7 +282,7 @@ export function OpsMap({ agents, onSelect }: { agents: AgentCard[]; onSelect: (s
       border: "1px solid var(--border, rgba(255,255,255,0.08))",
       borderRadius: 14, padding: 8, overflowX: "auto",
     }}>
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", minWidth: 640, display: "block" }}>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", minWidth: 680, display: "block" }}>
         <defs>
           <radialGradient id="mo-glow" cx="50%" cy="50%" r="50%">
             <stop offset="0%" stopColor="rgba(34,211,238,0.25)" />
@@ -220,22 +290,27 @@ export function OpsMap({ agents, onSelect }: { agents: AgentCard[]; onSelect: (s
           </radialGradient>
         </defs>
 
-        {/* connection lines */}
+        {/* faint tier labels */}
+        <text x={14} y={40} fill="#374151" fontSize="9" fontFamily="'JetBrains Mono', monospace" letterSpacing="0.2em">AGENTS</text>
+        <text x={14} y={286} fill="#374151" fontSize="9" fontFamily="'JetBrains Mono', monospace" letterSpacing="0.2em">SYSTEMS</text>
+        <text x={14} y={470} fill="#374151" fontSize="9" fontFamily="'JetBrains Mono', monospace" letterSpacing="0.2em">ARTIFACTS</text>
+
+        {/* agent → system wires */}
         {agentPos.map(({ a, x, y }) =>
           (AGENT_WIRES[a.key] ?? ["vault"]).map(sysId => {
             const sp = sysMap.get(sysId);
             if (!sp) return null;
             const active = isRecentlyActive(a);
-            const highlighted = hover === a.key;
-            const dimmed = hover !== null && !highlighted;
+            const highlighted = hovering && hoverAgents.has(a.key) && hoverSystems.has(sysId);
+            const dimmed = hovering && !highlighted;
             const color = sp.s.color;
             const midY = (y + sp.y) / 2;
-            const d = `M ${x} ${y + 26} C ${x} ${midY}, ${sp.x} ${midY}, ${sp.x} ${sp.y - 26}`;
+            const d = `M ${x} ${y + 24} C ${x} ${midY}, ${sp.x} ${midY}, ${sp.x} ${sp.y - 22}`;
             return (
-              <g key={`${a.key}-${sysId}`} opacity={dimmed ? 0.12 : 1}>
+              <g key={`${a.key}-${sysId}`} opacity={dimmed ? 0.1 : 1}>
                 <path d={d} fill="none" stroke={color}
-                  strokeOpacity={highlighted ? 0.9 : active ? 0.5 : 0.14}
-                  strokeWidth={highlighted ? 2.2 : active ? 1.6 : 1} />
+                  strokeOpacity={highlighted ? 0.9 : active ? 0.45 : 0.12}
+                  strokeWidth={highlighted ? 2.2 : active ? 1.5 : 1} />
                 {(active || highlighted) && (
                   <path d={d} fill="none" stroke={color} strokeWidth={2.2}
                     strokeDasharray="4 14" strokeLinecap="round" className="mo-flow" />
@@ -245,30 +320,52 @@ export function OpsMap({ agents, onSelect }: { agents: AgentCard[]; onSelect: (s
           })
         )}
 
+        {/* system → artifact wires */}
+        {artPos.map(({ art, x, y, color }) => {
+          const sp = sysMap.get(art.system);
+          if (!sp) return null;
+          const producer = shown.find(a => a.key === art.producedBy);
+          const active = producer ? isRecentlyActive(producer) : false;
+          const highlighted = hovering && hoverArtifacts.has(art.id);
+          const dimmed = hovering && !highlighted;
+          const d = `M ${sp.x} ${sp.y + 22} C ${sp.x} ${(sp.y + y) / 2}, ${x} ${(sp.y + y) / 2}, ${x} ${y - 14}`;
+          return (
+            <g key={`w-${art.id}`} opacity={dimmed ? 0.1 : 1}>
+              <path d={d} fill="none" stroke={color}
+                strokeOpacity={highlighted ? 0.9 : active ? 0.4 : 0.14}
+                strokeWidth={highlighted ? 2 : 1} strokeDasharray="2 5" />
+              {(active || highlighted) && (
+                <path d={d} fill="none" stroke={color} strokeWidth={1.8}
+                  strokeDasharray="3 12" strokeLinecap="round" className="mo-flow" />
+              )}
+            </g>
+          );
+        })}
+
         {/* agent nodes */}
         {agentPos.map(({ a, x, y }) => {
           const active = isRecentlyActive(a);
-          const highlighted = hover === a.key;
-          const dimmed = hover !== null && !highlighted;
-          const color = highlighted ? "#22d3ee" : active ? "#22d3ee" : "#4b5563";
+          const highlighted = hovering && hoverAgents.has(a.key);
+          const dimmed = hovering && !highlighted;
+          const color = highlighted || active ? "#22d3ee" : "#4b5563";
           return (
-            <g key={a.key} className="mo-click" opacity={dimmed ? 0.35 : 1}
-              onMouseEnter={() => setHover(a.key)}
-              onMouseLeave={() => setHover(h => (h === a.key ? null : h))}
+            <g key={a.key} className="mo-click" opacity={dimmed ? 0.3 : 1}
+              onMouseEnter={() => setHover({ kind: "agent", key: a.key })}
+              onMouseLeave={() => setHover(h => (h?.kind === "agent" && h.key === a.key ? null : h))}
               onClick={() => onSelect({ type: "agent", key: a.key })}>
-              {(active || highlighted) && <circle cx={x} cy={y} r={34} fill="url(#mo-glow)" />}
-              <circle cx={x} cy={y} r={22} fill="rgba(13,17,23,0.95)" stroke={color}
+              {(active || highlighted) && <circle cx={x} cy={y} r={32} fill="url(#mo-glow)" />}
+              <circle cx={x} cy={y} r={21} fill="rgba(13,17,23,0.95)" stroke={color}
                 strokeWidth={highlighted ? 2.2 : 1.5}
                 className={active ? "mo-node-pulse" : undefined} />
-              <circle cx={x} cy={y - 30} r={4} fill={active ? "#34d399" : "#4b5563"}
+              <circle cx={x} cy={y - 28} r={3.5} fill={active ? "#34d399" : "#4b5563"}
                 className={active ? "mo-pulse" : undefined} />
               <text x={x} y={y + 4} textAnchor="middle" fill={active || highlighted ? "#e5e7eb" : "#9ca3af"}
-                fontSize="10" fontFamily="'JetBrains Mono', monospace" style={{ pointerEvents: "none" }}>
+                fontSize="9.5" fontFamily="'JetBrains Mono', monospace" style={{ pointerEvents: "none" }}>
                 {a.name.split(" ")[0].slice(0, 9).toUpperCase()}
               </text>
-              <text x={x} y={y + 44} textAnchor="middle" fill="#6b7280" fontSize="9"
+              <text x={x} y={y + 40} textAnchor="middle" fill="#6b7280" fontSize="8.5"
                 fontFamily="'JetBrains Mono', monospace" style={{ pointerEvents: "none" }}>
-                {a.nextRunAt ? fmtCountdown(a.nextRunAt) : a.lastLogDate ?? a.schedule}
+                {a.nextRunAt ? fmtCountdown(a.nextRunAt) : a.lastLogDate ?? ""}
               </text>
             </g>
           );
@@ -276,16 +373,41 @@ export function OpsMap({ agents, onSelect }: { agents: AgentCard[]; onSelect: (s
 
         {/* system nodes */}
         {sysPos.map(({ s, x, y }) => {
-          const dimmed = hoverWires !== null && !hoverWires.has(s.id);
+          const highlighted = hovering && hoverSystems.has(s.id);
+          const dimmed = hovering && !highlighted;
           return (
-            <g key={s.id} className="mo-click" opacity={dimmed ? 0.3 : 1}
+            <g key={s.id} className="mo-click" opacity={dimmed ? 0.25 : 1}
+              onMouseEnter={() => setHover({ kind: "system", id: s.id })}
+              onMouseLeave={() => setHover(h => (h?.kind === "system" && h.id === s.id ? null : h))}
               onClick={() => onSelect({ type: "system", id: s.id })}>
-              <rect x={x - 46} y={y - 20} width={92} height={40} rx={10}
-                fill="rgba(13,17,23,0.95)" stroke={s.color} strokeOpacity={0.6} strokeWidth={1.4} />
-              <circle cx={x - 32} cy={y} r={4} fill={s.color} className="mo-pulse" />
-              <text x={x + 6} y={y + 4} textAnchor="middle" fill={s.color} fontSize="11"
-                fontFamily="'JetBrains Mono', monospace" letterSpacing="0.1em" style={{ pointerEvents: "none" }}>
+              <rect x={x - 54} y={y - 20} width={108} height={40} rx={10}
+                fill="rgba(13,17,23,0.95)" stroke={s.color}
+                strokeOpacity={highlighted ? 1 : 0.6} strokeWidth={highlighted ? 2 : 1.4} />
+              <circle cx={x - 42} cy={y} r={4} fill={s.color} className="mo-pulse" />
+              <text x={x + 5} y={y + 4} textAnchor="middle" fill={s.color} fontSize="10"
+                fontFamily="'JetBrains Mono', monospace" letterSpacing="0.08em" style={{ pointerEvents: "none" }}>
                 {s.label}
+              </text>
+            </g>
+          );
+        })}
+
+        {/* artifact satellite nodes */}
+        {artPos.map(({ art, x, y, color }) => {
+          const highlighted = hovering && hoverArtifacts.has(art.id);
+          const dimmed = hovering && !highlighted;
+          return (
+            <g key={art.id} className="mo-click" opacity={dimmed ? 0.25 : 1}
+              onMouseEnter={() => setHover({ kind: "artifact", id: art.id })}
+              onMouseLeave={() => setHover(h => (h?.kind === "artifact" && h.id === art.id ? null : h))}
+              onClick={() => onSelect({ type: "artifact", id: art.id })}>
+              <rect x={x - 34} y={y - 13} width={68} height={26} rx={7}
+                fill="rgba(13,17,23,0.95)" stroke={color}
+                strokeOpacity={highlighted ? 0.95 : 0.45} strokeWidth={highlighted ? 1.6 : 1}
+                strokeDasharray={highlighted ? undefined : "3 3"} />
+              <text x={x} y={y + 3.5} textAnchor="middle" fill={highlighted ? "#e5e7eb" : "#9ca3af"}
+                fontSize="8" fontFamily="'JetBrains Mono', monospace" style={{ pointerEvents: "none" }}>
+                {art.label}
               </text>
             </g>
           );
@@ -295,14 +417,16 @@ export function OpsMap({ agents, onSelect }: { agents: AgentCard[]; onSelect: (s
   );
 }
 
-// ── Agent tile (clickable) ─────────────────────────────────────────────────
+// ── Agent tile (calm: name + status dot + ONE line) ────────────────────────
 export function AgentTile({ a, onSelect }: { a: AgentCard; onSelect: (s: Selection) => void }) {
-  let pill = { text: "IDLE", color: "var(--text-muted, #6b7280)" };
+  let color = "var(--text-muted, #6b7280)";
   let pulse = false;
-  if (!a.enabled) pill = { text: "DISABLED", color: "var(--text-muted, #6b7280)" };
-  else if (a.pcNeeded && a.kind === "scheduled") pill = { text: "PC NEEDED", color: "#fb923c" };
-  else if (a.nextRunAt) { pill = { text: `NEXT ${fmtCountdown(a.nextRunAt)}`.toUpperCase(), color: "#22d3ee" }; pulse = true; }
-  else if (a.lastLogDate) { pill = { text: "ACTIVE", color: "#34d399" }; pulse = true; }
+  let line = a.schedule;
+  if (!a.enabled) { line = "disabled"; }
+  else if (a.pcNeeded && a.kind === "scheduled") { color = "#fb923c"; line = "PC needed"; }
+  else if (a.nextRunAt) { color = "#22d3ee"; pulse = true; line = `next ${fmtCountdown(a.nextRunAt)}`; }
+  else if (a.lastLogDate) { color = "#34d399"; pulse = true; line = `last seen ${a.lastLogDate}`; }
+  else if (a.kind === "crew") { line = "on demand"; }
 
   return (
     <div
@@ -310,35 +434,17 @@ export function AgentTile({ a, onSelect }: { a: AgentCard; onSelect: (s: Selecti
       className="mo-click"
       style={{
         background: "var(--bg-card, #0d1117)",
-        border: "1px solid var(--border, rgba(255,255,255,0.08))",
-        borderRadius: 12, padding: "12px 14px",
-        display: "flex", flexDirection: "column", gap: 6,
-        opacity: a.enabled ? 1 : 0.55,
+        border: "1px solid var(--border, rgba(255,255,255,0.06))",
+        borderRadius: 12, padding: "12px 16px",
+        display: "flex", alignItems: "center", gap: 10,
+        opacity: a.enabled ? 1 : 0.5,
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-          <Dot color={a.enabled ? pill.color : "var(--text-muted, #6b7280)"} pulse={pulse} />
-          <span style={{ fontWeight: 600, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.name}</span>
-        </div>
-        <Pill text={pill.text} color={pill.color} />
-      </div>
-      <div style={{ fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.35 }}>{a.role}</div>
-      <div style={{ fontSize: 11, color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace" }}>
-        {a.schedule}
-        {a.lastRunAt ? ` · last run ${new Date(a.lastRunAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : ""}
-      </div>
-      {a.lastLogLine && (
-        <div style={{
-          fontSize: 11, color: "var(--text-secondary)", fontFamily: "'JetBrains Mono', monospace",
-          background: "var(--bg-secondary, #0a0d14)", border: "1px solid var(--border, rgba(255,255,255,0.08))",
-          borderRadius: 6, padding: "5px 8px",
-          whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-        }} title={a.lastLogLine}>
-          <span style={{ color: "var(--text-muted)" }}>{a.lastLogDate} </span>
-          {a.lastLogLine}
-        </div>
-      )}
+      <Dot color={color} pulse={pulse} />
+      <span style={{ fontWeight: 600, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.name}</span>
+      <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace", whiteSpace: "nowrap" }}>
+        {line}
+      </span>
     </div>
   );
 }
@@ -361,19 +467,53 @@ export function FeedList({ feed, limit }: { feed: FeedEntry[]; limit?: number })
               <span style={{ marginLeft: "auto", color: "var(--text-muted)", fontSize: 10 }}>{expanded ? "collapse" : "expand"}</span>
             </div>
             <div style={{ fontSize: 12, color: "var(--text-primary)", margin: "2px 0" }}>{e.title}</div>
-            {(expanded ? e.lines : e.lines.slice(0, 2)).map((l, j) => (
-              <div key={j} style={{
-                fontSize: 11, color: "var(--text-muted)",
-                whiteSpace: expanded ? "normal" : "nowrap",
-                overflow: expanded ? "visible" : "hidden",
-                textOverflow: "ellipsis",
-                lineHeight: 1.5,
-              }}>{l}</div>
+            {(expanded ? e.lines : []).map((l, j) => (
+              <div key={j} style={{ fontSize: 11, color: "var(--text-muted)", lineHeight: 1.5 }}>{l}</div>
             ))}
           </div>
         );
       })}
     </>
+  );
+}
+
+// ── Feed ticker (calm main-view default: ~6 one-liners + "view all") ───────
+export function FeedTicker({ feed }: { feed: FeedEntry[] }) {
+  const [all, setAll] = useState(false);
+  if (all) {
+    return (
+      <div>
+        <button onClick={() => setAll(false)} style={{
+          background: "none", border: "none", color: "var(--accent, #22d3ee)",
+          cursor: "pointer", fontSize: 11, padding: 0, marginBottom: 8,
+        }}>collapse ticker</button>
+        <FeedList feed={feed} limit={40} />
+      </div>
+    );
+  }
+  const shown = feed.slice(0, 6);
+  return (
+    <div>
+      {shown.length === 0 && <div style={{ fontSize: 12, color: "var(--text-muted)" }}>log.md unavailable</div>}
+      {shown.map((e, i) => (
+        <div key={i} style={{
+          display: "flex", gap: 8, alignItems: "baseline", marginBottom: 7,
+          fontFamily: "'JetBrains Mono', monospace",
+        }}>
+          <span style={{ fontSize: 10, color: "var(--text-muted)", flexShrink: 0 }}>{e.date.slice(5)}</span>
+          <span style={{
+            fontSize: 12, color: "var(--text-secondary)",
+            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+          }}>{e.title}</span>
+        </div>
+      ))}
+      {feed.length > 6 && (
+        <button onClick={() => setAll(true)} style={{
+          background: "none", border: "none", color: "var(--accent, #22d3ee)",
+          cursor: "pointer", fontSize: 11, padding: 0,
+        }}>view all ({feed.length})</button>
+      )}
+    </div>
   );
 }
 
@@ -398,7 +538,6 @@ export function ClientHealthStrip({
           onClick={() => onSelect({ type: "client", name: c.client })}>
           <Dot color={STATUS_COLOR[c.overall]} pulse={c.overall !== "green"} />
           <span style={{ fontSize: 13 }}>{c.client}</span>
-          <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{c.pillars.join(" ")}</span>
         </div>
       ))}
       {health.runDate && (
@@ -439,20 +578,50 @@ function SlideOver({ title, accent, onClose, children }: {
   );
 }
 
-function SectionLabel({ text }: { text: string }) {
-  return <div style={{ fontSize: 10, letterSpacing: "0.14em", color: "var(--text-muted)", margin: "14px 0 6px", textTransform: "uppercase" }}>{text}</div>;
+// Collapsible section used inside panels: keeps detail tucked away by default.
+function Section({ title, defaultOpen, children }: {
+  title: string; defaultOpen?: boolean; children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(!!defaultOpen);
+  return (
+    <div style={{ borderTop: "1px solid var(--border, rgba(255,255,255,0.06))", marginTop: 12, paddingTop: 8 }}>
+      <div className="mo-click" onClick={() => setOpen(o => !o)}
+        style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ fontSize: 10, letterSpacing: "0.14em", color: "var(--text-muted)", textTransform: "uppercase" }}>{title}</span>
+        <span style={{ marginLeft: "auto", fontSize: 10, color: "var(--text-muted)" }}>{open ? "−" : "+"}</span>
+      </div>
+      {open && <div style={{ marginTop: 8 }}>{children}</div>}
+    </div>
+  );
 }
 
 const DIR_ARROW: Record<string, string> = { reads: "reads from", writes: "writes to", both: "reads + writes" };
 
+// Plain-English summary block the panels lead with.
+function SummaryBlock({ lines, accent }: { lines: string[]; accent: string }) {
+  return (
+    <div style={{
+      borderLeft: `2px solid ${accent}`, paddingLeft: 12, margin: "10px 0 4px",
+      display: "flex", flexDirection: "column", gap: 4,
+    }}>
+      {lines.filter(Boolean).map((l, i) => (
+        <div key={i} style={{ fontSize: 13, color: i === 0 ? "var(--text-primary)" : "var(--text-secondary)", lineHeight: 1.5 }}>{l}</div>
+      ))}
+    </div>
+  );
+}
+
 // ── Agent detail panel (fetches /api/mission?agent=key) ────────────────────
-function AgentPanel({ agentKey, onClose }: { agentKey: string; onClose: () => void }) {
+function AgentPanel({ agentKey, onClose, onSelect }: {
+  agentKey: string; onClose: () => void; onSelect: (s: Selection) => void;
+}) {
   const [detail, setDetail] = useState<AgentDetail | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [moreActivity, setMoreActivity] = useState(false);
 
   useEffect(() => {
     let alive = true;
-    setDetail(null); setErr(null);
+    setDetail(null); setErr(null); setMoreActivity(false);
     fetch(`/api/mission?agent=${encodeURIComponent(agentKey)}`, { cache: "no-store" })
       .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
       .then(j => { if (alive) setDetail(j); })
@@ -464,6 +633,10 @@ function AgentPanel({ agentKey, onClose }: { agentKey: string; onClose: () => vo
     detail?.status === "active" ? "#34d399" :
     detail?.status === "scheduled" ? "#22d3ee" :
     detail?.status === "disabled" ? "#6b7280" : "#9ca3af";
+
+  const producedArtifacts = ARTIFACTS.filter(a => a.producedBy === agentKey);
+  const activity = detail?.activity ?? [];
+  const shownActivity = moreActivity ? activity : activity.slice(0, 8);
 
   return (
     <SlideOver title={detail ? detail.name.toUpperCase() : "AGENT"} accent={statusColor} onClose={onClose}>
@@ -477,32 +650,60 @@ function AgentPanel({ agentKey, onClose }: { agentKey: string; onClose: () => vo
             {detail.installed === false && <Pill text="NOT INSTALLED" color="#fb923c" />}
           </div>
 
-          <SectionLabel text="Role" />
-          <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.55 }}>{detail.description}</div>
+          {/* lead: what this is / what it did last / what happens next */}
+          <SummaryBlock accent={statusColor} lines={[
+            detail.summary?.what ?? detail.role,
+            detail.summary?.last ?? "",
+            detail.summary?.next ?? "",
+          ]} />
 
-          <SectionLabel text="Schedule" />
-          <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5 }}>{detail.scheduleHuman}</div>
-          <div style={{ fontSize: 11, color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace", marginTop: 4 }}>
-            {detail.nextRunAt && <>next run {fmtCountdown(detail.nextRunAt)} ({new Date(detail.nextRunAt).toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit" })})<br /></>}
-            {detail.lastRunAt && <>last run {new Date(detail.lastRunAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</>}
-            {!detail.nextRunAt && !detail.lastRunAt && "no recorded runs"}
-          </div>
+          <Section title={`Activity (${activity.length})`} defaultOpen>
+            {activity.length === 0 && <div style={{ fontSize: 12, color: "var(--text-muted)" }}>No log entries mention this agent yet.</div>}
+            <FeedList feed={shownActivity} />
+            {activity.length > 8 && !moreActivity && (
+              <button onClick={() => setMoreActivity(true)} style={{
+                background: "none", border: "none", color: "var(--accent, #22d3ee)",
+                cursor: "pointer", fontSize: 11, padding: 0,
+              }}>show more ({activity.length - 8})</button>
+            )}
+          </Section>
 
-          <SectionLabel text="Systems it touches" />
-          {detail.systems.map(w => {
-            const sys = SYSTEMS.find(s => s.id === w.id);
-            return (
-              <div key={w.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, marginBottom: 5 }}>
-                <Dot color={sys?.color ?? "#9ca3af"} />
-                <span style={{ fontFamily: "'JetBrains Mono', monospace", color: sys?.color ?? "var(--text-secondary)" }}>{w.label}</span>
-                <span style={{ color: "var(--text-muted)" }}>{DIR_ARROW[w.direction]}</span>
+          <Section title="Schedule">
+            <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5 }}>{detail.scheduleHuman}</div>
+            <div style={{ fontSize: 11, color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace", marginTop: 4 }}>
+              {detail.nextRunAt && <>next run {fmtCountdown(detail.nextRunAt)} ({new Date(detail.nextRunAt).toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit" })})<br /></>}
+              {detail.lastRunAt && <>last run {new Date(detail.lastRunAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</>}
+              {!detail.nextRunAt && !detail.lastRunAt && "no recorded runs"}
+            </div>
+          </Section>
+
+          <Section title="Connections">
+            {detail.systems.map(w => {
+              const sys = SYSTEMS.find(s => s.id === w.id);
+              return (
+                <div key={w.id} className="mo-click" style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, marginBottom: 5 }}
+                  onClick={() => onSelect({ type: "system", id: w.id })}>
+                  <Dot color={sys?.color ?? "#9ca3af"} />
+                  <span style={{ fontFamily: "'JetBrains Mono', monospace", color: sys?.color ?? "var(--text-secondary)" }}>{w.label}</span>
+                  <span style={{ color: "var(--text-muted)" }}>{DIR_ARROW[w.direction]}</span>
+                </div>
+              );
+            })}
+            {producedArtifacts.map(a => (
+              <div key={a.id} className="mo-click" style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, marginBottom: 5 }}
+                onClick={() => onSelect({ type: "artifact", id: a.id })}>
+                <span style={{ color: "var(--text-muted)", fontSize: 11 }}>produces</span>
+                <span style={{ fontFamily: "'JetBrains Mono', monospace", color: "var(--accent, #22d3ee)" }}>{a.label}</span>
               </div>
-            );
-          })}
+            ))}
+          </Section>
+
+          <Section title="Full role">
+            <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.55 }}>{detail.description}</div>
+          </Section>
 
           {detail.artifact && (
-            <>
-              <SectionLabel text={detail.artifact.title} />
+            <Section title={detail.artifact.title}>
               <div style={{
                 fontSize: 11, fontFamily: "'JetBrains Mono', monospace", color: "var(--text-secondary)",
                 background: "var(--bg-card, #0d1117)", border: "1px solid var(--border, rgba(255,255,255,0.08))",
@@ -510,12 +711,70 @@ function AgentPanel({ agentKey, onClose }: { agentKey: string; onClose: () => vo
               }}>
                 {detail.artifact.lines.join("\n")}
               </div>
-            </>
+            </Section>
           )}
+        </>
+      )}
+    </SlideOver>
+  );
+}
 
-          <SectionLabel text={`Recent activity (${detail.activity.length})`} />
-          {detail.activity.length === 0 && <div style={{ fontSize: 12, color: "var(--text-muted)" }}>No log entries mention this agent yet.</div>}
-          <FeedList feed={detail.activity} />
+// ── Artifact panel (fetches /api/mission?artifact=id) ──────────────────────
+function ArtifactPanel({ artifactId, onClose, onSelect }: {
+  artifactId: string; onClose: () => void; onSelect: (s: Selection) => void;
+}) {
+  const [detail, setDetail] = useState<ArtifactDetail | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    setDetail(null); setErr(null);
+    fetch(`/api/mission?artifact=${encodeURIComponent(artifactId)}`, { cache: "no-store" })
+      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+      .then(j => { if (alive) setDetail(j); })
+      .catch(e => { if (alive) setErr(e instanceof Error ? e.message : "fetch failed"); });
+    return () => { alive = false; };
+  }, [artifactId]);
+
+  const sys = detail ? SYSTEMS.find(s => s.id === detail.system) : null;
+  const accent = sys?.color ?? "#22d3ee";
+
+  return (
+    <SlideOver title={detail ? detail.label.toUpperCase() : "ARTIFACT"} accent={accent} onClose={onClose}>
+      {!detail && !err && <div style={{ fontSize: 12, color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace" }}>Loading artifact...</div>}
+      {err && <div style={{ fontSize: 12, color: "#f87171" }}>Could not load artifact ({err})</div>}
+      {detail && (
+        <>
+          <SummaryBlock accent={accent} lines={[
+            detail.blurb,
+            `Produced by ${detail.producedByName}.`,
+            detail.updated ? `Last updated ${detail.updated}.` : detail.available ? "Update date unknown." : "File unavailable from here.",
+          ]} />
+
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "10px 0" }}>
+            <span className="mo-click" onClick={() => onSelect({ type: "agent", key: detail.producedBy })}>
+              <Pill text={detail.producedByName.toUpperCase()} color="#22d3ee" />
+            </span>
+            {sys && (
+              <span className="mo-click" onClick={() => onSelect({ type: "system", id: sys.id })}>
+                <Pill text={sys.label} color={sys.color} />
+              </span>
+            )}
+          </div>
+
+          <Section title="Content excerpt" defaultOpen>
+            {detail.lines.length === 0 && <div style={{ fontSize: 12, color: "var(--text-muted)" }}>No content available.</div>}
+            {detail.lines.length > 0 && (
+              <div style={{
+                fontSize: 11, fontFamily: "'JetBrains Mono', monospace", color: "var(--text-secondary)",
+                background: "var(--bg-card, #0d1117)", border: "1px solid var(--border, rgba(255,255,255,0.08))",
+                borderRadius: 8, padding: "8px 10px", lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word",
+              }}>
+                {detail.lines.join("\n")}
+              </div>
+            )}
+            <div style={{ fontSize: 10, color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace", marginTop: 6 }}>{detail.path}</div>
+          </Section>
         </>
       )}
     </SlideOver>
@@ -529,32 +788,54 @@ function SystemPanel({ systemId, data, onSelect, onClose }: {
   const sys = SYSTEMS.find(s => s.id === systemId);
   if (!sys) return null;
   const touching = data.agents.filter(a => (AGENT_WIRES[a.key] ?? []).includes(systemId));
+  const artifacts = ARTIFACTS.filter(a => a.system === systemId);
   const matchers = touching.map(a => AGENT_MATCH[a.key]).filter(Boolean);
   const related = data.feed.filter(e =>
     matchers.some(m => m.test(e.title) || m.test(e.type) || e.lines.some(l => m.test(l)))
   ).slice(0, 25);
+  const activeCount = touching.filter(isRecentlyActive).length;
 
   return (
     <SlideOver title={sys.label} accent={sys.color} onClose={onClose}>
-      <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.55 }}>{sys.blurb}</div>
+      <SummaryBlock accent={sys.color} lines={[
+        sys.blurb,
+        `${touching.length} agent${touching.length === 1 ? "" : "s"} wired in, ${activeCount} recently active.`,
+        related.length ? `Last activity ${related[0].date}: ${related[0].title}` : "No recent log activity for this system.",
+      ]} />
 
-      <SectionLabel text={`Agents that touch ${sys.label} (${touching.length})`} />
-      {touching.map(a => (
-        <div key={a.key} className="mo-click" style={{
-          display: "flex", alignItems: "center", gap: 8, fontSize: 12, marginBottom: 6,
-          border: "1px solid var(--border, rgba(255,255,255,0.08))", borderRadius: 8, padding: "6px 10px",
-        }} onClick={() => onSelect({ type: "agent", key: a.key })}>
-          <Dot color={isRecentlyActive(a) ? "#34d399" : "#6b7280"} pulse={isRecentlyActive(a)} />
-          <span style={{ fontWeight: 600 }}>{a.name}</span>
-          <span style={{ color: "var(--text-muted)", marginLeft: "auto", fontFamily: "'JetBrains Mono', monospace", fontSize: 10 }}>
-            {a.enabled ? a.schedule : "disabled"}
-          </span>
-        </div>
-      ))}
+      <Section title={`Agents (${touching.length})`} defaultOpen>
+        {touching.map(a => (
+          <div key={a.key} className="mo-click" style={{
+            display: "flex", alignItems: "center", gap: 8, fontSize: 12, marginBottom: 6,
+            border: "1px solid var(--border, rgba(255,255,255,0.08))", borderRadius: 8, padding: "6px 10px",
+          }} onClick={() => onSelect({ type: "agent", key: a.key })}>
+            <Dot color={isRecentlyActive(a) ? "#34d399" : "#6b7280"} pulse={isRecentlyActive(a)} />
+            <span style={{ fontWeight: 600 }}>{a.name}</span>
+            <span style={{ color: "var(--text-muted)", marginLeft: "auto", fontFamily: "'JetBrains Mono', monospace", fontSize: 10 }}>
+              {a.enabled ? a.schedule : "disabled"}
+            </span>
+          </div>
+        ))}
+      </Section>
 
-      <SectionLabel text={`Recent related activity (${related.length})`} />
-      {related.length === 0 && <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Nothing recent in the log for this system.</div>}
-      <FeedList feed={related} />
+      {artifacts.length > 0 && (
+        <Section title={`Artifacts (${artifacts.length})`} defaultOpen>
+          {artifacts.map(a => (
+            <div key={a.id} className="mo-click" style={{
+              display: "flex", alignItems: "center", gap: 8, fontSize: 12, marginBottom: 6,
+              border: `1px dashed ${sys.color}55`, borderRadius: 8, padding: "6px 10px",
+            }} onClick={() => onSelect({ type: "artifact", id: a.id })}>
+              <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>{a.label}</span>
+              <span style={{ color: "var(--text-muted)", marginLeft: "auto", fontSize: 10 }}>open</span>
+            </div>
+          ))}
+        </Section>
+      )}
+
+      <Section title={`Recent activity (${related.length})`}>
+        {related.length === 0 && <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Nothing recent in the log for this system.</div>}
+        <FeedList feed={related.slice(0, 8)} />
+      </Section>
     </SlideOver>
   );
 }
@@ -573,32 +854,39 @@ function ClientPanel({ name, data, onClose }: { name: string; data: MissionData;
         {data.health?.runDate && <Pill text={`BOARD RUN ${data.health.runDate}`} color="var(--text-muted, #6b7280)" />}
       </div>
 
-      <SectionLabel text="Pillar breakdown" />
-      {c.pillars.map((p, i) => {
-        const st = emojiStatus(p);
-        return (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, marginBottom: 7 }}>
-            <Dot color={STATUS_COLOR[st]} pulse={st !== "green"} />
-            <span style={{ color: "var(--text-secondary)" }}>{PILLAR_NAMES[i] ?? `Pillar ${i + 1}`}</span>
-            <span style={{ marginLeft: "auto", fontSize: 12 }}>{p}</span>
-          </div>
-        );
-      })}
+      <SummaryBlock accent={accent} lines={[
+        `${c.client} is ${c.overall.toUpperCase()} overall, in the ${c.phase} phase.`,
+        c.redFlags.length ? `${c.redFlags.length} open flag${c.redFlags.length === 1 ? "" : "s"} on the board.` : "No open flags. All clear.",
+      ]} />
 
-      <SectionLabel text={`Flags (${c.redFlags.length})`} />
-      {c.redFlags.length === 0 && <div style={{ fontSize: 12, color: "#34d399" }}>No open flags. All clear.</div>}
-      {c.redFlags.map((f, i) => (
-        <div key={i} style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 10, lineHeight: 1.5 }}>
-          <span style={{ color: "#f87171" }}>&#9873; </span>
-          {f.text}
-          {f.link && (
-            <>
-              {" "}
-              <a href={f.link} target="_blank" rel="noreferrer" style={{ color: "#22d3ee" }}>open &#8599;</a>
-            </>
-          )}
-        </div>
-      ))}
+      <Section title="Pillar breakdown" defaultOpen>
+        {c.pillars.map((p, i) => {
+          const st = emojiStatus(p);
+          return (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, marginBottom: 7 }}>
+              <Dot color={STATUS_COLOR[st]} pulse={st !== "green"} />
+              <span style={{ color: "var(--text-secondary)" }}>{PILLAR_NAMES[i] ?? `Pillar ${i + 1}`}</span>
+              <span style={{ marginLeft: "auto", fontSize: 12 }}>{p}</span>
+            </div>
+          );
+        })}
+      </Section>
+
+      <Section title={`Flags (${c.redFlags.length})`} defaultOpen={c.redFlags.length > 0}>
+        {c.redFlags.length === 0 && <div style={{ fontSize: 12, color: "#34d399" }}>No open flags. All clear.</div>}
+        {c.redFlags.map((f, i) => (
+          <div key={i} style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 10, lineHeight: 1.5 }}>
+            <span style={{ color: "#f87171" }}>&#9873; </span>
+            {f.text}
+            {f.link && (
+              <>
+                {" "}
+                <a href={f.link} target="_blank" rel="noreferrer" style={{ color: "#22d3ee" }}>open &#8599;</a>
+              </>
+            )}
+          </div>
+        ))}
+      </Section>
     </SlideOver>
   );
 }
@@ -609,7 +897,8 @@ export function MissionPanels({ selection, data, onSelect }: {
 }) {
   if (!selection) return null;
   const close = () => onSelect(null);
-  if (selection.type === "agent") return <AgentPanel agentKey={selection.key} onClose={close} />;
+  if (selection.type === "agent") return <AgentPanel agentKey={selection.key} onClose={close} onSelect={onSelect} />;
+  if (selection.type === "artifact") return <ArtifactPanel artifactId={selection.id} onClose={close} onSelect={onSelect} />;
   if (!data) return null;
   if (selection.type === "system") return <SystemPanel systemId={selection.id} data={data} onSelect={onSelect} onClose={close} />;
   if (selection.type === "client") return <ClientPanel name={selection.name} data={data} onClose={close} />;

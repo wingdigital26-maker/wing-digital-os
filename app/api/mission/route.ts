@@ -261,57 +261,117 @@ function parseStats(biz: string | null, outreach: string | null): { tiles: StatT
 
 // ── Per-agent detail data ──────────────────────────────────────────────────
 // Systems each agent touches, with the direction data flows.
+// System ids match SYSTEMS in MissionControlCore.tsx (the split map).
 interface Wire { id: string; label: string; direction: "reads" | "writes" | "both" }
 const AGENT_SYSTEMS: Record<string, Wire[]> = {
   "sentinel-daily": [
     { id: "clients", label: "CLIENTS", direction: "reads" },
+    { id: "website", label: "WEB/SEO", direction: "reads" },
     { id: "vault", label: "VAULT", direction: "writes" },
-    { id: "schedule", label: "SCHEDULE", direction: "reads" },
+    { id: "scheduler", label: "SCHEDULER", direction: "reads" },
   ],
   "chronicler-end-of-day": [
     { id: "vault", label: "VAULT", direction: "writes" },
-    { id: "schedule", label: "SCHEDULE", direction: "reads" },
+    { id: "scheduler", label: "SCHEDULER", direction: "reads" },
   ],
   "content-engine-weekly": [
     { id: "vault", label: "VAULT", direction: "both" },
+    { id: "website", label: "WEB/SEO", direction: "writes" },
     { id: "clients", label: "CLIENTS", direction: "writes" },
-    { id: "schedule", label: "SCHEDULE", direction: "reads" },
+    { id: "scheduler", label: "SCHEDULER", direction: "reads" },
   ],
   "renewal-content-weekly": [
     { id: "vault", label: "VAULT", direction: "both" },
+    { id: "website", label: "WEB/SEO", direction: "writes" },
     { id: "clients", label: "CLIENTS", direction: "writes" },
-    { id: "schedule", label: "SCHEDULE", direction: "reads" },
+    { id: "scheduler", label: "SCHEDULER", direction: "reads" },
   ],
   "wing-digital-daily-outreach": [
     { id: "email", label: "EMAIL", direction: "writes" },
-    { id: "schedule", label: "SCHEDULE", direction: "reads" },
+    { id: "scheduler", label: "SCHEDULER", direction: "reads" },
   ],
   "wing-audit-roofing-batch": [
     { id: "vault", label: "VAULT", direction: "writes" },
-    { id: "ghl", label: "GHL", direction: "reads" },
+    { id: "ghl-wing", label: "GHL WING", direction: "reads" },
   ],
   dispatch: [
     { id: "vault", label: "VAULT", direction: "writes" },
-    { id: "ghl", label: "GHL", direction: "reads" },
+    { id: "ghl-jackson", label: "GHL JACKSON", direction: "reads" },
+    { id: "ghl-wing", label: "GHL WING", direction: "reads" },
   ],
   prospector: [
     { id: "vault", label: "VAULT", direction: "writes" },
-    { id: "ghl", label: "GHL", direction: "reads" },
+    { id: "ghl-wing", label: "GHL WING", direction: "reads" },
   ],
   outreach: [
     { id: "email", label: "EMAIL", direction: "writes" },
-    { id: "ghl", label: "GHL", direction: "both" },
+    { id: "ghl-wing", label: "GHL WING", direction: "both" },
   ],
   "reply-triage": [
-    { id: "ghl", label: "GHL", direction: "reads" },
+    { id: "ghl-jackson", label: "GHL JACKSON", direction: "reads" },
+    { id: "ghl-wing", label: "GHL WING", direction: "reads" },
     { id: "email", label: "EMAIL", direction: "reads" },
     { id: "vault", label: "VAULT", direction: "writes" },
   ],
   builder: [
-    { id: "ghl", label: "GHL", direction: "writes" },
+    { id: "ghl-jackson", label: "GHL JACKSON", direction: "writes" },
     { id: "clients", label: "CLIENTS", direction: "writes" },
   ],
 };
+
+// ── Artifact registry ──────────────────────────────────────────────────────
+// The concrete files agents produce. These show up as satellite nodes on the
+// map; clicking one opens a panel with just that artifact's excerpt.
+interface ArtifactMeta {
+  id: string;
+  label: string;
+  system: string; // parent system node on the map
+  producedBy: string; // agent key
+  path: string; // vault-relative path
+  blurb: string;
+}
+const ARTIFACTS: ArtifactMeta[] = [
+  { id: "health-board", label: "Health board", system: "clients", producedBy: "sentinel-daily", path: "wiki/state/health-board.md", blurb: "Sentinel's master per-client health table with red flags." },
+  { id: "business-snapshot", label: "Biz snapshot", system: "vault", producedBy: "dispatch", path: "wiki/state/business-snapshot.md", blurb: "The live business state: MRR, active clients, pipeline." },
+  { id: "outreach-snapshot", label: "Outreach snapshot", system: "email", producedBy: "outreach", path: "wiki/state/outreach-snapshot.md", blurb: "Cold-email pipeline counts and send totals." },
+  { id: "content-calendar", label: "Content calendar", system: "website", producedBy: "content-engine-weekly", path: "wiki/campaigns/jackson-social-calendar.md", blurb: "Jackson Roofing's rolling content and social calendar." },
+  { id: "prospects-db", label: "prospects.db", system: "ghl-wing", producedBy: "prospector", path: "wiki/automations/prospects-db.md", blurb: "The self-refilling prospect database behind outreach." },
+  { id: "replies-inbox", label: "Replies inbox", system: "ghl-wing", producedBy: "reply-triage", path: "wiki/state/replies-inbox.md", blurb: "Triage page of inbound replies, HOT flagged loudly." },
+];
+
+async function artifactDetail(id: string) {
+  const meta = ARTIFACTS.find((a) => a.id === id);
+  if (!meta) return NextResponse.json({ error: `unknown artifact '${id}'` }, { status: 404 });
+  const raw = await readVaultFile(meta.path);
+  const producer = [...SCHEDULED, ...CREW].find((a) => a.key === meta.producedBy);
+  let updated: string | null = null;
+  let lines: string[] = [];
+  if (raw) {
+    updated =
+      raw.match(/\*\*Run date:\*\*\s*([\d-]+)/)?.[1] ??
+      raw.match(/_Last updated:\s*([^_]+)_/)?.[1]?.trim() ??
+      raw.match(/^updated:\s*(\S+)/m)?.[1] ??
+      null;
+    lines = raw
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter((l) => l && !l.startsWith("---"))
+      .slice(0, 20)
+      .map((l) => clean(redact(l)).slice(0, 200));
+  }
+  return NextResponse.json({
+    id: meta.id,
+    label: meta.label,
+    blurb: meta.blurb,
+    system: meta.system,
+    producedBy: meta.producedBy,
+    producedByName: producer?.name ?? meta.producedBy,
+    path: meta.path,
+    available: !!raw,
+    updated,
+    lines,
+  });
+}
 
 // Cron schedules in plain words (per agent key).
 const CRON_HUMAN: Record<string, string> = {
@@ -428,6 +488,23 @@ async function agentDetail(key: string) {
   else if (activity.length && (Date.now() - new Date(activity[0].date).getTime()) / 86400000 <= 2) status = "active";
   else if (nextAt) status = "scheduled";
 
+  // Plain-English 3-liner the panel leads with: what / did last / happens next.
+  const summary = {
+    what: meta.role,
+    last: activity.length
+      ? `Last seen ${activity[0].date}: ${activity[0].title}`
+      : st?.lastRunAt || st?.lastRun
+        ? `Last run ${new Date(st.lastRunAt ?? st.lastRun).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}.`
+        : "No recorded activity yet.",
+    next: !meta.enabled
+      ? "Disabled. Nothing scheduled."
+      : nextAt
+        ? `Next run ${nextAt.toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit" })}.`
+        : isScheduled
+          ? "Waiting on the scheduler."
+          : "Runs on demand, when Jack asks.",
+  };
+
   return NextResponse.json({
     key,
     name: meta.name,
@@ -441,6 +518,7 @@ async function agentDetail(key: string) {
     installed: present.size > 0 ? present.has(key) : null,
     lastRunAt: st?.lastRunAt ?? st?.lastRun ?? null,
     nextRunAt: nextAt ? nextAt.toISOString() : null,
+    summary,
     systems: AGENT_SYSTEMS[key] ?? [{ id: "vault", label: "VAULT", direction: "both" }],
     activity,
     artifact,
@@ -451,6 +529,8 @@ async function agentDetail(key: string) {
 export async function GET(req: NextRequest) {
   const agentKey = req.nextUrl.searchParams.get("agent");
   if (agentKey) return agentDetail(agentKey);
+  const artifactId = req.nextUrl.searchParams.get("artifact");
+  if (artifactId) return artifactDetail(artifactId);
 
   const cloud = isGithubVault();
 

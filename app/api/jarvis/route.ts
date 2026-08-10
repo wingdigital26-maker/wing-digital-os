@@ -16,7 +16,7 @@ export const runtime = "nodejs";
 // prompt) plus hard guardrails in the tool implementations below (vault path
 // containment, no raw/ writes, secret scanning, no GHL DELETE).
 
-const MODEL = "claude-sonnet-4-6";
+const MODEL = "claude-opus-5";
 
 const VAULT_ROOT = VAULT_PATH;
 const VAULT_WIKI = path.join(VAULT_ROOT, "wiki");
@@ -616,6 +616,9 @@ const SESSION_FILE = "C:\\Users\\wjack\\wing-digital-os\\.jarvis-session.json";
 let cachedCliPath: string | null | undefined; // undefined = not resolved yet
 
 function findClaudeCli(): string | null {
+  // Test/ops override: force the Anthropic API engine even where the CLI exists
+  // (mirrors the Vercel condition, where no CLI is installed).
+  if (process.env.JARVIS_DISABLE_CLI === "1") return null;
   if (cachedCliPath !== undefined) return cachedCliPath;
   const candidates = [
     process.env.CLAUDE_CLI_PATH,
@@ -818,8 +821,44 @@ function runClaudeCode(opts: {
   });
 }
 
-// ── Anthropic call (non-streaming) used inside the fallback agent loop ─────────
-async function callAnthropic(apiKey: string, messages: any[]) {
+// ── OS context for the API engine ─────────────────────────────────────────────
+// The same live OS state limited mode reads (mission data + vault state
+// snapshots + hot.md) is fed to the Anthropic API engine as system context so
+// Jarvis can answer anything about the OS even when it cannot reach a tool.
+async function buildOsContext(): Promise<string> {
+  const [biz, outreach, hot, log, health] = await Promise.all([
+    readVaultFile("wiki/state/business-snapshot.md"),
+    readVaultFile("wiki/state/outreach-snapshot.md"),
+    readVaultFile("wiki/hot.md"),
+    readVaultFile("wiki/log.md"),
+    readVaultFile("wiki/state/health-board.md"),
+  ]);
+  const parts: string[] = [];
+  const cap = (s: string, n: number) => (s.length > n ? s.slice(0, n) + "\n...[truncated]" : s);
+  if (biz) parts.push("## BUSINESS SNAPSHOT (live)\n" + cap(biz.trim(), 2500));
+  if (outreach) parts.push("## OUTREACH SNAPSHOT (live)\n" + cap(outreach.trim(), 2500));
+  if (hot) parts.push("## CURRENT FOCUS (hot.md)\n" + cap(hot.trim(), 3000));
+  if (health) parts.push("## CLIENT HEALTH BOARD\n" + cap(health.trim(), 2500));
+  if (log) {
+    // Recent activity: the last ~40 log entries (headers + a couple lines each).
+    const lines = log.split(/\r?\n/);
+    const idxs = lines
+      .map((l, i) => (l.startsWith("## ") ? i : -1))
+      .filter((i) => i >= 0);
+    const start = idxs.length > 40 ? idxs[idxs.length - 40] : 0;
+    parts.push("## RECENT OS ACTIVITY (log.md tail)\n" + cap(lines.slice(start).join("\n").trim(), 6000));
+  }
+  if (parts.length === 0) return "";
+  return (
+    "\n\n# LIVE WING OS STATE (auto-injected, current as of this request)\n" +
+    "Use this as ground truth about the OS, agents, clients, and pipeline. " +
+    "Prefer tools for anything not covered here.\n\n" +
+    parts.join("\n\n")
+  );
+}
+
+// ── Anthropic call (non-streaming) used inside the API engine loop ─────────────
+async function callAnthropic(apiKey: string, messages: any[], systemExtra: string) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -830,7 +869,7 @@ async function callAnthropic(apiKey: string, messages: any[]) {
     body: JSON.stringify({
       model: MODEL,
       max_tokens: 1500,
-      system: SYSTEM_PROMPT,
+      system: SYSTEM_PROMPT + systemExtra,
       tools: TOOLS,
       messages,
     }),
@@ -880,18 +919,27 @@ async function runLimitedMode(send: (obj: any) => void, userText: string) {
   send({ text: parts.join("\n") });
 }
 
-// The original Anthropic-API agent loop, kept as the fallback engine.
+// Engine 2: the Anthropic Messages API agent loop — first-class whenever the
+// Claude Code CLI is unavailable (e.g. on Vercel). Gets the full OS context
+// (mission data + vault state snapshots + hot.md) as system context, plus the
+// same tool set (cloud-unsafe tools degrade gracefully with pcRequired notes).
 async function runApiLoop(send: (obj: any) => void, messages: any[], userText: string) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     await runLimitedMode(send, userText);
     return;
   }
+  let systemExtra = "";
+  try {
+    systemExtra = await buildOsContext();
+  } catch {
+    /* context is best-effort; the tools still work */
+  }
   try {
         // Agent loop: keep letting Claude call tools until it stops asking.
         const MAX_TURNS = 8;
         for (let turn = 0; turn < MAX_TURNS; turn++) {
-          const resp = await callAnthropic(apiKey, messages);
+          const resp = await callAnthropic(apiKey, messages, systemExtra);
           const blocks: any[] = resp.content ?? [];
 
           // Stream any text this turn produced.

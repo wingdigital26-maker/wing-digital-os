@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 import { readVaultFile, isGithubVault } from "../../../lib/vaultSource";
@@ -138,7 +138,7 @@ function parseLog(raw: string): FeedEntry[] {
       cur = { date: m[1], type: m[2].toLowerCase(), title: redact(m[3].trim()), lines: [] };
       entries.push(cur);
     } else if (cur && line.trim() && !line.startsWith("---") && !line.startsWith("#")) {
-      if (cur.lines.length < 6) cur.lines.push(redact(line.trim()));
+      if (cur.lines.length < 12) cur.lines.push(redact(line.trim()));
     }
   }
   return entries;
@@ -259,8 +259,199 @@ function parseStats(biz: string | null, outreach: string | null): { tiles: StatT
   return { tiles, updated };
 }
 
+// ── Per-agent detail data ──────────────────────────────────────────────────
+// Systems each agent touches, with the direction data flows.
+interface Wire { id: string; label: string; direction: "reads" | "writes" | "both" }
+const AGENT_SYSTEMS: Record<string, Wire[]> = {
+  "sentinel-daily": [
+    { id: "clients", label: "CLIENTS", direction: "reads" },
+    { id: "vault", label: "VAULT", direction: "writes" },
+    { id: "schedule", label: "SCHEDULE", direction: "reads" },
+  ],
+  "chronicler-end-of-day": [
+    { id: "vault", label: "VAULT", direction: "writes" },
+    { id: "schedule", label: "SCHEDULE", direction: "reads" },
+  ],
+  "content-engine-weekly": [
+    { id: "vault", label: "VAULT", direction: "both" },
+    { id: "clients", label: "CLIENTS", direction: "writes" },
+    { id: "schedule", label: "SCHEDULE", direction: "reads" },
+  ],
+  "renewal-content-weekly": [
+    { id: "vault", label: "VAULT", direction: "both" },
+    { id: "clients", label: "CLIENTS", direction: "writes" },
+    { id: "schedule", label: "SCHEDULE", direction: "reads" },
+  ],
+  "wing-digital-daily-outreach": [
+    { id: "email", label: "EMAIL", direction: "writes" },
+    { id: "schedule", label: "SCHEDULE", direction: "reads" },
+  ],
+  "wing-audit-roofing-batch": [
+    { id: "vault", label: "VAULT", direction: "writes" },
+    { id: "ghl", label: "GHL", direction: "reads" },
+  ],
+  dispatch: [
+    { id: "vault", label: "VAULT", direction: "writes" },
+    { id: "ghl", label: "GHL", direction: "reads" },
+  ],
+  prospector: [
+    { id: "vault", label: "VAULT", direction: "writes" },
+    { id: "ghl", label: "GHL", direction: "reads" },
+  ],
+  outreach: [
+    { id: "email", label: "EMAIL", direction: "writes" },
+    { id: "ghl", label: "GHL", direction: "both" },
+  ],
+  "reply-triage": [
+    { id: "ghl", label: "GHL", direction: "reads" },
+    { id: "email", label: "EMAIL", direction: "reads" },
+    { id: "vault", label: "VAULT", direction: "writes" },
+  ],
+  builder: [
+    { id: "ghl", label: "GHL", direction: "writes" },
+    { id: "clients", label: "CLIENTS", direction: "writes" },
+  ],
+};
+
+// Cron schedules in plain words (per agent key).
+const CRON_HUMAN: Record<string, string> = {
+  "sentinel-daily": "Runs every day at 7:00 in the morning, right after Dispatch.",
+  "chronicler-end-of-day": "Runs every day at 9:52 at night, after the workday ends.",
+  "content-engine-weekly": "Runs every Monday morning at 7:10.",
+  "renewal-content-weekly": "Runs every Monday morning at 7:44.",
+  "wing-digital-daily-outreach": "Disabled. Superseded by the live outreach sender.",
+  "wing-audit-roofing-batch": "Disabled. Runs only when triggered by hand.",
+};
+
+// Concise role text used when no SKILL.md is on disk (cloud mode, crew agents).
+const ROLE_LONG: Record<string, string> = {
+  "sentinel-daily":
+    "Per-client health monitor. Every day it runs a fixed 5-pillar checklist per client (SEO foundation, content quality and brand safety, website health, CRM/outreach, onboarding completeness), scores each pillar green/yellow/red, writes one condensed health page per client plus the master health board, and surfaces red flags loudly. Report-only: it checks and recommends, never fixes.",
+  "chronicler-end-of-day":
+    "End-of-day vault historian. Reads new Claude Code conversation content since its last run, sorts it into facts and ideas, scrubs secrets, appends a digest to the vault inbox, files ideas onto the idea backlog, and updates log.md and hot.md for high-confidence facts.",
+  "content-engine-weekly":
+    "Jackson Roofing weekly SEO content producer. Refreshes the live content calendar, writes the week's 2 blog drafts plus the Google Business post copy and the Wednesday rotation outline. Never produces insurance content.",
+  "renewal-content-weekly":
+    "Renewal Health (Lynette Wing) weekly content engine. Mirror of Jackson's content engine adapted for her static site and health/YMYL rules: 2 blog posts and a service page, Pexels images, health-claim gate, then publishes via the static-site publisher. No diagnose/treat/cure claims, ever.",
+  "wing-digital-daily-outreach":
+    "Legacy scheduled outreach runner. Superseded by the live outreach sender that runs every 15 minutes during business hours.",
+  "wing-audit-roofing-batch":
+    "Batch sales-audit generator. Runs Wing Digital audits on roofing prospects and produces a branded one-page PDF per business, wired into the call sheet.",
+  dispatch:
+    "Morning briefing agent. Regenerates campaign data, orders the day's dial list, checks GHL, and writes a one-page briefing so Jack is call-ready.",
+  prospector:
+    "Lead scout. Scans new DFW cities for leads, stages them as enriching, runs full enrichment, and produces a ready-to-promote list for Jack's approval.",
+  outreach:
+    "B2B cold email sender, live since 8/6. Checks the send window and daily cap, dry-runs the outreach script, then fires for real if clean. Logs every run.",
+  "reply-triage":
+    "Reply triage. Scans both GHL accounts for unread prospect replies, classifies each HOT/WARM/COLD, writes a condensed triage page into the vault, and surfaces HOT replies loudly.",
+  builder:
+    "Client onboarding runner. When a new client signs, executes the full onboarding SOP in GHL and hands Jack the UI-only checklist.",
+};
+
+// Read the agent's SKILL.md description from the local scheduled-tasks dir.
+function readSkillDescription(key: string): string | null {
+  try {
+    const p = path.join(SCHEDULED_DIR, key, "SKILL.md");
+    const raw = fs.readFileSync(p, "utf-8");
+    // frontmatter description: field, else first non-heading paragraph
+    const fm = raw.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+    if (fm) {
+      const m = fm[1].match(/^description:\s*([\s\S]*?)(?=\n\w[\w_-]*:|$)/m);
+      if (m) {
+        const d = m[1].replace(/^[>|]-?\s*/, "").replace(/\s+/g, " ").trim();
+        if (d) return redact(d).slice(0, 900);
+      }
+    }
+    const body = fm ? raw.slice(fm[0].length) : raw;
+    const para = body
+      .split(/\r?\n\r?\n/)
+      .map((s) => s.trim())
+      .find((s) => s && !s.startsWith("#"));
+    return para ? redact(para.replace(/\s+/g, " ")).slice(0, 900) : null;
+  } catch {
+    return null;
+  }
+}
+
+// Artifacts: what this agent most recently produced, when we know where to look.
+async function buildArtifact(key: string): Promise<{ title: string; lines: string[] } | null> {
+  const pick = async (rel: string, title: string, max = 14) => {
+    const raw = await readVaultFile(rel);
+    if (!raw) return null;
+    const lines = raw
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter((l) => l && !l.startsWith("---"))
+      .slice(0, max)
+      .map((l) => clean(redact(l)).slice(0, 200));
+    return lines.length ? { title, lines } : null;
+  };
+  if (key === "sentinel-daily") return pick("wiki/state/health-board.md", "Latest health board", 18);
+  if (key === "outreach" || key === "wing-digital-daily-outreach")
+    return pick("wiki/state/outreach-snapshot.md", "Outreach snapshot");
+  if (key === "dispatch") return pick("wiki/state/business-snapshot.md", "Business snapshot");
+  if (key === "reply-triage") return pick("wiki/state/reply-triage.md", "Latest triage page");
+  return null;
+}
+
+async function agentDetail(key: string) {
+  const meta =
+    SCHEDULED.find((s) => s.key === key) ??
+    CREW.map((c) => ({
+      key: c.key, name: c.name, role: c.role, schedule: "On demand",
+      enabled: true, match: c.match, next: () => null as Date | null,
+    })).find((s) => s.key === key);
+  if (!meta) {
+    return NextResponse.json({ error: `unknown agent '${key}'` }, { status: 404 });
+  }
+
+  const logRaw = await readVaultFile("wiki/log.md");
+  // Last ~200 log entries, newest first, filtered to this agent.
+  const all = logRaw ? parseLog(logRaw).slice(-200).reverse() : [];
+  const activity = all
+    .filter((e) => meta.match.test(e.title) || meta.match.test(e.type) || e.lines.some((l) => meta.match.test(l)))
+    .slice(0, 40);
+
+  const { present, state } = readScheduledDisk();
+  const st = state.get(key);
+  const isScheduled = SCHEDULED.some((s) => s.key === key);
+  const nextAt = st?.nextRunAt
+    ? new Date(st.nextRunAt)
+    : meta.enabled && isScheduled ? meta.next() : null;
+
+  const description = readSkillDescription(key) ?? ROLE_LONG[key] ?? meta.role;
+  const artifact = await buildArtifact(key);
+
+  let status = "idle";
+  if (!meta.enabled) status = "disabled";
+  else if (activity.length && (Date.now() - new Date(activity[0].date).getTime()) / 86400000 <= 2) status = "active";
+  else if (nextAt) status = "scheduled";
+
+  return NextResponse.json({
+    key,
+    name: meta.name,
+    kind: isScheduled ? "scheduled" : "crew",
+    role: meta.role,
+    description,
+    schedule: meta.schedule,
+    scheduleHuman: isScheduled ? CRON_HUMAN[key] ?? meta.schedule : "Runs on demand, when Jack asks for it.",
+    enabled: meta.enabled,
+    status,
+    installed: present.size > 0 ? present.has(key) : null,
+    lastRunAt: st?.lastRunAt ?? st?.lastRun ?? null,
+    nextRunAt: nextAt ? nextAt.toISOString() : null,
+    systems: AGENT_SYSTEMS[key] ?? [{ id: "vault", label: "VAULT", direction: "both" }],
+    activity,
+    artifact,
+  });
+}
+
 // ── main handler ───────────────────────────────────────────────────────────
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const agentKey = req.nextUrl.searchParams.get("agent");
+  if (agentKey) return agentDetail(agentKey);
+
   const cloud = isGithubVault();
 
   const [logRaw, hotRaw, healthRaw, bizRaw, outreachRaw] = await Promise.all([

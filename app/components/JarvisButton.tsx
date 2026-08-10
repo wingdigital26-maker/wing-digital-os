@@ -26,6 +26,53 @@ export default function JarvisButton() {
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sendMessageRef = useRef<(text: string) => void>(() => {});
   const SILENCE_MS = 4500;
+  // Voice output: speak replies aloud with the best deep or UK voice available.
+  const [voiceOn, setVoiceOn] = useState(false);
+  const voiceOnRef = useRef(false);
+  const chosenVoiceRef = useRef<SpeechSynthesisVoice | null>(null);
+
+  useEffect(() => { voiceOnRef.current = voiceOn; }, [voiceOn]);
+
+  // Pick the best available voice at runtime: deep or UK male first.
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+    const pick = () => {
+      const voices = window.speechSynthesis.getVoices();
+      if (!voices.length) return;
+      const prefer = [
+        (v: SpeechSynthesisVoice) => /ryan/i.test(v.name) && v.lang.startsWith("en"),
+        (v: SpeechSynthesisVoice) => /google uk english male/i.test(v.name),
+        (v: SpeechSynthesisVoice) => /george|daniel|arthur|brian/i.test(v.name) && v.lang.startsWith("en"),
+        (v: SpeechSynthesisVoice) => v.lang === "en-GB" && /male/i.test(v.name),
+        (v: SpeechSynthesisVoice) => v.lang === "en-GB",
+        (v: SpeechSynthesisVoice) => v.lang.startsWith("en"),
+      ];
+      for (const p of prefer) {
+        const v = voices.find(p);
+        if (v) { chosenVoiceRef.current = v; return; }
+      }
+    };
+    pick();
+    window.speechSynthesis.onvoiceschanged = pick;
+  }, []);
+
+  const speak = useCallback((text: string) => {
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+    const clean = text
+      .replace(/```[\s\S]*?```/g, " code block ")
+      .replace(/[#*_`>|]/g, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 1200);
+    if (!clean) return;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(clean);
+    if (chosenVoiceRef.current) u.voice = chosenVoiceRef.current;
+    u.rate = 1.02;
+    u.pitch = 0.85;
+    u.volume = 1;
+    window.speechSynthesis.speak(u);
+  }, []);
 
   // Hide on login page
   if (pathname === "/login") return null;
@@ -112,6 +159,14 @@ export default function JarvisButton() {
           }
         }
       }
+      // Voice mode: read the finished reply aloud.
+      if (voiceOnRef.current) {
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last?.role === "assistant" && last.content) speak(last.content);
+          return prev;
+        });
+      }
     } catch (err) {
       setMessages((prev) => {
         const updated = [...prev];
@@ -126,7 +181,26 @@ export default function JarvisButton() {
       setStreaming(false);
       setToolLabel(null);
     }
-  }, [messages, streaming, conversationId]);
+  }, [messages, streaming, conversationId, speak]);
+
+  // Global events: the sidebar Jarvis button and "Ask" buttons around the OS
+  // open this panel (and optionally preload a question).
+  useEffect(() => {
+    const onOpen = () => setOpen(true);
+    const onAsk = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      setOpen(true);
+      if (typeof detail === "string" && detail.trim()) {
+        setTimeout(() => sendMessageRef.current(detail), 150);
+      }
+    };
+    window.addEventListener("jarvis:open", onOpen);
+    window.addEventListener("jarvis:ask", onAsk);
+    return () => {
+      window.removeEventListener("jarvis:open", onOpen);
+      window.removeEventListener("jarvis:ask", onAsk);
+    };
+  }, []);
 
   // Keep a stable ref to sendMessage so timers/recognition callbacks never go stale.
   useEffect(() => {
@@ -149,6 +223,9 @@ export default function JarvisButton() {
     finalTranscriptRef.current = "";
     if (submit && text) {
       setInput("");
+      // Spoke to Jarvis: speak the reply back.
+      voiceOnRef.current = true;
+      setVoiceOn(true);
       sendMessageRef.current(text);
     } else {
       setInput(text); // leave captured text in the input for editing
@@ -343,12 +420,21 @@ export default function JarvisButton() {
                 Jarvis
               </span>
               {engine && (
-                <span style={{ color: "#556", fontSize: 10, fontFamily: "Inter, sans-serif", border: "1px solid rgba(16,192,240,0.2)", borderRadius: 6, padding: "1px 6px" }}>
-                  {engine === "claude-code" ? "via Claude Code" : "via API"}
+                <span style={{ color: engine === "limited" ? "#fb923c" : "#556", fontSize: 10, fontFamily: "Inter, sans-serif", border: `1px solid ${engine === "limited" ? "rgba(251,146,60,0.4)" : "rgba(16,192,240,0.2)"}`, borderRadius: 6, padding: "1px 6px" }}>
+                  {engine === "claude-code" ? "via Claude Code" : engine === "limited" ? "limited mode" : "via API"}
                 </span>
               )}
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <button
+                onClick={() => {
+                  const next = !voiceOn;
+                  setVoiceOn(next);
+                  if (!next && typeof window !== "undefined") window.speechSynthesis?.cancel();
+                }}
+                title={voiceOn ? "Voice replies on" : "Voice replies off"}
+                style={{ background: "none", border: "1px solid rgba(16,192,240,0.25)", borderRadius: 6, color: voiceOn ? "#10C0F0" : "#556", cursor: "pointer", fontSize: 10, padding: "2px 8px", fontFamily: "Inter, sans-serif" }}
+              >{voiceOn ? "Voice on" : "Voice off"}</button>
               <button
                 onClick={() => {
                   // New chat: fresh Claude Code session + clean panel.

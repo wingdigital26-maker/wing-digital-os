@@ -10,6 +10,7 @@ function isPublicPath(pathname: string): boolean {
     pathname.startsWith("/_next") ||
     pathname === "/favicon.ico" ||
     pathname === "/manifest.json" ||
+    pathname === "/sw.js" ||
     pathname === "/icon.svg" ||
     pathname.startsWith("/icon-") ||
     pathname === "/apple-touch-icon.png" ||

@@ -3,6 +3,23 @@ import { listVaultFiles, readVaultFile } from "@/lib/vaultSource";
 
 export const runtime = "nodejs";
 
+// ── Always-loaded graph cache ──────────────────────────────────────────────
+// Building the graph walks every vault file, which is slow (especially against
+// the GitHub vault in cloud mode). We keep the last built graph in module
+// memory and serve it instantly; when it goes stale we refresh in the
+// BACKGROUND while still serving the cached copy, so the vault view never
+// blocks on a rebuild after the first load.
+const GRAPH_TTL_MS = 5 * 60 * 1000; // consider stale after 5 minutes
+
+interface GraphPayload {
+  nodes: { id: string; name: string; path: string; group: string }[];
+  links: { source: string; target: string }[];
+  builtAt: string;
+}
+
+let graphCache: { value: GraphPayload; at: number } | null = null;
+let building: Promise<GraphPayload> | null = null;
+
 function extractWikilinks(content: string): string[] {
   // Match [[link]], [[link|alias]], [[link\|alias]] (escaped pipe in tables)
   const matches = content.matchAll(/\[\[([^\]|#\\]+)(?:[\\]?[|#][^\]]*)?\]\]/g);
@@ -14,7 +31,7 @@ function basename(rel: string): string {
   return file.replace(/\.md$/, "");
 }
 
-export async function GET() {
+async function buildGraph(): Promise<GraphPayload> {
   const allFiles = await listVaultFiles(); // relative paths, "/"-separated
 
   // Build both filename and relative-path lookups
@@ -54,5 +71,32 @@ export async function GET() {
     }
   }
 
-  return NextResponse.json({ nodes, links });
+  return { nodes, links, builtAt: new Date().toISOString() };
+}
+
+function refresh(): Promise<GraphPayload> {
+  if (!building) {
+    building = buildGraph()
+      .then(g => {
+        graphCache = { value: g, at: Date.now() };
+        return g;
+      })
+      .finally(() => {
+        building = null;
+      });
+  }
+  return building;
+}
+
+export async function GET() {
+  if (graphCache) {
+    // Serve instantly; kick off a background rebuild if stale.
+    if (Date.now() - graphCache.at > GRAPH_TTL_MS) {
+      refresh().catch(() => {});
+    }
+    return NextResponse.json({ ...graphCache.value, cached: true });
+  }
+  // First request since boot: build once (deduped if concurrent).
+  const g = await refresh();
+  return NextResponse.json({ ...g, cached: false });
 }

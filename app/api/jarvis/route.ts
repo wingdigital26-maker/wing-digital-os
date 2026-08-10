@@ -842,11 +842,49 @@ async function callAnthropic(apiKey: string, messages: any[]) {
   return res.json();
 }
 
+// ── Limited mode (engine 3) ────────────────────────────────────────────────
+// No Claude Code CLI and no API key (e.g. a bare Vercel deploy). Instead of
+// erroring out, answer from the live vault state snapshots so Jarvis can still
+// report what is going on inside the OS. Clearly labeled as limited mode.
+async function runLimitedMode(send: (obj: any) => void, userText: string) {
+  send({ engine: "limited" });
+  const [biz, outreach, hot, log] = await Promise.all([
+    readVaultFile("wiki/state/business-snapshot.md"),
+    readVaultFile("wiki/state/outreach-snapshot.md"),
+    readVaultFile("wiki/hot.md"),
+    readVaultFile("wiki/log.md"),
+  ]);
+
+  const parts: string[] = [];
+  parts.push("Limited mode: the full AI backend is unreachable from here, so this is a direct readout of the live OS state instead of a reasoned answer.\n");
+
+  const q = userText.toLowerCase();
+  const wantAll = !/(outreach|email|pipeline|client|mrr|focus|log|activity|agent)/.test(q);
+
+  if (biz && (wantAll || /client|mrr|business|money|revenue/.test(q))) {
+    parts.push("BUSINESS SNAPSHOT\n" + biz.trim().slice(0, 1200));
+  }
+  if (outreach && (wantAll || /outreach|email|pipeline|lead|prospect|sent/.test(q))) {
+    parts.push("\nOUTREACH SNAPSHOT\n" + outreach.trim().slice(0, 1200));
+  }
+  if (hot && (wantAll || /focus|priorit|question|decision|next/.test(q))) {
+    parts.push("\nCURRENT FOCUS (hot.md)\n" + hot.trim().slice(0, 1000));
+  }
+  if (log && (wantAll || /log|activity|agent|recent|happen|today/.test(q))) {
+    const recent = log.split(/\r?\n/).filter(l => l.startsWith("## ")).slice(-8).join("\n");
+    if (recent) parts.push("\nRECENT ACTIVITY (log.md)\n" + recent);
+  }
+  if (parts.length === 1) {
+    parts.push("No vault state files are reachable right now. Try again once the vault source is connected.");
+  }
+  send({ text: parts.join("\n") });
+}
+
 // The original Anthropic-API agent loop, kept as the fallback engine.
-async function runApiLoop(send: (obj: any) => void, messages: any[]) {
+async function runApiLoop(send: (obj: any) => void, messages: any[], userText: string) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    send({ text: "(Jarvis is unavailable: no Claude Code CLI and ANTHROPIC_API_KEY not set.)" });
+    await runLimitedMode(send, userText);
     return;
   }
   try {
@@ -937,8 +975,8 @@ export async function POST(req: NextRequest) {
         }
         // Engine 2 (fallback): the original Anthropic API tool loop.
         if (!handled) {
-          send({ engine: "api" });
-          await runApiLoop(send, messages);
+          if (process.env.ANTHROPIC_API_KEY) send({ engine: "api" });
+          await runApiLoop(send, messages, userText);
         }
       } catch (e: any) {
         send({ text: "\n\n(Jarvis hit an error: " + (e?.message ?? "unknown") + ")" });

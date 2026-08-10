@@ -1,24 +1,18 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
-import { motion, AnimatePresence, MotionConfig } from "motion/react";
-import { Bolt, Target, Users, Cpu, Bulb, Plus, Calendar, Note, Sparkles } from "reicon-react";
+import { motion, MotionConfig } from "motion/react";
+import { Bolt, Users, Cpu, Bulb, Plus, Calendar, Note, Sparkles } from "reicon-react";
 import { staggerContainer, riseItem, hoverSpring, cardHover, cardTap } from "./components/motion";
-import { KpiCard, BarChart, FunnelChart, DonutChart, ChartCard, Sparkline, Delta, buildDailySeries } from "./components/Charts";
+import { Sparkline, Delta, buildDailySeries } from "./components/Charts";
 
 type IconType = React.ComponentType<{ size?: number; color?: string }>;
 
 const VaultGraph = dynamic(() => import("./components/VaultGraph"), { ssr: false });
-const AgentsView = dynamic(() => import("./components/AgentPanel"), { ssr: false });
 const Search = dynamic(() => import("./components/Search"), { ssr: false });
 const ActivityLog = dynamic(() => import("./components/ActivityLog"), { ssr: false });
 const WeekCalendar = dynamic(() => import("./components/WeekCalendar"), { ssr: false });
-const FloatingChat = dynamic(() => import("./components/FloatingChat"), { ssr: false });
-const ColdCallBoard = dynamic(() => import("./components/ColdCallBoard"), { ssr: false });
-const AgentBoard = dynamic(() => import("./components/AgentBoard"), { ssr: false });
-const AgentActivity = dynamic(() => import("./components/AgentActivity"), { ssr: false });
-const TrustPanel = dynamic(() => import("./components/TrustPanel"), { ssr: false });
-const CampaignBoard = dynamic(() => import("./components/CampaignBoard"), { ssr: false });
+const MissionOps = dynamic(() => import("./components/MissionOps"), { ssr: false });
 const ClientsBoard = dynamic(() => import("./components/ClientsBoard"), { ssr: false });
 
 type NavGroup = {
@@ -34,21 +28,10 @@ const NAV: NavGroup[] = [
       { id: "personal", label: "Personal" },
     ],
   },
-  {
-    id: "sales", label: "Sales", icon: Target,
-    subs: [
-      { id: "sales-overview", label: "Overview" },
-      { id: "coldcalls", label: "Cold Calls" },
-    ],
-  },
   { id: "clients", label: "Clients", icon: Users, subs: [{ id: "clients", label: "Clients" }] },
   {
     id: "agent", label: "Agents", icon: Cpu,
-    subs: [
-      { id: "activity", label: "Activity" },
-      { id: "agent", label: "Workforce" },
-      { id: "trust", label: "Trust & Budget" },
-    ],
+    subs: [{ id: "agent", label: "Mission Control" }],
   },
   {
     id: "intel", label: "Intel", icon: Bulb,
@@ -71,7 +54,6 @@ export default function Home() {
   const [ghlData, setGhlData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [openNotePath, setOpenNotePath] = useState<string | undefined>();
-  const [aiInject, setAiInject] = useState<string | undefined>();
   const [newLeadCount, setNewLeadCount] = useState(0);
   const prevLeadCount = useRef(0);
 
@@ -80,9 +62,10 @@ export default function Home() {
     setOpenNotePath(path);
   }
 
+  // Sales section is gone; "ask the AI" now opens the Jarvis panel with the
+  // context preloaded (JarvisButton listens for this event globally).
   function sendToAI(context: string) {
-    setAiInject(context);
-    setActive("agent");
+    window.dispatchEvent(new CustomEvent("jarvis:ask", { detail: context }));
   }
 
   const fetchGhl = useCallback(() => {
@@ -139,11 +122,11 @@ export default function Home() {
         <nav style={{ flex: 1, padding: "12px 8px", display: "flex", flexDirection: "column", gap: 2 }}>
           {NAV.map(item => {
             const isActive = groupOf(active).id === item.id;
-            const hasBadge = item.id === "sales" && newLeadCount > 0;
+            const hasBadge = item.id === "command" && newLeadCount > 0;
             return (
               <button key={item.id} onClick={() => {
                 setActive(item.subs[0].id);
-                if (item.id === "sales") setNewLeadCount(0);
+                if (item.id === "command") setNewLeadCount(0);
               }} style={{
                 display: "flex", alignItems: "center", gap: 10,
                 padding: "10px 10px", borderRadius: 8, border: "none",
@@ -172,17 +155,17 @@ export default function Home() {
           })}
         </nav>
 
-        {/* AI Brain — separate full-page route (chat grounded in the vault) */}
-        <a href="/brain" style={{
+        {/* Jarvis — the one merged assistant (AI brain + voice), opens the panel */}
+        <button onClick={() => window.dispatchEvent(new CustomEvent("jarvis:open"))} style={{
           display: "flex", alignItems: "center", gap: 10,
           margin: "0 8px 4px", padding: "10px 10px", borderRadius: 8,
           background: "var(--accent-glow)", border: "1px solid var(--accent)",
-          color: "var(--accent)", textDecoration: "none",
+          color: "var(--accent)", cursor: "pointer",
           fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden",
         }}>
           <span style={{ display: "inline-flex", flexShrink: 0 }}><Sparkles size={16} /></span>
-          {sidebarOpen && <span>AI Brain</span>}
-        </a>
+          {sidebarOpen && <span>Jarvis</span>}
+        </button>
 
         <button onClick={() => setSidebarOpen(!sidebarOpen)} style={{
           margin: "8px", padding: "8px", borderRadius: 8, border: "none",
@@ -242,214 +225,22 @@ export default function Home() {
         )}
 
         <div style={{ flex: 1, overflow: "auto", padding: "24px" }}>
-          <AnimatePresence mode="wait">
-            <motion.div key={active}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.25, ease: "easeOut" }}
-            >
+          {/* CSS-only section transition: the new view mounts IMMEDIATELY
+              (no JS-gated exit animation that can stall in background tabs). */}
+          <style>{`@keyframes viewIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }`}</style>
+          <div key={active} style={{ animation: "viewIn 0.25s ease-out" }}>
               {active === "command" && <CommandCenter data={ghlData} loading={loading} onSendToAI={sendToAI} />}
-              {active === "sales-overview" && <SalesOverview data={ghlData} loading={loading} />}
-              {active === "coldcalls" && <ColdCallBoard onSendToAI={sendToAI} />}
               {active === "clients" && <ClientsBoard />}
               {active === "competitors" && <CompetitorIntel onSendToAI={sendToAI} />}
               {active === "knowledge" && <KnowledgeBase initialPath={openNotePath} onSendToAI={sendToAI} />}
-              {active === "activity" && <AgentActivity />}
-              {active === "agent" && <><AgentBoard /><AgentsView inject={aiInject} /></>}
-              {active === "trust" && <TrustPanel />}
+              {active === "agent" && <MissionOps />}
               {active === "log" && <ActivityLog />}
               {active === "personal" && <PersonalSection data={ghlData} />}
-            </motion.div>
-          </AnimatePresence>
+          </div>
         </div>
       </main>
-      <FloatingChat />
     </div>
     </MotionConfig>
-  );
-}
-
-function SalesOverview({ data, loading }: { data: any; loading: boolean }) {
-  const [metrics, setMetrics] = useState<any>(null);
-  const [camp, setCamp] = useState<any>(null);
-  const [prospects, setProspects] = useState<any[]>([]);
-  useEffect(() => {
-    fetch("/api/sales-metrics").then(r => r.json()).then(d => { if (!d.error) setMetrics(d); }).catch(() => {});
-    fetch("/api/campaign").then(r => r.json()).then(d => { if (!d.error) setCamp(d); }).catch(() => {});
-    fetch("/api/prospects").then(r => r.json()).then(d => { if (Array.isArray(d.prospects)) setProspects(d.prospects); }).catch(() => {});
-  }, []);
-  const m = metrics ?? {};
-  const pending = loading && !metrics;
-
-  // ── Real GHL email open stats (live per-message statuses via /api/sales-metrics) ──
-  const es = m.emailStats ?? null;
-  const openRate = es?.totals?.openRatePct;
-  const openedCount = es?.totals?.opened ?? m.opened ?? 0;
-  const deliveredCount = es?.totals?.delivered ?? 0;
-  const uniqueOpenRate = es?.unique?.openRatePct;
-  const STEP_META = [
-    { key: "day1", label: "Day 1", color: "#22d3ee" },
-    { key: "day3", label: "Day 3", color: "#a78bfa" },
-    { key: "day7", label: "Day 7", color: "#fb923c" },
-  ];
-
-  // ── Daily email series (last 14 days) from campaign by_day ────────────────
-  const series14 = buildDailySeries(camp?.by_day, 14);
-  const sparkValues = series14.map(s => s.value);
-  const sentYesterday = series14.length >= 2 ? series14[series14.length - 2].value : 0;
-  const sentTodaySeries = series14.length ? series14[series14.length - 1].value : 0;
-  const sentToday = m.sentToday ?? sentTodaySeries;
-  const deltaToday = camp?.by_day ? sentToday - sentYesterday : null;
-  const total14 = sparkValues.reduce((a, b) => a + b, 0);
-
-  // ── Cold-call funnel + tier/status mix from prospects.db ──────────────────
-  const CONTACTED = new Set(["no-answer", "voicemail", "callback", "booked", "emailed", "not-interested", "closed"]);
-  const contacted = prospects.filter(p => CONTACTED.has(p.status)).length;
-  const callbacks = prospects.filter(p => p.status === "callback").length;
-  const booked = prospects.filter(p => p.status === "booked").length;
-  const closed = prospects.filter(p => p.status === "closed").length;
-
-  const TIER_COLORS: Record<number, string> = { 1: "#22d3ee", 2: "#a78bfa", 3: "#fb923c" };
-  const tierCounts = new Map<number, number>();
-  prospects.forEach(p => { const t = Number(p.tier) || 0; tierCounts.set(t, (tierCounts.get(t) ?? 0) + 1); });
-  const tierSegments = [...tierCounts.entries()]
-    .sort((a, b) => a[0] - b[0])
-    .map(([t, n]) => ({ label: t ? `Tier ${t}` : "Untiered", value: n, color: TIER_COLORS[t] ?? "#6b7280" }));
-
-  const STATUS_COLORS: Record<string, string> = {
-    new: "#6b7280", enriching: "#818cf8", "no-answer": "#fbbf24", voicemail: "#fb923c",
-    callback: "#a78bfa", booked: "#34d399", emailed: "#22d3ee", "not-interested": "#fb7185", closed: "#4ade80",
-  };
-  const statusCounts = new Map<string, number>();
-  prospects.forEach(p => { const s = p.status || "new"; statusCounts.set(s, (statusCounts.get(s) ?? 0) + 1); });
-  const statusRows = [...statusCounts.entries()].sort((a, b) => b[1] - a[1]);
-  const statusMax = Math.max(...statusRows.map(r => r[1]), 1);
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      {/* KPI metric cards — big number + delta + sparkline */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
-        <KpiCard label="Emails Sent Today" value={pending ? "..." : sentToday}
-          color="#22d3ee" delta={pending ? null : deltaToday} deltaLabel="vs yesterday"
-          spark={sparkValues} sub={`${total14} sent in the last 14 days`} />
-        <KpiCard label="Queued Today" value={pending ? "..." : (m.queuedToday ?? 0)}
-          color="#a78bfa" sub="cap headroom left for today" />
-        <KpiCard label="Sent This Month" value={pending ? "..." : (m.sentMonth ?? 0)}
-          color="#60a5fa" spark={sparkValues} />
-        <KpiCard label="Eligible Queue" value={pending ? "..." : (m.queuedMonth ?? 0)}
-          color="#fb923c" sub="prospects with email + owner, not yet sent" />
-        <KpiCard label="Open Rate" value={pending || openRate === undefined ? "..." : `${openRate}%`}
-          color="#34d399"
-          sub={es
-            ? `${openedCount} of ${deliveredCount} delivered opened · ${uniqueOpenRate}% of contacts · live from GHL`
-            : "live open stats from GHL loading"} />
-      </div>
-
-      {/* Charts row 1: emails per day + email funnel */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 14 }}>
-        <ChartCard title="Emails Sent Per Day" badge="last 14 days" badgeColor="#22d3ee">
-          {camp?.by_day ? (
-            <BarChart data={series14.map(s => ({ label: s.label, value: s.value, hint: s.date }))} color="#22d3ee" height={120} showEvery={2} />
-          ) : <div className="skel" style={{ height: 140 }} />}
-        </ChartCard>
-        <ChartCard title="Email Outreach Funnel" badge={camp?.totals ? `${camp.totals.contacts} contacts` : undefined} badgeColor="#60a5fa">
-          {camp?.totals ? (
-            <>
-              <FunnelChart stages={[
-                { label: "Contacts", value: camp.totals.contacts ?? 0, color: "#60a5fa" },
-                { label: "Emailed", value: camp.totals.sent ?? 0, color: "#22d3ee" },
-                { label: "Opened", value: openedCount, color: "#34d399" },
-              ]} />
-              {camp?.stages && (
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 14 }}>
-                  {[
-                    { l: "day 1", v: camp.stages.day1, c: "#22d3ee" },
-                    { l: "day 3", v: camp.stages.day3, c: "#a78bfa" },
-                    { l: "day 7", v: camp.stages.day7, c: "#fb923c" },
-                    { l: "done", v: camp.stages.done, c: "#6b7280" },
-                  ].map(s => (
-                    <span key={s.l} style={{ fontSize: 10, fontWeight: 700, color: s.c, background: `${s.c}14`, border: `1px solid ${s.c}33`, padding: "3px 10px", borderRadius: 999 }}>
-                      {s.v ?? 0} in {s.l}
-                    </span>
-                  ))}
-                </div>
-              )}
-              {es?.steps && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 5, marginTop: 14 }}>
-                  <p style={{ fontSize: 10, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                    Open rate by step (GHL, live)
-                  </p>
-                  {STEP_META.map(sm => {
-                    const st = es.steps[sm.key];
-                    if (!st || !st.sent) return null;
-                    return (
-                      <div key={sm.key} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span style={{ fontSize: 10.5, color: "var(--text-secondary)", width: 44, flexShrink: 0 }}>{sm.label}</span>
-                        <div style={{ flex: 1, height: 8, background: "rgba(255,255,255,0.04)", borderRadius: 999, overflow: "hidden" }}>
-                          <div style={{ width: `${Math.min(st.openRatePct, 100)}%`, height: "100%", borderRadius: 999, background: `linear-gradient(90deg, ${sm.color}, ${sm.color}77)`, transition: "width 0.5s ease" }} />
-                        </div>
-                        <span style={{ fontSize: 10.5, fontWeight: 700, color: sm.color, width: 88, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif" }}>
-                          {st.openRatePct}% · {st.opened}/{st.delivered}
-                        </span>
-                      </div>
-                    );
-                  })}
-                  {(es.totals?.clicked > 0 || es.totals?.failed > 0) && (
-                    <p style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>
-                      {es.totals.clicked} clicked · {es.totals.failed} bounced or failed
-                    </p>
-                  )}
-                </div>
-              )}
-            </>
-          ) : <div className="skel" style={{ height: 140 }} />}
-        </ChartCard>
-      </div>
-
-      {/* Charts row 2: cold-call funnel + lead mix */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 14 }}>
-        <ChartCard title="Cold-Call Pipeline Funnel" badge={prospects.length ? `${prospects.length} prospects` : undefined} badgeColor="#a78bfa">
-          {prospects.length ? (
-            <FunnelChart stages={[
-              { label: "Prospects", value: prospects.length, color: "#60a5fa" },
-              { label: "Contacted", value: contacted, color: "#22d3ee" },
-              { label: "Callbacks", value: callbacks, color: "#a78bfa" },
-              { label: "Booked", value: booked, color: "#34d399" },
-              { label: "Closed", value: closed, color: "#4ade80" },
-            ]} />
-          ) : <div className="skel" style={{ height: 140 }} />}
-        </ChartCard>
-        <ChartCard title="Leads by Tier & Status" badge="prospects.db" badgeColor="#fb923c">
-          {prospects.length ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              <DonutChart segments={tierSegments} centerLabel="leads" />
-              <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                {statusRows.map(([s, n]) => {
-                  const c = STATUS_COLORS[s] ?? "#6b7280";
-                  return (
-                    <div key={s} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ fontSize: 10.5, color: "var(--text-secondary)", width: 90, flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s}</span>
-                      <div style={{ flex: 1, height: 8, background: "rgba(255,255,255,0.04)", borderRadius: 999, overflow: "hidden" }}>
-                        <div style={{ width: `${(n / statusMax) * 100}%`, height: "100%", borderRadius: 999, background: `linear-gradient(90deg, ${c}, ${c}77)`, transition: "width 0.5s ease" }} />
-                      </div>
-                      <span style={{ fontSize: 10.5, fontWeight: 700, color: c, width: 32, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif" }}>{n}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ) : <div className="skel" style={{ height: 140 }} />}
-        </ChartCard>
-      </div>
-
-      <div>
-        <p style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>
-          Email Campaign
-        </p>
-        <CampaignBoard />
-      </div>
-    </div>
   );
 }
 
@@ -469,7 +260,20 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
   const [camp, setCamp] = useState<any>(null);
   const [sentToday, setSentToday] = useState<number | null>(null);
   const [agentHealth, setAgentHealth] = useState<any[]>([]);
+  const [missionStats, setMissionStats] = useState<{ tiles: { label: string; value: string; sub: string | null }[]; updated: string | null } | null>(null);
   const stats = data?.stats;
+
+  // Command Center absorbs the mission stats row (MRR, active clients,
+  // pipeline size, emails sent) — big tiles, zero configuration.
+  useEffect(() => {
+    const load = () => fetch("/api/mission")
+      .then(r => r.json())
+      .then(d => { if (d?.stats?.tiles) setMissionStats(d.stats); })
+      .catch(() => {});
+    load();
+    const id = setInterval(load, 5 * 60 * 1000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     fetch("/api/agents/brief")
@@ -714,6 +518,22 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
         </motion.div>
       )}
 
+      {/* Mission stats row — the essential numbers, no filters, no config */}
+      {missionStats && missionStats.tiles.length > 0 && (
+        <motion.div variants={riseItem} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
+          {missionStats.tiles.map(t => (
+            <div key={t.label} style={{
+              background: "linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))",
+              border: "1px solid var(--border)", borderRadius: 14, padding: "14px 18px",
+            }}>
+              <div style={{ fontSize: 10, letterSpacing: "0.12em", color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 700 }}>{t.label}</div>
+              <div style={{ fontSize: 28, fontWeight: 800, color: "var(--text-primary)", fontFamily: "'Space Grotesk', sans-serif", marginTop: 4 }}>{t.value}</div>
+              {t.sub && <div style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 2 }}>{t.sub}</div>}
+            </div>
+          ))}
+        </motion.div>
+      )}
+
       {/* Dispatch agent briefing */}
       {brief && (
         <div style={{
@@ -937,297 +757,6 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
         <ModalActions onCancel={() => setShowNewNote(false)} onSubmit={submitNote} saving={saving} submitLabel="Save to Vault" />
       </Modal>}
     </motion.div>
-  );
-}
-
-function Pipeline({ data, loading, onSendToAI, onRefresh }: { data: any; loading: boolean; onSendToAI: (ctx: string) => void; onRefresh: () => void }) {
-  const [movingOpp, setMovingOpp] = useState<string | null>(null);
-  const [toast, setToast] = useState("");
-  const [selectedPipelineIdx, setSelectedPipelineIdx] = useState(0);
-  const [lastSynced, setLastSynced] = useState<Date | null>(null);
-  const [localOpps, setLocalOpps] = useState<any[]>([]);
-
-  const locationId = data?.locationId ?? "";
-  const pipelines: any[] = data?.pipelines ?? [];
-  const allOpps: any[] = data?.opportunities ?? [];
-
-  // Keep local copy so stage moves reflect immediately without a full refetch
-  useEffect(() => { setLocalOpps(allOpps); }, [allOpps]);
-  useEffect(() => { if (data) setLastSynced(new Date()); }, [data]);
-
-  function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(""), 3000); }
-
-  async function moveToStage(opp: any, stageId: string, stageName: string) {
-    setMovingOpp(opp.id);
-    const res = await fetch("/api/ghl/opportunity", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ opportunityId: opp.id, pipelineStageId: stageId }),
-    });
-    setMovingOpp(null);
-    if (res.ok) {
-      // Optimistic update in local state
-      setLocalOpps(prev => prev.map(o => o.id === opp.id
-        ? { ...o, pipelineStage: { id: stageId, name: stageName } }
-        : o
-      ));
-      showToast(`Moved to "${stageName}"`);
-    } else {
-      showToast("Failed — check GHL");
-    }
-  }
-
-  async function markWon(opp: any) {
-    setMovingOpp(opp.id);
-    const res = await fetch("/api/ghl/opportunity", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ opportunityId: opp.id, status: "won" }),
-    });
-    setMovingOpp(null);
-    if (res.ok) { setLocalOpps(prev => prev.map(o => o.id === opp.id ? { ...o, status: "won" } : o)); showToast("Marked as Won!"); }
-    else showToast("Failed — check GHL");
-  }
-
-  async function markLost(opp: any) {
-    setMovingOpp(opp.id);
-    const res = await fetch("/api/ghl/opportunity", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ opportunityId: opp.id, status: "lost" }),
-    });
-    setMovingOpp(null);
-    if (res.ok) { setLocalOpps(prev => prev.map(o => o.id === opp.id ? { ...o, status: "lost" } : o)); showToast("Marked as Lost"); }
-    else showToast("Failed — check GHL");
-  }
-
-  const activePipeline = pipelines[selectedPipelineIdx];
-  const pipelineStages: { id: string; name: string; position: number }[] = activePipeline?.stages ?? [];
-
-  // Filter to open opps in the active pipeline
-  const pipelineOpps = localOpps.filter(o =>
-    o.status === "open" && (!activePipeline || o.pipelineId === activePipeline.id)
-  );
-
-  // Group by stage — use ordered stages as columns, extras go in "Other"
-  const stageMap = new Map<string, any[]>();
-  pipelineStages.forEach(s => stageMap.set(s.id, []));
-  const unstaged: any[] = [];
-  pipelineOpps.forEach(o => {
-    const sid = o.pipelineStage?.id;
-    if (sid && stageMap.has(sid)) stageMap.get(sid)!.push(o);
-    else unstaged.push(o);
-  });
-
-  // Summary stats
-  const totalOpen = pipelineOpps.length;
-  const totalValue = pipelineOpps.reduce((s: number, o: any) => s + (o.monetaryValue ?? 0), 0);
-  const wonThisMonth = localOpps.filter(o => {
-    if (o.status !== "won") return false;
-    const d = new Date(o.lastStageChangeAt ?? o.dateAdded ?? 0);
-    const now = new Date();
-    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-  });
-
-  const STAGE_PALETTE = ["#60a5fa", "#fb923c", "#22d3ee", "#f59e0b", "#34d399", "#f472b6", "#38bdf8"];
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-      {toast && <div style={{ position: "fixed", bottom: 24, right: 24, background: "#4ade80", color: "#07080f", padding: "10px 18px", borderRadius: 10, fontWeight: 700, fontSize: 13, zIndex: 200 }}>{toast}</div>}
-
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
-        <div>
-          <h2 style={{ fontSize: 16, fontWeight: 700 }}>Prospect Pipeline</h2>
-          <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
-            Live from GHL · {lastSynced ? `Last synced ${lastSynced.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}` : "Loading..."}
-          </p>
-        </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {pipelines.length > 1 && (
-            <select value={selectedPipelineIdx} onChange={e => setSelectedPipelineIdx(Number(e.target.value))}
-              style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 10px", color: "var(--text-primary)", fontSize: 12, cursor: "pointer" }}>
-              {pipelines.map((p: any, i: number) => (
-                <option key={p.id} value={i}>{p.name}</option>
-              ))}
-            </select>
-          )}
-          <button onClick={onRefresh} disabled={loading} style={{
-            padding: "6px 14px", borderRadius: 8, fontSize: 12, cursor: "pointer",
-            border: "1px solid var(--border)", background: "var(--bg-card)",
-            color: "var(--text-muted)", opacity: loading ? 0.5 : 1,
-          }}>
-            {loading ? "Syncing..." : "⟳ Refresh"}
-          </button>
-          <a href={`https://app.gohighlevel.com/v2/location/${locationId}/opportunities/list`}
-            target="_blank" rel="noreferrer"
-            style={{ padding: "6px 14px", borderRadius: 8, fontSize: 12, border: "1px solid var(--accent)", background: "var(--accent-glow)", color: "var(--accent)", textDecoration: "none", fontWeight: 600 }}>
-            Open GHL →
-          </a>
-        </div>
-      </div>
-
-      {/* Summary stats */}
-      {!loading && (
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-          {[
-            { label: "Open Prospects", value: totalOpen, color: "#60a5fa" },
-            { label: "Pipeline Value", value: `$${totalValue.toLocaleString()}`, color: "#fbbf24" },
-            { label: "Won This Month", value: wonThisMonth.length, color: "#34d399" },
-          ].map(s => (
-            <div key={s.label} style={{
-              background: `radial-gradient(ellipse 90% 80% at 50% -30%, ${s.color}14, transparent 60%), linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))`,
-              border: "1px solid rgba(255,255,255,0.07)", borderRadius: 14, padding: "14px 20px",
-              flex: 1, minWidth: 130,
-              boxShadow: "0 8px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.04)",
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-                <span style={{ width: 5, height: 5, borderRadius: "50%", background: s.color, boxShadow: `0 0 7px ${s.color}` }} />
-                <p style={{ fontSize: 10.5, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>{s.label}</p>
-              </div>
-              <p style={{ fontSize: 24, fontWeight: 800, color: s.color, fontFamily: "'Space Grotesk', sans-serif", textShadow: `0 0 18px ${s.color}44`, lineHeight: 1 }}>{s.value}</p>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {loading ? <Spinner /> : pipelineStages.length === 0 ? (
-        <div style={{ padding: "48px 0", textAlign: "center", color: "var(--text-muted)" }}>
-          <p style={{ fontSize: 28, marginBottom: 8 }}>🎯</p>
-          <p>No pipeline found in GHL.</p>
-          <p style={{ fontSize: 12, marginTop: 4 }}>Create a pipeline in GHL and add opportunities — they'll appear here live.</p>
-          <a href={`https://app.gohighlevel.com/v2/location/${locationId}/opportunities/list`} target="_blank" rel="noreferrer"
-            style={{ display: "inline-block", marginTop: 16, fontSize: 13, color: "var(--accent)", textDecoration: "none", border: "1px solid var(--accent)", borderRadius: 8, padding: "8px 18px" }}>
-            Set up pipeline in GHL →
-          </a>
-        </div>
-      ) : (
-        /* Kanban columns — one per pipeline stage in GHL order */
-        <div style={{ display: "flex", gap: 14, overflowX: "auto", paddingBottom: 12, alignItems: "flex-start" }}>
-          {pipelineStages.map((stage, idx) => {
-            const color = STAGE_PALETTE[idx % STAGE_PALETTE.length];
-            const opps = stageMap.get(stage.id) ?? [];
-            const stageValue = opps.reduce((s: number, o: any) => s + (o.monetaryValue ?? 0), 0);
-            return (
-              <div key={stage.id} style={{
-                minWidth: 240, maxWidth: 270, flexShrink: 0,
-                background: "linear-gradient(180deg, rgba(16,19,31,0.85), rgba(11,13,23,0.75))",
-                border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16, overflow: "hidden",
-                boxShadow: "0 8px 24px rgba(0,0,0,0.25)",
-              }}>
-                {/* Column header */}
-                <div style={{
-                  padding: "13px 15px",
-                  borderBottom: "1px solid rgba(255,255,255,0.05)",
-                  background: `linear-gradient(135deg, ${color}12, transparent 65%)`,
-                }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                      <span style={{ width: 7, height: 7, borderRadius: "50%", background: color, boxShadow: `0 0 8px ${color}` }} />
-                      <span style={{ fontSize: 12.5, fontWeight: 700, letterSpacing: "0.01em" }}>{stage.name}</span>
-                    </div>
-                    <span style={{ background: color + "1e", color, fontSize: 11, fontWeight: 700, padding: "2px 9px", borderRadius: 999, border: `1px solid ${color}44` }}>{opps.length}</span>
-                  </div>
-                  {stageValue > 0 && <p style={{ fontSize: 11, color: "#34d399", marginTop: 4, fontWeight: 600 }}>${stageValue.toLocaleString()}</p>}
-                </div>
-
-                {/* Cards */}
-                <div style={{ padding: 10, display: "flex", flexDirection: "column", gap: 8, maxHeight: 520, overflowY: "auto" }}>
-                  {opps.length === 0 && (
-                    <p style={{ fontSize: 11, color: "var(--text-muted)", textAlign: "center", padding: "16px 0" }}>Empty</p>
-                  )}
-                  {opps.map((opp: any) => {
-                    const daysInStage = opp.lastStageChangeAt
-                      ? Math.floor((Date.now() - new Date(opp.lastStageChangeAt).getTime()) / 86400000)
-                      : null;
-                    const isStale = daysInStage !== null && daysInStage > 5;
-                    return (
-                      <div key={opp.id} style={{
-                        background: "rgba(255,255,255,0.035)", borderRadius: 12, padding: "12px 13px",
-                        border: `1px solid ${isStale ? "rgba(251,113,133,0.4)" : "rgba(255,255,255,0.06)"}`,
-                        borderLeft: `3px solid ${isStale ? "#fb7185" : color}`,
-                        boxShadow: isStale ? "0 0 12px rgba(251,113,133,0.08)" : "none",
-                        opacity: movingOpp === opp.id ? 0.4 : 1,
-                        transition: "opacity 0.15s",
-                      }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 6 }}>
-                          <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 2 }}>{opp.contactName || opp.name || "—"}</p>
-                          {opp.monetaryValue > 0 && (
-                            <p style={{ fontSize: 12, color: "#34d399", fontWeight: 700, whiteSpace: "nowrap" }}>${opp.monetaryValue.toLocaleString()}<span style={{ opacity: 0.6, fontWeight: 400 }}>/mo</span></p>
-                          )}
-                        </div>
-                        {daysInStage !== null && (
-                          <p style={{ fontSize: 10, color: isStale ? "#fb7185" : "var(--text-muted)", marginBottom: 8, fontWeight: isStale ? 600 : 400 }}>
-                            {isStale ? "⚠ " : ""}{daysInStage}d in stage
-                          </p>
-                        )}
-
-                        {/* Move to stage */}
-                        <select
-                          value={opp.pipelineStage?.id ?? ""}
-                          onChange={e => {
-                            const s = pipelineStages.find(ps => ps.id === e.target.value);
-                            if (s) moveToStage(opp, s.id, s.name);
-                          }}
-                          style={{ width: "100%", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: "5px 8px", color: "var(--text-secondary)", fontSize: 11, cursor: "pointer", marginBottom: 8 }}
-                        >
-                          {pipelineStages.map(s => (
-                            <option key={s.id} value={s.id}>{s.name}</option>
-                          ))}
-                        </select>
-
-                        <div style={{ display: "flex", gap: 6 }}>
-                          <button onClick={() => markWon(opp)} style={{ flex: 1, fontSize: 10, padding: "5px 0", borderRadius: 999, border: "1px solid rgba(52,211,153,0.5)", background: "rgba(52,211,153,0.1)", color: "#34d399", cursor: "pointer", fontWeight: 700 }}>Won ✓</button>
-                          <button onClick={() => markLost(opp)} style={{ flex: 1, fontSize: 10, padding: "5px 0", borderRadius: 999, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "var(--text-muted)", cursor: "pointer" }}>Lost</button>
-                          {locationId && opp.contactId && (
-                            <a href={`https://app.gohighlevel.com/v2/location/${locationId}/contacts/detail/${opp.contactId}`}
-                              target="_blank" rel="noreferrer"
-                              style={{ flex: 1, fontSize: 10, padding: "5px 0", borderRadius: 999, border: "1px solid rgba(34,211,238,0.35)", background: "rgba(34,211,238,0.06)", color: "var(--accent)", cursor: "pointer", textDecoration: "none", textAlign: "center", fontWeight: 600 }}>
-                              GHL
-                            </a>
-                          )}
-                        </div>
-                        <button onClick={() => onSendToAI(`Wing Digital prospect:\nName: ${opp.contactName || opp.name}\nCurrent stage: ${stage.name}\nValue: $${opp.monetaryValue ?? 0}/mo\nDays in stage: ${daysInStage ?? "?"}\n\nWhat's the best next move to advance this prospect?`)}
-                          style={{ width: "100%", marginTop: 8, fontSize: 10.5, color: "#E8692A", background: "transparent", border: "none", cursor: "pointer", padding: 0, textAlign: "left", fontWeight: 600 }}>
-                          ✦ Ask Claude →
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-
-          {/* Unstaged column if any */}
-          {unstaged.length > 0 && (
-            <div style={{ minWidth: 240, maxWidth: 270, flexShrink: 0, background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
-              <div style={{ padding: "12px 14px", borderBottom: "1px solid var(--border)", borderTop: "3px solid #6b7280" }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-muted)" }}>No Stage</span>
-              </div>
-              <div style={{ padding: 10, display: "flex", flexDirection: "column", gap: 8 }}>
-                {unstaged.map((opp: any) => (
-                  <div key={opp.id} style={{ background: "var(--bg-hover)", borderRadius: 8, padding: "10px 12px", border: "1px solid var(--border)" }}>
-                    <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>{opp.contactName || opp.name || "—"}</p>
-                    <select
-                      value=""
-                      onChange={e => {
-                        const s = pipelineStages.find(ps => ps.id === e.target.value);
-                        if (s) moveToStage(opp, s.id, s.name);
-                      }}
-                      style={{ width: "100%", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 6, padding: "5px 8px", color: "var(--text-muted)", fontSize: 11, cursor: "pointer" }}
-                    >
-                      <option value="">Move to stage...</option>
-                      {pipelineStages.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                    </select>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
   );
 }
 

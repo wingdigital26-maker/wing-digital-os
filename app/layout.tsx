@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import JarvisButton from "./components/JarvisButton";
+import SwRegister from "./components/SwRegister";
 
 export const metadata: Metadata = {
   title: "Wing Digital OS",
@@ -28,6 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="h-full">
         {children}
         <JarvisButton />
+        <SwRegister />
       </body>
     </html>
   );

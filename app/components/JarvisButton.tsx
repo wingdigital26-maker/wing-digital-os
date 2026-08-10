@@ -93,6 +93,8 @@ export default function JarvisButton() {
   const speak = useCallback(async (text: string) => {
     const clean = text
       .replace(/```[\s\S]*?```/g, " code block ")
+      // Strip emoji/symbol unicode so speechSynthesis never reads "red dot" etc.
+      .replace(/[\u{1F000}-\u{1FBFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{2190}-\u{21FF}\u{2300}-\u{23FF}\u{25A0}-\u{25FF}\u{2022}\u{FE00}-\u{FE0F}\u{200D}\u{20D0}-\u{20FF}\u{E000}-\u{F8FF}]/gu, " ")
       .replace(/[#*_`>|]/g, "")
       .replace(/\s+/g, " ")
       .trim()

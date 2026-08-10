@@ -14,11 +14,15 @@ const VOICE_ID = "JBFqnCBsd6RMkjVDRZzb";
 const MODEL_ID = "eleven_turbo_v2_5"; // low latency, good quality
 const MAX_CHARS = 800;
 
-// Strip markdown noise so the voice does not read asterisks and code fences.
+// Strip markdown noise AND all emoji/symbol unicode so the voice never reads
+// things like "red dot" aloud. Safety net on top of the Jarvis style prompt.
+const EMOJI_SYMBOLS =
+  /[\u{1F000}-\u{1FBFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{2190}-\u{21FF}\u{2300}-\u{23FF}\u{25A0}-\u{25FF}\u{2022}\u{FE00}-\u{FE0F}\u{200D}\u{20D0}-\u{20FF}\u{E000}-\u{F8FF}]/gu;
 function cleanForSpeech(text: string): string {
   return text
     .replace(/```[\s\S]*?```/g, " code block ")
     .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(EMOJI_SYMBOLS, " ")
     .replace(/[#*_`>|~]/g, "")
     .replace(/\s+/g, " ")
     .trim()

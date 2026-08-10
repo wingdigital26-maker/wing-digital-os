@@ -296,7 +296,7 @@ const AGENT_SYSTEMS: Record<string, Wire[]> = {
   ],
   dispatch: [
     { id: "vault", label: "VAULT", direction: "writes" },
-    { id: "ghl-jackson", label: "GHL JACKSON", direction: "reads" },
+    { id: "ghl-clients", label: "GHL", direction: "reads" },
     { id: "ghl-wing", label: "GHL WING", direction: "reads" },
   ],
   prospector: [
@@ -308,13 +308,13 @@ const AGENT_SYSTEMS: Record<string, Wire[]> = {
     { id: "ghl-wing", label: "GHL WING", direction: "both" },
   ],
   "reply-triage": [
-    { id: "ghl-jackson", label: "GHL JACKSON", direction: "reads" },
+    { id: "ghl-clients", label: "GHL", direction: "reads" },
     { id: "ghl-wing", label: "GHL WING", direction: "reads" },
     { id: "email", label: "EMAIL", direction: "reads" },
     { id: "vault", label: "VAULT", direction: "writes" },
   ],
   builder: [
-    { id: "ghl-jackson", label: "GHL JACKSON", direction: "writes" },
+    { id: "ghl-clients", label: "GHL", direction: "writes" },
     { id: "clients", label: "CLIENTS", direction: "writes" },
   ],
 };
@@ -339,6 +339,41 @@ const ARTIFACTS: ArtifactMeta[] = [
   { id: "replies-inbox", label: "Replies inbox", system: "ghl-wing", producedBy: "reply-triage", path: "wiki/state/replies-inbox.md", blurb: "Triage page of inbound replies, HOT flagged loudly." },
 ];
 
+// Distill a markdown state file to its headline numbers/key-value lines.
+// "**Pipeline:** 1364 prospects  •  **Emailed:** 184" becomes separate short
+// lines. Max 8 lines, each short. Raw excerpt stays available separately.
+function distill(raw: string): string[] {
+  const out: string[] = [];
+  const push = (s: string) => {
+    const c = clean(redact(s))
+      .replace(/[\u{1F000}-\u{1FBFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}\u{200D}]/gu, "")
+      .replace(/^\W+/, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (c && out.length < 8) out.push(c.length > 70 ? c.slice(0, 69) + "…" : c);
+  };
+  for (const line of raw.split(/\r?\n/)) {
+    if (out.length >= 8) break;
+    const t = line.trim();
+    // skip structure: frontmatter, headings, tables, callouts, footers
+    if (!t || t.startsWith("---") || t.startsWith("#") || t.startsWith(">") || t.startsWith("|")) continue;
+    if (/^(title|tags|updated):/.test(t) || /^_.*_$/.test(t) || /^-\s*$/.test(t)) continue;
+    // keep only headline lines: bold key-value stats, "Key: 123" lines, or
+    // numbered items. Wrapped prose continuation lines are dropped.
+    const isStat = /\*\*[^*]+:\*\*/.test(t);
+    const isNumbered = /^\d+\.\s/.test(t);
+    const isKv = /^[*_]{0,2}[A-Za-z][^:]{0,40}:[*_]{0,2}\s.*\d/.test(t);
+    if (!isStat && !isNumbered && !isKv) continue;
+    if (/^[*_\s]*legend/i.test(t)) continue;
+    // split "A • B • C" stat rows into separate short lines
+    for (const seg of t.split(/\s+[•·]\s+/)) {
+      if (isStat && !/\d/.test(seg) && !/:/.test(seg)) continue;
+      push(seg);
+    }
+  }
+  return out;
+}
+
 async function artifactDetail(id: string) {
   const meta = ARTIFACTS.find((a) => a.id === id);
   if (!meta) return NextResponse.json({ error: `unknown artifact '${id}'` }, { status: 404 });
@@ -346,7 +381,9 @@ async function artifactDetail(id: string) {
   const producer = [...SCHEDULED, ...CREW].find((a) => a.key === meta.producedBy);
   let updated: string | null = null;
   let lines: string[] = [];
+  let distilled: string[] = [];
   if (raw) {
+    distilled = distill(raw);
     updated =
       raw.match(/\*\*Run date:\*\*\s*([\d-]+)/)?.[1] ??
       raw.match(/_Last updated:\s*([^_]+)_/)?.[1]?.trim() ??
@@ -370,6 +407,7 @@ async function artifactDetail(id: string) {
     available: !!raw,
     updated,
     lines,
+    distilled,
   });
 }
 
@@ -445,7 +483,7 @@ async function buildArtifact(key: string): Promise<{ title: string; lines: strin
       .filter((l) => l && !l.startsWith("---"))
       .slice(0, max)
       .map((l) => clean(redact(l)).slice(0, 200));
-    return lines.length ? { title, lines } : null;
+    return lines.length ? { title, lines, distilled: distill(raw) } : null;
   };
   if (key === "sentinel-daily") return pick("wiki/state/health-board.md", "Latest health board", 18);
   if (key === "outreach" || key === "wing-digital-daily-outreach")
@@ -492,7 +530,7 @@ async function agentDetail(key: string) {
   const summary = {
     what: meta.role,
     last: activity.length
-      ? `Last seen ${activity[0].date}: ${activity[0].title}`
+      ? `Last seen ${activity[0].date}: ${activity[0].title.slice(0, 90)}`
       : st?.lastRunAt || st?.lastRun
         ? `Last run ${new Date(st.lastRunAt ?? st.lastRun).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}.`
         : "No recorded activity yet.",
@@ -534,12 +572,13 @@ export async function GET(req: NextRequest) {
 
   const cloud = isGithubVault();
 
-  const [logRaw, hotRaw, healthRaw, bizRaw, outreachRaw] = await Promise.all([
+  const [logRaw, hotRaw, healthRaw, bizRaw, outreachRaw, repliesRaw] = await Promise.all([
     readVaultFile("wiki/log.md"),
     readVaultFile("wiki/hot.md"),
     readVaultFile("wiki/state/health-board.md"),
     readVaultFile("wiki/state/business-snapshot.md"),
     readVaultFile("wiki/state/outreach-snapshot.md"),
+    readVaultFile("wiki/state/replies-inbox.md"),
   ]);
 
   // Activity feed: last 50 entries, newest first
@@ -606,6 +645,46 @@ export async function GET(req: NextRequest) {
   // Stats
   const stats = parseStats(bizRaw, outreachRaw);
 
+  // Volume badges for the ops map. Rule: only show where a real number exists.
+  interface Vol { value: string; sub: string | null }
+  const volumes: { systems: Record<string, Vol>; artifacts: Record<string, Vol> } = {
+    systems: {},
+    artifacts: {},
+  };
+  if (outreachRaw) {
+    const emailed = outreachRaw.match(/\*\*Emailed:\*\*\s*([\d,]+)/)?.[1];
+    const today = outreachRaw.match(/\*\*Sent today:\*\*\s*([\d,]+)/)?.[1];
+    const pipeline = outreachRaw.match(/\*\*Pipeline:\*\*\s*([\d,]+)/)?.[1];
+    if (today || emailed) {
+      volumes.systems["email"] = today && emailed
+        ? { value: `${today} today`, sub: `/ ${emailed} sent` }
+        : { value: (today ?? emailed) as string, sub: today ? "today" : "sent" };
+    }
+    if (pipeline) {
+      volumes.systems["ghl-wing"] = { value: pipeline, sub: "pipeline" };
+      volumes.artifacts["prospects-db"] = { value: pipeline, sub: "prospects" };
+    }
+  }
+  if (bizRaw) {
+    const active = bizRaw.match(/\*\*Active clients:\*\*\s*(\d+)/)?.[1];
+    if (active) volumes.systems["clients"] = { value: active, sub: "active" };
+  }
+  // Web/SEO: publishes this week counted from log.md entries mentioning a publish.
+  {
+    const weekAgo = Date.now() - 7 * 86400000;
+    const publishes = feed.filter(
+      (e) => new Date(e.date).getTime() >= weekAgo && /publish|posted|went live/i.test(e.title)
+    ).length;
+    if (publishes > 0) volumes.systems["website"] = { value: String(publishes), sub: "pub/wk" };
+  }
+  if (repliesRaw) {
+    const m = repliesRaw.match(/\*\*(\d+)\s*hot\s*\/\s*(\d+)\s*warm\s*\/\s*(\d+)\s*cold\*\*/i);
+    if (m) {
+      const total = Number(m[1]) + Number(m[2]) + Number(m[3]);
+      volumes.artifacts["replies-inbox"] = { value: String(total), sub: "waiting" };
+    }
+  }
+
   // Overall system light: red if any client red or any expected feed silence
   const anyRed = health.clients.some((c) => c.overall === "red");
   const anyYellow = health.clients.some((c) => c.overall === "yellow");
@@ -628,5 +707,6 @@ export async function GET(req: NextRequest) {
     focus,
     health,
     stats,
+    volumes,
   });
 }

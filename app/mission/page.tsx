@@ -102,7 +102,7 @@ export default function MissionControl() {
 
           {/* Ops map — click agents and systems */}
           <div style={{ marginBottom: 16 }}>
-            <OpsMap agents={data.agents} onSelect={setSelection} />
+            <OpsMap agents={data.agents} volumes={data.volumes} onSelect={setSelection} />
           </div>
 
           {/* Main grid: agents + focus | feed */}

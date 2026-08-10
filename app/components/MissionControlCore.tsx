@@ -32,6 +32,11 @@ export interface ClientHealth {
   redFlags: { text: string; link: string | null }[];
 }
 export interface StatTile { label: string; value: string; sub: string | null }
+export interface VolumeBadge { value: string; sub: string | null }
+export interface Volumes {
+  systems: Record<string, VolumeBadge>;
+  artifacts: Record<string, VolumeBadge>;
+}
 export interface MissionData {
   generatedAt: string;
   cloud: boolean;
@@ -48,6 +53,7 @@ export interface MissionData {
   };
   health?: { runDate: string | null; clients: ClientHealth[] };
   stats: { tiles: StatTile[]; updated: string | null };
+  volumes?: Volumes;
 }
 export interface AgentWire { id: string; label: string; direction: "reads" | "writes" | "both" }
 export interface AgentDetail {
@@ -66,7 +72,7 @@ export interface AgentDetail {
   summary?: { what: string; last: string; next: string };
   systems: AgentWire[];
   activity: FeedEntry[];
-  artifact: { title: string; lines: string[] } | null;
+  artifact: { title: string; lines: string[]; distilled?: string[] } | null;
 }
 export interface ArtifactDetail {
   id: string;
@@ -79,13 +85,14 @@ export interface ArtifactDetail {
   available: boolean;
   updated: string | null;
   lines: string[];
+  distilled?: string[];
 }
 
 // ── shared metadata ────────────────────────────────────────────────────────
 // Systems split into precise pieces so the moving parts are visible.
 export const SYSTEMS = [
   { id: "vault", label: "VAULT", color: "#a78bfa", blurb: "The Obsidian brain: log.md, hot.md, state snapshots, client pages. Most agents write their results here." },
-  { id: "ghl-jackson", label: "GHL JACKSON", color: "#fbbf24", blurb: "Jackson Roofing's GoHighLevel account: contacts, pipeline, conversations, calendar." },
+  { id: "ghl-clients", label: "GHL", color: "#fbbf24", blurb: "Client subaccounts in GoHighLevel (Jackson Roofing today, more as clients sign): contacts, pipelines, conversations, calendars." },
   { id: "ghl-wing", label: "GHL WING", color: "#fb923c", blurb: "Wing Digital's own GoHighLevel account: the outreach CRM, reply inbox, and prospect pipeline." },
   { id: "email", label: "EMAIL", color: "#22d3ee", blurb: "The cold-email path: the autonomous outreach sender and the inbox it feeds." },
   { id: "clients", label: "CLIENTS", color: "#34d399", blurb: "Live client deliverables: Jackson Roofing, Renewal Health, and the health board that watches them." },
@@ -111,11 +118,11 @@ export const AGENT_WIRES: Record<string, string[]> = {
   "renewal-content-weekly": ["vault", "clients", "website", "scheduler"],
   "wing-digital-daily-outreach": ["email", "scheduler"],
   "wing-audit-roofing-batch": ["vault", "ghl-wing"],
-  dispatch: ["vault", "ghl-jackson", "ghl-wing"],
+  dispatch: ["vault", "ghl-clients", "ghl-wing"],
   prospector: ["vault", "ghl-wing"],
   outreach: ["email", "ghl-wing"],
-  "reply-triage": ["vault", "ghl-jackson", "ghl-wing", "email"],
-  builder: ["ghl-jackson", "clients"],
+  "reply-triage": ["vault", "ghl-clients", "ghl-wing", "email"],
+  builder: ["ghl-clients", "clients"],
 };
 
 // How each agent shows up in log.md (client-side mirror of the API's matchers,
@@ -175,6 +182,24 @@ export function fmtCountdown(iso: string): string {
   return `in ${Math.floor(h / 24)}d`;
 }
 
+// "2026-08-07" -> "Aug 7" (falls back to the raw string).
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+export function shortDate(iso: string): string {
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return iso;
+  return `${MONTHS[Number(m[2]) - 1] ?? m[2]} ${Number(m[3])}`;
+}
+
+// One short sentence per activity line: strip log-format prefixes, cap ~90 chars.
+export function tightLine(s: string, max = 90): string {
+  const t = s
+    .replace(/^\s*[-*]\s+/, "")
+    .replace(/^\[?\d{4}-\d{2}-\d{2}\]?\s*[|:-]?\s*/, "")
+    .replace(/^(build|ingest|query|security|lint)\s*\|\s*/i, "")
+    .trim();
+  return t.length > max ? t.slice(0, max - 1).trimEnd() + "…" : t;
+}
+
 export function isRecentlyActive(a: AgentCard): boolean {
   if (a.lastLogDate) {
     const days = (Date.now() - new Date(a.lastLogDate).getTime()) / 86400000;
@@ -232,7 +257,20 @@ type Hover =
   | { kind: "artifact"; id: string }
   | null;
 
-export function OpsMap({ agents, onSelect }: { agents: AgentCard[]; onSelect: (s: Selection) => void }) {
+// Tiny volume pill rendered inside the SVG map (numbers only, no clutter).
+function VolPill({ x, y, text, color }: { x: number; y: number; text: string; color: string }) {
+  const w = text.length * 5.6 + 14;
+  return (
+    <g style={{ pointerEvents: "none" }}>
+      <rect x={x - w / 2} y={y - 9} width={w} height={18} rx={9}
+        fill="rgba(13,17,23,0.92)" stroke={color} strokeOpacity={0.7} strokeWidth={1} />
+      <text x={x} y={y + 3} textAnchor="middle" fill={color} fontSize="9"
+        fontFamily="'JetBrains Mono', monospace">{text}</text>
+    </g>
+  );
+}
+
+export function OpsMap({ agents, volumes, onSelect }: { agents: AgentCard[]; volumes?: Volumes; onSelect: (s: Selection) => void }) {
   const [hover, setHover] = useState<Hover>(null);
   const W = 960, H = 500;
   const shown = agents.filter(a => a.enabled);
@@ -412,6 +450,30 @@ export function OpsMap({ agents, onSelect }: { agents: AgentCard[]; onSelect: (s
             </g>
           );
         })}
+
+        {/* volume pills: real numbers on the wires/nodes where one exists */}
+        {volumes && sysPos.map(({ s, x, y }) => {
+          const v = volumes.systems[s.id];
+          if (!v) return null;
+          const dimmed = hovering && !hoverSystems.has(s.id);
+          return (
+            <g key={`vol-${s.id}`} opacity={dimmed ? 0.2 : 1}>
+              <VolPill x={x} y={y - 32} text={v.sub ? `${v.value} ${v.sub}` : v.value} color={s.color} />
+            </g>
+          );
+        })}
+        {volumes && artPos.map(({ art, x, y, color }) => {
+          const v = volumes.artifacts[art.id];
+          const sp = sysMap.get(art.system);
+          if (!v || !sp) return null;
+          const dimmed = hovering && !hoverArtifacts.has(art.id);
+          return (
+            <g key={`vola-${art.id}`} opacity={dimmed ? 0.2 : 1}>
+              <VolPill x={(sp.x + x) / 2} y={(sp.y + 22 + y - 14) / 2}
+                text={v.sub ? `${v.value} ${v.sub}` : v.value} color={color} />
+            </g>
+          );
+        })}
       </svg>
     </div>
   );
@@ -462,11 +524,11 @@ export function FeedList({ feed, limit }: { feed: FeedEntry[]; limit?: number })
           <div key={i} className="mo-feedline" style={{ marginBottom: 12, fontFamily: "'JetBrains Mono', monospace" }}
             onClick={() => setOpen(expanded ? null : i)}>
             <div style={{ fontSize: 11, display: "flex", gap: 8, alignItems: "baseline" }}>
-              <span style={{ color: "var(--text-muted)" }}>{e.date}</span>
+              <span style={{ color: "var(--text-muted)" }}>{shortDate(e.date)}</span>
               <span style={{ color: TYPE_COLOR[e.type] ?? "var(--text-secondary)", textTransform: "uppercase", fontSize: 10, letterSpacing: "0.08em" }}>{e.type}</span>
               <span style={{ marginLeft: "auto", color: "var(--text-muted)", fontSize: 10 }}>{expanded ? "collapse" : "expand"}</span>
             </div>
-            <div style={{ fontSize: 12, color: "var(--text-primary)", margin: "2px 0" }}>{e.title}</div>
+            <div style={{ fontSize: 12, color: "var(--text-primary)", margin: "2px 0" }}>{expanded ? e.title : tightLine(e.title)}</div>
             {(expanded ? e.lines : []).map((l, j) => (
               <div key={j} style={{ fontSize: 11, color: "var(--text-muted)", lineHeight: 1.5 }}>{l}</div>
             ))}
@@ -500,11 +562,11 @@ export function FeedTicker({ feed }: { feed: FeedEntry[] }) {
           display: "flex", gap: 8, alignItems: "baseline", marginBottom: 7,
           fontFamily: "'JetBrains Mono', monospace",
         }}>
-          <span style={{ fontSize: 10, color: "var(--text-muted)", flexShrink: 0 }}>{e.date.slice(5)}</span>
+          <span style={{ fontSize: 10, color: "var(--text-muted)", flexShrink: 0 }}>{shortDate(e.date)}</span>
           <span style={{
             fontSize: 12, color: "var(--text-secondary)",
             whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-          }}>{e.title}</span>
+          }}>{tightLine(e.title)}</span>
         </div>
       ))}
       {feed.length > 6 && (
@@ -596,6 +658,40 @@ function Section({ title, defaultOpen, children }: {
 }
 
 const DIR_ARROW: Record<string, string> = { reads: "reads from", writes: "writes to", both: "reads + writes" };
+
+// Distilled artifact view: headline numbers up front, raw excerpt tucked away.
+function DistilledExcerpt({ distilled, raw, accent }: { distilled: string[]; raw: string[]; accent: string }) {
+  const [showRaw, setShowRaw] = useState(false);
+  const lead = distilled.length ? distilled : raw.slice(0, 8);
+  return (
+    <>
+      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+        {lead.map((l, i) => (
+          <div key={i} style={{
+            fontSize: 12, fontFamily: "'JetBrains Mono', monospace",
+            color: "var(--text-secondary)", borderLeft: `2px solid ${accent}44`, paddingLeft: 8, lineHeight: 1.45,
+          }}>{l}</div>
+        ))}
+        {lead.length === 0 && <div style={{ fontSize: 12, color: "var(--text-muted)" }}>No content available.</div>}
+      </div>
+      {raw.length > 0 && (
+        <button onClick={() => setShowRaw(r => !r)} style={{
+          background: "none", border: "none", color: "var(--accent, #22d3ee)",
+          cursor: "pointer", fontSize: 11, padding: 0, marginTop: 8,
+        }}>{showRaw ? "hide raw" : "view raw"}</button>
+      )}
+      {showRaw && (
+        <div style={{
+          fontSize: 11, fontFamily: "'JetBrains Mono', monospace", color: "var(--text-secondary)",
+          background: "var(--bg-card, #0d1117)", border: "1px solid var(--border, rgba(255,255,255,0.08))",
+          borderRadius: 8, padding: "8px 10px", lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word", marginTop: 6,
+        }}>
+          {raw.join("\n")}
+        </div>
+      )}
+    </>
+  );
+}
 
 // Plain-English summary block the panels lead with.
 function SummaryBlock({ lines, accent }: { lines: string[]; accent: string }) {
@@ -704,13 +800,11 @@ function AgentPanel({ agentKey, onClose, onSelect }: {
 
           {detail.artifact && (
             <Section title={detail.artifact.title}>
-              <div style={{
-                fontSize: 11, fontFamily: "'JetBrains Mono', monospace", color: "var(--text-secondary)",
-                background: "var(--bg-card, #0d1117)", border: "1px solid var(--border, rgba(255,255,255,0.08))",
-                borderRadius: 8, padding: "8px 10px", lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word",
-              }}>
-                {detail.artifact.lines.join("\n")}
-              </div>
+              <DistilledExcerpt
+                distilled={detail.artifact.distilled ?? []}
+                raw={detail.artifact.lines}
+                accent={statusColor}
+              />
             </Section>
           )}
         </>
@@ -762,17 +856,8 @@ function ArtifactPanel({ artifactId, onClose, onSelect }: {
             )}
           </div>
 
-          <Section title="Content excerpt" defaultOpen>
-            {detail.lines.length === 0 && <div style={{ fontSize: 12, color: "var(--text-muted)" }}>No content available.</div>}
-            {detail.lines.length > 0 && (
-              <div style={{
-                fontSize: 11, fontFamily: "'JetBrains Mono', monospace", color: "var(--text-secondary)",
-                background: "var(--bg-card, #0d1117)", border: "1px solid var(--border, rgba(255,255,255,0.08))",
-                borderRadius: 8, padding: "8px 10px", lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word",
-              }}>
-                {detail.lines.join("\n")}
-              </div>
-            )}
+          <Section title="Content" defaultOpen>
+            <DistilledExcerpt distilled={detail.distilled ?? []} raw={detail.lines} accent={accent} />
             <div style={{ fontSize: 10, color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace", marginTop: 6 }}>{detail.path}</div>
           </Section>
         </>
@@ -800,7 +885,7 @@ function SystemPanel({ systemId, data, onSelect, onClose }: {
       <SummaryBlock accent={sys.color} lines={[
         sys.blurb,
         `${touching.length} agent${touching.length === 1 ? "" : "s"} wired in, ${activeCount} recently active.`,
-        related.length ? `Last activity ${related[0].date}: ${related[0].title}` : "No recent log activity for this system.",
+        related.length ? `Last activity ${shortDate(related[0].date)}: ${tightLine(related[0].title, 80)}` : "No recent log activity for this system.",
       ]} />
 
       <Section title={`Agents (${touching.length})`} defaultOpen>

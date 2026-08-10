@@ -22,6 +22,7 @@ function isPublicPath(pathname: string): boolean {
     pathname.startsWith("/demo-freshco") ||
     pathname.startsWith("/demo-roofing") ||
     pathname.startsWith("/demo-clearhaul") ||
+    pathname.startsWith("/demo-jackson-roofing") ||
     pathname.startsWith("/jackson-site")
   );
 }
@@ -44,6 +45,11 @@ export async function middleware(req: NextRequest) {
   if (pathname === "/demo-clearhaul" || pathname === "/demo-clearhaul/") {
     const url = req.nextUrl.clone();
     url.pathname = "/demo-clearhaul/index.html";
+    return NextResponse.redirect(url);
+  }
+  if (pathname === "/demo-jackson-roofing" || pathname === "/demo-jackson-roofing/") {
+    const url = req.nextUrl.clone();
+    url.pathname = "/demo-jackson-roofing/index.html";
     return NextResponse.redirect(url);
   }
   if (pathname === "/jackson-site" || pathname === "/jackson-site/") {

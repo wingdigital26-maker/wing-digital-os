@@ -7,6 +7,7 @@
 // Everything here is read-only.
 
 import { useEffect, useState } from "react";
+import { sfx } from "../lib/sounds";
 
 // ── types (mirror of /api/mission payload) ─────────────────────────────────
 export interface AgentCard {
@@ -422,9 +423,9 @@ export function OpsMap({ agents, volumes, onSelect }: { agents: AgentCard[]; vol
           const color = highlighted || active ? "#22d3ee" : "#4b5563";
           return (
             <g key={a.key} className="mo-click" opacity={dimmed ? 0.3 : 1}
-              onMouseEnter={() => setHover({ kind: "agent", key: a.key })}
+              onMouseEnter={() => { sfx.play("hover"); setHover({ kind: "agent", key: a.key }); }}
               onMouseLeave={() => setHover(h => (h?.kind === "agent" && h.key === a.key ? null : h))}
-              onClick={() => onSelect({ type: "agent", key: a.key })}>
+              onClick={() => { sfx.play("blip"); onSelect({ type: "agent", key: a.key }); }}>
               {(active || highlighted) && <circle cx={x} cy={y} r={32} fill="url(#mo-glow)" />}
               <circle cx={x} cy={y} r={21} fill="rgba(13,17,23,0.95)" stroke={color}
                 strokeWidth={highlighted ? 2.2 : 1.5}
@@ -449,9 +450,9 @@ export function OpsMap({ agents, volumes, onSelect }: { agents: AgentCard[]; vol
           const dimmed = hovering && !highlighted;
           return (
             <g key={s.id} className="mo-click" opacity={dimmed ? 0.25 : 1}
-              onMouseEnter={() => setHover({ kind: "system", id: s.id })}
+              onMouseEnter={() => { sfx.play("hover"); setHover({ kind: "system", id: s.id }); }}
               onMouseLeave={() => setHover(h => (h?.kind === "system" && h.id === s.id ? null : h))}
-              onClick={() => onSelect({ type: "system", id: s.id })}>
+              onClick={() => { sfx.play("blip-system"); onSelect({ type: "system", id: s.id }); }}>
               <rect x={x - 54} y={y - 20} width={108} height={40} rx={10}
                 fill="rgba(13,17,23,0.95)" stroke={s.color}
                 strokeOpacity={highlighted ? 1 : 0.6} strokeWidth={highlighted ? 2 : 1.4} />
@@ -470,9 +471,9 @@ export function OpsMap({ agents, volumes, onSelect }: { agents: AgentCard[]; vol
           const dimmed = hovering && !highlighted;
           return (
             <g key={art.id} className="mo-click" opacity={dimmed ? 0.25 : 1}
-              onMouseEnter={() => setHover({ kind: "artifact", id: art.id })}
+              onMouseEnter={() => { sfx.play("hover"); setHover({ kind: "artifact", id: art.id }); }}
               onMouseLeave={() => setHover(h => (h?.kind === "artifact" && h.id === art.id ? null : h))}
-              onClick={() => onSelect({ type: "artifact", id: art.id })}>
+              onClick={() => { sfx.play("blip-artifact"); onSelect({ type: "artifact", id: art.id }); }}>
               <rect x={x - 34} y={y - 13} width={68} height={26} rx={7}
                 fill="rgba(13,17,23,0.95)" stroke={color}
                 strokeOpacity={highlighted ? 0.95 : 0.45} strokeWidth={highlighted ? 1.6 : 1}
@@ -526,7 +527,7 @@ export function AgentTile({ a, onSelect }: { a: AgentCard; onSelect: (s: Selecti
 
   return (
     <div
-      onClick={() => onSelect({ type: "agent", key: a.key })}
+      onClick={() => { sfx.play("blip"); onSelect({ type: "agent", key: a.key }); }}
       className="mo-click"
       style={{
         background: "var(--bg-card, #0d1117)",
@@ -553,7 +554,7 @@ export function StatTiles({ tiles, onSelect }: { tiles: StatTile[]; onSelect: (s
       {tiles.map((t) => {
         const age = fmtAge(t.updated);
         return (
-          <div key={t.label} className="mo-click" onClick={() => onSelect({ type: "stat", key: t.key })}
+          <div key={t.label} className="mo-click" onClick={() => { sfx.play("ping"); onSelect({ type: "stat", key: t.key }); }}
             title="Click for the breakdown"
             style={{ background: "var(--bg-card, #0d1117)", border: "1px solid var(--border, rgba(255,255,255,0.08))", borderRadius: 12, padding: "14px 16px", position: "relative" }}>
             <div style={{ fontSize: 26, fontWeight: 700, color: "var(--text-primary)", fontFamily: "'Space Grotesk', sans-serif" }}>{t.value}</div>
@@ -581,7 +582,7 @@ export function NextUpStrip({ agents, onSelect }: { agents: AgentCard[]; onSelec
     <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", background: "var(--bg-card, #0d1117)", border: "1px solid var(--border, rgba(255,255,255,0.08))", borderRadius: 12, padding: "8px 14px" }}>
       <span style={{ fontSize: 10, letterSpacing: "0.12em", color: "var(--text-muted)" }}>NEXT 24H</span>
       {upcoming.map((a) => (
-        <span key={a.key} className="mo-click" onClick={() => onSelect({ type: "agent", key: a.key })}
+        <span key={a.key} className="mo-click" onClick={() => { sfx.play("blip"); onSelect({ type: "agent", key: a.key }); }}
           style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", color: "var(--text-secondary)", border: "1px solid var(--border, rgba(255,255,255,0.1))", borderRadius: 99, padding: "3px 10px" }}>
           <Dot color="#22d3ee" />
           {a.name}
@@ -603,7 +604,7 @@ export function FeedList({ feed, limit }: { feed: FeedEntry[]; limit?: number })
         const expanded = open === i;
         return (
           <div key={i} className="mo-feedline" style={{ marginBottom: 12, fontFamily: "'JetBrains Mono', monospace" }}
-            onClick={() => setOpen(expanded ? null : i)}>
+            onClick={() => { sfx.play("nav"); setOpen(expanded ? null : i); }}>
             <div style={{ fontSize: 11, display: "flex", gap: 8, alignItems: "baseline" }}>
               <span style={{ color: "var(--text-muted)" }}>{shortDate(e.date)}</span>
               <span style={{ color: TYPE_COLOR[e.type] ?? "var(--text-secondary)", textTransform: "uppercase", fontSize: 10, letterSpacing: "0.08em" }}>{e.type}</span>
@@ -678,7 +679,7 @@ export function ClientHealthStrip({
       )}
       {health.clients.map((c) => (
         <div key={c.client} className="mo-click" style={{ display: "flex", alignItems: "center", gap: 7 }}
-          onClick={() => onSelect({ type: "client", name: c.client })}>
+          onClick={() => { sfx.play("blip"); onSelect({ type: "client", name: c.client }); }}>
           <Dot color={STATUS_COLOR[c.overall]} pulse={c.overall !== "green"} />
           <span style={{ fontSize: 13 }}>{c.client}</span>
         </div>
@@ -696,9 +697,12 @@ export function ClientHealthStrip({
 function SlideOver({ title, accent, onClose, children }: {
   title: string; accent: string; onClose: () => void; children: React.ReactNode;
 }) {
+  // Panel open whoosh once on mount; close plays a fall.
+  useEffect(() => { sfx.play("open"); }, []);
+  const close = () => { sfx.play("close"); onClose(); };
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 200 }}>
-      <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)" }} />
+      <div onClick={close} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)" }} />
       <div className="mo-panel" style={{
         position: "absolute", top: 0, right: 0, bottom: 0,
         width: "min(480px, 94vw)",
@@ -710,7 +714,7 @@ function SlideOver({ title, accent, onClose, children }: {
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 18px", borderBottom: "1px solid var(--border, rgba(255,255,255,0.08))" }}>
           <Dot color={accent} pulse />
           <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.1em", fontFamily: "'JetBrains Mono', monospace" }}>{title}</span>
-          <button onClick={onClose} style={{
+          <button onClick={close} style={{
             marginLeft: "auto", background: "none", border: "1px solid var(--border, rgba(255,255,255,0.15))",
             color: "var(--text-secondary, #9ca3af)", borderRadius: 8, padding: "4px 10px", cursor: "pointer", fontSize: 12,
           }}>Close</button>
@@ -728,7 +732,7 @@ function Section({ title, defaultOpen, children }: {
   const [open, setOpen] = useState(!!defaultOpen);
   return (
     <div style={{ borderTop: "1px solid var(--border, rgba(255,255,255,0.06))", marginTop: 12, paddingTop: 8 }}>
-      <div className="mo-click" onClick={() => setOpen(o => !o)}
+      <div className="mo-click" onClick={() => { sfx.play(open ? "toggle-off" : "toggle-on"); setOpen(o => !o); }}
         style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <span style={{ fontSize: 10, letterSpacing: "0.14em", color: "var(--text-muted)", textTransform: "uppercase" }}>{title}</span>
         <span style={{ marginLeft: "auto", fontSize: 10, color: "var(--text-muted)" }}>{open ? "−" : "+"}</span>

@@ -6,6 +6,8 @@ import { Bolt, Users, Cpu, Bulb, Plus, Calendar, Note, Sparkles } from "reicon-r
 import { staggerContainer, riseItem, hoverSpring, cardHover, cardTap } from "./components/motion";
 import { Sparkline, Delta, buildDailySeries } from "./components/Charts";
 import { StatTiles, MissionPanels, MissionStyles, Selection, StatTile } from "./components/MissionControlCore";
+import { sfx } from "./lib/sounds";
+import SfxMuteButton from "./components/SfxMuteButton";
 
 type IconType = React.ComponentType<{ size?: number; color?: string }>;
 
@@ -137,6 +139,7 @@ export default function Home() {
             const hasBadge = item.id === "command" && newLeadCount > 0;
             return (
               <button key={item.id} onClick={() => {
+                sfx.play("nav");
                 setActive(item.subs[0].id);
                 if (item.id === "command") setNewLeadCount(0);
               }} style={{
@@ -168,7 +171,7 @@ export default function Home() {
         </nav>
 
         {/* Jarvis — the one merged assistant (AI brain + voice), opens the panel */}
-        <button onClick={() => window.dispatchEvent(new CustomEvent("jarvis:open"))} style={{
+        <button onClick={() => window.dispatchEvent(new CustomEvent("jarvis:open"))} style={{ /* chime plays in JarvisButton */
           display: "flex", alignItems: "center", gap: 10,
           margin: "0 8px 4px", padding: "10px 10px", borderRadius: 8,
           background: "var(--accent-glow)", border: "1px solid var(--accent)",
@@ -179,7 +182,7 @@ export default function Home() {
           {sidebarOpen && <span>Jarvis</span>}
         </button>
 
-        <button onClick={() => setSidebarOpen(!sidebarOpen)} style={{
+        <button onClick={() => { sfx.play(sidebarOpen ? "toggle-off" : "toggle-on"); setSidebarOpen(!sidebarOpen); }} style={{
           margin: "8px", padding: "8px", borderRadius: 8, border: "none",
           background: "transparent", color: "var(--text-muted)",
           cursor: "pointer", fontSize: 16,
@@ -205,6 +208,7 @@ export default function Home() {
             </p>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <SfxMuteButton />
             <Search onOpenNote={handleSearchOpenNote} />
             <div style={{
               width: 34, height: 34, borderRadius: "50%",
@@ -222,7 +226,7 @@ export default function Home() {
             background: "var(--bg-primary)", flexShrink: 0, flexWrap: "wrap",
           }}>
             {groupOf(active).subs.map(sub => (
-              <button key={sub.id} onClick={() => setActive(sub.id)} style={{
+              <button key={sub.id} onClick={() => { sfx.play("nav"); setActive(sub.id); }} style={{
                 padding: "7px 16px", borderRadius: 999, fontSize: 12.5, cursor: "pointer",
                 fontWeight: active === sub.id ? 700 : 500,
                 border: active === sub.id ? "1px solid var(--accent)" : "1px solid var(--border)",
@@ -688,7 +692,7 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
             <motion.a key={stat.label} href={stat.href} target="_blank" rel="noreferrer" style={baseStyle}
               whileHover={hover} whileTap={tap} transition={hoverSpring}>{inner}</motion.a>
           );
-          return <motion.div key={stat.label} onClick={stat.onClick} style={baseStyle}
+          return <motion.div key={stat.label} onClick={stat.onClick ? () => { sfx.play("ping"); stat.onClick(); } : undefined} style={baseStyle}
             whileHover={hover} whileTap={tap} transition={hoverSpring}>{inner}</motion.div>;
         })}
       </motion.div>
@@ -707,7 +711,7 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
           { icon: Note, label: "New Note", action: () => setShowNewNote(true), c: "#a78bfa" },
           { icon: Sparkles, label: "Ask Claude", action: () => onSendToAI("What should I focus on today for Wing Digital?"), c: "#E8692A" },
         ].map(btn => (
-          <motion.button key={btn.label} onClick={btn.action}
+          <motion.button key={btn.label} onClick={() => { sfx.play("blip"); btn.action(); }}
             whileHover={cardHover} whileTap={cardTap} transition={hoverSpring} style={{
             display: "inline-flex", alignItems: "center", gap: 7,
             background: `${btn.c}10`, border: `1px solid ${btn.c}44`,

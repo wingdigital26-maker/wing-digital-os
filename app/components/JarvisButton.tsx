@@ -1,6 +1,7 @@
 "use client";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { usePathname } from "next/navigation";
+import { sfx } from "../lib/sounds";
 
 type Message = { role: "user" | "assistant"; content: string };
 
@@ -150,6 +151,7 @@ export default function JarvisButton() {
 
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || streaming) return;
+    sfx.play("send");
     const userMsg: Message = { role: "user", content: text.trim() };
     const updatedHistory = [...messages, userMsg];
     setMessages(updatedHistory);
@@ -236,7 +238,7 @@ export default function JarvisButton() {
   // Global events: the sidebar Jarvis button and "Ask" buttons around the OS
   // open this panel (and optionally preload a question).
   useEffect(() => {
-    const onOpen = () => setOpen(true);
+    const onOpen = () => { sfx.play("chime"); setOpen(true); };
     const onAsk = (e: Event) => {
       const detail = (e as CustomEvent).detail;
       setOpen(true);
@@ -398,7 +400,7 @@ export default function JarvisButton() {
 
       {/* Floating trigger button */}
       <button
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => setOpen((o) => { sfx.play(o ? "close" : "chime"); return !o; })}
         title="Jarvis AI"
         style={{
           position: "fixed",
@@ -533,7 +535,7 @@ export default function JarvisButton() {
                 style={{ background: "none", border: "1px solid rgba(16,192,240,0.25)", borderRadius: 6, color: "#8ab", cursor: streaming ? "default" : "pointer", fontSize: 10, padding: "2px 8px", fontFamily: "Inter, sans-serif" }}
               >New chat</button>
               <button
-                onClick={() => setOpen(false)}
+                onClick={() => { sfx.play("close"); setOpen(false); }}
                 style={{ background: "none", border: "none", color: "#666", cursor: "pointer", fontSize: 18, lineHeight: 1 }}
               >×</button>
             </div>

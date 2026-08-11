@@ -482,7 +482,7 @@ export function OpsMap({ agents, volumes, watchdog, onSelect }: {
             <circle cx={wdX} cy={wdY - 25} r={3.5} fill={wdColor} className={wdProblems ? "mo-pulse" : undefined} />
             <text x={wdX} y={wdY + 3.5} textAnchor="middle" fill={wdColor} fontSize="8.5"
               fontFamily="'JetBrains Mono', monospace" letterSpacing="0.06em" style={{ pointerEvents: "none" }}>
-              WATCHDOG
+              THE BOSS
             </text>
             <text x={wdX} y={wdY + 34} textAnchor="middle" fill={wdProblems ? "#f87171" : "#6b7280"} fontSize="8.5"
               fontFamily="'JetBrains Mono', monospace" style={{ pointerEvents: "none" }}>
@@ -646,8 +646,8 @@ function watchdogReportText(w: WatchdogData): string {
   const count = Math.max(w.problemCount, w.problems.length);
   lines.push(
     w.overall === "problems" || count > 0
-      ? `WATCHDOG REPORT: ${count} problem${count === 1 ? "" : "s"} reported`
-      : "WATCHDOG REPORT: all systems reporting, no problems"
+      ? `THE BOSS REPORT: ${count} problem${count === 1 ? "" : "s"} reported`
+      : "THE BOSS REPORT: all systems reporting, no problems"
   );
   if (w.problems.length) {
     lines.push("");
@@ -666,7 +666,7 @@ function watchdogReportText(w: WatchdogData): string {
     for (const k of agentKeys) lines.push(`- ${k}: ${w.agents[k]}`);
   }
   lines.push("");
-  lines.push(`Last watchdog report: ${w.updated ?? "unknown"}`);
+  lines.push(`Last report from The Boss: ${w.updated ?? "unknown"}`);
   return lines.join("\n");
 }
 
@@ -675,8 +675,8 @@ function WatchdogCopyButton({ watchdog, color }: { watchdog: WatchdogData; color
   const [copied, setCopied] = useState(false);
   return (
     <button
-      title="Copy the full watchdog report"
-      aria-label="Copy watchdog report"
+      title="Copy the full report from The Boss"
+      aria-label="Copy report from The Boss"
       onClick={(e) => {
         e.stopPropagation();
         navigator.clipboard?.writeText(watchdogReportText(watchdog)).then(() => {
@@ -722,7 +722,7 @@ export function WatchdogBanner({ watchdog }: { watchdog?: WatchdogData | null })
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <Dot color="#6b7280" />
           <span style={{ fontSize: 11, letterSpacing: "0.1em", color: "var(--text-muted, #6b7280)" }}>
-            WATCHDOG - watchdog has not reported yet
+            THE BOSS - has not reported yet
           </span>
         </div>
       </div>
@@ -742,7 +742,7 @@ export function WatchdogBanner({ watchdog }: { watchdog?: WatchdogData | null })
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <Dot color="#34d399" />
           <span style={{ fontSize: 11, letterSpacing: "0.1em", color: "#34d399" }}>
-            ALL SYSTEMS REPORTING - watchdog checked {relAge(ageMin)}
+            ALL SYSTEMS REPORTING - The Boss checked {relAge(ageMin)}
           </span>
           <span style={{ marginLeft: "auto" }}>
             <WatchdogCopyButton watchdog={watchdog} color="#34d399" />
@@ -760,8 +760,8 @@ export function WatchdogBanner({ watchdog }: { watchdog?: WatchdogData | null })
     setExpanded(!isOpen);
   };
   const headline = hasProblems
-    ? `WATCHDOG: ${count} PROBLEM${count === 1 ? "" : "S"} REPORTED`
-    : `WATCHDOG ITSELF IS LATE (last report ${relAge(ageMin)})`;
+    ? `THE BOSS: ${count} PROBLEM${count === 1 ? "" : "S"} REPORTED`
+    : `THE BOSS ITSELF IS LATE (last report ${relAge(ageMin)})`;
 
   return (
     <div className="mo-click wd-banner" onClick={toggle} role="button" style={{
@@ -817,11 +817,11 @@ export function WatchdogBanner({ watchdog }: { watchdog?: WatchdogData | null })
           )}
           {stale && hasProblems && (
             <div style={{ fontSize: 10.5, color: "#fb923c" }}>
-              The watchdog report itself is older than 3 hours - the watcher being silent is also a problem.
+              The Boss report itself is older than 3 hours - The Boss being silent is also a problem.
             </div>
           )}
           <div style={{ fontSize: 10, color: "var(--text-muted, #6b7280)" }}>
-            last watchdog report {relAge(ageMin)}
+            last report from The Boss {relAge(ageMin)}
           </div>
         </div>
       )}
@@ -835,8 +835,8 @@ export function AgentTile({ a, onSelect }: { a: AgentCard; onSelect: (s: Selecti
   let pulse = false;
   let line = a.schedule;
   if (!a.enabled) { line = "disabled"; }
-  else if (a.watchdogState === "SILENT") { color = "#f87171"; pulse = true; line = "SILENT (watchdog)"; }
-  else if (a.watchdogState === "LATE") { color = "#fb923c"; pulse = true; line = "LATE (watchdog)"; }
+  else if (a.watchdogState === "SILENT") { color = "#f87171"; pulse = true; line = "SILENT (The Boss)"; }
+  else if (a.watchdogState === "LATE") { color = "#fb923c"; pulse = true; line = "LATE (The Boss)"; }
   else if (a.pcNeeded && a.kind === "scheduled") { color = "#fb923c"; line = "PC needed"; }
   else if (a.nextRunAt) { color = "#22d3ee"; pulse = true; line = `next ${fmtCountdown(a.nextRunAt)}`; }
   else if (a.lastLogDate) { color = "#34d399"; pulse = true; line = `last seen ${a.lastLogDate}`; }
@@ -1181,9 +1181,9 @@ function AgentPanel({ agentKey, onClose, onSelect }: {
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
             <Pill text={detail.status.toUpperCase()} color={statusColor} />
             <Pill text={detail.kind === "scheduled" ? "SCHEDULED" : "ON DEMAND"} color="var(--text-muted, #6b7280)" />
-            {detail.watchdogState === "SILENT" && <Pill text="SILENT (WATCHDOG)" color="#f87171" />}
-            {detail.watchdogState === "LATE" && <Pill text="LATE (WATCHDOG)" color="#fb923c" />}
-            {detail.watchdogState === "DISABLED" && <Pill text="DISABLED (WATCHDOG)" color="#6b7280" />}
+            {detail.watchdogState === "SILENT" && <Pill text="SILENT (THE BOSS)" color="#f87171" />}
+            {detail.watchdogState === "LATE" && <Pill text="LATE (THE BOSS)" color="#fb923c" />}
+            {detail.watchdogState === "DISABLED" && <Pill text="DISABLED (THE BOSS)" color="#6b7280" />}
             {detail.installed === false && <Pill text="NOT INSTALLED" color="#fb923c" />}
           </div>
 
@@ -1413,7 +1413,7 @@ const CAL_ENTRIES: CalEntry[] = [
   { key: "renewal-content-weekly", label: "Renewal Content", color: "#a78bfa", days: [0], time: "07:40" },
   { key: "chronicler-end-of-day", label: "Chronicler", color: "#60a5fa", days: ALL_DAYS, time: "21:47" },
   { key: "b2b-outreach-engine", label: "Outreach", color: "#22d3ee", days: ALL_DAYS, band: { start: "08:00", end: "20:00", every: "every 30 min", everyMin: 30 } },
-  { key: "watchdog", label: "Watchdog", color: "#f87171", days: ALL_DAYS, band: { start: "06:00", end: "22:00", every: "every 2h", everyMin: 120 } },
+  { key: "watchdog", label: "The Boss", color: "#f87171", days: ALL_DAYS, band: { start: "06:00", end: "22:00", every: "every 2h", everyMin: 120 } },
 ];
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const CAL_START_MIN = 5 * 60 + 30; // grid spans 5:30am
@@ -1717,9 +1717,9 @@ function WatchdogPanel({ watchdog, onClose }: { watchdog?: WatchdogData | null; 
   const accent = hasProblems ? "#f87171" : "#34d399";
   const ageMin = watchdog ? watchdogAgeMin(watchdog.updated) : null;
   return (
-    <SlideOver title="WATCHDOG" accent={accent} onClose={onClose}>
+    <SlideOver title="THE BOSS" accent={accent} onClose={onClose}>
       {(!watchdog || !watchdog.available) && (
-        <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>The watchdog has not reported yet.</div>
+        <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>The Boss has not reported yet.</div>
       )}
       {watchdog?.available && (
         <>
@@ -1733,9 +1733,9 @@ function WatchdogPanel({ watchdog, onClose }: { watchdog?: WatchdogData | null; 
 
           <SummaryBlock accent={accent} lines={[
             hasProblems
-              ? `The watchdog is reporting ${Math.max(watchdog.problemCount, watchdog.problems.length)} open problem${Math.max(watchdog.problemCount, watchdog.problems.length) === 1 ? "" : "s"}.`
+              ? `The Boss is reporting ${Math.max(watchdog.problemCount, watchdog.problems.length)} open problem${Math.max(watchdog.problemCount, watchdog.problems.length) === 1 ? "" : "s"}.`
               : "Every agent is reporting on schedule. Nothing needs attention.",
-            `Last watchdog report ${relAge(ageMin)}.`,
+            `Last report from The Boss ${relAge(ageMin)}.`,
           ]} />
 
           <Section title={`Problems (${watchdog.problems.length})`} defaultOpen={hasProblems}>

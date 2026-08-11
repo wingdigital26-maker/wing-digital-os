@@ -877,7 +877,7 @@ async function agentDetail(key: string) {
   const summary = {
     what:
       watchdogState && watchdogState !== "OK"
-        ? `${watchdogState} per the latest watchdog report. ${meta.role}`
+        ? `${watchdogState} per the latest report from The Boss. ${meta.role}`
         : meta.role,
     last: activity.length
       ? `Last seen ${activity[0].date}: ${activity[0].title.slice(0, 90)}`

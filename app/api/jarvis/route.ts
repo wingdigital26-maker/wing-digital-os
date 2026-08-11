@@ -865,13 +865,13 @@ async function buildOsContext(): Promise<string> {
       if (inProblems && /^(?:[-*]|\d+\.)\s+/.test(t)) problemLines.push(t);
     }
     parts.push(
-      "## WATCHDOG REPORT (latest, updated " + updated + ")\n" +
+      "## THE BOSS REPORT (latest, updated " + updated + ")\n" +
       "Answer \"is everything running\" from this report. If it lists problems, say so plainly.\n" +
       overallLine +
       (problemLines.length ? "\n" + cap(problemLines.join("\n"), 2000) : "")
     );
   } else {
-    parts.push("## WATCHDOG REPORT\nThe watchdog has not produced its first report yet (wiki/state/watchdog.md missing). Say so if asked whether everything is running.");
+    parts.push("## THE BOSS REPORT\nThe Boss has not produced its first report yet (wiki/state/watchdog.md missing). Say so if asked whether everything is running.");
   }
   // Ground truth on WHEN things run, so Jarvis answers schedule questions correctly.
   parts.push(

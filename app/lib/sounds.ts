@@ -159,6 +159,26 @@ class SfxEngine {
     src.stop(t0 + opts.decay + 0.05);
   }
 
+  // Play now if the AudioContext is already unlocked (a prior user gesture
+  // created/resumed it); otherwise queue the sound to fire on the very next
+  // user interaction instead of being silently dropped by autoplay rules.
+  // Used for arrival/ambient cues that are not themselves gesture-driven.
+  playWhenReady(name: SoundName) {
+    if (this.muted || typeof window === "undefined") return;
+    if (this.ctx && this.ctx.state === "running") {
+      this.play(name);
+      return;
+    }
+    const fire = () => {
+      window.removeEventListener("pointerdown", fire);
+      window.removeEventListener("keydown", fire);
+      // Tiny delay so the gesture itself unlocks the context first.
+      window.setTimeout(() => this.play(name), 30);
+    };
+    window.addEventListener("pointerdown", fire, { once: true });
+    window.addEventListener("keydown", fire, { once: true });
+  }
+
   play(name: SoundName) {
     if (this.muted) return;
     switch (name) {

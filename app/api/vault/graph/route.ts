@@ -51,6 +51,26 @@ function basename(rel: string): string {
   return file.replace(/\.md$/, "");
 }
 
+// Classify a vault-relative path into a folder bucket. Robust against the
+// differences between local disk paths and GitHub tree paths: normalizes
+// separators + case, strips any vault-root prefix, and looks PAST the "wiki"
+// umbrella folder to the meaningful subfolder (wiki/clients/x.md -> "clients").
+function classifyGroup(rel: string): string {
+  const norm = rel.replace(/\\/g, "/").replace(/^\/+/, "").toLowerCase();
+  let parts = norm.split("/").filter(Boolean);
+  // Strip a root-folder prefix if the path ever arrives absolute-ish
+  // ("jacks ai brain 2.0/wiki/..." or the repo name).
+  if (parts.length > 1 && (/brain/.test(parts[0]) || parts[0] === "wing-os-vault")) {
+    parts = parts.slice(1);
+  }
+  if (parts.length <= 1) return "root";
+  if (parts[0] === "wiki") {
+    // wiki/clients/x.md -> clients; wiki/x.md -> wiki
+    return parts.length >= 3 ? parts[1] : "wiki";
+  }
+  return parts[0];
+}
+
 async function buildGraph(): Promise<GraphPayload> {
   const allFiles = await listVaultFiles(); // relative paths, "/"-separated
 
@@ -72,7 +92,7 @@ async function buildGraph(): Promise<GraphPayload> {
 
   for (const rel of allFiles) {
     const name = basename(rel);
-    const group = rel.split("/")[0];
+    const group = classifyGroup(rel);
 
     if (!nodeIds.has(rel)) {
       nodes.push({ id: rel, name, path: rel, group });
@@ -91,6 +111,17 @@ async function buildGraph(): Promise<GraphPayload> {
     }
   }
 
+  // Bucket distribution log — sanity check that classification is not
+  // collapsing everything into one bucket (the "all the same color" bug).
+  const buckets: Record<string, number> = {};
+  for (const n of nodes) buckets[n.group] = (buckets[n.group] ?? 0) + 1;
+  console.log(
+    "[vault/graph] bucket distribution:",
+    JSON.stringify(buckets),
+    "sample paths:",
+    nodes.slice(0, 5).map(n => n.path).join(", ")
+  );
+
   return { nodes, links, builtAt: new Date().toISOString(), hash: graphHash(nodes, links) };
 }
 
@@ -108,15 +139,27 @@ function refresh(): Promise<GraphPayload> {
   return building;
 }
 
+// CDN cache: on Vercel the auth middleware runs BEFORE the edge cache lookup,
+// so unauthorized requests never reach a cached copy; s-maxage lets the CDN
+// answer warm requests without even invoking the (cold-startable) function.
+// stale-while-revalidate keeps first paint instant while a refresh happens.
+const CACHE_HEADER = "max-age=0, s-maxage=300, stale-while-revalidate=1800";
+
 export async function GET() {
   if (graphCache) {
     // Serve instantly; kick off a background rebuild if stale.
     if (Date.now() - graphCache.at > GRAPH_TTL_MS) {
       refresh().catch(() => {});
     }
-    return NextResponse.json({ ...graphCache.value, cached: true });
+    return NextResponse.json(
+      { ...graphCache.value, cached: true },
+      { headers: { "Cache-Control": CACHE_HEADER } }
+    );
   }
   // First request since boot: build once (deduped if concurrent).
   const g = await refresh();
-  return NextResponse.json({ ...g, cached: false });
+  return NextResponse.json(
+    { ...g, cached: false },
+    { headers: { "Cache-Control": CACHE_HEADER } }
+  );
 }

@@ -1406,11 +1406,16 @@ function KnowledgeBase({ initialPath, onSendToAI }: { initialPath?: string; onSe
       </div>
       {!treeOpen && (
         <button onClick={togglePanel} aria-label="Expand vault tree" title="Show tree" style={{
-          position: "absolute", top: "50%", left: 4, transform: "translateY(-50%)", zIndex: 5,
-          width: 22, height: 44, borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)",
-          background: "rgba(8,9,15,0.7)", backdropFilter: "blur(6px)", color: "var(--text-secondary)",
-          cursor: "pointer", fontSize: 14, lineHeight: 1,
-        }}>›</button>
+          position: "absolute", top: "50%", left: 0, transform: "translateY(-50%)", zIndex: 5,
+          width: 26, height: 92, borderRadius: "0 10px 10px 0", border: "1px solid var(--accent)",
+          borderLeft: "none", background: "rgba(8,9,15,0.85)", backdropFilter: "blur(6px)",
+          color: "var(--accent)", boxShadow: "0 0 12px rgba(96,165,250,0.35)",
+          cursor: "pointer", fontSize: 13, lineHeight: 1.15, display: "flex",
+          flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4,
+        }}>
+          <span style={{ fontSize: 15 }}>›</span>
+          <span style={{ writingMode: "vertical-rl", letterSpacing: 2, fontSize: 10, textTransform: "uppercase" }}>Vault</span>
+        </button>
       )}
 
       {/* Middle: Graph always visible */}

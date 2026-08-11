@@ -33,24 +33,65 @@ interface GLink {
 
 const LS_LAYOUT = "wingos-vault-graph-layout-v1";
 
-// Folder palette — color-coded by top-level vault folder.
+// ── Warm the graph API as soon as this module loads ──
+// Once per session, low priority: by the time Jack opens the vault view the
+// serverless function is warm and the JSON is in the HTTP cache.
+if (typeof window !== "undefined") {
+  try {
+    if (!window.sessionStorage.getItem("wingos-graph-prefetched")) {
+      window.sessionStorage.setItem("wingos-graph-prefetched", "1");
+      fetch("/api/vault/graph", { priority: "low" } as RequestInit).catch(() => {});
+    }
+  } catch {
+    /* noop */
+  }
+}
+
+// Folder palette — strongly differentiated, Obsidian-style. Keys match the
+// API's classified buckets (wiki/clients/x.md classifies as "clients").
 const GROUP_COLORS: Record<string, string> = {
-  wiki: "#22d3ee",
-  clients: "#4ade80",
-  campaigns: "#f6b93b",
-  automations: "#a78bfa",
-  agents: "#f472b6",
+  wiki: "#38bdf8",        // sky blue
+  clients: "#22c55e",     // green
+  campaigns: "#f59e0b",   // amber
+  automations: "#a855f7", // purple
+  agents: "#ec4899",      // pink
+  state: "#f97316",       // orange
+  syntheses: "#eab308",   // yellow
+  inbox: "#ef4444",       // red
+  root: "#94a3b8",        // slate
 };
-const OTHER_COLOR = "#8fa3b8";
-const LEGEND: [string, string][] = [
-  ["wiki", GROUP_COLORS.wiki],
-  ["clients", GROUP_COLORS.clients],
-  ["campaigns", GROUP_COLORS.campaigns],
-  ["automations", GROUP_COLORS.automations],
-  ["agents", GROUP_COLORS.agents],
-  ["other", OTHER_COLOR],
-];
-const colorOf = (g: string) => GROUP_COLORS[g] ?? OTHER_COLOR;
+// Deterministic distinct color for any unmapped folder, so new buckets never
+// all collapse into one grey.
+const fallbackCache = new Map<string, string>();
+function colorOf(g: string): string {
+  const known = GROUP_COLORS[g];
+  if (known) return known;
+  let c = fallbackCache.get(g);
+  if (!c) {
+    let h = 0;
+    for (let i = 0; i < g.length; i++) h = (h * 31 + g.charCodeAt(i)) >>> 0;
+    // Must be 6-digit hex: sprite rendering appends hex alpha ("cc" etc).
+    c = hslToHex(h % 360, 75, 62);
+    fallbackCache.set(g, c);
+  }
+  return c;
+}
+
+function hslToHex(h: number, s: number, l: number): string {
+  const sn = s / 100, ln = l / 100;
+  const f = (n: number) => {
+    const k = (n + h / 30) % 12;
+    const col = ln - sn * Math.min(ln, 1 - ln) * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+    return Math.round(255 * col).toString(16).padStart(2, "0");
+  };
+  return `#${f(0)}${f(8)}${f(4)}`;
+}
+
+// Obsidian-style dramatic sizing: tiny leaves, unmistakably big hubs.
+function nodeRadius(deg: number): number {
+  return Math.min(18, 2.5 + Math.sqrt(deg) * 2.6);
+}
+const HUB_DEG = 8; // degree at which a node reads as a hub (halo + label)
 
 function lid(x: string | GNode): string {
   return typeof x === "string" ? x : x.id;
@@ -99,6 +140,7 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
   const [loading, setLoading] = useState(true);
   const [restored, setRestored] = useState(false);
   const [stats, setStats] = useState({ nodes: 0, links: 0 });
+  const [legend, setLegend] = useState<[string, string][]>([]);
   const [query, setQuery] = useState("");
   const queryRef = useRef("");
   queryRef.current = query.trim().toLowerCase();
@@ -222,6 +264,23 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
     s.hash = hash;
     setStats({ nodes: nodes.length, links: links.length });
 
+    // Dynamic legend: buckets actually present, biggest first.
+    const groupCounts = new Map<string, number>();
+    for (const n of nodes) groupCounts.set(n.group, (groupCounts.get(n.group) ?? 0) + 1);
+    setLegend(
+      [...groupCounts.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 8)
+        .map(([g]) => [g, colorOf(g)] as [string, string])
+    );
+    // Debug/verification hook: bucket distribution + radius range.
+    const degs = nodes.map(n => degree.get(n.id) ?? 0);
+    (window as unknown as { __vaultGraphDebug?: unknown }).__vaultGraphDebug = {
+      buckets: Object.fromEntries(groupCounts),
+      radiusMin: nodeRadius(Math.min(...degs, 0)),
+      radiusMax: nodeRadius(Math.max(...degs, 0)),
+    };
+
     // Sprites for any new colors
     for (const n of nodes) {
       const c = colorOf(n.group);
@@ -254,8 +313,7 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
     }
 
     function radiusOf(id: string): number {
-      const d = degree.get(id) ?? 0;
-      return Math.min(11, 2.6 + Math.sqrt(d) * 1.5);
+      return nodeRadius(degree.get(id) ?? 0);
     }
 
     function settleDone(fromCache: boolean) {
@@ -263,7 +321,9 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
       setRestored(fromCache);
       if (!s.arrived) {
         s.arrived = true;
-        sfx.play("graph-arrive");
+        // Plays now if audio is already unlocked by a prior gesture, otherwise
+        // queues for the first interaction instead of being dropped.
+        sfx.playWhenReady("graph-arrive");
       }
       if (!fromCache) fitView();
     }
@@ -317,7 +377,23 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
       .then((g: { nodes: GNode[]; links: { source: string; target: string }[]; hash?: string }) => {
         const hash = g.hash ?? "";
         if (saved && saved.hash && hash && saved.hash === hash) {
-          // Unchanged: saved layout is the truth, nothing to do.
+          // Structure unchanged: keep the saved positions, but refresh
+          // node groups/names from the API. Groups are not part of the
+          // hash, so a stale layout must never pin old colors forever.
+          const pos = new Map(saved.nodes.map(n => [n.id, n]));
+          const groupsChanged = g.nodes.some(n => pos.get(n.id)?.group !== n.group);
+          if (groupsChanged) {
+            installGraph(
+              g.nodes.map(n => {
+                const p = pos.get(n.id);
+                return { id: n.id, name: n.name, path: n.path, group: n.group, x: p?.x, y: p?.y };
+              }),
+              g.links,
+              hash,
+              { settled: true }
+            );
+            saveLayout();
+          }
           return;
         }
         // Changed (or no cache): seed with whatever positions we have.
@@ -540,23 +616,25 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
         const n = s.nodes[i];
         const x = driftX(n, i), y = driftY(n, i);
         const deg = s.degree.get(n.id) ?? 0;
-        const r = Math.min(11, 2.6 + Math.sqrt(deg) * 1.5);
+        const r = nodeRadius(deg);
         const color = colorOf(n.group);
         const isHot = !active || active.has(n.id);
         const isFocal = n.id === s.hoverId || n.id === s.focusId;
+        const isHub = deg >= HUB_DEG;
         ctx.globalAlpha = isHot ? 1 : 0.13;
         const sprite = s.sprites.get(color);
         if (sprite) {
-          const gs = r * (isFocal ? 7 : 4.5);
-          ctx.globalAlpha = (isHot ? (isFocal ? 0.9 : 0.5) : 0.06);
+          // Hubs get a clearly wider, brighter halo than leaves.
+          const gs = r * (isFocal ? 7 : isHub ? 5.8 : 4);
+          ctx.globalAlpha = (isHot ? (isFocal ? 0.95 : isHub ? 0.75 : 0.45) : 0.06);
           ctx.drawImage(sprite, x - gs / 2, y - gs / 2, gs, gs);
         }
-        ctx.globalAlpha = isHot ? 0.95 : 0.18;
+        ctx.globalAlpha = isHot ? (isHub ? 1 : 0.92) : 0.18;
         ctx.fillStyle = color;
         ctx.beginPath();
         ctx.arc(x, y, r, 0, Math.PI * 2);
         ctx.fill();
-        if (isFocal || deg >= 8) {
+        if (isFocal || isHub) {
           ctx.globalAlpha = isHot ? 0.9 : 0.2;
           ctx.fillStyle = "#ffffff";
           ctx.beginPath();
@@ -577,10 +655,10 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
         let a = labelAlpha;
         if (isFocal) a = 1;
         else if (active) a = inHood ? Math.max(labelAlpha, 0.85) : 0;
-        else if (deg >= 8) a = Math.max(labelAlpha, 0.6);
+        else if (deg >= HUB_DEG) a = Math.max(labelAlpha, 0.6);
         if (a <= 0.02) continue;
         const x = driftX(n, i), y = driftY(n, i);
-        const r = Math.min(11, 2.6 + Math.sqrt(deg) * 1.5);
+        const r = nodeRadius(deg);
         ctx.globalAlpha = a;
         ctx.fillStyle = isFocal ? "#eaf6ff" : "#9db4cc";
         ctx.fillText(n.name, x, y + r + 12 / t.k);
@@ -649,7 +727,7 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
         border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: "8px 12px",
         display: "flex", flexDirection: "column", gap: 4,
       }}>
-        {LEGEND.map(([name, color]) => (
+        {legend.map(([name, color]) => (
           <div key={name} style={{ display: "flex", alignItems: "center", gap: 7 }}>
             <span style={{ width: 7, height: 7, borderRadius: "50%", background: color, boxShadow: `0 0 6px ${color}` }} />
             <span style={{ fontSize: 10, color: "var(--text-secondary)", textTransform: "capitalize" }}>{name}</span>

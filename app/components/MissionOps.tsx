@@ -5,7 +5,7 @@
 // slide-over panel shows everything going on with it. Shared pieces live in
 // MissionControlCore.tsx (also used by /mission). Reuses /api/mission.
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   MissionData, Selection, Dot, MissionStyles, OpsMap, AgentTile, FeedTicker,
   MissionPanels, NextUpStrip, WatchdogBanner,
@@ -16,22 +16,24 @@ export default function MissionOps() {
   const [error, setError] = useState<string | null>(null);
   const [selection, setSelection] = useState<Selection>(null);
 
+  const aliveRef = useRef(true);
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch("/api/mission", { cache: "no-store" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const j = await res.json();
+      if (aliveRef.current) { setData(j); setError(null); }
+    } catch (e: unknown) {
+      if (aliveRef.current) setError(e instanceof Error ? e.message : "fetch failed");
+    }
+  }, []);
+
   useEffect(() => {
-    let alive = true;
-    const load = async () => {
-      try {
-        const res = await fetch("/api/mission", { cache: "no-store" });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const j = await res.json();
-        if (alive) { setData(j); setError(null); }
-      } catch (e: unknown) {
-        if (alive) setError(e instanceof Error ? e.message : "fetch failed");
-      }
-    };
+    aliveRef.current = true;
     load();
     const poll = setInterval(load, 30_000);
-    return () => { alive = false; clearInterval(poll); };
-  }, []);
+    return () => { aliveRef.current = false; clearInterval(poll); };
+  }, [load]);
 
   const scheduled = useMemo(() => data?.agents.filter(a => a.kind === "scheduled") ?? [], [data]);
   const crew = useMemo(() => data?.agents.filter(a => a.kind === "crew") ?? [], [data]);
@@ -42,7 +44,7 @@ export default function MissionOps() {
       <MissionStyles />
 
       {/* Watchdog problems banner — always the very first thing on screen */}
-      {data && <WatchdogBanner watchdog={data.watchdog} />}
+      {data && <WatchdogBanner watchdog={data.watchdog} onRechecked={load} />}
 
       {/* header row */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
@@ -116,7 +118,7 @@ export default function MissionOps() {
         </>
       )}
 
-      <MissionPanels selection={selection} data={data} onSelect={setSelection} />
+      <MissionPanels selection={selection} data={data} onSelect={setSelection} onRechecked={load} />
     </div>
   );
 }

@@ -334,7 +334,8 @@ export function OpsMap({ agents, volumes, watchdog, onSelect }: {
   const [hover, setHover] = useState<Hover>(null);
   const W = 960, H = 500;
   // Extra headroom above the agents arc for the watchdog overseer node.
-  const TOP = watchdog?.available ? 74 : 0;
+  // Extra headroom for the oversized boss orb (1.5x the agent nodes).
+  const TOP = watchdog?.available ? 100 : 0;
   const shown = agents.filter(a => a.enabled);
   const agentPos = shown.map((a, i) => {
     const x = (W / (shown.length + 1)) * (i + 1);
@@ -387,7 +388,9 @@ export function OpsMap({ agents, volumes, watchdog, onSelect }: {
   const hovering = hover !== null;
   const wdProblems = !!watchdog && (watchdog.overall === "problems" || Math.max(watchdog.problemCount, watchdog.problems.length) > 0);
   const wdColor = wdProblems ? "#f87171" : "#34d399";
-  const wdX = W / 2, wdY = -TOP + 30;
+  const wdX = W / 2, wdY = -TOP + 44;
+  // Boss orb is 1.5x an agent node (agent r=21 -> 31.5), glow kept proportional.
+  const wdR = 31.5;
 
   return (
     <div style={{
@@ -460,7 +463,7 @@ export function OpsMap({ agents, volumes, watchdog, onSelect }: {
           const p = agentPos.find(ap => ap.a.key === a.key);
           if (!p) return null;
           const midY = (wdY + p.y) / 2;
-          const d = `M ${wdX} ${wdY + 18} C ${wdX} ${midY}, ${p.x} ${midY}, ${p.x} ${p.y - 26}`;
+          const d = `M ${wdX} ${wdY + wdR} C ${wdX} ${midY}, ${p.x} ${midY}, ${p.x} ${p.y - 26}`;
           return (
             <g key={`wd-${a.key}`}>
               <path d={d} fill="none" stroke="#f87171" strokeOpacity={0.5} strokeWidth={1.6} />
@@ -476,15 +479,15 @@ export function OpsMap({ agents, volumes, watchdog, onSelect }: {
             onMouseEnter={() => { sfx.play("hover"); setHover({ kind: "watchdog" }); }}
             onMouseLeave={() => setHover(h => (h?.kind === "watchdog" ? null : h))}
             onClick={() => { sfx.play("blip-watchdog"); onSelect({ type: "watchdog" }); }}>
-            {wdProblems && <circle cx={wdX} cy={wdY} r={34} fill="url(#mo-glow)" />}
-            <circle cx={wdX} cy={wdY} r={18} fill="rgba(13,17,23,0.95)" stroke={wdColor}
-              strokeWidth={2} className={wdProblems ? "mo-node-pulse" : undefined} />
-            <circle cx={wdX} cy={wdY - 25} r={3.5} fill={wdColor} className={wdProblems ? "mo-pulse" : undefined} />
-            <text x={wdX} y={wdY + 3.5} textAnchor="middle" fill={wdColor} fontSize="8.5"
-              fontFamily="'JetBrains Mono', monospace" letterSpacing="0.06em" style={{ pointerEvents: "none" }}>
-              THE BOSS
+            {wdProblems && <circle cx={wdX} cy={wdY} r={wdR * 1.9} fill="url(#mo-glow)" />}
+            <circle cx={wdX} cy={wdY} r={wdR} fill="rgba(13,17,23,0.95)" stroke={wdColor}
+              strokeWidth={3} className={wdProblems ? "mo-node-pulse" : undefined} />
+            <circle cx={wdX} cy={wdY - wdR - 7} r={5} fill={wdColor} className={wdProblems ? "mo-pulse" : undefined} />
+            <text x={wdX} y={wdY + 4} textAnchor="middle" fill={wdColor} fontSize="11"
+              fontFamily="'JetBrains Mono', monospace" letterSpacing="0.06em" fontWeight="700" style={{ pointerEvents: "none" }}>
+              DA BOSS
             </text>
-            <text x={wdX} y={wdY + 34} textAnchor="middle" fill={wdProblems ? "#f87171" : "#6b7280"} fontSize="8.5"
+            <text x={wdX} y={wdY + wdR + 14} textAnchor="middle" fill={wdProblems ? "#f87171" : "#6b7280"} fontSize="8.5"
               fontFamily="'JetBrains Mono', monospace" style={{ pointerEvents: "none" }}>
               {wdProblems
                 ? `${Math.max(watchdog.problemCount, watchdog.problems.length)} problem${Math.max(watchdog.problemCount, watchdog.problems.length) === 1 ? "" : "s"}`
@@ -646,8 +649,8 @@ function watchdogReportText(w: WatchdogData): string {
   const count = Math.max(w.problemCount, w.problems.length);
   lines.push(
     w.overall === "problems" || count > 0
-      ? `THE BOSS REPORT: ${count} problem${count === 1 ? "" : "s"} reported`
-      : "THE BOSS REPORT: all systems reporting, no problems"
+      ? `DA BOSS REPORT: ${count} problem${count === 1 ? "" : "s"} reported`
+      : "DA BOSS REPORT: all systems reporting, no problems"
   );
   if (w.problems.length) {
     lines.push("");
@@ -666,7 +669,7 @@ function watchdogReportText(w: WatchdogData): string {
     for (const k of agentKeys) lines.push(`- ${k}: ${w.agents[k]}`);
   }
   lines.push("");
-  lines.push(`Last report from The Boss: ${w.updated ?? "unknown"}`);
+  lines.push(`Last report from Da Boss: ${w.updated ?? "unknown"}`);
   return lines.join("\n");
 }
 
@@ -675,8 +678,8 @@ function WatchdogCopyButton({ watchdog, color }: { watchdog: WatchdogData; color
   const [copied, setCopied] = useState(false);
   return (
     <button
-      title="Copy the full report from The Boss"
-      aria-label="Copy report from The Boss"
+      title="Copy the full report from Da Boss"
+      aria-label="Copy report from Da Boss"
       onClick={(e) => {
         e.stopPropagation();
         navigator.clipboard?.writeText(watchdogReportText(watchdog)).then(() => {
@@ -706,7 +709,171 @@ function WatchdogCopyButton({ watchdog, color }: { watchdog: WatchdogData; color
   );
 }
 
-export function WatchdogBanner({ watchdog }: { watchdog?: WatchdogData | null }) {
+// ── Da Boss "Recheck": run live checks on demand ──────────────────────────
+// Hits POST /api/boss/recheck and shows the fresh results inline over top of
+// the cached report. Resolved lines go green, still-broken stay red, needs-pc
+// shows a subtle pill. Honest: it only greens what the server truly verified.
+export interface RecheckItem { label: string; status: string; line: string; url?: string | null; http?: number | null }
+export interface RecheckCheck { id: string; label: string; status: string; line: string; items?: RecheckItem[] }
+export interface RecheckResult { ranAt: string; target: string; cloud: boolean; wrote: boolean; writeNote: string | null; overall: string; checks: RecheckCheck[] }
+
+const RECHECK_TARGETS: { id: string; label: string }[] = [
+  { id: "all", label: "Recheck everything" },
+  { id: "urls", label: "Recheck the flagged pages" },
+  { id: "freshness", label: "Recheck data freshness" },
+  { id: "outreach", label: "Recheck outreach" },
+];
+
+const statusColor = (s: string): string =>
+  s === "resolved" || s === "ok" ? "#34d399" : s === "problem" ? "#f87171" : "#93a4b8";
+
+function StatusMark({ status }: { status: string }) {
+  if (status === "resolved" || status === "ok") return <span style={{ color: "#34d399" }} aria-hidden>&#10003;</span>;
+  if (status === "problem") return <span style={{ color: "#f87171" }} aria-hidden>&#10007;</span>;
+  return <Pill text="needs PC" color="#93a4b8" />;
+}
+
+export function RecheckButton({ onRechecked, compact }: { onRechecked?: () => void; compact?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [result, setResult] = useState<RecheckResult | null>(null);
+  const [ranAt, setRanAt] = useState<number | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const mono = "'JetBrains Mono', monospace";
+
+  const run = async (target: string) => {
+    setOpen(false);
+    setBusy(target);
+    setErr(null);
+    sfx.play("nav"); // tick on start
+    try {
+      const res = await fetch("/api/boss/recheck", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target }),
+        cache: "no-store",
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const j: RecheckResult = await res.json();
+      setResult(j);
+      setRanAt(Date.now());
+      const anyResolved = j.checks.some((c) => c.status === "resolved" || (c.items ?? []).some((i) => i.status === "resolved"));
+      sfx.play(anyResolved ? "chime" : "blip-watchdog"); // positive chime if anything resolved, else the watchdog tone
+      onRechecked?.(); // re-pull /api/mission so banner/agent states/red lines update
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "recheck failed");
+      sfx.play("blip-watchdog");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <div style={{ position: "relative", display: "inline-flex", flexDirection: "column", alignItems: "stretch", gap: 6 }}
+      onClick={(e) => e.stopPropagation()}>
+      <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+        <button
+          title="Recheck now"
+          aria-label="Recheck now"
+          disabled={!!busy}
+          onClick={() => (busy ? undefined : run("all"))}
+          style={{
+            background: "none", border: "1px solid var(--accent, #22d3ee)55", color: "var(--accent, #22d3ee)",
+            borderRadius: 6, padding: compact ? "2px 8px" : "3px 10px", cursor: busy ? "wait" : "pointer",
+            fontSize: 10, display: "inline-flex", alignItems: "center", gap: 5, fontFamily: mono, flexShrink: 0,
+          }}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+            strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
+            style={busy ? { animation: "recheckSpin 0.8s linear infinite" } : undefined}>
+            <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+            <path d="M21 3v6h-6" />
+          </svg>
+          {busy ? "rechecking" : "recheck"}
+        </button>
+        <button
+          aria-label="Choose what to recheck"
+          disabled={!!busy}
+          onClick={() => setOpen((o) => !o)}
+          style={{
+            background: "none", border: "1px solid var(--accent, #22d3ee)55", color: "var(--accent, #22d3ee)",
+            borderRadius: 6, padding: "3px 6px", cursor: busy ? "wait" : "pointer", fontSize: 10, fontFamily: mono, flexShrink: 0,
+          }}>
+          &#9662;
+        </button>
+      </div>
+      <style>{`@keyframes recheckSpin { to { transform: rotate(360deg); } }`}</style>
+
+      {open && (
+        <div style={{
+          position: "absolute", top: "100%", right: 0, marginTop: 4, zIndex: 30,
+          background: "var(--bg-card, #0d1117)", border: "1px solid var(--border, rgba(255,255,255,0.12))",
+          borderRadius: 8, padding: 4, minWidth: 190, boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
+        }}>
+          {RECHECK_TARGETS.map((t) => (
+            <button key={t.id} onClick={() => run(t.id)}
+              style={{
+                display: "block", width: "100%", textAlign: "left", background: "none", border: "none",
+                color: "var(--text-secondary, #9ca3af)", fontSize: 11, fontFamily: mono, padding: "6px 8px",
+                borderRadius: 6, cursor: "pointer",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.05)")}
+              onMouseLeave={(e) => (e.currentTarget.style.background = "none")}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {err && <div style={{ fontSize: 10.5, color: "#f87171", fontFamily: mono }}>recheck failed: {err}</div>}
+
+      {result && !busy && (
+        <div style={{
+          border: `1px solid ${statusColor(result.overall)}55`, borderRadius: 8, padding: "8px 10px",
+          background: "rgba(255,255,255,0.02)", display: "flex", flexDirection: "column", gap: 6, minWidth: compact ? undefined : 280,
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 10.5, fontFamily: mono, color: statusColor(result.overall) }}>
+            <StatusMark status={result.overall} />
+            <span style={{ fontWeight: 700, letterSpacing: "0.08em" }}>
+              RECHECKED JUST NOW{result.cloud ? " (cloud)" : ""}
+            </span>
+            <span style={{ marginLeft: "auto", color: "var(--text-muted, #6b7280)" }}>
+              {ranAt ? new Date(ranAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : ""}
+            </span>
+          </div>
+          {result.checks.map((c) => (
+            <div key={c.id} style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: statusColor(c.status), fontFamily: mono }}>
+                <StatusMark status={c.status} />
+                <span style={{ fontWeight: 600 }}>{c.label}:</span>
+                <span style={{ color: "var(--text-secondary, #9ca3af)" }}>{c.line}</span>
+              </div>
+              {(c.items ?? []).map((it, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 6, fontSize: 10.5, paddingLeft: 16, color: "var(--text-secondary, #9ca3af)", lineHeight: 1.45 }}>
+                  <StatusMark status={it.status} />
+                  <span>
+                    {it.url ? (
+                      <a href={it.url} target="_blank" rel="noreferrer" style={{ color: statusColor(it.status), textDecoration: "underline" }}>
+                        {it.url}
+                      </a>
+                    ) : (
+                      <span style={{ color: statusColor(it.status) }}>{it.label}</span>
+                    )}
+                    {" — "}{it.line}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ))}
+          {result.writeNote && (
+            <div style={{ fontSize: 10, color: "var(--text-muted, #6b7280)", fontFamily: mono }}>{result.writeNote}</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function WatchdogBanner({ watchdog, onRechecked }: { watchdog?: WatchdogData | null; onRechecked?: () => void }) {
   const [expanded, setExpanded] = useState<boolean | null>(null);
   const mono = "'JetBrains Mono', monospace";
 
@@ -722,7 +889,10 @@ export function WatchdogBanner({ watchdog }: { watchdog?: WatchdogData | null })
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <Dot color="#6b7280" />
           <span style={{ fontSize: 11, letterSpacing: "0.1em", color: "var(--text-muted, #6b7280)" }}>
-            THE BOSS - has not reported yet
+            DA BOSS - has not reported yet
+          </span>
+          <span style={{ marginLeft: "auto" }}>
+            <RecheckButton onRechecked={onRechecked} compact />
           </span>
         </div>
       </div>
@@ -742,9 +912,10 @@ export function WatchdogBanner({ watchdog }: { watchdog?: WatchdogData | null })
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <Dot color="#34d399" />
           <span style={{ fontSize: 11, letterSpacing: "0.1em", color: "#34d399" }}>
-            ALL SYSTEMS REPORTING - The Boss checked {relAge(ageMin)}
+            ALL SYSTEMS REPORTING - Da Boss checked {relAge(ageMin)}
           </span>
-          <span style={{ marginLeft: "auto" }}>
+          <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "flex-start", gap: 8 }}>
+            <RecheckButton onRechecked={onRechecked} compact />
             <WatchdogCopyButton watchdog={watchdog} color="#34d399" />
           </span>
         </div>
@@ -760,8 +931,8 @@ export function WatchdogBanner({ watchdog }: { watchdog?: WatchdogData | null })
     setExpanded(!isOpen);
   };
   const headline = hasProblems
-    ? `THE BOSS: ${count} PROBLEM${count === 1 ? "" : "S"} REPORTED`
-    : `THE BOSS ITSELF IS LATE (last report ${relAge(ageMin)})`;
+    ? `DA BOSS: ${count} PROBLEM${count === 1 ? "" : "S"} REPORTED`
+    : `DA BOSS ITSELF IS LATE (last report ${relAge(ageMin)})`;
 
   return (
     <div className="mo-click wd-banner" onClick={toggle} role="button" style={{
@@ -781,7 +952,8 @@ export function WatchdogBanner({ watchdog }: { watchdog?: WatchdogData | null })
             report is also late ({relAge(ageMin)})
           </span>
         )}
-        <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 8 }}>
+        <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "flex-start", gap: 8 }}>
+          <RecheckButton onRechecked={onRechecked} compact />
           <WatchdogCopyButton watchdog={watchdog} color={color} />
           <span style={{ fontSize: 10, color: "var(--text-muted, #6b7280)" }}>
             {isOpen ? "collapse" : "expand"}
@@ -817,11 +989,11 @@ export function WatchdogBanner({ watchdog }: { watchdog?: WatchdogData | null })
           )}
           {stale && hasProblems && (
             <div style={{ fontSize: 10.5, color: "#fb923c" }}>
-              The Boss report itself is older than 3 hours - The Boss being silent is also a problem.
+              Da Boss report itself is older than 3 hours - Da Boss being silent is also a problem.
             </div>
           )}
           <div style={{ fontSize: 10, color: "var(--text-muted, #6b7280)" }}>
-            last report from The Boss {relAge(ageMin)}
+            last report from Da Boss {relAge(ageMin)}
           </div>
         </div>
       )}
@@ -835,8 +1007,8 @@ export function AgentTile({ a, onSelect }: { a: AgentCard; onSelect: (s: Selecti
   let pulse = false;
   let line = a.schedule;
   if (!a.enabled) { line = "disabled"; }
-  else if (a.watchdogState === "SILENT") { color = "#f87171"; pulse = true; line = "SILENT (The Boss)"; }
-  else if (a.watchdogState === "LATE") { color = "#fb923c"; pulse = true; line = "LATE (The Boss)"; }
+  else if (a.watchdogState === "SILENT") { color = "#f87171"; pulse = true; line = "SILENT (Da Boss)"; }
+  else if (a.watchdogState === "LATE") { color = "#fb923c"; pulse = true; line = "LATE (Da Boss)"; }
   else if (a.pcNeeded && a.kind === "scheduled") { color = "#fb923c"; line = "PC needed"; }
   else if (a.nextRunAt) { color = "#22d3ee"; pulse = true; line = `next ${fmtCountdown(a.nextRunAt)}`; }
   else if (a.lastLogDate) { color = "#34d399"; pulse = true; line = `last seen ${a.lastLogDate}`; }
@@ -1181,9 +1353,9 @@ function AgentPanel({ agentKey, onClose, onSelect }: {
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
             <Pill text={detail.status.toUpperCase()} color={statusColor} />
             <Pill text={detail.kind === "scheduled" ? "SCHEDULED" : "ON DEMAND"} color="var(--text-muted, #6b7280)" />
-            {detail.watchdogState === "SILENT" && <Pill text="SILENT (THE BOSS)" color="#f87171" />}
-            {detail.watchdogState === "LATE" && <Pill text="LATE (THE BOSS)" color="#fb923c" />}
-            {detail.watchdogState === "DISABLED" && <Pill text="DISABLED (THE BOSS)" color="#6b7280" />}
+            {detail.watchdogState === "SILENT" && <Pill text="SILENT (DA BOSS)" color="#f87171" />}
+            {detail.watchdogState === "LATE" && <Pill text="LATE (DA BOSS)" color="#fb923c" />}
+            {detail.watchdogState === "DISABLED" && <Pill text="DISABLED (DA BOSS)" color="#6b7280" />}
             {detail.installed === false && <Pill text="NOT INSTALLED" color="#fb923c" />}
           </div>
 
@@ -1413,7 +1585,7 @@ const CAL_ENTRIES: CalEntry[] = [
   { key: "renewal-content-weekly", label: "Renewal Content", color: "#a78bfa", days: [0], time: "07:40" },
   { key: "chronicler-end-of-day", label: "Chronicler", color: "#60a5fa", days: ALL_DAYS, time: "21:47" },
   { key: "b2b-outreach-engine", label: "Outreach", color: "#22d3ee", days: ALL_DAYS, band: { start: "08:00", end: "20:00", every: "every 30 min", everyMin: 30 } },
-  { key: "watchdog", label: "The Boss", color: "#f87171", days: ALL_DAYS, band: { start: "06:00", end: "22:00", every: "every 2h", everyMin: 120 } },
+  { key: "watchdog", label: "Da Boss", color: "#f87171", days: ALL_DAYS, band: { start: "06:00", end: "22:00", every: "every 2h", everyMin: 120 } },
 ];
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const CAL_START_MIN = 5 * 60 + 30; // grid spans 5:30am
@@ -1712,14 +1884,17 @@ export function ClientPanel({ name, data, onClose }: { name: string; data: Missi
 }
 
 // ── Watchdog report panel (opened from the overseer node on the map) ───────
-function WatchdogPanel({ watchdog, onClose }: { watchdog?: WatchdogData | null; onClose: () => void }) {
+function WatchdogPanel({ watchdog, onClose, onRechecked }: { watchdog?: WatchdogData | null; onClose: () => void; onRechecked?: () => void }) {
   const hasProblems = !!watchdog && (watchdog.overall === "problems" || Math.max(watchdog.problemCount, watchdog.problems.length) > 0);
   const accent = hasProblems ? "#f87171" : "#34d399";
   const ageMin = watchdog ? watchdogAgeMin(watchdog.updated) : null;
   return (
-    <SlideOver title="THE BOSS" accent={accent} onClose={onClose}>
+    <SlideOver title="DA BOSS" accent={accent} onClose={onClose}>
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 4 }}>
+        <RecheckButton onRechecked={onRechecked} />
+      </div>
       {(!watchdog || !watchdog.available) && (
-        <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>The Boss has not reported yet.</div>
+        <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>Da Boss has not reported yet.</div>
       )}
       {watchdog?.available && (
         <>
@@ -1733,9 +1908,9 @@ function WatchdogPanel({ watchdog, onClose }: { watchdog?: WatchdogData | null; 
 
           <SummaryBlock accent={accent} lines={[
             hasProblems
-              ? `The Boss is reporting ${Math.max(watchdog.problemCount, watchdog.problems.length)} open problem${Math.max(watchdog.problemCount, watchdog.problems.length) === 1 ? "" : "s"}.`
+              ? `Da Boss is reporting ${Math.max(watchdog.problemCount, watchdog.problems.length)} open problem${Math.max(watchdog.problemCount, watchdog.problems.length) === 1 ? "" : "s"}.`
               : "Every agent is reporting on schedule. Nothing needs attention.",
-            `Last report from The Boss ${relAge(ageMin)}.`,
+            `Last report from Da Boss ${relAge(ageMin)}.`,
           ]} />
 
           <Section title={`Problems (${watchdog.problems.length})`} defaultOpen={hasProblems}>
@@ -1816,8 +1991,8 @@ export function ClientHealthSlideOver({ clientName, onClose }: { clientName: str
 }
 
 // ── Selection router: render whichever panel is open ───────────────────────
-export function MissionPanels({ selection, data, onSelect }: {
-  selection: Selection; data: MissionData | null; onSelect: (s: Selection) => void;
+export function MissionPanels({ selection, data, onSelect, onRechecked }: {
+  selection: Selection; data: MissionData | null; onSelect: (s: Selection) => void; onRechecked?: () => void;
 }) {
   if (!selection) return null;
   const close = () => onSelect(null);
@@ -1827,6 +2002,6 @@ export function MissionPanels({ selection, data, onSelect }: {
   if (!data) return null;
   if (selection.type === "system") return <SystemPanel systemId={selection.id} data={data} onSelect={onSelect} onClose={close} />;
   if (selection.type === "client") return <ClientPanel name={selection.name} data={data} onClose={close} />;
-  if (selection.type === "watchdog") return <WatchdogPanel watchdog={data.watchdog} onClose={close} />;
+  if (selection.type === "watchdog") return <WatchdogPanel watchdog={data.watchdog} onClose={close} onRechecked={onRechecked} />;
   return null;
 }

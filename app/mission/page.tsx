@@ -6,7 +6,7 @@
 // client health dots, and feed lines all open detail panels. Shared pieces
 // live in app/components/MissionControlCore.tsx (also used by MissionOps).
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   MissionData, Selection, Dot, Pill, MissionStyles, OpsMap, AgentTile,
   FeedTicker, ClientHealthStrip, MissionPanels, StatTiles, NextUpStrip,
@@ -30,23 +30,25 @@ export default function MissionControl() {
   const [now, setNow] = useState<Date>(new Date());
   const [selection, setSelection] = useState<Selection>(null);
 
+  const aliveRef = useRef(true);
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch("/api/mission", { cache: "no-store" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const j = await res.json();
+      if (aliveRef.current) { setData(j); setError(null); }
+    } catch (e: unknown) {
+      if (aliveRef.current) setError(e instanceof Error ? e.message : "fetch failed");
+    }
+  }, []);
+
   useEffect(() => {
-    let alive = true;
-    const load = async () => {
-      try {
-        const res = await fetch("/api/mission", { cache: "no-store" });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const j = await res.json();
-        if (alive) { setData(j); setError(null); }
-      } catch (e: unknown) {
-        if (alive) setError(e instanceof Error ? e.message : "fetch failed");
-      }
-    };
+    aliveRef.current = true;
     load();
     const poll = setInterval(load, 30_000);
     const clock = setInterval(() => setNow(new Date()), 1000);
-    return () => { alive = false; clearInterval(poll); clearInterval(clock); };
-  }, []);
+    return () => { aliveRef.current = false; clearInterval(poll); clearInterval(clock); };
+  }, [load]);
 
   const overallColor = STATUS_COLOR[data?.overall ?? "green"];
   const scheduled = useMemo(() => data?.agents.filter((a) => a.kind === "scheduled") ?? [], [data]);
@@ -58,7 +60,7 @@ export default function MissionControl() {
       {/* Watchdog problems banner — always the very first thing on screen */}
       {data && (
         <div style={{ marginBottom: 14 }}>
-          <WatchdogBanner watchdog={data.watchdog} />
+          <WatchdogBanner watchdog={data.watchdog} onRechecked={load} />
         </div>
       )}
       <style>{`
@@ -184,7 +186,7 @@ export default function MissionControl() {
         </>
       )}
 
-      <MissionPanels selection={selection} data={data} onSelect={setSelection} />
+      <MissionPanels selection={selection} data={data} onSelect={setSelection} onRechecked={load} />
     </div>
   );
 }

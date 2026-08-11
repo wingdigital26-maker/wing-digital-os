@@ -31,7 +31,11 @@ export interface ClientHealth {
   overall: "green" | "yellow" | "red";
   pillars: string[];
   redFlags: { text: string; link: string | null }[];
+  site?: string | null;
 }
+export interface PublishItem { date: string; title: string; url: string | null; note: string | null }
+export interface Publishes { windowDays: number; items: PublishItem[]; lastPriorPublish: string | null }
+export interface RealLink { label: string; url: string }
 export interface StatTile { key: string; label: string; value: string; sub: string | null; updated: string | null }
 export interface StatDetail {
   id: string;
@@ -41,6 +45,7 @@ export interface StatDetail {
   summary: string[];
   items: { label: string; value: string; note: string | null }[];
   note: string | null;
+  links?: RealLink[];
 }
 export interface VolumeBadge { value: string; sub: string | null }
 export interface Volumes {
@@ -64,6 +69,7 @@ export interface MissionData {
   health?: { runDate: string | null; clients: ClientHealth[] };
   stats: { tiles: StatTile[]; updated: string | null };
   volumes?: Volumes;
+  publishes?: Publishes;
 }
 export interface AgentWire { id: string; label: string; direction: "reads" | "writes" | "both" }
 export interface AgentDetail {
@@ -82,6 +88,7 @@ export interface AgentDetail {
   summary?: { what: string; last: string; next: string };
   systems: AgentWire[];
   activity: FeedEntry[];
+  olderActivity?: number;
   artifact: { title: string; lines: string[]; distilled?: string[] } | null;
 }
 export interface ArtifactDetail {
@@ -96,6 +103,7 @@ export interface ArtifactDetail {
   updated: string | null;
   lines: string[];
   distilled?: string[];
+  links?: RealLink[];
 }
 
 // ── shared metadata ────────────────────────────────────────────────────────
@@ -778,6 +786,42 @@ function DistilledExcerpt({ distilled, raw, accent }: { distilled: string[]; raw
   );
 }
 
+// Real outbound links row (opens the actual thing in a new tab).
+function LinkRow({ links, accent }: { links: RealLink[]; accent: string }) {
+  if (!links.length) return null;
+  return (
+    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+      {links.map((l) => (
+        <a key={l.url} href={l.url} target="_blank" rel="noreferrer"
+          style={{ fontSize: 12, color: accent, textDecoration: "none", border: `1px solid ${accent}55`, borderRadius: 8, padding: "6px 12px", display: "inline-block" }}>
+          {l.label} &#8599;
+        </a>
+      ))}
+    </div>
+  );
+}
+
+// Vault path as copyable text (the browser cannot open Obsidian files, so the
+// honest affordance is copy-the-path).
+function CopyPath({ path }: { path: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
+      <span style={{ fontSize: 10, color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace", wordBreak: "break-all" }}>{path}</span>
+      <button
+        onClick={() => {
+          navigator.clipboard?.writeText(path).then(() => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+          }).catch(() => {});
+        }}
+        style={{ background: "none", border: "1px solid var(--border, rgba(255,255,255,0.15))", color: copied ? "#34d399" : "var(--text-secondary, #9ca3af)", borderRadius: 6, padding: "2px 8px", cursor: "pointer", fontSize: 10, flexShrink: 0 }}>
+        {copied ? "copied" : "copy vault path"}
+      </button>
+    </div>
+  );
+}
+
 // Plain-English summary block the panels lead with.
 function SummaryBlock({ lines, accent }: { lines: string[]; accent: string }) {
   return (
@@ -846,6 +890,11 @@ function AgentPanel({ agentKey, onClose, onSelect }: {
                 background: "none", border: "none", color: "var(--accent, #22d3ee)",
                 cursor: "pointer", fontSize: 11, padding: 0,
               }}>show more ({activity.length - 8})</button>
+            )}
+            {(detail.olderActivity ?? 0) > 0 && (
+              <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6 }}>
+                Showing the last 7 days. Older activity exists ({detail.olderActivity} earlier entr{detail.olderActivity === 1 ? "y" : "ies"} in log.md).
+              </div>
             )}
           </Section>
 
@@ -947,9 +996,11 @@ function ArtifactPanel({ artifactId, onClose, onSelect }: {
             )}
           </div>
 
+          <LinkRow links={detail.links ?? []} accent={accent} />
+
           <Section title="Content" defaultOpen>
             <DistilledExcerpt distilled={detail.distilled ?? []} raw={detail.lines} accent={accent} />
-            <div style={{ fontSize: 10, color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace", marginTop: 6 }}>{detail.path}</div>
+            <CopyPath path={detail.path} />
           </Section>
         </>
       )}
@@ -1003,6 +1054,7 @@ function StatPanel({ statKey, onClose, onSelect }: {
               {detail.note}
             </div>
           )}
+          <LinkRow links={detail.links ?? []} accent={accent} />
           {statKey === "clients" && (
             <div style={{ marginTop: 14 }}>
               <a href="/?section=clients" style={{ fontSize: 12, color: accent, textDecoration: "none", border: `1px solid ${accent}55`, borderRadius: 8, padding: "6px 12px", display: "inline-block" }}
@@ -1052,6 +1104,31 @@ function SystemPanel({ systemId, data, onSelect, onClose }: {
         `${touching.length} agent${touching.length === 1 ? "" : "s"} wired in, ${activeCount} recently active.`,
         related.length ? `Last activity ${shortDate(related[0].date)}: ${tightLine(related[0].title, 80)}` : "No recent log activity for this system.",
       ]} />
+
+      {systemId === "website" && (
+        <Section title="Published this week" defaultOpen>
+          {(data.publishes?.items ?? []).map((p, i) => (
+            <div key={i} style={{ fontSize: 12, marginBottom: 8, lineHeight: 1.5 }}>
+              <span style={{ color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace", fontSize: 10, marginRight: 8 }}>{shortDate(p.date)}</span>
+              {p.url ? (
+                <a href={p.url} target="_blank" rel="noreferrer" style={{ color: sys.color, textDecoration: "none" }}>
+                  {tightLine(p.title, 110)} &#8599;
+                </a>
+              ) : (
+                <span style={{ color: "var(--text-secondary)" }}>
+                  {tightLine(p.title, 110)} <span style={{ color: "var(--text-muted)", fontSize: 10 }}>({p.note ?? "no link logged"})</span>
+                </span>
+              )}
+            </div>
+          ))}
+          {(data.publishes?.items ?? []).length === 0 && (
+            <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+              Nothing published in the last 7 days.
+              {data.publishes?.lastPriorPublish ? ` Most recent prior publish: ${shortDate(data.publishes.lastPriorPublish)}.` : ""}
+            </div>
+          )}
+        </Section>
+      )}
 
       <Section title={`Agents (${touching.length})`} defaultOpen>
         {touching.map(a => (
@@ -1108,6 +1185,29 @@ function ClientPanel({ name, data, onClose }: { name: string; data: MissionData;
         `${c.client} is ${c.overall.toUpperCase()} overall, in the ${c.phase} phase.`,
         c.redFlags.length ? `${c.redFlags.length} open flag${c.redFlags.length === 1 ? "" : "s"} on the board.` : "No open flags. All clear.",
       ]} />
+
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+        {c.site && (
+          <a href={c.site} target="_blank" rel="noreferrer"
+            style={{ fontSize: 12, color: accent, textDecoration: "none", border: `1px solid ${accent}55`, borderRadius: 8, padding: "6px 12px", display: "inline-block" }}>
+            Open live site ({c.site.replace(/^https?:\/\//, "")}) &#8599;
+          </a>
+        )}
+        <a href="/?section=clients"
+          style={{ fontSize: 12, color: accent, textDecoration: "none", border: `1px solid ${accent}55`, borderRadius: 8, padding: "6px 12px", display: "inline-block" }}
+          onClick={(e) => {
+            // In the main app, jump to the Clients section in place. On /mission
+            // this lands on the Command Center (the main app has no ?section=
+            // deep link yet).
+            if (typeof window !== "undefined" && window.location.pathname === "/") {
+              e.preventDefault();
+              window.dispatchEvent(new CustomEvent("os:navigate", { detail: "clients" }));
+              onClose();
+            }
+          }}>
+          Open in Clients section &#8594;
+        </a>
+      </div>
 
       <Section title="Pillar breakdown" defaultOpen>
         {c.pillars.map((p, i) => {

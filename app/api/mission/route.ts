@@ -193,6 +193,7 @@ interface ClientHealth {
   overall: "green" | "yellow" | "red";
   pillars: string[]; // emoji per pillar
   redFlags: { text: string; link: string | null }[];
+  site?: string | null; // live-site origin derived from real board links
 }
 
 function emojiToStatus(e: string): "green" | "yellow" | "red" {
@@ -215,6 +216,7 @@ function parseHealthBoard(raw: string): { runDate: string | null; clients: Clien
         overall: emojiToStatus(m[8]),
         pillars: [m[3], m[4], m[5], m[6], m[7]].map((p) => p.trim()),
         redFlags: [],
+        site: null,
       });
     }
   }
@@ -247,6 +249,125 @@ function parseHealthBoard(raw: string): { runDate: string | null; clients: Clien
     }
   }
   return { runDate, clients };
+}
+
+// ── Real-world links ───────────────────────────────────────────────────────
+// GHL location ids come from Jack's own tooling (ghl-cli/apollo_outreach.py),
+// not guessed. URL patterns are GHL's stable v2 app routes.
+const GHL_WING_LOCATION = "rJ45gqUrsMXwb7pVjXQY";
+const GHL_JACKSON_LOCATION = "T2HknbMbA9IJ3qFGLm1G";
+const ghlConversationsUrl = (loc: string) =>
+  `https://app.gohighlevel.com/v2/location/${loc}/conversations/conversations`;
+const ghlContactsUrl = (loc: string) =>
+  `https://app.gohighlevel.com/v2/location/${loc}/contacts/smart_list/All`;
+
+// Live-site domains the OS is allowed to link to as publish targets. Links are
+// only ever rendered when a real URL on one of these hosts appears in the
+// vault text (or, for Jackson, when a real WP post id is logged).
+const LIVE_HOSTS = ["jacksonroofingco.com", "renewalhealth.life"];
+
+interface PublishItem { date: string; title: string; url: string | null; note: string | null }
+
+// Pull live post URLs out of a blob of vault text: only whitelisted hosts,
+// never wp-admin or preview links, never localhost.
+function extractLiveUrls(text: string): string[] {
+  const out: string[] = [];
+  const re = /https?:\/\/[^\s|,)\]"']+/g;
+  for (const m of text.match(re) ?? []) {
+    let u = m.replace(/[.,;:]+$/, "");
+    if (!LIVE_HOSTS.some((h) => u.includes(h))) continue;
+    if (/wp-admin|preview=true|action=edit/.test(u)) continue;
+    if (!out.includes(u)) out.push(u);
+  }
+  return out;
+}
+
+// Publish events from log.md in the last 7 days (rolling window), plus the
+// health board's "Published since last run" lines which carry real live URLs.
+function parsePublishes(feed: FeedEntry[], healthRaw: string | null): {
+  windowDays: number;
+  items: PublishItem[];
+  lastPriorPublish: string | null;
+} {
+  const weekAgo = Date.now() - 7 * 86400000;
+  // A WEB publish, not a GHL workflow/template/campaign publish and not a
+  // draft-only or rolled-back run. Title carries the verb, or a body line
+  // explicitly says blogs/posts/pages were published.
+  const NEGATION = /PULLED|rolled back|unpublish|nothing published|not published|draft[- ]only/i;
+  const NON_WEB = /workflow|send path|cold email|outreach|x-ray|template/i;
+  const isPublish = (e: FeedEntry) => {
+    if (NEGATION.test(e.title) || NON_WEB.test(e.title)) return false;
+    if (/\b(published|publishes|went live|posted live|now live)\b/i.test(e.title)) return true;
+    return e.lines.some((l) =>
+      /\b(blogs?|posts?|pages?)\b[^.]{0,40}\bpublished\b|\bpublished\b[^.]{0,40}\b(live|blogs?|posts?|pages?)\b/i.test(l)
+    );
+  };
+  const publishEntries = feed.filter(isPublish);
+  const items: PublishItem[] = [];
+
+  for (const e of publishEntries) {
+    if (new Date(e.date).getTime() < weekAgo) continue;
+    const text = e.title + "\n" + e.lines.join("\n");
+    const urls = extractLiveUrls(text);
+    if (urls.length) {
+      for (const url of urls) items.push({ date: e.date, title: e.title, url, note: null });
+      continue;
+    }
+    // Jackson WP posts logged by id only: ?p=<id> is WordPress's canonical
+    // query permalink, built from the real post id in the publish line itself.
+    if (/jackson/i.test(text)) {
+      const ids = [...text.matchAll(/\bpublish\w*\b[^\n]{0,120}?\bposts?\s+(\d{4,6})(?:\s+and\s+(\d{4,6}))?/gi)]
+        .flatMap((m) => [m[1], m[2]])
+        .filter(Boolean) as string[];
+      if (ids.length) {
+        for (const id of [...new Set(ids)])
+          items.push({ date: e.date, title: `${e.title} (post ${id})`, url: `https://jacksonroofingco.com/?p=${id}`, note: null });
+        continue;
+      }
+    }
+    items.push({ date: e.date, title: e.title, url: null, note: "no link logged" });
+  }
+
+  // Health board: "- Title — https://..." under "Published since last run".
+  if (healthRaw) {
+    const runDate = healthRaw.match(/\*\*Run date:\*\*\s*([\d-]+)/)?.[1] ?? null;
+    if (runDate && new Date(runDate).getTime() >= weekAgo) {
+      const sect = healthRaw.split(/\*\*Published since last run/i)[1];
+      if (sect) {
+        for (const line of sect.split(/\r?\n/).slice(0, 12)) {
+          const m = line.match(/^-\s+(.+?)\s+[—-]+\s+(https?:\/\/\S+)/);
+          if (m) {
+            const url = m[2].replace(/[.,;:]+$/, "");
+            if (LIVE_HOSTS.some((h) => url.includes(h)) && !items.some((i) => i.url === url)) {
+              items.push({ date: runDate, title: clean(redact(m[1])), url, note: null });
+            }
+          }
+        }
+      }
+    }
+  }
+
+  items.sort((a, b) => (a.date < b.date ? 1 : -1));
+  const lastPriorPublish = items.length
+    ? null
+    : publishEntries.length ? publishEntries[0].date : null;
+  return { windowDays: 7, items, lastPriorPublish };
+}
+
+// Derive each client's live-site origin from real links already on the board
+// (flag deep links, publish lines) — never invented.
+function deriveClientSites(clients: ClientHealth[], healthRaw: string | null): Record<string, string> {
+  const sites: Record<string, string> = {};
+  if (!healthRaw) return sites;
+  for (const c of clients) {
+    // scan this client's section of the board for whitelisted live hosts
+    const sect = healthRaw.split(new RegExp(`^##\\s+${c.client.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "m"))[1] ?? healthRaw;
+    const urls = extractLiveUrls(sect);
+    if (urls.length) {
+      try { sites[c.client] = new URL(urls[0]).origin; } catch { /* skip */ }
+    }
+  }
+  return sites;
 }
 
 // ── stats parsing ──────────────────────────────────────────────────────────
@@ -342,7 +463,8 @@ async function statDetail(id: string) {
           : "Recipient businesses and send times below.",
       ],
       items: todayRows.map((r) => ({ label: r.company, value: r.when.slice(11) || r.when, note: r.city })),
-      note: null,
+      note: "Per-contact GHL links are not derivable from the snapshot (it logs company names, not contact ids). Use the contacts list link below and search the company name.",
+      links: [{ label: "Open Wing contacts in GHL", url: ghlContactsUrl(GHL_WING_LOCATION) }],
     });
   }
 
@@ -514,10 +636,21 @@ async function artifactDetail(id: string) {
       .slice(0, 20)
       .map((l) => clean(redact(l)).slice(0, 200));
   }
+  // Real outbound links for artifacts that mirror a live system. Only URL
+  // patterns constructible from real data (documented GHL location ids).
+  const links: { label: string; url: string }[] = [];
+  if (meta.id === "replies-inbox") {
+    links.push({ label: "Open Wing conversations in GHL", url: ghlConversationsUrl(GHL_WING_LOCATION) });
+    links.push({ label: "Open Jackson conversations in GHL", url: ghlConversationsUrl(GHL_JACKSON_LOCATION) });
+  }
+  if (meta.id === "outreach-snapshot" || meta.id === "prospects-db") {
+    links.push({ label: "Open Wing contacts in GHL", url: ghlContactsUrl(GHL_WING_LOCATION) });
+  }
   return NextResponse.json({
     id: meta.id,
     label: meta.label,
     blurb: meta.blurb,
+    links,
     system: meta.system,
     producedBy: meta.producedBy,
     producedByName: producer?.name ?? meta.producedBy,
@@ -625,9 +758,12 @@ async function agentDetail(key: string) {
   const logRaw = await readVaultFile("wiki/log.md");
   // Last ~200 log entries, newest first, filtered to this agent.
   const all = logRaw ? parseLog(logRaw).slice(-200).reverse() : [];
-  const activity = all
-    .filter((e) => meta.match.test(e.title) || meta.match.test(e.type) || e.lines.some((l) => meta.match.test(l)))
-    .slice(0, 40);
+  const mine = all
+    .filter((e) => meta.match.test(e.title) || meta.match.test(e.type) || e.lines.some((l) => meta.match.test(l)));
+  // Rolling 7-day window: older history adds noise; the panel notes it exists.
+  const weekAgo = Date.now() - 7 * 86400000;
+  const activity = mine.filter((e) => new Date(e.date).getTime() >= weekAgo).slice(0, 40);
+  const olderActivity = mine.length - activity.length;
 
   const { present, state } = readScheduledDisk();
   const st = state.get(key);
@@ -677,6 +813,7 @@ async function agentDetail(key: string) {
     summary,
     systems: AGENT_SYSTEMS[key] ?? [{ id: "vault", label: "VAULT", direction: "both" }],
     activity,
+    olderActivity,
     artifact,
   });
 }
@@ -759,8 +896,14 @@ export async function GET(req: NextRequest) {
     updated: hotRaw?.match(/^updated:\s*(\S+)/m)?.[1] ?? null,
   };
 
-  // Client health
+  // Client health (each client gets its live-site origin, derived from real
+  // links already on the board)
   const health = healthRaw ? parseHealthBoard(healthRaw) : { runDate: null, clients: [] };
+  const clientSites = deriveClientSites(health.clients, healthRaw);
+  for (const c of health.clients) c.site = clientSites[c.client] ?? null;
+
+  // Published this week (rolling 7-day window) for the Web/SEO panel
+  const publishes = parsePublishes(feed, healthRaw);
 
   // Stats
   const stats = parseStats(bizRaw, outreachRaw);
@@ -828,5 +971,6 @@ export async function GET(req: NextRequest) {
     health,
     stats,
     volumes,
+    publishes,
   });
 }

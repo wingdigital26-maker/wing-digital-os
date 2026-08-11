@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
-import { readVaultFile, isGithubVault, VAULT_PATH } from "../../../../lib/vaultSource";
+import { execFile } from "child_process";
+import { readVaultFile, isGithubVault, VAULT_PATH, commitVaultFile } from "../../../../lib/vaultSource";
+import { readProspectsLive, sendsTodayHonest, parseSnapshotAsOf } from "../../../../lib/liveTruth";
 
 // ───────────────────────────────────────────────────────────────────────────
 // THE BOSS — live "Recheck" endpoint (POST).
@@ -47,9 +49,25 @@ const SCHEDULED_DIR = "C:\\Users\\wjack\\.claude\\scheduled-tasks";
 // Only these hosts are ever fetched. Live-client domains + Jack's own OS host.
 const ALLOWED_URL_HOSTS = ["jacksonroofingco.com", "renewalhealth.life"];
 
-// The literal build-note leak the watchdog flagged on the Jackson pages. If a
-// page still contains it, it is reachable but NOT fixed — never a green.
-const BUILD_NOTE_MARKER = /NOTE:\s*image_todo/i;
+// Build-note / scaffolding leak markers. If a fetched page body still contains
+// ANY of these, it is reachable but NOT fixed — it can never count as a green.
+// This is the honesty guard for "2xx AND clean": we scan for the exact Jackson
+// leak paragraph plus the generic build-note/placeholder markers it was built
+// from. Erring toward "still leaking" is the safe direction — it can only keep
+// a page red, never falsely green it.
+const BUILD_NOTE_MARKERS: RegExp[] = [
+  /image_todo/i, // the literal leaked ledger key
+  /NOTE:\s*image_todo/i, // the leaked paragraph opener
+  /fetch_images\.py/i, // the leaked build-script reference
+  /used-images\.json/i, // the leaked ledger filename
+  /\b(TODO|FIXME)\b/, // generic scaffolding placeholders
+];
+function bodyHasLeak(body: string): boolean {
+  return BUILD_NOTE_MARKERS.some((re) => re.test(body));
+}
+// The scheduled push script that syncs the local vault to the cloud GitHub copy.
+const PUSH_VAULT_PS1 = "C:\\Users\\wjack\\ghl-cli\\push_vault.ps1";
+const WATCHDOG_ABS = () => path.resolve(VAULT_PATH, WATCHDOG_REL);
 
 // ── redaction: never echo credential-looking strings ───────────────────────
 const SECRET_PATTERNS: RegExp[] = [
@@ -186,7 +204,7 @@ async function fetchUrl(url: string): Promise<{ status: number | null; leak: boo
     if (res.ok) {
       try {
         const body = await res.text();
-        leak = BUILD_NOTE_MARKER.test(body);
+        leak = bodyHasLeak(body);
       } catch {
         /* body unreadable: treat as no leak, status still authoritative */
       }
@@ -338,15 +356,22 @@ async function checkOutreach(): Promise<CheckResult> {
     const m = raw.match(re);
     return m ? Number(m[1].replace(/,/g, "")) : null;
   };
-  const sentToday = num(/\*\*Sent today:\*\*\s*([\d,]+)/i);
+  // Sends-today truth: prefer the live prospects.db (local PC). Only fall back
+  // to the snapshot when the DB is unreachable — and never let a prior-day
+  // snapshot count read as today's (that is the exact bug we are killing).
+  const live = await readProspectsLive();
+  const st = sendsTodayHonest(live, raw, parseSnapshotAsOf(raw));
+  const sentToday = st.value; // number | null, honest (0 on prior-day snapshot)
+  const sentSourceLabel = live ? "live from prospects.db" : st.stale ? `snapshot, ${st.display}` : "snapshot";
   // "Ready/armed" pool: prefer an explicit ready/armed/campaign_ready count if
   // the snapshot carries one, else fall back to the new+enriching remaining
   // pool (and say so). The true send-ready count lives in prospects.db (PC).
   const readyExplicit =
     num(/\*\*(?:Ready|Armed|Campaign[_ ]?ready|Send[_ ]?ready)[^:]*:\*\*\s*([\d,]+)/i);
   const remaining = num(/\*\*Remaining[^:]*:\*\*\s*([\d,]+)/i);
-  const pool = readyExplicit ?? remaining;
-  const poolIsExplicit = readyExplicit !== null;
+  // Live armed count (intent-scored, not emailed) is the truest ready pool.
+  const pool = live ? live.armed : (readyExplicit ?? remaining);
+  const poolIsExplicit = live ? true : readyExplicit !== null;
   const { ageHours } = parseUpdated(raw);
 
   const now = new Date();
@@ -356,37 +381,41 @@ async function checkOutreach(): Promise<CheckResult> {
 
   const items: CheckItem[] = [];
 
-  // sent-today judgement
+  // sent-today judgement — from live DB when available, honest snapshot otherwise.
   if (sentToday === null) {
-    items.push({ label: "Sent today", status: "problem", line: "No sent-today figure in the snapshot." });
+    items.push({ label: "Sent today", status: "problem", line: `Sent-today count unknown (${sentSourceLabel}). Connect the PC to confirm.` });
   } else if (sentToday === 0 && isWeekday && afterEleven) {
     items.push({
       label: "Sent today",
       status: "problem",
-      line: `0 sent, and it is a weekday past 11am. That is a real fault (snapshot is ${ageWords(ageHours)}; live DB confirmation needs PC).`,
+      line: live
+        ? "0 sent, and it is a weekday past 11am. Confirmed live from prospects.db — the sender is not sending (paused or broken)."
+        : `0 sent today (${sentSourceLabel}), a weekday past 11am. Real fault; live DB confirmation needs PC.`,
     });
   } else {
     items.push({
       label: "Sent today",
       status: "ok",
-      line: `${sentToday} sent today per the snapshot (${ageWords(ageHours)}).`,
+      line: live
+        ? `${sentToday} sent today, counted live from prospects.db.`
+        : `${sentToday} sent today per the snapshot (${ageWords(ageHours)}).`,
     });
   }
 
   // pool judgement
   if (pool === null) {
-    items.push({ label: "Ready pool", status: "problem", line: "No ready/armed pool figure in the snapshot." });
+    items.push({ label: "Ready pool", status: "problem", line: "No ready/armed pool figure available." });
   } else if (pool < 20) {
     items.push({
       label: "Ready pool",
       status: "problem",
-      line: `Pool is ${pool}, under the 20 line${poolIsExplicit ? "" : " (using new+enriching remaining; true armed count needs PC)"}.`,
+      line: `Pool is ${pool}, under the 20 line${live ? " (live armed count from prospects.db)" : poolIsExplicit ? "" : " (using new+enriching remaining; true armed count needs PC)"}.`,
     });
   } else {
     items.push({
       label: "Ready pool",
       status: "ok",
-      line: `Pool is ${pool}${poolIsExplicit ? "" : " (new+enriching remaining)"}, over the 20 line.`,
+      line: `Pool is ${pool}${live ? " (live armed count)" : poolIsExplicit ? "" : " (new+enriching remaining)"}, over the 20 line.`,
     });
   }
 
@@ -464,29 +493,111 @@ function checkHeartbeats(cloud: boolean): CheckResult {
   };
 }
 
-// ── local writer: clear fully-clean URL problem blocks ──────────────────────
-// Only runs locally with write access. Removes any PROBLEMS block whose URLs
-// ALL came back clean-200, adds a RESOLVED bullet, renumbers the remaining
-// problems, decrements the OVERALL count, and restamps updated:. Returns the
-// new file text, or null if nothing to do / anything looked unsafe.
-function rewriteWatchdog(raw: string, cleanUrls: Set<string>): string | null {
-  if (cleanUrls.size === 0) return null;
+// ── classifier: which PROBLEM blocks did the recheck TRULY verify as fixed ──
+// The recheck may only clear a block on a signal that actually tested it. Every
+// other block — especially anything needing PC-only state (log.md appends,
+// task heartbeats, cron/lastRunAt, code-line fixes) — is left exactly as-is.
+//
+// Verifiable clears:
+//   URL block       -> has allowed-host URLs AND every one came back clean-2xx
+//                      (2xx AND no build-note leak in the body).
+//   Freshness block -> is purely about snapshot staleness AND every named
+//                      snapshot is now fresh. Never cleared if it also mentions
+//                      heartbeat/cron/never-run/log.md (that needs the PC).
+//   Outreach block  -> the specific outreach dimension it complains about
+//                      (sending, or ready-pool >= 20) now reads healthy from a
+//                      FRESH outreach snapshot. A stale snapshot never clears it.
+interface ResolvedMark {
+  index: number;
+  bullet: string;
+}
+// PC-only / deeper-state signals that forbid an automatic clear no matter what.
+const PC_ONLY = /\b(log\.md|append|heartbeat|lastRunAt|last run|never run|cron|nextRunAt|STOP_WING|\.py:\d+|flag)\b/i;
+const FRESHNESS_HINT = /\b(stale|aging|ages?|\d+(\.\d+)?h old|hours? old|snapshot.*old|keep aging)\b/i;
+const SNAPSHOT_NAME = /(business-snapshot|outreach-snapshot|health-board)/i;
+const OUTREACH_SENDING_HINT = /\b(sends?|sending|sender|no-?op|emailed today|0 sent)\b/i;
+const OUTREACH_POOL_HINT = /\b(pool|send-?ready|campaign[_ ]?ready|armed)\b/i;
+
+function itemStatus(result: CheckResult | null, labelRe: RegExp): CheckStatus | null {
+  if (!result) return null;
+  const it = (result.items ?? []).find((i) => labelRe.test(i.label));
+  return it ? it.status : null;
+}
+
+function classifyResolved(
+  blocks: ProblemBlock[],
+  cleanUrls: Set<string>,
+  freshness: CheckResult | null,
+  outreach: CheckResult | null,
+  outreachSnapshotFresh: boolean
+): ResolvedMark[] {
+  const stamp = new Date().toISOString().slice(0, 16).replace("T", " ");
+  const marks: ResolvedMark[] = [];
+  for (const b of blocks) {
+    // 1) URL blocks — the primary, strongest signal.
+    if (b.urls.length > 0) {
+      if (b.urls.every((u) => cleanUrls.has(u))) {
+        marks.push({
+          index: b.index,
+          bullet: `- **Cleared by manual recheck ${stamp}.** ${b.urls.join(", ")} now HTTP 200 and clean of build-note leaks.`,
+        });
+      }
+      continue; // URL block that is not all-clean stays a live problem, untouched.
+    }
+    // Never auto-clear anything that hangs on PC-only / deeper local state.
+    if (PC_ONLY.test(b.text)) continue;
+
+    // 2) Freshness-only blocks.
+    if (FRESHNESS_HINT.test(b.text) && SNAPSHOT_NAME.test(b.text)) {
+      const anyStale = (freshness?.items ?? []).some((i) => i.status === "problem");
+      if (freshness && !anyStale) {
+        marks.push({
+          index: b.index,
+          bullet: `- **Cleared by manual recheck ${stamp}.** Named snapshots re-read fresh (within threshold).`,
+        });
+      }
+      continue;
+    }
+
+    // 3) Outreach blocks — only on a FRESH outreach snapshot.
+    if (outreachSnapshotFresh) {
+      if (OUTREACH_SENDING_HINT.test(b.text) && itemStatus(outreach, /sent today/i) === "ok") {
+        marks.push({
+          index: b.index,
+          bullet: `- **Cleared by manual recheck ${stamp}.** Outreach is sending again per a fresh snapshot.`,
+        });
+        continue;
+      }
+      if (OUTREACH_POOL_HINT.test(b.text) && itemStatus(outreach, /ready pool/i) === "ok") {
+        marks.push({
+          index: b.index,
+          bullet: `- **Cleared by manual recheck ${stamp}.** Ready pool is back over the 20 line per a fresh snapshot.`,
+        });
+        continue;
+      }
+    }
+  }
+  return marks;
+}
+
+// ── writer: move verified-resolved blocks to RESOLVED, renumber, restamp ─────
+// Pure text transform (no I/O). Given the resolved marks, removes those PROBLEM
+// blocks, renumbers the rest, adds RESOLVED bullets, recomputes OVERALL, and
+// restamps updated:. Returns the new file text, or null if nothing changed.
+function rewriteWatchdog(raw: string, resolved: ResolvedMark[]): string | null {
+  if (resolved.length === 0) return null;
   const { blocks, sectionStart, sectionEnd, lines } = parseProblemBlocks(raw);
   if (sectionStart === -1 || blocks.length === 0) return null;
 
-  const clearable = blocks.filter(
-    (b) => b.urls.length > 0 && b.flaggedBroken && b.urls.every((u) => cleanUrls.has(u))
-  );
+  const clearIdx = new Set(resolved.map((r) => r.index));
+  const clearable = blocks.filter((b) => clearIdx.has(b.index));
   if (clearable.length === 0) return null;
-
-  const clearIdx = new Set(clearable.map((b) => b.index));
   const keptBlocks = blocks.filter((b) => !clearIdx.has(b.index));
 
   // Rebuild the PROBLEMS section body with renumbered kept blocks.
   const renumbered: string[] = [];
   keptBlocks.forEach((b, i) => {
     const newNum = i + 1;
-    // replace only the leading "N. " of the block's first line
     const bl = b.raw.split(/\r?\n/);
     bl[0] = bl[0].replace(/^(\d+)\.\s+/, `${newNum}. `);
     renumbered.push(...bl);
@@ -495,11 +606,7 @@ function rewriteWatchdog(raw: string, cleanUrls: Set<string>): string | null {
   const before = lines.slice(0, sectionStart + 1); // through "## PROBLEMS"
   const after = lines.slice(sectionEnd); // "## RESOLVED" onward
 
-  // Insert resolved bullets at the top of the RESOLVED section.
-  const stamp = new Date().toISOString().slice(0, 16).replace("T", " ");
-  const resolvedBullets = clearable.map(
-    (b) => `- **Cleared by manual recheck ${stamp}.** ${b.urls.join(", ")} now HTTP 200 and clean.`
-  );
+  const resolvedBullets = resolved.map((r) => r.bullet);
   const afterWithResolved: string[] = [];
   let inserted = false;
   for (const l of after) {
@@ -510,26 +617,44 @@ function rewriteWatchdog(raw: string, cleanUrls: Set<string>): string | null {
     }
   }
   if (!inserted) {
-    // No RESOLVED section present: append one just after PROBLEMS.
     renumbered.push("", "## RESOLVED", ...resolvedBullets);
   }
 
   let out = [...before, ...renumbered, "", ...afterWithResolved].join("\n");
 
-  // Decrement / recompute the OVERALL count to match kept problems.
+  // Recompute OVERALL to match the kept problem count.
   const keptN = keptBlocks.length;
   out = out.replace(
     /(\*\*OVERALL:\s*)(?:PROBLEMS\s*[:\-]?\s*\d+|OK)([^\n]*)/i,
     keptN > 0 ? `$1PROBLEMS: ${keptN}$2` : `$1OK$2`
   );
 
-  // Restamp the frontmatter updated: field.
+  // Restamp the frontmatter updated: field to now.
   const iso = new Date().toISOString().replace(/\.\d{3}Z$/, "-05:00");
   out = out.replace(/^(updated:\s*)["']?[^"'\r\n]+["']?\s*$/m, `$1${iso}`);
 
   // collapse any accidental 3+ blank lines the splice created
   out = out.replace(/\n{3,}/g, "\n\n");
   return redact(out);
+}
+
+// ── local push: sync the rewritten vault to the cloud GitHub copy ───────────
+// Best-effort. Runs the existing scheduled push script; never throws, never
+// logs the command's output (which could echo tokens). Resolves true only on a
+// clean exit.
+function pushVaultToCloud(): Promise<boolean> {
+  return new Promise((resolve) => {
+    try {
+      execFile(
+        "powershell",
+        ["-ExecutionPolicy", "Bypass", "-File", PUSH_VAULT_PS1],
+        { timeout: 90_000, windowsHide: true },
+        (err) => resolve(!err)
+      );
+    } catch {
+      resolve(false);
+    }
+  });
 }
 
 // ── main handler ────────────────────────────────────────────────────────────
@@ -562,33 +687,74 @@ export async function POST(req: NextRequest) {
     checks.push(result);
     cleanUrls = c;
   }
-  if (wantAll || target === "freshness") checks.push(await checkFreshness());
-  if (wantAll || target === "outreach") checks.push(await checkOutreach());
+  let freshnessResult: CheckResult | null = null;
+  let outreachResult: CheckResult | null = null;
+  if (wantAll || target === "freshness") { freshnessResult = await checkFreshness(); checks.push(freshnessResult); }
+  if (wantAll || target === "outreach") { outreachResult = await checkOutreach(); checks.push(outreachResult); }
   if (wantAll || target === "heartbeats") checks.push(checkHeartbeats(cloud));
 
-  // Optional local write-back for fully-clean URL problem blocks.
-  let wrote = false;
-  let writeNote: string | null = null;
-  if ((wantAll || target === "urls") && cleanUrls.size > 0) {
-    if (vaultWritable() && watchdogRaw) {
-      try {
-        const next = rewriteWatchdog(watchdogRaw, cleanUrls);
-        if (next && next !== watchdogRaw) {
-          const abs = path.resolve(VAULT_PATH, WATCHDOG_REL);
-          fs.writeFileSync(abs, next, "utf-8");
-          wrote = true;
-          writeNote = "watchdog.md updated: resolved URL blocks moved to RESOLVED.";
+  // ── Persistence: rewrite watchdog.md honestly, then sync ──────────────────
+  // Decide which PROBLEM blocks the recheck TRULY verified, build the rewritten
+  // file, and persist it: locally to disk + push to cloud, or on Vercel by
+  // committing to the GitHub vault. Never throws; degrades to overlay-only.
+  let persisted = false;
+  let mode: "local" | "cloud-github" | "none" = "none";
+  let pushedToCloud: boolean | null = null;
+  let commit: string | null = null;
+  let reason: string | null = null;
+  let resolvedCount = 0;
+  let refetchMission = false;
+  let writeNote: string | null = null; // kept for backward-compat with the overlay UI
+
+  if (watchdogRaw) {
+    // outreach snapshot freshness gates outreach-block clears (never clear on stale data)
+    let outreachSnapshotFresh = false;
+    if (outreachResult) {
+      outreachSnapshotFresh = itemStatus(freshnessResult, /outreach-snapshot/i) === "ok"
+        || (freshnessResult === null && (parseUpdated((await readVaultFile("wiki/state/outreach-snapshot.md")) ?? "").ageHours ?? 999) <= 24);
+    }
+
+    const { blocks } = parseProblemBlocks(watchdogRaw);
+    const resolvedMarks = classifyResolved(blocks, cleanUrls, freshnessResult, outreachResult, outreachSnapshotFresh);
+    resolvedCount = resolvedMarks.length;
+    const next = resolvedMarks.length ? rewriteWatchdog(watchdogRaw, resolvedMarks) : null;
+
+    if (next && next !== watchdogRaw) {
+      if (cloud) {
+        // CLOUD: commit to the GitHub vault via the contents API.
+        const res = await commitVaultFile(
+          WATCHDOG_REL,
+          next,
+          `da boss recheck: ${resolvedCount} resolved (manual)`
+        );
+        if (res.ok) {
+          persisted = true; mode = "cloud-github"; commit = res.commit; refetchMission = true;
+          writeNote = `Report updated in the cloud vault: ${resolvedCount} moved to RESOLVED.`;
         } else {
-          writeNote = "Nothing to write: no fully-clean flagged block to clear.";
+          persisted = false; reason = res.reason;
+          writeNote = "Live check only, report not updated (cloud write unavailable).";
         }
-      } catch {
-        // Never throw on a write failure; the fresh results still return.
-        writeNote = "Write skipped: vault not writable at write time.";
+      } else if (vaultWritable()) {
+        // LOCAL: write to disk, then push the vault to the cloud copy.
+        try {
+          fs.writeFileSync(WATCHDOG_ABS(), next, "utf-8");
+          persisted = true; mode = "local"; refetchMission = true;
+          pushedToCloud = await pushVaultToCloud();
+          writeNote = `Report updated on disk: ${resolvedCount} moved to RESOLVED.`
+            + (pushedToCloud ? " Cloud copy synced." : " Cloud sync will catch up on the next scheduled push.");
+        } catch {
+          persisted = false; reason = "disk write failed"; mode = "none";
+          writeNote = "Live check only, report not updated (disk write failed).";
+        }
+      } else {
+        persisted = false; reason = "vault not writable and not cloud-backed";
+        writeNote = "Live check only, report not updated - needs PC.";
       }
     } else {
-      writeNote = cloud
-        ? "Read-only cloud vault: results shown live, file not modified."
-        : "Vault not writable: results shown live, file not modified.";
+      // Nothing verifiable to clear: overlay-only, and that is honest.
+      writeNote = resolvedMarks.length
+        ? "No net change to write."
+        : "Live check only - nothing verified as newly resolved.";
     }
   }
 
@@ -602,7 +768,14 @@ export async function POST(req: NextRequest) {
     ranAt: new Date().toISOString(),
     target,
     cloud,
-    wrote,
+    persisted,
+    mode,
+    pushedToCloud,
+    commit,
+    reason,
+    resolvedCount,
+    refetchMission,
+    wrote: persisted, // backward-compat
     writeNote,
     overall,
     checks,

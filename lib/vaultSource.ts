@@ -185,6 +185,58 @@ function buildTree(relPaths: string[]): VaultFileNode[] {
   return root;
 }
 
+// ── GitHub write-back (contents API commit) ────────────────────────────────────
+// Commit updated content for a single vault file to the private GitHub vault on
+// GH_BRANCH. Used by cloud (Vercel) hosts that read the vault from GitHub and
+// have no local disk to write to. Fetches the current blob sha first, then PUTs
+// the new content. Never throws; returns a discriminated result the caller can
+// degrade on. The token is only ever sent in the Authorization header and is
+// never returned or logged.
+export async function commitVaultFile(
+  relPath: string,
+  content: string,
+  message: string
+): Promise<{ ok: true; commit: string } | { ok: false; reason: string }> {
+  const token = process.env.GH_VAULT_TOKEN;
+  if (!token) return { ok: false, reason: "no vault token configured" };
+  const rel = relPath.replace(/\\/g, "/").replace(/^\/+/, "");
+  const apiPath = rel.split("/").map(encodeURIComponent).join("/");
+  const base = `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${apiPath}`;
+
+  // Current sha (required to update an existing file). Absent -> create new.
+  const cur = await ghApi(`${base}?ref=${GH_BRANCH}`);
+  const sha = cur && typeof cur.sha === "string" ? cur.sha : undefined;
+
+  try {
+    const res = await fetch(base, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "wing-digital-os",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        message,
+        content: Buffer.from(content, "utf-8").toString("base64"),
+        branch: GH_BRANCH,
+        ...(sha ? { sha } : {}),
+      }),
+      cache: "no-store",
+    });
+    if (!res.ok) return { ok: false, reason: `github api ${res.status}` };
+    const j = await res.json();
+    // Invalidate caches so a follow-up /api/mission read reflects the new file.
+    fileCache.delete(rel);
+    treeCache = null;
+    const commit = j?.commit?.sha;
+    return { ok: true, commit: typeof commit === "string" ? commit : "unknown" };
+  } catch (e) {
+    return { ok: false, reason: e instanceof Error ? e.name : "put failed" };
+  }
+}
+
 // ── Public API ─────────────────────────────────────────────────────────────────
 export async function listVaultFiles(): Promise<string[]> {
   return isGithubVault() ? githubListFiles() : localListFiles();

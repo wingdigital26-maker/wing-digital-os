@@ -2,6 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 import { readVaultFile, isGithubVault } from "../../../lib/vaultSource";
+import {
+  readProspectsLive,
+  sendsTodayHonest,
+  parseSnapshotAsOf,
+  isStale,
+  provenanceLine,
+  STALE_HOURS,
+  type LiveOutreach,
+  type MetricSource,
+} from "../../../lib/liveTruth";
 
 // ───────────────────────────────────────────────────────────────────────────
 // Mission Control API (READ-ONLY)
@@ -462,29 +472,62 @@ function deriveClientSites(clients: ClientHealth[], healthRaw: string | null): R
 // ── stats parsing ──────────────────────────────────────────────────────────
 // Each tile carries a stable key so the UI can open the matching breakdown
 // panel (/api/mission?stat=key), plus the snapshot timestamp it came from.
-interface StatTile { key: string; label: string; value: string; sub: string | null; updated: string | null }
+// Every tile carries provenance: value, source, asOf (when it was actually
+// true), and stale. Never a bare number with no timestamp.
+interface StatTile {
+  key: string;
+  label: string;
+  value: string;
+  sub: string | null;
+  updated: string | null; // asOf: ISO (live) or snapshot "_Last updated_" string
+  source: MetricSource;
+  stale: boolean;
+  provenance: string; // human "Live from prospects.db, just now" / "From snapshot, 20h old"
+}
 
-function parseStats(biz: string | null, outreach: string | null): { tiles: StatTile[]; updated: string | null } {
+function buildStats(
+  biz: string | null,
+  outreach: string | null,
+  live: LiveOutreach | null,
+): { tiles: StatTile[]; updated: string | null } {
   const tiles: StatTile[] = [];
   let updated: string | null = null;
-  const bizUpdated = biz?.match(/_Last updated:\s*([^_]+)_/)?.[1]?.trim() ?? null;
-  const outUpdated = outreach?.match(/_Last updated:\s*([^_]+)_/)?.[1]?.trim() ?? null;
+  const bizUpdated = parseSnapshotAsOf(biz);
+  const outUpdated = parseSnapshotAsOf(outreach);
+  const nowIso = new Date().toISOString();
+
+  // MRR / active clients: snapshot only (48h threshold).
   if (biz) {
     const mrr = biz.match(/\*\*MRR:\*\*\s*\$?([\d,]+)/);
     const active = biz.match(/\*\*Active clients:\*\*\s*(\d+)/);
-    if (mrr) tiles.push({ key: "clients", label: "MRR", value: "$" + mrr[1] + "/mo", sub: null, updated: bizUpdated });
-    if (active) tiles.push({ key: "clients", label: "Active Clients", value: active[1], sub: null, updated: bizUpdated });
+    const bizStale = isStale(bizUpdated, STALE_HOURS.clients);
+    const prov = provenanceLine({ source: "snapshot", asOf: bizUpdated, stale: bizStale });
+    if (mrr) tiles.push({ key: "clients", label: "MRR", value: "$" + mrr[1] + "/mo", sub: null, updated: bizUpdated, source: "snapshot", stale: bizStale, provenance: prov });
+    if (active) tiles.push({ key: "clients", label: "Active Clients", value: active[1], sub: null, updated: bizUpdated, source: "snapshot", stale: bizStale, provenance: prov });
     updated = bizUpdated;
   }
-  if (outreach) {
+
+  // Sends-today: the single honest answer (live DB, else honest snapshot).
+  const st = sendsTodayHonest(live, outreach, outUpdated);
+
+  if (live) {
+    // LOCAL live mode: pipeline / emailed / untouched come straight from the DB.
+    const liveProv = provenanceLine({ source: "live-db", asOf: live.asOf, stale: false });
+    tiles.push({ key: "pipeline", label: "Pipeline", value: String(live.pipeline), sub: "prospects", updated: live.asOf, source: "live-db", stale: false, provenance: liveProv });
+    tiles.push({ key: "emails", label: "Emails Sent", value: String(live.emailed), sub: st.display, updated: live.asOf, source: "live-db", stale: false, provenance: liveProv });
+    tiles.push({ key: "untouched", label: "Untouched Leads", value: String(live.untouched), sub: "new + enriching", updated: live.asOf, source: "live-db", stale: false, provenance: liveProv });
+  } else if (outreach) {
+    // CLOUD / degraded: prospects.db unreachable — snapshot with real staleness.
+    const outStale = isStale(outUpdated, STALE_HOURS.pipeline);
+    const outProv = provenanceLine({ source: "snapshot", asOf: outUpdated, stale: outStale });
     const pipeline = outreach.match(/\*\*Pipeline:\*\*\s*([\d,]+)/);
     const emailed = outreach.match(/\*\*Emailed:\*\*\s*([\d,]+)/);
     const remaining = outreach.match(/\*\*Remaining[^:]*:\*\*\s*([\d,]+)/);
-    const today = outreach.match(/\*\*Sent today:\*\*\s*([\d,]+)/);
-    if (pipeline) tiles.push({ key: "pipeline", label: "Pipeline", value: pipeline[1], sub: "prospects", updated: outUpdated });
-    if (emailed) tiles.push({ key: "emails", label: "Emails Sent", value: emailed[1], sub: today ? `${today[1]} today` : null, updated: outUpdated });
-    if (remaining) tiles.push({ key: "untouched", label: "Untouched Leads", value: remaining[1], sub: "new + enriching", updated: outUpdated });
+    if (pipeline) tiles.push({ key: "pipeline", label: "Pipeline", value: pipeline[1], sub: "prospects", updated: outUpdated, source: "snapshot", stale: outStale, provenance: outProv });
+    if (emailed) tiles.push({ key: "emails", label: "Emails Sent", value: emailed[1], sub: st.display, updated: st.asOf ?? outUpdated, source: "snapshot", stale: st.stale, provenance: st.stale ? provenanceLine({ source: "snapshot", asOf: st.asOf, stale: true }) : outProv });
+    if (remaining) tiles.push({ key: "untouched", label: "Untouched Leads", value: remaining[1], sub: "new + enriching", updated: outUpdated, source: "snapshot", stale: outStale, provenance: outProv });
   }
+  void nowIso;
   return { tiles, updated };
 }
 
@@ -505,68 +548,81 @@ function parseEmailedRows(outreach: string): { company: string; city: string; wh
 }
 
 async function statDetail(id: string) {
-  const [biz, outreach] = await Promise.all([
+  const [biz, outreach, live] = await Promise.all([
     readVaultFile("wiki/state/business-snapshot.md"),
     readVaultFile("wiki/state/outreach-snapshot.md"),
+    readProspectsLive(),
   ]);
-  const outUpdated = outreach?.match(/_Last updated:\s*([^_]+)_/)?.[1]?.trim() ?? null;
-  const bizUpdated = biz?.match(/_Last updated:\s*([^_]+)_/)?.[1]?.trim() ?? null;
+  const outUpdated = parseSnapshotAsOf(outreach);
+  const bizUpdated = parseSnapshotAsOf(biz);
   const num = (src: string | null, re: RegExp) => src?.match(re)?.[1] ?? null;
+  // The source line the panel leads with, so every panel states its provenance.
+  const outSource: MetricSource = live ? "live-db" : "snapshot";
+  const outAsOf = live ? live.asOf : outUpdated;
+  const outStale = live ? false : isStale(outUpdated, STALE_HOURS.pipeline);
+  const outProvenance = provenanceLine({ source: outSource, asOf: outAsOf, stale: outStale }, "outreach snapshot");
+  const st = sendsTodayHonest(live, outreach, outUpdated);
 
   if (id === "pipeline") {
-    const pipeline = num(outreach, /\*\*Pipeline:\*\*\s*([\d,]+)/);
-    const emailed = num(outreach, /\*\*Emailed:\*\*\s*([\d,]+)/);
-    const remaining = num(outreach, /\*\*Remaining[^:]*:\*\*\s*([\d,]+)/);
-    const sentToday = num(outreach, /\*\*Sent today:\*\*\s*([\d,]+)/);
-    const p = Number((pipeline ?? "0").replace(/,/g, ""));
-    const e = Number((emailed ?? "0").replace(/,/g, ""));
-    const r = Number((remaining ?? "0").replace(/,/g, ""));
+    const p = live ? live.pipeline : Number((num(outreach, /\*\*Pipeline:\*\*\s*([\d,]+)/) ?? "0").replace(/,/g, ""));
+    const e = live ? live.emailed : Number((num(outreach, /\*\*Emailed:\*\*\s*([\d,]+)/) ?? "0").replace(/,/g, ""));
+    const r = live ? live.untouched : Number((num(outreach, /\*\*Remaining[^:]*:\*\*\s*([\d,]+)/) ?? "0").replace(/,/g, ""));
     const other = p - e - r;
     return NextResponse.json({
-      id, title: "Pipeline breakdown", updated: outUpdated, available: !!outreach,
+      id, title: "Pipeline breakdown", updated: outAsOf, available: live ? true : !!outreach,
+      source: outSource, stale: outStale, provenance: outProvenance,
       summary: [
-        `${pipeline ?? "?"} prospects total in prospects.db.`,
-        "Sourced by the daily B2B prospector (free Google Maps + OSM scrapers).",
+        `${p} prospects total in prospects.db.`,
+        live ? "Counted live from prospects.db just now." : "From the outreach snapshot; live totals need the PC.",
       ],
-      items: outreach ? [
-        { label: "Emailed", value: emailed ?? "?", note: sentToday ? `${sentToday} of those today` : null },
-        { label: "Untouched (new + enriching)", value: remaining ?? "?", note: "staged, not yet armed" },
+      items: (live || outreach) ? [
+        { label: "Emailed", value: String(e), note: `${st.display}` },
+        { label: "Untouched (new + enriching)", value: String(r), note: "staged, not yet armed" },
+        ...(live ? [{ label: "Armed (intent-scored, not emailed)", value: String(live.armed), note: "ready to send" }] : []),
         ...(other > 0 ? [{ label: "Other statuses (ready / closed / dead)", value: String(other), note: "derived: total minus emailed minus untouched" }] : []),
       ] : [],
-      note: "Per-status detail beyond this lives in prospects.db on Jack's PC; the snapshot publishes totals only.",
+      note: live ? null : "Per-status detail lives in prospects.db on Jack's PC; the snapshot publishes totals only.",
     });
   }
 
   if (id === "emails") {
-    const rows = outreach ? parseEmailedRows(outreach) : [];
-    // today = the snapshot's own updated date (its rows share that date format)
-    const today = (outUpdated ?? new Date().toISOString()).slice(0, 10);
-    const todayRows = rows.filter((r) => r.when.startsWith(today));
-    const sentToday = num(outreach, /\*\*Sent today:\*\*\s*([\d,]+)/);
+    // Live: today's real rows from the DB. Snapshot: only trustworthy if same-day.
+    const todayRows = live
+      ? live.recentToday.map((r) => ({ company: redact(r.name), city: redact(r.city), when: r.when }))
+      : (st.value === 0 ? [] : parseEmailedRows(outreach ?? "").filter((r) => r.when.startsWith((outUpdated ?? "").slice(0, 10))));
     return NextResponse.json({
-      id, title: "Emails sent today", updated: outUpdated, available: !!outreach,
+      id, title: "Emails sent today", updated: outAsOf, available: live ? true : !!outreach,
+      source: outSource, stale: st.stale, provenance: outProvenance,
       summary: [
-        `${sentToday ?? todayRows.length} sends today per the outreach snapshot.`,
-        todayRows.length && sentToday && Number(sentToday) > todayRows.length
-          ? `Snapshot lists the most recent ${todayRows.length}; the rest scrolled off the last-15 table.`
-          : "Recipient businesses and send times below.",
+        live
+          ? `${st.value} sends today, counted live from prospects.db.`
+          : st.value === 0
+            ? st.display + "."
+            : `${st.value} sends today per the outreach snapshot.`,
+        live && st.value === 0
+          ? "The sender has logged no sends today (paused or outside the window)."
+          : todayRows.length ? "Recipient businesses and send times below." : "No send rows to show.",
       ],
-      items: todayRows.map((r) => ({ label: r.company, value: r.when.slice(11) || r.when, note: r.city })),
-      note: "Per-contact GHL links are not derivable from the snapshot (it logs company names, not contact ids). Use the contacts list link below and search the company name.",
+      items: todayRows.map((r) => ({ label: r.company, value: (r.when.slice(11) || r.when).trim(), note: r.city })),
+      note: st.note ?? "Per-contact GHL links are not derivable here (company names, not contact ids). Use the contacts list link and search the company name.",
       links: [{ label: "Open Wing contacts in GHL", url: ghlContactsUrl(GHL_WING_LOCATION) }],
     });
   }
 
   if (id === "untouched") {
-    const remaining = num(outreach, /\*\*Remaining[^:]*:\*\*\s*([\d,]+)/);
+    const remaining = live ? String(live.untouched) : num(outreach, /\*\*Remaining[^:]*:\*\*\s*([\d,]+)/);
     return NextResponse.json({
-      id, title: "Untouched leads", updated: outUpdated, available: !!outreach,
+      id, title: "Untouched leads", updated: outAsOf, available: live ? true : !!outreach,
+      source: outSource, stale: outStale, provenance: outProvenance,
       summary: [
         `${remaining ?? "?"} prospects staged but not yet emailed.`,
         "These sit at status new (just scraped) or enriching (contact + QA pass in progress). They only become sends after rank, QA, and activation.",
       ],
-      items: [],
-      note: "The new-vs-enriching split lives in prospects.db on Jack's PC; the snapshot publishes the combined count.",
+      items: live ? [
+        { label: "Untouched (new + enriching)", value: String(live.untouched), note: null },
+        { label: "Armed (intent-scored, not emailed)", value: String(live.armed), note: "ready pool" },
+      ] : [],
+      note: live ? null : "The new-vs-enriching split lives in prospects.db on Jack's PC; the snapshot publishes the combined count.",
     });
   }
 
@@ -580,8 +636,11 @@ async function statDetail(id: string) {
         }
       }
     }
+    const bizStale = isStale(bizUpdated, STALE_HOURS.clients);
     return NextResponse.json({
       id, title: "Active clients", updated: bizUpdated, available: !!biz,
+      source: "snapshot" as MetricSource, stale: bizStale,
+      provenance: provenanceLine({ source: "snapshot", asOf: bizUpdated, stale: bizStale }, "business snapshot"),
       summary: [
         `${num(biz, /\*\*Active clients:\*\*\s*(\d+)/) ?? items.length} active client${items.length === 1 ? "" : "s"}, $${num(biz, /\*\*MRR:\*\*\s*\$?([\d,]+)/) ?? "?"}/mo MRR.`,
         "Full client detail lives in the Clients section of the OS.",
@@ -926,7 +985,7 @@ export async function GET(req: NextRequest) {
 
   const cloud = isGithubVault();
 
-  const [logRaw, hotRaw, healthRaw, bizRaw, outreachRaw, repliesRaw, watchdogRaw] = await Promise.all([
+  const [logRaw, hotRaw, healthRaw, bizRaw, outreachRaw, repliesRaw, watchdogRaw, live] = await Promise.all([
     readVaultFile("wiki/log.md"),
     readVaultFile("wiki/hot.md"),
     readVaultFile("wiki/state/health-board.md"),
@@ -934,6 +993,7 @@ export async function GET(req: NextRequest) {
     readVaultFile("wiki/state/outreach-snapshot.md"),
     readVaultFile("wiki/state/replies-inbox.md"),
     readVaultFile("wiki/state/watchdog.md"),
+    readProspectsLive(),
   ]);
 
   const watchdog = parseWatchdog(watchdogRaw);
@@ -1008,31 +1068,39 @@ export async function GET(req: NextRequest) {
   const publishes = parsePublishes(feed, healthRaw);
 
   // Stats
-  const stats = parseStats(bizRaw, outreachRaw);
+  const stats = buildStats(bizRaw, outreachRaw, live);
 
-  // Volume badges for the ops map. Rule: only show where a real number exists.
-  interface Vol { value: string; sub: string | null }
+  // Volume badges for the ops map. Every badge carries the same provenance as
+  // the tiles: source + asOf + stale, so no confident stale number ever shows.
+  const outAsOf = live ? live.asOf : parseSnapshotAsOf(outreachRaw);
+  const bizAsOf = parseSnapshotAsOf(bizRaw);
+  interface Vol { value: string; sub: string | null; source: MetricSource; asOf: string | null; stale: boolean }
   const volumes: { systems: Record<string, Vol>; artifacts: Record<string, Vol> } = {
     systems: {},
     artifacts: {},
   };
-  if (outreachRaw) {
-    const emailed = outreachRaw.match(/\*\*Emailed:\*\*\s*([\d,]+)/)?.[1];
-    const today = outreachRaw.match(/\*\*Sent today:\*\*\s*([\d,]+)/)?.[1];
-    const pipeline = outreachRaw.match(/\*\*Pipeline:\*\*\s*([\d,]+)/)?.[1];
-    if (today || emailed) {
-      volumes.systems["email"] = today && emailed
-        ? { value: `${today} today`, sub: `/ ${emailed} sent` }
-        : { value: (today ?? emailed) as string, sub: today ? "today" : "sent" };
+  {
+    const st = sendsTodayHonest(live, outreachRaw, parseSnapshotAsOf(outreachRaw));
+    const emailed = live ? String(live.emailed) : outreachRaw?.match(/\*\*Emailed:\*\*\s*([\d,]+)/)?.[1];
+    const pipeline = live ? String(live.pipeline) : outreachRaw?.match(/\*\*Pipeline:\*\*\s*([\d,]+)/)?.[1];
+    const outStale = live ? false : isStale(parseSnapshotAsOf(outreachRaw), STALE_HOURS.pipeline);
+    const src: MetricSource = live ? "live-db" : "snapshot";
+    // EMAIL badge shows sends-today honestly (0 today, not yesterday's count).
+    if (st.value != null || emailed) {
+      volumes.systems["email"] = {
+        value: st.display, sub: emailed ? `/ ${emailed} sent` : null,
+        source: st.source, asOf: st.asOf, stale: st.stale,
+      };
     }
     if (pipeline) {
-      volumes.systems["ghl-wing"] = { value: pipeline, sub: "pipeline" };
-      volumes.artifacts["prospects-db"] = { value: pipeline, sub: "prospects" };
+      volumes.systems["ghl-wing"] = { value: pipeline, sub: "pipeline", source: src, asOf: outAsOf, stale: outStale };
+      volumes.artifacts["prospects-db"] = { value: pipeline, sub: "prospects", source: src, asOf: outAsOf, stale: outStale };
     }
   }
   if (bizRaw) {
     const active = bizRaw.match(/\*\*Active clients:\*\*\s*(\d+)/)?.[1];
-    if (active) volumes.systems["clients"] = { value: active, sub: "active" };
+    const bizStale = isStale(bizAsOf, STALE_HOURS.clients);
+    if (active) volumes.systems["clients"] = { value: active, sub: "active", source: "snapshot", asOf: bizAsOf, stale: bizStale };
   }
   // Web/SEO: publishes this week counted from log.md entries mentioning a publish.
   {
@@ -1040,13 +1108,15 @@ export async function GET(req: NextRequest) {
     const publishes = feed.filter(
       (e) => new Date(e.date).getTime() >= weekAgo && /publish|posted|went live/i.test(e.title)
     ).length;
-    if (publishes > 0) volumes.systems["website"] = { value: String(publishes), sub: "pub/wk" };
+    // Rolling 7-day count from log.md — not time-critical, marked snapshot.
+    if (publishes > 0) volumes.systems["website"] = { value: String(publishes), sub: "pub/wk", source: "snapshot", asOf: null, stale: false };
   }
   if (repliesRaw) {
     const m = repliesRaw.match(/\*\*(\d+)\s*hot\s*\/\s*(\d+)\s*warm\s*\/\s*(\d+)\s*cold\*\*/i);
     if (m) {
       const total = Number(m[1]) + Number(m[2]) + Number(m[3]);
-      volumes.artifacts["replies-inbox"] = { value: String(total), sub: "waiting" };
+      const repAsOf = parseSnapshotAsOf(repliesRaw);
+      volumes.artifacts["replies-inbox"] = { value: String(total), sub: "waiting", source: "snapshot", asOf: repAsOf, stale: isStale(repAsOf, STALE_HOURS.outreach) };
     }
   }
 
@@ -1066,6 +1136,7 @@ export async function GET(req: NextRequest) {
       outreach: !!outreachRaw,
       scheduledDisk: localDiskOk,
       watchdog: watchdog.available,
+      prospectsDb: !!live, // live outreach truth reachable (local PC) vs snapshot-only
     },
     overall,
     watchdog,

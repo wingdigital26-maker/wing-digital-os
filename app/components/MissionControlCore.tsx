@@ -47,7 +47,11 @@ export interface ClientHealth {
 export interface PublishItem { date: string; title: string; url: string | null; note: string | null }
 export interface Publishes { windowDays: number; items: PublishItem[]; lastPriorPublish: string | null }
 export interface RealLink { label: string; url: string }
-export interface StatTile { key: string; label: string; value: string; sub: string | null; updated: string | null }
+export type MetricSource = "live-db" | "live-ghl" | "snapshot";
+export interface StatTile {
+  key: string; label: string; value: string; sub: string | null; updated: string | null;
+  source: MetricSource; stale: boolean; provenance: string;
+}
 export interface StatDetail {
   id: string;
   title: string;
@@ -57,8 +61,11 @@ export interface StatDetail {
   items: { label: string; value: string; note: string | null }[];
   note: string | null;
   links?: RealLink[];
+  source?: MetricSource;
+  stale?: boolean;
+  provenance?: string;
 }
-export interface VolumeBadge { value: string; sub: string | null }
+export interface VolumeBadge { value: string; sub: string | null; source: MetricSource; asOf: string | null; stale: boolean }
 export interface Volumes {
   systems: Record<string, VolumeBadge>;
   artifacts: Record<string, VolumeBadge>;
@@ -316,13 +323,19 @@ type Hover =
   | null;
 
 // Tiny volume pill rendered inside the SVG map (numbers only, no clutter).
-function VolPill({ x, y, text, color }: { x: number; y: number; text: string; color: string }) {
-  const w = text.length * 5.6 + 14;
+function VolPill({ x, y, text, color, live, stale }: { x: number; y: number; text: string; color: string; live?: boolean; stale?: boolean }) {
+  // Stale volumes turn amber and dim; live ones get a small green dot. A
+  // confident stale number is never shown as if it were current.
+  const stroke = stale ? "#fb923c" : color;
+  const fill = stale ? "#fb923c" : color;
+  const w = text.length * 5.6 + 14 + (live ? 8 : 0);
   return (
-    <g style={{ pointerEvents: "none" }}>
+    <g style={{ pointerEvents: "none" }} opacity={stale ? 0.7 : 1}>
       <rect x={x - w / 2} y={y - 9} width={w} height={18} rx={9}
-        fill="rgba(13,17,23,0.92)" stroke={color} strokeOpacity={0.7} strokeWidth={1} />
-      <text x={x} y={y + 3} textAnchor="middle" fill={color} fontSize="9"
+        fill="rgba(13,17,23,0.92)" stroke={stroke} strokeOpacity={stale ? 0.9 : 0.7}
+        strokeWidth={1} strokeDasharray={stale ? "3 2" : undefined} />
+      {live && <circle cx={x - w / 2 + 8} cy={y} r={2.6} fill="#34d399" />}
+      <text x={x + (live ? 4 : 0)} y={y + 3} textAnchor="middle" fill={fill} fontSize="9"
         fontFamily="'JetBrains Mono', monospace">{text}</text>
     </g>
   );
@@ -575,7 +588,8 @@ export function OpsMap({ agents, volumes, watchdog, onSelect }: {
           const dimmed = hovering && !hoverSystems.has(s.id);
           return (
             <g key={`vol-${s.id}`} opacity={dimmed ? 0.2 : 1}>
-              <VolPill x={x} y={y - 32} text={v.sub ? `${v.value} ${v.sub}` : v.value} color={s.color} />
+              <VolPill x={x} y={y - 32} text={v.sub ? `${v.value} ${v.sub}` : v.value} color={s.color}
+                live={v.source === "live-db" || v.source === "live-ghl"} stale={v.stale} />
             </g>
           );
         })}
@@ -587,7 +601,8 @@ export function OpsMap({ agents, volumes, watchdog, onSelect }: {
           return (
             <g key={`vola-${art.id}`} opacity={dimmed ? 0.2 : 1}>
               <VolPill x={(sp.x + x) / 2} y={(sp.y + 22 + y - 14) / 2}
-                text={v.sub ? `${v.value} ${v.sub}` : v.value} color={color} />
+                text={v.sub ? `${v.value} ${v.sub}` : v.value} color={color}
+                live={v.source === "live-db" || v.source === "live-ghl"} stale={v.stale} />
             </g>
           );
         })}
@@ -715,7 +730,13 @@ function WatchdogCopyButton({ watchdog, color }: { watchdog: WatchdogData; color
 // shows a subtle pill. Honest: it only greens what the server truly verified.
 export interface RecheckItem { label: string; status: string; line: string; url?: string | null; http?: number | null }
 export interface RecheckCheck { id: string; label: string; status: string; line: string; items?: RecheckItem[] }
-export interface RecheckResult { ranAt: string; target: string; cloud: boolean; wrote: boolean; writeNote: string | null; overall: string; checks: RecheckCheck[] }
+export interface RecheckResult {
+  ranAt: string; target: string; cloud: boolean;
+  persisted?: boolean; mode?: "local" | "cloud-github" | "none";
+  pushedToCloud?: boolean | null; commit?: string | null; reason?: string | null;
+  resolvedCount?: number; refetchMission?: boolean;
+  wrote: boolean; writeNote: string | null; overall: string; checks: RecheckCheck[];
+}
 
 const RECHECK_TARGETS: { id: string; label: string }[] = [
   { id: "all", label: "Recheck everything" },
@@ -864,9 +885,39 @@ export function RecheckButton({ onRechecked, compact }: { onRechecked?: () => vo
               ))}
             </div>
           ))}
-          {result.writeNote && (
-            <div style={{ fontSize: 10, color: "var(--text-muted, #6b7280)", fontFamily: mono }}>{result.writeNote}</div>
-          )}
+          {(() => {
+            const persisted = !!result.persisted;
+            const cloud = result.mode === "cloud-github";
+            const n = result.resolvedCount ?? 0;
+            const col = persisted ? "#34d399" : "#93a4b8";
+            return (
+              <div style={{
+                display: "flex", alignItems: "center", gap: 6, fontSize: 10, fontFamily: mono,
+                color: col, borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 6,
+              }}>
+                {persisted ? (
+                  // synced / cloud icon
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    {cloud
+                      ? <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" />
+                      : <><path d="M21 12a9 9 0 1 1-2.64-6.36" /><path d="M21 3v6h-6" /></>}
+                  </svg>
+                ) : (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+                  </svg>
+                )}
+                <span style={{ fontWeight: 700 }}>
+                  {persisted
+                    ? `Report updated${n ? `, ${n} resolved` : ""}${cloud ? " (cloud)" : result.pushedToCloud ? " (synced)" : ""}`
+                    : "Live check only, report not updated - needs PC"}
+                </span>
+                {result.writeNote && (
+                  <span style={{ color: "var(--text-muted, #6b7280)", fontWeight: 400 }}>· {result.writeNote}</span>
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
     </div>
@@ -1036,26 +1087,70 @@ export function AgentTile({ a, onSelect }: { a: AgentCard; onSelect: (s: Selecti
 }
 
 // ── Stat tiles (clickable: each opens its breakdown panel) ─────────────────
+// A tiny freshness affordance shared by tiles and panels: a green pulsing
+// "live" dot for live sources, or a muted age label for snapshots. Stale
+// snapshots turn amber so a stale value can never read as a confident stat.
+export function FreshnessMark({ source, updated, stale }: { source: MetricSource; updated: string | null; stale?: boolean }) {
+  const mono = "'JetBrains Mono', monospace";
+  if (source === "live-db" || source === "live-ghl") {
+    return (
+      <span title={source === "live-db" ? "Live from prospects.db, just now" : "Live from the GHL API, just now"}
+        style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 9, color: "#34d399", fontFamily: mono }}>
+        <Dot color="#34d399" pulse /> live
+      </span>
+    );
+  }
+  const age = fmtAge(updated);
+  const color = stale ? "#fb923c" : "var(--text-muted, #6b7280)";
+  return (
+    <span title={stale ? "From a snapshot and past its freshness window — may be stale, needs PC or state-sync" : `From snapshot${age ? `, ${age}` : ""}`}
+      style={{ fontSize: 9, color, fontFamily: mono }}>
+      {stale ? "stale " : ""}{age ? (source === "snapshot" ? `as of ${age}` : age) : "snapshot"}
+    </span>
+  );
+}
+
+// Legend explaining the live vs snapshot affordance. One quiet line.
+export function FreshnessLegend() {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", fontSize: 10, color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace" }}>
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Dot color="#34d399" /> live — queried from the source just now</span>
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Dot color="#6b7280" /> snapshot — shows its real age</span>
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 5, color: "#fb923c" }}><Dot color="#fb923c" /> stale — past its freshness window, needs PC</span>
+    </div>
+  );
+}
+
 export function StatTiles({ tiles, onSelect }: { tiles: StatTile[]; onSelect: (s: Selection) => void }) {
   if (!tiles.length) return null;
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
-      {tiles.map((t) => {
-        const age = fmtAge(t.updated);
-        return (
-          <div key={t.label} className="mo-click" onClick={() => { sfx.play("ping"); onSelect({ type: "stat", key: t.key }); }}
-            title="Click for the breakdown"
-            style={{ background: "var(--bg-card, #0d1117)", border: "1px solid var(--border, rgba(255,255,255,0.08))", borderRadius: 12, padding: "14px 16px", position: "relative" }}>
-            <div style={{ fontSize: 26, fontWeight: 700, color: "var(--text-primary)", fontFamily: "'Space Grotesk', sans-serif" }}>{t.value}</div>
-            <div style={{ fontSize: 10, letterSpacing: "0.12em", color: "var(--text-muted)", textTransform: "uppercase" }}>
-              {t.label}{t.sub ? <span style={{ textTransform: "none", letterSpacing: 0 }}> · {t.sub}</span> : null}
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
+        {tiles.map((t) => {
+          const live = t.source === "live-db" || t.source === "live-ghl";
+          // Stale snapshot values render muted/amber, never as a bright stat.
+          const valueColor = t.stale ? "#fb923c" : live ? "var(--text-primary)" : "var(--text-secondary, #9ca3af)";
+          return (
+            <div key={t.label} className="mo-click" onClick={() => { sfx.play("ping"); onSelect({ type: "stat", key: t.key }); }}
+              title={t.provenance || "Click for the breakdown"}
+              style={{
+                background: "var(--bg-card, #0d1117)",
+                border: `1px solid ${t.stale ? "rgba(251,146,60,0.4)" : "var(--border, rgba(255,255,255,0.08))"}`,
+                borderRadius: 12, padding: "14px 16px", position: "relative",
+                opacity: t.stale ? 0.85 : 1,
+              }}>
+              <div style={{ fontSize: 26, fontWeight: 700, color: valueColor, fontFamily: "'Space Grotesk', sans-serif" }}>{t.value}</div>
+              <div style={{ fontSize: 10, letterSpacing: "0.12em", color: "var(--text-muted)", textTransform: "uppercase" }}>
+                {t.label}{t.sub ? <span style={{ textTransform: "none", letterSpacing: 0 }}> · {t.sub}</span> : null}
+              </div>
+              <span style={{ position: "absolute", top: 8, right: 10 }}>
+                <FreshnessMark source={t.source} updated={t.updated} stale={t.stale} />
+              </span>
             </div>
-            {age && (
-              <span style={{ position: "absolute", top: 8, right: 10, fontSize: 9, color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace" }}>{age}</span>
-            )}
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
+      <FreshnessLegend />
     </div>
   );
 }
@@ -1517,8 +1612,18 @@ function StatPanel({ statKey, onClose, onSelect }: {
       {err && <div style={{ fontSize: 12, color: "#f87171" }}>Could not load breakdown ({err})</div>}
       {detail && (
         <>
+          {/* Every panel states its source line at top: live vs snapshot age. */}
+          <div style={{
+            display: "flex", alignItems: "center", gap: 8, marginBottom: 8, padding: "6px 10px", borderRadius: 8,
+            border: `1px solid ${detail.stale ? "rgba(251,146,60,0.4)" : "var(--border, rgba(255,255,255,0.08))"}`,
+            background: detail.stale ? "rgba(251,146,60,0.06)" : "rgba(255,255,255,0.02)",
+          }}>
+            <FreshnessMark source={detail.source ?? "snapshot"} updated={detail.updated} stale={detail.stale} />
+            <span style={{ fontSize: 11, color: detail.stale ? "#fb923c" : "var(--text-secondary, #9ca3af)", fontFamily: "'JetBrains Mono', monospace" }}>
+              {detail.provenance ?? (age ? `From snapshot, ${age}` : "From snapshot")}
+            </span>
+          </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
-            {age && <Pill text={`SNAPSHOT ${age.toUpperCase()}`} color="var(--text-muted, #6b7280)" />}
             {!detail.available && <Pill text="SNAPSHOT UNAVAILABLE" color="#fb923c" />}
           </div>
           <SummaryBlock accent={accent} lines={detail.summary} />

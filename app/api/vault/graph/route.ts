@@ -15,6 +15,26 @@ interface GraphPayload {
   nodes: { id: string; name: string; path: string; group: string }[];
   links: { source: string; target: string }[];
   builtAt: string;
+  hash: string;
+}
+
+// Stable structural hash of the graph (node ids + link pairs). The client uses
+// this as the change signal: same hash means the saved layout is still valid.
+function graphHash(
+  nodes: { id: string }[],
+  links: { source: string; target: string }[]
+): string {
+  const parts = [
+    ...nodes.map(n => n.id).sort(),
+    ...links.map(l => `${l.source}>${l.target}`).sort(),
+  ].join("|");
+  // FNV-1a, 32-bit, hex
+  let h = 0x811c9dc5;
+  for (let i = 0; i < parts.length; i++) {
+    h ^= parts.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(16);
 }
 
 let graphCache: { value: GraphPayload; at: number } | null = null;
@@ -71,7 +91,7 @@ async function buildGraph(): Promise<GraphPayload> {
     }
   }
 
-  return { nodes, links, builtAt: new Date().toISOString() };
+  return { nodes, links, builtAt: new Date().toISOString(), hash: graphHash(nodes, links) };
 }
 
 function refresh(): Promise<GraphPayload> {

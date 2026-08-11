@@ -21,13 +21,22 @@ type SoundName =
   | "send" // Jarvis send: crisp send tick
   | "toggle-on"
   | "toggle-off"
-  | "hover"; // map node hover: VERY quiet tick, throttled
+  | "hover" // map node hover: VERY quiet tick, throttled
+  // ── vault graph space set ──
+  | "graph-hover" // node hover: soft high shimmer tick, throttled
+  | "graph-focus" // node click/focus: deep resonant ping, layered with reverb tail
+  | "graph-zoom" // significant zoom change: very subtle woosh, throttled
+  | "tree-open" // folder open: paper-ish tick up
+  | "tree-close" // folder close: paper-ish tick down
+  | "graph-arrive"; // graph settle/load complete: quiet three-note arrival chime
 
 class SfxEngine {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
   private muted = false;
   private lastHover = 0;
+  private lastGraphHover = 0;
+  private lastZoom = 0;
   private listeners = new Set<(muted: boolean) => void>();
 
   constructor() {
@@ -156,8 +165,9 @@ class SfxEngine {
       case "blip": // agent node: soft mid blip
         this.tone({ freq: 660, endFreq: 880, type: "sine", decay: 0.09, gain: 0.9 });
         break;
-      case "blip-system": // system node: lower, rounder
-        this.tone({ freq: 440, endFreq: 520, type: "triangle", decay: 0.1, gain: 0.9 });
+      case "blip-system": // system node: clean glassy sine, gentle rise + quiet octave
+        this.tone({ freq: 460, endFreq: 540, type: "sine", attack: 0.008, decay: 0.11, gain: 0.85 });
+        this.tone({ freq: 920, endFreq: 1080, type: "sine", attack: 0.008, decay: 0.08, gain: 0.18 });
         break;
       case "blip-artifact": // artifact node: higher, lighter
         this.tone({ freq: 880, endFreq: 1100, type: "sine", decay: 0.07, gain: 0.7 });
@@ -193,6 +203,44 @@ class SfxEngine {
       case "toggle-off": // two-tone down
         this.tone({ freq: 660, type: "sine", decay: 0.06, gain: 0.6 });
         this.tone({ freq: 440, type: "sine", decay: 0.08, gain: 0.6, delay: 0.06 });
+        break;
+      case "graph-hover": {
+        // soft high shimmer: two tiny detuned sines, throttled ~7/sec
+        const now = Date.now();
+        if (now - this.lastGraphHover < 140) return;
+        this.lastGraphHover = now;
+        this.tone({ freq: 1560, type: "sine", decay: 0.05, gain: 0.1 });
+        this.tone({ freq: 2093, type: "sine", decay: 0.07, gain: 0.06, delay: 0.012 });
+        break;
+      }
+      case "graph-focus":
+        // deep resonant ping: low fundamental + fifth + faint echo tail (reverb feel)
+        this.tone({ freq: 196, type: "sine", attack: 0.006, decay: 0.5, gain: 0.55 });
+        this.tone({ freq: 294, type: "sine", decay: 0.4, gain: 0.3, delay: 0.015 });
+        this.tone({ freq: 588, type: "triangle", decay: 0.22, gain: 0.14, delay: 0.02 });
+        this.tone({ freq: 196, type: "sine", decay: 0.35, gain: 0.14, delay: 0.16 });
+        this.tone({ freq: 294, type: "sine", decay: 0.3, gain: 0.07, delay: 0.28 });
+        break;
+      case "graph-zoom": {
+        // very subtle woosh, throttled hard so continuous zooming stays quiet
+        const now = Date.now();
+        if (now - this.lastZoom < 450) return;
+        this.lastZoom = now;
+        this.noise({ decay: 0.16, gain: 0.1, from: 500, to: 1600 });
+        break;
+      }
+      case "tree-open": // paper-ish tick up
+        this.noise({ decay: 0.05, gain: 0.14, from: 1600, to: 3400 });
+        this.tone({ freq: 520, endFreq: 700, type: "triangle", decay: 0.06, gain: 0.35 });
+        break;
+      case "tree-close": // paper-ish tick down
+        this.noise({ decay: 0.05, gain: 0.12, from: 3000, to: 1300 });
+        this.tone({ freq: 700, endFreq: 480, type: "triangle", decay: 0.06, gain: 0.32 });
+        break;
+      case "graph-arrive": // quiet three-note arrival chime (C5 E5 G5)
+        this.tone({ freq: 523.25, type: "sine", decay: 0.2, gain: 0.28 });
+        this.tone({ freq: 659.25, type: "sine", decay: 0.22, gain: 0.26, delay: 0.11 });
+        this.tone({ freq: 783.99, type: "sine", decay: 0.34, gain: 0.24, delay: 0.22 });
         break;
       case "hover": {
         // VERY quiet tick, throttled to at most ~8/sec

@@ -1245,11 +1245,31 @@ function KnowledgeBase({ initialPath, onSendToAI }: { initialPath?: string; onSe
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState("");
   const [loadingFile, setLoadingFile] = useState(false);
-  const [expanded, setExpanded] = useState<Set<string>>(new Set(["wiki"]));
+  const LS_EXPANDED = "wingos-vault-tree-expanded";
+  const LS_PANEL = "wingos-vault-tree-panel";
+  const [expanded, setExpanded] = useState<Set<string>>(() => {
+    try {
+      const raw = window.localStorage.getItem(LS_EXPANDED);
+      if (raw) return new Set(JSON.parse(raw) as string[]);
+    } catch { /* default */ }
+    return new Set(["wiki"]);
+  });
+  const [treeOpen, setTreeOpen] = useState<boolean>(() => {
+    try { return window.localStorage.getItem(LS_PANEL) !== "0"; } catch { return true; }
+  });
 
   useEffect(() => {
     fetch("/api/vault").then(r => r.json()).then(d => setTree(d.tree ?? []));
   }, []);
+
+  const togglePanel = () => {
+    setTreeOpen(prev => {
+      const next = !prev;
+      sfx.play(next ? "tree-open" : "tree-close");
+      try { window.localStorage.setItem(LS_PANEL, next ? "1" : "0"); } catch { /* noop */ }
+      return next;
+    });
+  };
 
   function showToast(msg: string) {
     setToast(msg); setTimeout(() => setToast(""), 3000);
@@ -1284,7 +1304,10 @@ function KnowledgeBase({ initialPath, onSendToAI }: { initialPath?: string; onSe
   const toggleFolder = (p: string) => {
     setExpanded(prev => {
       const next = new Set(prev);
-      next.has(p) ? next.delete(p) : next.add(p);
+      const opening = !next.has(p);
+      opening ? next.add(p) : next.delete(p);
+      sfx.play(opening ? "tree-open" : "tree-close");
+      try { window.localStorage.setItem(LS_EXPANDED, JSON.stringify([...next])); } catch { /* noop */ }
       return next;
     });
   };
@@ -1311,8 +1334,16 @@ function KnowledgeBase({ initialPath, onSendToAI }: { initialPath?: string; onSe
                   }}>▶</span>
                   {node.name}
                 </button>
-                {expanded.has(node.path) && node.children && (
-                  <FileTree nodes={node.children} depth={depth + 1} />
+                {node.children && (
+                  <div style={{
+                    display: "grid",
+                    gridTemplateRows: expanded.has(node.path) ? "1fr" : "0fr",
+                    transition: "grid-template-rows 0.22s ease",
+                  }}>
+                    <div style={{ overflow: "hidden", minHeight: 0 }}>
+                      <FileTree nodes={node.children} depth={depth + 1} />
+                    </div>
+                  </div>
                 )}
               </>
             ) : (
@@ -1341,20 +1372,39 @@ function KnowledgeBase({ initialPath, onSendToAI }: { initialPath?: string; onSe
   }
 
   return (
-    <div style={{ display: "flex", height: "calc(100vh - 130px)", margin: "-24px", overflow: "hidden" }}>
+    <div style={{ position: "relative", display: "flex", height: "calc(100vh - 130px)", margin: "-24px", overflow: "hidden" }}>
 
-      {/* Left: File tree */}
-      <div style={{ width: 230, flexShrink: 0, borderRight: "1px solid rgba(255,255,255,0.05)", overflow: "auto", padding: "16px 0", background: "rgba(11,13,23,0.6)", backdropFilter: "blur(10px)" }}>
-        <p style={{
-          fontSize: 11, fontWeight: 700, padding: "0 14px 12px",
-          textTransform: "uppercase", letterSpacing: "0.1em",
-          background: "linear-gradient(90deg, var(--accent), var(--accent-2))",
-          WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent",
-        }}>
-          ◈ Vault
-        </p>
-        <FileTree nodes={tree} />
+      {/* Left: File tree (collapsible panel) */}
+      <div style={{
+        width: treeOpen ? 230 : 0, flexShrink: 0,
+        borderRight: treeOpen ? "1px solid rgba(255,255,255,0.05)" : "none",
+        overflow: "hidden", background: "rgba(11,13,23,0.6)", backdropFilter: "blur(10px)",
+        transition: "width 0.25s ease",
+      }}>
+        <div style={{ width: 230, height: "100%", overflow: "auto", padding: "16px 0" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 14px 12px" }}>
+            <p style={{
+              fontSize: 11, fontWeight: 700,
+              textTransform: "uppercase", letterSpacing: "0.1em",
+              background: "linear-gradient(90deg, var(--accent), var(--accent-2))",
+              WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent",
+            }}>
+              ◈ Vault
+            </p>
+            <button onClick={togglePanel} aria-label="Collapse vault tree" title="Collapse tree"
+              style={{ background: "transparent", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 14, lineHeight: 1, padding: 0 }}>‹</button>
+          </div>
+          <FileTree nodes={tree} />
+        </div>
       </div>
+      {!treeOpen && (
+        <button onClick={togglePanel} aria-label="Expand vault tree" title="Show tree" style={{
+          position: "absolute", top: "50%", left: 4, transform: "translateY(-50%)", zIndex: 5,
+          width: 22, height: 44, borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)",
+          background: "rgba(8,9,15,0.7)", backdropFilter: "blur(6px)", color: "var(--text-secondary)",
+          cursor: "pointer", fontSize: 14, lineHeight: 1,
+        }}>›</button>
+      )}
 
       {/* Middle: Graph always visible */}
       <div style={{ flex: 1, position: "relative", minWidth: 0 }}>

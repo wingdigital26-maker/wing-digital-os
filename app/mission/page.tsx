@@ -10,6 +10,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   MissionData, Selection, Dot, Pill, MissionStyles, OpsMap, AgentTile,
   FeedTicker, ClientHealthStrip, MissionPanels, StatTiles, NextUpStrip,
+  WatchdogBanner,
 } from "../components/MissionControlCore";
 import SfxMuteButton from "../components/SfxMuteButton";
 
@@ -54,6 +55,12 @@ export default function MissionControl() {
   return (
     <div style={{ height: "100vh", overflowY: "auto", padding: "18px 22px 40px" }}>
       <MissionStyles />
+      {/* Watchdog problems banner — always the very first thing on screen */}
+      {data && (
+        <div style={{ marginBottom: 14 }}>
+          <WatchdogBanner watchdog={data.watchdog} />
+        </div>
+      )}
       <style>{`
         .mc-feed::-webkit-scrollbar { width: 6px; }
         .mc-feed::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }

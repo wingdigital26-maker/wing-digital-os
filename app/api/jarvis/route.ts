@@ -841,15 +841,38 @@ function runClaudeCode(opts: {
 // snapshots + hot.md) is fed to the Anthropic API engine as system context so
 // Jarvis can answer anything about the OS even when it cannot reach a tool.
 async function buildOsContext(): Promise<string> {
-  const [biz, outreach, hot, log, health] = await Promise.all([
+  const [biz, outreach, hot, log, health, watchdogRaw] = await Promise.all([
     readVaultFile("wiki/state/business-snapshot.md"),
     readVaultFile("wiki/state/outreach-snapshot.md"),
     readVaultFile("wiki/hot.md"),
     readVaultFile("wiki/log.md"),
     readVaultFile("wiki/state/health-board.md"),
+    readVaultFile("wiki/state/watchdog.md"),
   ]);
   const parts: string[] = [];
   const cap = (s: string, n: number) => (s.length > n ? s.slice(0, n) + "\n...[truncated]" : s);
+  // Watchdog report first: this is the ground truth for "is everything running".
+  if (watchdogRaw) {
+    const updated = watchdogRaw.match(/^updated:\s*(.+)$/m)?.[1]?.trim() ?? "unknown";
+    const overallLine = watchdogRaw.split(/\r?\n/).find((l) => /OVERALL/i.test(l))?.trim() ?? "OVERALL: unknown";
+    const wdLines = watchdogRaw.split(/\r?\n/);
+    const problemLines: string[] = [];
+    let inProblems = false;
+    for (const l of wdLines) {
+      const t = l.trim();
+      if (/^(#{1,4}|\*\*)?\s*PROBLEMS\b/i.test(t) && !/OVERALL/i.test(t)) { inProblems = true; continue; }
+      if (inProblems && (/^(#{1,4}|\*\*)?\s*(RESOLVED|ALL\s*CLEAR)\b/i.test(t) || /^#{1,4}\s/.test(t))) inProblems = false;
+      if (inProblems && /^(?:[-*]|\d+\.)\s+/.test(t)) problemLines.push(t);
+    }
+    parts.push(
+      "## WATCHDOG REPORT (latest, updated " + updated + ")\n" +
+      "Answer \"is everything running\" from this report. If it lists problems, say so plainly.\n" +
+      overallLine +
+      (problemLines.length ? "\n" + cap(problemLines.join("\n"), 2000) : "")
+    );
+  } else {
+    parts.push("## WATCHDOG REPORT\nThe watchdog has not produced its first report yet (wiki/state/watchdog.md missing). Say so if asked whether everything is running.");
+  }
   // Ground truth on WHEN things run, so Jarvis answers schedule questions correctly.
   parts.push(
     "## AGENT SCHEDULE (ground truth)\n" +

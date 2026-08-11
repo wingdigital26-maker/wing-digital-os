@@ -23,6 +23,17 @@ export interface AgentCard {
   nextRunAt: string | null;
   lastLogDate: string | null;
   lastLogLine: string | null;
+  watchdogState?: string | null; // OK | LATE | SILENT | DISABLED per watchdog.md
+}
+export interface WatchdogProblem { text: string; url: string | null }
+export interface WatchdogData {
+  available: boolean;
+  updated: string | null;
+  overall: "ok" | "problems" | "unknown";
+  problemCount: number;
+  problems: WatchdogProblem[];
+  resolved: string[];
+  agents: Record<string, string>;
 }
 export interface FeedEntry { date: string; type: string; title: string; lines: string[] }
 export interface ClientHealth {
@@ -70,6 +81,7 @@ export interface MissionData {
   stats: { tiles: StatTile[]; updated: string | null };
   volumes?: Volumes;
   publishes?: Publishes;
+  watchdog?: WatchdogData;
 }
 export interface AgentWire { id: string; label: string; direction: "reads" | "writes" | "both" }
 export interface AgentDetail {
@@ -82,6 +94,7 @@ export interface AgentDetail {
   scheduleHuman: string;
   enabled: boolean;
   status: string;
+  watchdogState?: string | null;
   installed: boolean | null;
   lastRunAt: string | null;
   nextRunAt: string | null;
@@ -438,8 +451,9 @@ export function OpsMap({ agents, volumes, onSelect }: { agents: AgentCard[]; vol
               <circle cx={x} cy={y} r={21} fill="rgba(13,17,23,0.95)" stroke={color}
                 strokeWidth={highlighted ? 2.2 : 1.5}
                 className={active ? "mo-node-pulse" : undefined} />
-              <circle cx={x} cy={y - 28} r={3.5} fill={active ? "#34d399" : "#4b5563"}
-                className={active ? "mo-pulse" : undefined} />
+              <circle cx={x} cy={y - 28} r={3.5}
+                fill={a.watchdogState === "SILENT" ? "#f87171" : a.watchdogState === "LATE" ? "#fb923c" : active ? "#34d399" : "#4b5563"}
+                className={active || (a.watchdogState && a.watchdogState !== "OK") ? "mo-pulse" : undefined} />
               <text x={x} y={y + 4} textAnchor="middle" fill={active || highlighted ? "#e5e7eb" : "#9ca3af"}
                 fontSize="9.5" fontFamily="'JetBrains Mono', monospace" style={{ pointerEvents: "none" }}>
                 {a.name.split(" ")[0].slice(0, 9).toUpperCase()}
@@ -522,12 +536,178 @@ export function OpsMap({ agents, volumes, onSelect }: { agents: AgentCard[]; vol
   );
 }
 
+// ── Watchdog status banner ─────────────────────────────────────────────────
+// Sits at the very top of the Command Center and the mission views. Green
+// quiet strip when the last watchdog report is clean and fresh; amber when the
+// watchdog itself has gone quiet (report older than 3 hours); red prominent
+// banner when the report lists problems. Missing file (first run pending) is a
+// quiet neutral state, never an error. Clicking toggles the detail list.
+
+// Render a problem line with any URL in it as a clickable link.
+function ProblemLine({ p, color }: { p: WatchdogProblem; color: string }) {
+  if (!p.url) return <span>{p.text}</span>;
+  const i = p.text.indexOf(p.url);
+  const before = i >= 0 ? p.text.slice(0, i) : p.text + " ";
+  const after = i >= 0 ? p.text.slice(i + p.url.length) : "";
+  return (
+    <span>
+      {before}
+      <a href={p.url} target="_blank" rel="noreferrer" style={{ color, textDecoration: "underline" }}
+        onClick={(e) => e.stopPropagation()}>
+        {i >= 0 ? p.url : "open link"} &#8599;
+      </a>
+      {after}
+    </span>
+  );
+}
+
+// Age of the watchdog report in minutes (null when unparseable).
+function watchdogAgeMin(updated: string | null): number | null {
+  if (!updated) return null;
+  let d = new Date(updated);
+  if (isNaN(d.getTime())) {
+    const m = updated.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s]+(\d{2}):(\d{2}))?/);
+    if (!m) return null;
+    d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4] ?? 12), Number(m[5] ?? 0));
+  }
+  const min = Math.floor((Date.now() - d.getTime()) / 60000);
+  return min >= 0 ? min : 0;
+}
+
+function relAge(min: number | null): string {
+  if (min === null) return "at an unknown time";
+  if (min < 1) return "just now";
+  if (min < 60) return `${min}m ago`;
+  const h = Math.floor(min / 60);
+  if (h < 48) return `${h}h ${min % 60}m ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+
+export function WatchdogBanner({ watchdog }: { watchdog?: WatchdogData | null }) {
+  const [expanded, setExpanded] = useState<boolean | null>(null);
+  const mono = "'JetBrains Mono', monospace";
+
+  const base: React.CSSProperties = {
+    borderRadius: 12, padding: "9px 16px", fontFamily: mono,
+    display: "flex", flexDirection: "column", gap: 6,
+  };
+
+  // Not reported yet (file missing): quiet neutral, never an error.
+  if (!watchdog || !watchdog.available) {
+    return (
+      <div style={{ ...base, border: "1px solid var(--border, rgba(255,255,255,0.08))", background: "var(--bg-card, #0d1117)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <Dot color="#6b7280" />
+          <span style={{ fontSize: 11, letterSpacing: "0.1em", color: "var(--text-muted, #6b7280)" }}>
+            WATCHDOG - watchdog has not reported yet
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  const ageMin = watchdogAgeMin(watchdog.updated);
+  const stale = ageMin !== null && ageMin > 180; // watchdog runs every 2h; older than 3h means the watcher itself is silent
+  const problems = watchdog.problems;
+  const count = Math.max(watchdog.problemCount, problems.length);
+  const hasProblems = watchdog.overall === "problems" || count > 0;
+
+  // All clear and fresh: green quiet strip.
+  if (!hasProblems && !stale) {
+    return (
+      <div style={{ ...base, border: "1px solid rgba(52,211,153,0.35)", background: "rgba(52,211,153,0.06)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <Dot color="#34d399" />
+          <span style={{ fontSize: 11, letterSpacing: "0.1em", color: "#34d399" }}>
+            ALL SYSTEMS REPORTING - watchdog checked {relAge(ageMin)}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  // Problems (red) and/or the watchdog itself late (amber).
+  const color = hasProblems ? "#f87171" : "#fb923c";
+  const isOpen = expanded ?? (hasProblems ? count <= 2 : false);
+  const toggle = () => {
+    sfx.play(isOpen ? "toggle-off" : "toggle-on");
+    setExpanded(!isOpen);
+  };
+  const headline = hasProblems
+    ? `WATCHDOG: ${count} PROBLEM${count === 1 ? "" : "S"} REPORTED`
+    : `WATCHDOG ITSELF IS LATE (last report ${relAge(ageMin)})`;
+
+  return (
+    <div className="mo-click wd-banner" onClick={toggle} role="button" style={{
+      ...base,
+      border: `1px solid ${color}66`,
+      background: hasProblems ? "rgba(248,113,113,0.08)" : "rgba(251,146,60,0.08)",
+    }}>
+      <style>{`
+        .wd-banner { animation: wdPulse 2.4s ease-in-out infinite; }
+        @keyframes wdPulse { 0%,100% { box-shadow: 0 0 0 0 ${color}00; } 50% { box-shadow: 0 0 14px 1px ${color}44; } }
+      `}</style>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <Dot color={color} pulse />
+        <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.1em", color }}>{headline}</span>
+        {hasProblems && stale && (
+          <span style={{ fontSize: 10, color: "#fb923c", border: "1px solid #fb923c55", borderRadius: 99, padding: "1px 8px" }}>
+            report is also late ({relAge(ageMin)})
+          </span>
+        )}
+        <span style={{ marginLeft: "auto", fontSize: 10, color: "var(--text-muted, #6b7280)" }}>
+          {isOpen ? "collapse" : "expand"}
+        </span>
+      </div>
+
+      {/* collapsed: count + worst (first) problem line */}
+      {hasProblems && !isOpen && problems.length > 0 && (
+        <div style={{ fontSize: 11.5, color: "var(--text-secondary, #9ca3af)", lineHeight: 1.5, paddingLeft: 19 }}>
+          <ProblemLine p={problems[0]} color={color} />
+          {count > 1 && <span style={{ color: "var(--text-muted, #6b7280)" }}> (+{count - 1} more)</span>}
+        </div>
+      )}
+
+      {/* expanded: every problem, one line each, with its suggested action */}
+      {isOpen && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 5, paddingLeft: 19 }}>
+          {problems.map((p, i) => (
+            <div key={i} style={{ fontSize: 11.5, color: "var(--text-secondary, #9ca3af)", lineHeight: 1.5, borderLeft: `2px solid ${color}55`, paddingLeft: 8 }}>
+              <ProblemLine p={p} color={color} />
+            </div>
+          ))}
+          {hasProblems && problems.length === 0 && (
+            <div style={{ fontSize: 11.5, color: "var(--text-secondary, #9ca3af)" }}>
+              The report counts {count} problem{count === 1 ? "" : "s"} but lists no detail lines.
+            </div>
+          )}
+          {watchdog.resolved.length > 0 && (
+            <div style={{ fontSize: 10.5, color: "var(--text-muted, #6b7280)", lineHeight: 1.5 }}>
+              resolved: {watchdog.resolved.slice(0, 4).join("; ")}
+            </div>
+          )}
+          {stale && hasProblems && (
+            <div style={{ fontSize: 10.5, color: "#fb923c" }}>
+              The watchdog report itself is older than 3 hours - the watcher being silent is also a problem.
+            </div>
+          )}
+          <div style={{ fontSize: 10, color: "var(--text-muted, #6b7280)" }}>
+            last watchdog report {relAge(ageMin)}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Agent tile (calm: name + status dot + ONE line) ────────────────────────
 export function AgentTile({ a, onSelect }: { a: AgentCard; onSelect: (s: Selection) => void }) {
   let color = "var(--text-muted, #6b7280)";
   let pulse = false;
   let line = a.schedule;
   if (!a.enabled) { line = "disabled"; }
+  else if (a.watchdogState === "SILENT") { color = "#f87171"; pulse = true; line = "SILENT (watchdog)"; }
+  else if (a.watchdogState === "LATE") { color = "#fb923c"; pulse = true; line = "LATE (watchdog)"; }
   else if (a.pcNeeded && a.kind === "scheduled") { color = "#fb923c"; line = "PC needed"; }
   else if (a.nextRunAt) { color = "#22d3ee"; pulse = true; line = `next ${fmtCountdown(a.nextRunAt)}`; }
   else if (a.lastLogDate) { color = "#34d399"; pulse = true; line = `last seen ${a.lastLogDate}`; }
@@ -872,6 +1052,9 @@ function AgentPanel({ agentKey, onClose, onSelect }: {
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
             <Pill text={detail.status.toUpperCase()} color={statusColor} />
             <Pill text={detail.kind === "scheduled" ? "SCHEDULED" : "ON DEMAND"} color="var(--text-muted, #6b7280)" />
+            {detail.watchdogState === "SILENT" && <Pill text="SILENT (WATCHDOG)" color="#f87171" />}
+            {detail.watchdogState === "LATE" && <Pill text="LATE (WATCHDOG)" color="#fb923c" />}
+            {detail.watchdogState === "DISABLED" && <Pill text="DISABLED (WATCHDOG)" color="#6b7280" />}
             {detail.installed === false && <Pill text="NOT INSTALLED" color="#fb923c" />}
           </div>
 

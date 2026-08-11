@@ -251,6 +251,95 @@ function parseHealthBoard(raw: string): { runDate: string | null; clients: Clien
   return { runDate, clients };
 }
 
+// ── watchdog.md parsing ────────────────────────────────────────────────────
+// A scheduled Watchdog task overwrites wiki/state/watchdog.md every 2 hours:
+// frontmatter (updated:), an OVERALL line (OK / PROBLEMS: n), a PROBLEMS
+// section (one line per problem), a RESOLVED section, and an ALL CLEAR line
+// listing each agent with state OK/LATE/SILENT/DISABLED. The file may not
+// exist yet (first run pending) — that is a normal, non-error state.
+interface WatchdogProblem { text: string; url: string | null }
+interface Watchdog {
+  available: boolean;
+  updated: string | null;
+  overall: "ok" | "problems" | "unknown";
+  problemCount: number;
+  problems: WatchdogProblem[];
+  resolved: string[];
+  agents: Record<string, string>; // agent name -> OK | LATE | SILENT | DISABLED
+}
+
+function parseWatchdog(raw: string | null): Watchdog {
+  const wd: Watchdog = {
+    available: false, updated: null, overall: "unknown",
+    problemCount: 0, problems: [], resolved: [], agents: {},
+  };
+  if (!raw) return wd;
+  wd.available = true;
+  wd.updated =
+    raw.match(/^updated:\s*["']?([^"'\r\n]+)["']?\s*$/m)?.[1]?.trim() ?? null;
+  const ov = raw.match(/OVERALL\W*[:\-]?\s*(OK\b|PROBLEMS\s*[:\-]?\s*(\d+))/i);
+  if (ov) {
+    if (/^OK/i.test(ov[1])) wd.overall = "ok";
+    else { wd.overall = "problems"; wd.problemCount = Number(ov[2] ?? 0) || 0; }
+  }
+  let section: "problems" | "resolved" | "allclear" | null = null;
+  let curProblem: WatchdogProblem | null = null;
+  for (const line of raw.split(/\r?\n/)) {
+    const t = line.trim();
+    if (!t) continue;
+    if (/^(#{1,4}\s*|\*\*)?PROBLEMS\b/i.test(t) && !/OVERALL/i.test(t)) { section = "problems"; curProblem = null; continue; }
+    if (/^(#{1,4}\s*|\*\*)?RESOLVED\b/i.test(t)) { section = "resolved"; curProblem = null; continue; }
+    if (/^(#{1,4}\s*|\*\*)?ALL\s*CLEAR\b/i.test(t)) { section = "allclear"; curProblem = null; continue; }
+    if (/^#{1,4}\s/.test(t)) { section = null; curProblem = null; continue; }
+
+    if (section === "allclear") {
+      // "- sentinel-daily: OK (detail)"; names can be comma-separated.
+      const m = t.match(/^[-*]?\s*(.+?)\s*:\s*(OK|LATE|SILENT|DISABLED|NEVER RUN)\b/i);
+      if (m) {
+        for (const nm of m[1].split(/\s*,\s*/)) {
+          const name = nm.replace(/^[-*\s]+/, "").trim();
+          if (name && name.length <= 48) wd.agents[name] = m[2].toUpperCase();
+        }
+      }
+      continue;
+    }
+
+    const item = t.match(/^(?:[-*]|\d+\.)\s+(.+)$/);
+    if (section === "problems") {
+      if (item) {
+        curProblem = { text: clean(redact(item[1])).slice(0, 400), url: null };
+        wd.problems.push(curProblem);
+      } else if (curProblem) {
+        // continuation lines: keep the suggested action, grab arrow links
+        const arrow = t.match(/^(?:→|->)\s*(\S+)/);
+        if (arrow && !curProblem.url && arrow[1].startsWith("http")) {
+          curProblem.url = arrow[1].replace(/[.,;:]+$/, "");
+        } else if (/^Action\s*:/i.test(t)) {
+          curProblem.text = (curProblem.text + " " + clean(redact(t))).slice(0, 500);
+        }
+      }
+    } else if (section === "resolved" && item) {
+      wd.resolved.push(clean(redact(item[1])).slice(0, 300));
+    }
+  }
+  if (wd.overall === "unknown" && wd.problems.length) wd.overall = "problems";
+  if (wd.overall === "problems" && !wd.problemCount) wd.problemCount = wd.problems.length;
+  if (wd.overall === "problems" && wd.problemCount < wd.problems.length) wd.problemCount = wd.problems.length;
+  return wd;
+}
+
+// Match a watchdog agent name against our roster (name or key, loose).
+function watchdogStateFor(wd: Watchdog, key: string, name: string): string | null {
+  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const nk = norm(key), nn = norm(name);
+  for (const [wname, state] of Object.entries(wd.agents)) {
+    const w = norm(wname);
+    if (!w) continue;
+    if (w === nk || w === nn || nk.includes(w) || w.includes(nn) || nn.includes(w)) return state;
+  }
+  return null;
+}
+
 // ── Real-world links ───────────────────────────────────────────────────────
 // GHL location ids come from Jack's own tooling (ghl-cli/apollo_outreach.py),
 // not guessed. URL patterns are GHL's stable v2 app routes.
@@ -755,7 +844,11 @@ async function agentDetail(key: string) {
     return NextResponse.json({ error: `unknown agent '${key}'` }, { status: 404 });
   }
 
-  const logRaw = await readVaultFile("wiki/log.md");
+  const [logRaw, wdRaw] = await Promise.all([
+    readVaultFile("wiki/log.md"),
+    readVaultFile("wiki/state/watchdog.md"),
+  ]);
+  const watchdogState = watchdogStateFor(parseWatchdog(wdRaw), meta.key, meta.name);
   // Last ~200 log entries, newest first, filtered to this agent.
   const all = logRaw ? parseLog(logRaw).slice(-200).reverse() : [];
   const mine = all
@@ -782,7 +875,10 @@ async function agentDetail(key: string) {
 
   // Plain-English 3-liner the panel leads with: what / did last / happens next.
   const summary = {
-    what: meta.role,
+    what:
+      watchdogState && watchdogState !== "OK"
+        ? `${watchdogState} per the latest watchdog report. ${meta.role}`
+        : meta.role,
     last: activity.length
       ? `Last seen ${activity[0].date}: ${activity[0].title.slice(0, 90)}`
       : st?.lastRunAt || st?.lastRun
@@ -807,6 +903,7 @@ async function agentDetail(key: string) {
     scheduleHuman: isScheduled ? CRON_HUMAN[key] ?? meta.schedule : "Runs on demand, when Jack asks for it.",
     enabled: meta.enabled,
     status,
+    watchdogState,
     installed: present.size > 0 ? present.has(key) : null,
     lastRunAt: st?.lastRunAt ?? st?.lastRun ?? null,
     nextRunAt: nextAt ? nextAt.toISOString() : null,
@@ -829,14 +926,17 @@ export async function GET(req: NextRequest) {
 
   const cloud = isGithubVault();
 
-  const [logRaw, hotRaw, healthRaw, bizRaw, outreachRaw, repliesRaw] = await Promise.all([
+  const [logRaw, hotRaw, healthRaw, bizRaw, outreachRaw, repliesRaw, watchdogRaw] = await Promise.all([
     readVaultFile("wiki/log.md"),
     readVaultFile("wiki/hot.md"),
     readVaultFile("wiki/state/health-board.md"),
     readVaultFile("wiki/state/business-snapshot.md"),
     readVaultFile("wiki/state/outreach-snapshot.md"),
     readVaultFile("wiki/state/replies-inbox.md"),
+    readVaultFile("wiki/state/watchdog.md"),
   ]);
+
+  const watchdog = parseWatchdog(watchdogRaw);
 
   // Activity feed: last 50 entries, newest first
   const feed = logRaw ? parseLog(logRaw).slice(-50).reverse() : [];
@@ -865,6 +965,7 @@ export async function GET(req: NextRequest) {
       nextRunAt: nextAt ? nextAt.toISOString() : null,
       lastLogDate: mention?.date ?? null,
       lastLogLine: mention ? clean(mention.title) : null,
+      watchdogState: watchdogStateFor(watchdog, s.key, s.name),
     };
   });
 
@@ -883,6 +984,7 @@ export async function GET(req: NextRequest) {
       nextRunAt: null,
       lastLogDate: mention?.date ?? null,
       lastLogLine: mention ? clean(mention.title) : null,
+      watchdogState: watchdogStateFor(watchdog, c.key, c.name),
     };
   });
 
@@ -963,8 +1065,10 @@ export async function GET(req: NextRequest) {
       business: !!bizRaw,
       outreach: !!outreachRaw,
       scheduledDisk: localDiskOk,
+      watchdog: watchdog.available,
     },
     overall,
+    watchdog,
     agents: [...scheduledAgents, ...crewAgents],
     feed,
     focus,

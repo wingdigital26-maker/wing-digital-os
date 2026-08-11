@@ -5,7 +5,7 @@ import { motion, MotionConfig } from "motion/react";
 import { Bolt, Users, Cpu, Bulb, Plus, Calendar, Note, Sparkles } from "reicon-react";
 import { staggerContainer, riseItem, hoverSpring, cardHover, cardTap } from "./components/motion";
 import { Sparkline, Delta, buildDailySeries } from "./components/Charts";
-import { StatTiles, MissionPanels, MissionStyles, Selection, StatTile } from "./components/MissionControlCore";
+import { StatTiles, MissionPanels, MissionStyles, Selection, StatTile, WatchdogBanner, WatchdogData } from "./components/MissionControlCore";
 import { sfx } from "./lib/sounds";
 import SfxMuteButton from "./components/SfxMuteButton";
 
@@ -277,6 +277,7 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
   const [sentToday, setSentToday] = useState<number | null>(null);
   const [agentHealth, setAgentHealth] = useState<any[]>([]);
   const [missionStats, setMissionStats] = useState<{ tiles: StatTile[]; updated: string | null } | null>(null);
+  const [watchdog, setWatchdog] = useState<WatchdogData | null | undefined>(undefined);
   const [statSelection, setStatSelection] = useState<Selection>(null);
   const stats = data?.stats;
 
@@ -285,7 +286,10 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
   useEffect(() => {
     const load = () => fetch("/api/mission")
       .then(r => r.json())
-      .then(d => { if (d?.stats?.tiles) setMissionStats(d.stats); })
+      .then(d => {
+        if (d?.stats?.tiles) setMissionStats(d.stats);
+        setWatchdog(d?.watchdog ?? null);
+      })
       .catch(() => {});
     load();
     const id = setInterval(load, 5 * 60 * 1000);
@@ -408,6 +412,9 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
   return (
     <motion.div style={{ display: "flex", flexDirection: "column", gap: 24 }}
       variants={staggerContainer} initial="hidden" animate="show">
+      {/* Watchdog problems banner — always the very first thing on screen */}
+      {watchdog !== undefined && <WatchdogBanner watchdog={watchdog} />}
+
       {/* Toast */}
       {toast && (
         <div style={{ position: "fixed", bottom: 24, right: 24, background: "#4ade80", color: "#07080f", padding: "10px 18px", borderRadius: 10, fontWeight: 700, fontSize: 13, zIndex: 200 }}>

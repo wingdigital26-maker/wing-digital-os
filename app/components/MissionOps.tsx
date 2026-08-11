@@ -8,7 +8,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   MissionData, Selection, Dot, MissionStyles, OpsMap, AgentTile, FeedTicker,
-  MissionPanels, NextUpStrip,
+  MissionPanels, NextUpStrip, WatchdogBanner,
 } from "./MissionControlCore";
 
 export default function MissionOps() {
@@ -40,6 +40,9 @@ export default function MissionOps() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <MissionStyles />
+
+      {/* Watchdog problems banner — always the very first thing on screen */}
+      {data && <WatchdogBanner watchdog={data.watchdog} />}
 
       {/* header row */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>

@@ -5,7 +5,7 @@ import { motion, MotionConfig } from "motion/react";
 import { Bolt, Users, Cpu, Bulb, Plus, Calendar, Note, Sparkles } from "reicon-react";
 import { staggerContainer, riseItem, hoverSpring, cardHover, cardTap } from "./components/motion";
 import { Sparkline, Delta, buildDailySeries } from "./components/Charts";
-import { StatTiles, MissionPanels, MissionStyles, Selection, StatTile, WatchdogBanner, WatchdogData } from "./components/MissionControlCore";
+import { StatTiles, MissionPanels, MissionStyles, Selection, StatTile, WatchdogBanner, WatchdogData, MissionData } from "./components/MissionControlCore";
 import { sfx } from "./lib/sounds";
 import SfxMuteButton from "./components/SfxMuteButton";
 
@@ -60,6 +60,38 @@ export default function Home() {
   const [newLeadCount, setNewLeadCount] = useState(0);
   const prevLeadCount = useRef(0);
 
+  // ── Pull-to-refresh (phone only, Command + Mission views) ───────────────
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const pullStart = useRef<number | null>(null);
+  const [pullY, setPullY] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const PTR_MAX = 90, PTR_TRIGGER = 64;
+  const ptrEligible = () => (active === "command" || active === "agent" || active === "personal");
+  const onTouchStart = (e: React.TouchEvent) => {
+    const el = scrollRef.current;
+    if (!el || refreshing || !ptrEligible() || el.scrollTop > 2) { pullStart.current = null; return; }
+    pullStart.current = e.touches[0].clientY;
+  };
+  const onTouchMove = (e: React.TouchEvent) => {
+    if (pullStart.current == null) return;
+    const dy = e.touches[0].clientY - pullStart.current;
+    if (dy <= 0) { setPullY(0); return; }
+    // resistance curve so it feels rubbery, not linear
+    setPullY(Math.min(PTR_MAX, dy * 0.5));
+  };
+  const onTouchEnd = () => {
+    if (pullStart.current == null) return;
+    pullStart.current = null;
+    if (pullY >= PTR_TRIGGER) {
+      setRefreshing(true);
+      sfx.play("nav");
+      try { fetchGhl(); } catch { /* noop */ }
+      window.dispatchEvent(new CustomEvent("os:pull-refresh"));
+      setTimeout(() => setRefreshing(false), 900);
+    }
+    setPullY(0);
+  };
+
   // Panels (e.g. the Active Clients stat breakdown) can ask the shell to jump
   // to a section: window.dispatchEvent(new CustomEvent("os:navigate", { detail: "clients" })).
   useEffect(() => {
@@ -105,10 +137,10 @@ export default function Home() {
 
   return (
     <MotionConfig reducedMotion="user">
-    <div style={{ display: "flex", height: "100vh", background: "var(--bg-primary)" }}>
+    <div className="app-shell" style={{ display: "flex", height: "100vh", background: "var(--bg-primary)" }}>
 
-      {/* Sidebar */}
-      <aside style={{
+      {/* Sidebar (desktop side rail; hidden on phone in favor of the bottom tab bar) */}
+      <aside className="app-sidebar" style={{
         width: sidebarOpen ? 220 : 60,
         background: "var(--bg-secondary)",
         borderRight: "1px solid var(--border)",
@@ -192,8 +224,8 @@ export default function Home() {
       </aside>
 
       {/* Main */}
-      <main style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        <header style={{
+      <main className="app-main" style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <header className="app-header" style={{
           padding: "16px 24px", borderBottom: "1px solid var(--border)",
           display: "flex", alignItems: "center", justifyContent: "space-between",
           background: "var(--bg-secondary)", flexShrink: 0,
@@ -210,7 +242,7 @@ export default function Home() {
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <SfxMuteButton />
             <Search onOpenNote={handleSearchOpenNote} />
-            <div style={{
+            <div className="header-avatar" style={{
               width: 34, height: 34, borderRadius: "50%",
               background: "linear-gradient(135deg, #22d3ee, #0e7490)",
               display: "flex", alignItems: "center", justifyContent: "center",
@@ -240,11 +272,24 @@ export default function Home() {
           </div>
         )}
 
-        <div style={{ flex: 1, overflow: "auto", padding: "24px" }}>
+        <div
+          ref={scrollRef}
+          className="app-scroll"
+          style={{ flex: 1, overflow: "auto", padding: "24px" }}
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+        >
+          {/* Pull-to-refresh spinner (phone) */}
+          <div className={`ptr-indicator${refreshing ? " spinning" : ""}`} aria-hidden="true"
+            style={{ height: refreshing ? 44 : pullY, opacity: refreshing ? 1 : Math.min(1, pullY / 64) }}>
+            <span className="ptr-spinner" style={{ transform: `rotate(${pullY * 3}deg)` }} />
+            <span className="ptr-text">{refreshing ? "Refreshing" : pullY >= 64 ? "Release to refresh" : "Pull to refresh"}</span>
+          </div>
           {/* CSS-only section transition: the new view mounts IMMEDIATELY
               (no JS-gated exit animation that can stall in background tabs). */}
           <style>{`@keyframes viewIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }`}</style>
-          <div key={active} style={{ animation: "viewIn 0.25s ease-out" }}>
+          <div key={active} className="app-view" style={{ animation: "viewIn 0.25s ease-out" }}>
               {active === "command" && <CommandCenter data={ghlData} loading={loading} onSendToAI={sendToAI} />}
               {active === "clients" && <ClientsBoard />}
               {active === "competitors" && <CompetitorIntel onSendToAI={sendToAI} />}
@@ -255,8 +300,125 @@ export default function Home() {
           </div>
         </div>
       </main>
+
+      {/* Mobile bottom tab bar — primary nav on phone, replaces the side rail */}
+      <MobileNav active={active} onNavigate={(id) => {
+        sfx.play("nav");
+        setActive(id);
+        if (groupOf(id).id === "command") setNewLeadCount(0);
+      }} newLeadCount={newLeadCount} />
+
+      {/* Global Da Boss status — visible on every section, like Jarvis */}
+      <GlobalDaBoss />
     </div>
     </MotionConfig>
+  );
+}
+
+// Fixed bottom tab bar shown only on phone (see .mobile-nav in globals.css).
+// Icons + short labels for the core sections plus Jarvis, with active highlight,
+// safe-area padding for the home indicator, and the nav tick sfx on change.
+function MobileNav({ active, onNavigate, newLeadCount }: {
+  active: string; onNavigate: (id: string) => void; newLeadCount: number;
+}) {
+  const activeGroup = groupOf(active).id;
+  const tabs: { id: string; label: string; icon: IconType; group: string; badge?: number }[] = [
+    { id: "command", label: "Command", icon: Bolt, group: "command", badge: newLeadCount },
+    { id: "agent", label: "Mission", icon: Cpu, group: "agent" },
+    { id: "knowledge", label: "Vault", icon: Bulb, group: "intel" },
+    { id: "clients", label: "Clients", icon: Users, group: "clients" },
+  ];
+  return (
+    <nav className="mobile-nav" aria-label="Primary">
+      {tabs.map(t => {
+        const on = activeGroup === t.group;
+        return (
+          <button key={t.id} className={`mobile-nav-btn${on ? " on" : ""}`} onClick={() => onNavigate(t.id)}>
+            <span className="mobile-nav-ico">
+              <t.icon size={21} />
+              {!!t.badge && t.badge > 0 && <span className="mobile-nav-badge">{t.badge}</span>}
+            </span>
+            <span>{t.label}</span>
+          </button>
+        );
+      })}
+      <button className="mobile-nav-btn jarvis" onClick={() => { sfx.play("nav"); window.dispatchEvent(new CustomEvent("jarvis:open")); }}>
+        <span className="mobile-nav-ico"><Sparkles size={21} /></span>
+        <span>Jarvis</span>
+      </button>
+    </nav>
+  );
+}
+
+// Persistent, app-wide Da Boss status chip. Reads /api/mission (same payload
+// Mission Control uses), shows blue=clear / red=problems / amber=stale, and
+// taps open the full WatchdogPanel (portaled bottom sheet) from anywhere.
+function GlobalDaBoss() {
+  const [data, setData] = useState<MissionData | null>(null);
+  const [sel, setSel] = useState<Selection>(null);
+  const load = useCallback(async () => {
+    try {
+      const r = await fetch("/api/mission", { cache: "no-store" });
+      if (r.ok) setData(await r.json());
+    } catch { /* stay quiet; chip just shows last-known */ }
+  }, []);
+  useEffect(() => {
+    load();
+    const id = setInterval(load, 60 * 1000);
+    const onPull = () => load();
+    window.addEventListener("os:pull-refresh", onPull);
+    return () => { clearInterval(id); window.removeEventListener("os:pull-refresh", onPull); };
+  }, [load]);
+
+  const wd = data?.watchdog;
+  const count = wd ? Math.max(wd.problemCount ?? 0, wd.problems?.length ?? 0) : 0;
+  const hasProblems = !!wd && (wd.overall === "problems" || count > 0);
+  // stale = older than 3h (watchdog runs every 2h)
+  let stale = false;
+  if (wd?.updated) {
+    const ageMin = (Date.now() - new Date(wd.updated).getTime()) / 60000;
+    stale = ageMin > 180;
+  }
+  const state = hasProblems ? "red" : stale ? "amber" : "blue";
+  const color = state === "red" ? "#f87171" : state === "amber" ? "#fb923c" : "#60a5fa";
+  const label = state === "red" ? `${count} problem${count === 1 ? "" : "s"}` : state === "amber" ? "late" : "all clear";
+
+  return (
+    <>
+      <button
+        className={`daboss-chip${state === "red" ? " alert" : ""}`}
+        onClick={() => { sfx.play("blip-watchdog"); setSel({ type: "watchdog" }); }}
+        aria-label={`Da Boss: ${label}. Open report.`}
+        title={`Da Boss: ${label}`}
+        style={{
+          position: "fixed", zIndex: 9997,
+          display: "inline-flex", alignItems: "center", gap: 7,
+          padding: "8px 12px", minHeight: 40, borderRadius: 999,
+          border: `1px solid ${color}`, background: "rgba(9,11,20,0.82)",
+          backdropFilter: "blur(10px)", color, cursor: "pointer",
+          fontSize: 12, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace",
+          boxShadow: `0 4px 18px ${color}33`,
+          transition: "none", // color must reflect state instantly (a transition gets stuck under re-render)
+        }}
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+        </svg>
+        <span className="daboss-dot" style={{ width: 7, height: 7, borderRadius: "50%", background: color, boxShadow: `0 0 8px ${color}` }} />
+        <span>{label}</span>
+      </button>
+      <style>{`
+        /* Desktop: bottom-left corner (opposite the bottom-right Jarvis FAB) */
+        .daboss-chip { bottom: 22px; left: 22px; }
+        .daboss-chip.alert { animation: dabossPulse 1.8s ease-in-out infinite; }
+        @keyframes dabossPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(248,113,113,0.5); } 50% { box-shadow: 0 0 0 8px rgba(248,113,113,0); } }
+        /* Phone: top-right status area, clear of the bottom tab bar + Jarvis */
+        @media (max-width: 768px) {
+          .daboss-chip { top: calc(env(safe-area-inset-top, 0px) + 10px); right: 12px; bottom: auto; left: auto; padding: 6px 10px !important; font-size: 11px !important; }
+        }
+      `}</style>
+      {sel && <MissionPanels selection={sel} data={data} onSelect={setSel} onRechecked={load} />}
+    </>
   );
 }
 
@@ -1264,9 +1426,18 @@ function KnowledgeBase({ initialPath, onSendToAI }: { initialPath?: string; onSe
   const [treeOpen, setTreeOpen] = useState<boolean>(() => {
     try { return window.localStorage.getItem(LS_PANEL) !== "0"; } catch { return true; }
   });
+  const [isPhone, setIsPhone] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 768px)");
+    const on = () => setIsPhone(mq.matches);
+    on(); mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
 
   useEffect(() => {
     fetch("/api/vault").then(r => r.json()).then(d => setTree(d.tree ?? []));
+    // On phone the graph should own the full width by default; tree opens as a drawer.
+    try { if (window.matchMedia("(max-width: 768px)").matches) setTreeOpen(false); } catch { /* noop */ }
   }, []);
 
   const togglePanel = () => {
@@ -1379,10 +1550,21 @@ function KnowledgeBase({ initialPath, onSendToAI }: { initialPath?: string; onSe
   }
 
   return (
-    <div style={{ position: "relative", display: "flex", height: "calc(100vh - 130px)", margin: "-24px", overflow: "hidden" }}>
+    <div className={`kb-root${treeOpen ? " tree-open" : ""}`} style={{ position: "relative", display: "flex", height: "calc(100vh - 130px)", margin: "-24px", overflow: "hidden" }}>
 
-      {/* Left: File tree (collapsible panel) */}
-      <div style={{
+      {/* Left: File tree (collapsible panel on desktop; a slide-in drawer on phone).
+          On phone the drawer is positioned with inline styles (React-owned) to
+          avoid a stylesheet cascade quirk, and overlays the graph instead of
+          squeezing it. */}
+      <div className={`kb-tree${isPhone && treeOpen ? " kb-drawer-in" : ""}`} style={isPhone ? {
+        position: "absolute", top: 0, bottom: 0, left: 0, zIndex: 40,
+        width: "82vw", maxWidth: 300,
+        transform: treeOpen ? "translateX(0)" : "translateX(-102%)",
+        transition: "none",
+        borderRight: "1px solid rgba(255,255,255,0.06)",
+        overflow: "hidden", background: "rgba(9,11,20,0.96)", backdropFilter: "blur(12px)",
+        boxShadow: treeOpen ? "8px 0 30px rgba(0,0,0,0.5)" : "none",
+      } : {
         width: treeOpen ? 230 : 0, flexShrink: 0,
         borderRight: treeOpen ? "1px solid rgba(255,255,255,0.05)" : "none",
         overflow: "hidden", background: "rgba(11,13,23,0.6)", backdropFilter: "blur(10px)",
@@ -1418,8 +1600,8 @@ function KnowledgeBase({ initialPath, onSendToAI }: { initialPath?: string; onSe
         </button>
       )}
 
-      {/* Middle: Graph always visible */}
-      <div style={{ flex: 1, position: "relative", minWidth: 0 }}>
+      {/* Middle: Graph always visible (full width on phone; tree opens over it) */}
+      <div className="kb-graph" style={{ flex: 1, position: "relative", minWidth: 0 }}>
         <VaultGraph onSelectNode={(p) => openFile(p)} />
       </div>
 

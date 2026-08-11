@@ -32,7 +32,10 @@ export default function MissionOps() {
     aliveRef.current = true;
     load();
     const poll = setInterval(load, 30_000);
-    return () => { aliveRef.current = false; clearInterval(poll); };
+    // Pull-to-refresh (phone) dispatches this to re-fetch /api/mission.
+    const onPull = () => load();
+    window.addEventListener("os:pull-refresh", onPull);
+    return () => { aliveRef.current = false; clearInterval(poll); window.removeEventListener("os:pull-refresh", onPull); };
   }, [load]);
 
   const scheduled = useMemo(() => data?.agents.filter(a => a.kind === "scheduled") ?? [], [data]);
@@ -84,7 +87,7 @@ export default function MissionOps() {
           {/* Ops map: click an agent or system for its detail panel */}
           <OpsMap agents={data.agents} volumes={data.volumes} watchdog={data.watchdog} onSelect={setSelection} />
 
-          <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.6fr) minmax(280px, 1fr)", gap: 20, alignItems: "start" }}>
+          <div className="mission-ops-grid" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.6fr) minmax(280px, 1fr)", gap: 20, alignItems: "start" }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 20, minWidth: 0 }}>
               <section>
                 <h2 style={{ fontSize: 11, letterSpacing: "0.14em", color: "var(--text-muted)", marginBottom: 8 }}>SCHEDULED AGENTS</h2>

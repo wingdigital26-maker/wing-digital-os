@@ -7,7 +7,13 @@
 // Everything here is read-only.
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { sfx } from "../lib/sounds";
+
+// Da Boss healthy / all-clear accent: a calm blue (not green). Red stays for
+// problems, amber for the stale/late state.
+const BOSS_CLEAR = "#60a5fa";
+const BOSS_CLEAR_RGB = "96, 165, 250";
 
 // ── types (mirror of /api/mission payload) ─────────────────────────────────
 export interface AgentCard {
@@ -400,18 +406,18 @@ export function OpsMap({ agents, volumes, watchdog, onSelect }: {
   if (hover?.kind === "watchdog") for (const a of implicated) hoverAgents.add(a.key);
   const hovering = hover !== null;
   const wdProblems = !!watchdog && (watchdog.overall === "problems" || Math.max(watchdog.problemCount, watchdog.problems.length) > 0);
-  const wdColor = wdProblems ? "#f87171" : "#34d399";
+  const wdColor = wdProblems ? "#f87171" : BOSS_CLEAR;
   const wdX = W / 2, wdY = -TOP + 44;
   // Boss orb is 1.5x an agent node (agent r=21 -> 31.5), glow kept proportional.
   const wdR = 31.5;
 
   return (
-    <div style={{
+    <div className="mo-map" style={{
       background: "linear-gradient(180deg, var(--bg-card, #0d1117), rgba(10,12,20,0.9))",
       border: "1px solid var(--border, rgba(255,255,255,0.08))",
-      borderRadius: 14, padding: 8, overflowX: "auto",
+      borderRadius: 14, padding: 8, overflowX: "auto", WebkitOverflowScrolling: "touch",
     }}>
-      <svg viewBox={`0 ${-TOP} ${W} ${H + TOP}`} style={{ width: "100%", minWidth: 680, display: "block" }}>
+      <svg className="mo-map-svg" viewBox={`0 ${-TOP} ${W} ${H + TOP}`} style={{ width: "100%", minWidth: 680, display: "block" }}>
         <defs>
           <radialGradient id="mo-glow" cx="50%" cy="50%" r="50%">
             <stop offset="0%" stopColor="rgba(34,211,238,0.25)" />
@@ -924,6 +930,95 @@ export function RecheckButton({ onRechecked, compact }: { onRechecked?: () => vo
   );
 }
 
+// ── "Run Da Boss": one big finger-friendly tap = full patrol (target "all") ──
+// Surfaces the exact same POST /api/boss/recheck {target:"all"} the granular
+// RecheckButton runs, as a prominent control. Honest about persisted:false.
+export function RunDaBossButton({ onRechecked, block }: { onRechecked?: () => void; block?: boolean }) {
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<RecheckResult | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const mono = "'JetBrains Mono', monospace";
+
+  const run = async () => {
+    if (busy) return;
+    setBusy(true);
+    setErr(null);
+    sfx.play("blip-watchdog"); // watchdog tone on start
+    try {
+      const res = await fetch("/api/boss/recheck", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target: "all" }), cache: "no-store",
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const j: RecheckResult = await res.json();
+      setResult(j);
+      if ((j.resolvedCount ?? 0) > 0) sfx.play("chime"); // positive chime only if something got fixed
+      onRechecked?.(); // refresh banner, agent states, ops-map red lines from the newly written report
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "run failed");
+      sfx.play("blip-watchdog");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const problems = result
+    ? result.checks.reduce((n, c) => n + ((c.items ?? []).filter(i => i.status === "problem").length || (c.status === "problem" ? 1 : 0)), 0)
+    : 0;
+  const persisted = !!result?.persisted;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8, width: block ? "100%" : undefined }}
+      onClick={(e) => e.stopPropagation()}>
+      <button
+        onClick={run}
+        disabled={busy}
+        aria-label="Run Da Boss - full patrol now"
+        style={{
+          display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 9,
+          minHeight: 44, padding: "0 18px", width: block ? "100%" : undefined,
+          borderRadius: 12, cursor: busy ? "wait" : "pointer",
+          border: "1px solid var(--accent, #22d3ee)",
+          background: busy ? "rgba(34,211,238,0.10)" : "linear-gradient(135deg, rgba(34,211,238,0.22), rgba(167,139,250,0.18))",
+          color: "var(--accent, #22d3ee)", fontFamily: mono, fontSize: 13, fontWeight: 700, letterSpacing: "0.06em",
+          boxShadow: busy ? "none" : "0 4px 18px rgba(34,211,238,0.18)",
+        }}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+          strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
+          style={busy ? { animation: "recheckSpin 0.8s linear infinite" } : undefined}>
+          {busy
+            ? <><path d="M21 12a9 9 0 1 1-2.64-6.36" /><path d="M21 3v6h-6" /></>
+            : <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />}
+        </svg>
+        {busy ? "Da Boss is checking..." : "Run Da Boss"}
+      </button>
+      <style>{`@keyframes recheckSpin { to { transform: rotate(360deg); } }`}</style>
+
+      {err && <div style={{ fontSize: 11, color: "#f87171", fontFamily: mono }}>Da Boss run failed: {err}</div>}
+
+      {result && !busy && (
+        <div style={{
+          border: `1px solid ${statusColor(result.overall)}55`, borderRadius: 10, padding: "9px 11px",
+          background: "rgba(255,255,255,0.02)", display: "flex", flexDirection: "column", gap: 5,
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11.5, fontFamily: mono, color: statusColor(result.overall) }}>
+            <StatusMark status={result.overall} />
+            <span style={{ fontWeight: 700, letterSpacing: "0.06em" }}>
+              {problems} problem{problems === 1 ? "" : "s"}
+              {(result.resolvedCount ?? 0) > 0 ? `, ${result.resolvedCount} resolved this run` : ""}
+            </span>
+          </div>
+          <div style={{ fontSize: 10.5, fontFamily: mono, color: persisted ? "#34d399" : "#93a4b8" }}>
+            {persisted
+              ? `Report updated${result.mode === "cloud-github" ? " (cloud)" : result.pushedToCloud ? " (synced)" : ""}`
+              : "Live check only, report not updated - needs PC"}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function WatchdogBanner({ watchdog, onRechecked }: { watchdog?: WatchdogData | null; onRechecked?: () => void }) {
   const [expanded, setExpanded] = useState<boolean | null>(null);
   const mono = "'JetBrains Mono', monospace";
@@ -946,6 +1041,7 @@ export function WatchdogBanner({ watchdog, onRechecked }: { watchdog?: WatchdogD
             <RecheckButton onRechecked={onRechecked} compact />
           </span>
         </div>
+        <RunDaBossButton onRechecked={onRechecked} block />
       </div>
     );
   }
@@ -959,17 +1055,18 @@ export function WatchdogBanner({ watchdog, onRechecked }: { watchdog?: WatchdogD
   // All clear and fresh: green quiet strip.
   if (!hasProblems && !stale) {
     return (
-      <div style={{ ...base, border: "1px solid rgba(52,211,153,0.35)", background: "rgba(52,211,153,0.06)" }}>
+      <div style={{ ...base, border: `1px solid rgba(${BOSS_CLEAR_RGB},0.35)`, background: `rgba(${BOSS_CLEAR_RGB},0.06)` }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <Dot color="#34d399" />
-          <span style={{ fontSize: 11, letterSpacing: "0.1em", color: "#34d399" }}>
+          <Dot color={BOSS_CLEAR} />
+          <span style={{ fontSize: 11, letterSpacing: "0.1em", color: BOSS_CLEAR }}>
             ALL SYSTEMS REPORTING - Da Boss checked {relAge(ageMin)}
           </span>
           <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "flex-start", gap: 8 }}>
             <RecheckButton onRechecked={onRechecked} compact />
-            <WatchdogCopyButton watchdog={watchdog} color="#34d399" />
+            <WatchdogCopyButton watchdog={watchdog} color={BOSS_CLEAR} />
           </span>
         </div>
+        <RunDaBossButton onRechecked={onRechecked} block />
       </div>
     );
   }
@@ -1011,6 +1108,9 @@ export function WatchdogBanner({ watchdog, onRechecked }: { watchdog?: WatchdogD
           </span>
         </span>
       </div>
+
+      {/* One-tap full patrol, front and center when there are problems */}
+      <RunDaBossButton onRechecked={onRechecked} block />
 
       {/* collapsed: count + worst (first) problem line */}
       {hasProblems && !isOpen && problems.length > 0 && (
@@ -1283,8 +1383,10 @@ function SlideOver({ title, accent, onClose, children }: {
 }) {
   // Panel open whoosh once on mount; close plays a fall.
   useEffect(() => { sfx.play("open"); }, []);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
   const close = () => { sfx.play("close"); onClose(); };
-  return (
+  const overlay = (
     <div style={{ position: "fixed", inset: 0, zIndex: 200 }}>
       <div onClick={close} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)" }} />
       <div className="mo-panel" style={{
@@ -1295,18 +1397,27 @@ function SlideOver({ title, accent, onClose, children }: {
         boxShadow: "-12px 0 40px rgba(0,0,0,0.5)",
         display: "flex", flexDirection: "column",
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 18px", borderBottom: "1px solid var(--border, rgba(255,255,255,0.08))" }}>
+        {/* tap-close handle target (styled as a grab handle on the phone bottom sheet) */}
+        <div className="mo-panel-close" onClick={close} aria-label="Close panel" style={{
+          display: "flex", alignItems: "center", gap: 10, padding: "14px 18px",
+          borderBottom: "1px solid var(--border, rgba(255,255,255,0.08))", cursor: "pointer",
+        }}>
           <Dot color={accent} pulse />
           <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.1em", fontFamily: "'JetBrains Mono', monospace" }}>{title}</span>
           <button onClick={close} style={{
             marginLeft: "auto", background: "none", border: "1px solid var(--border, rgba(255,255,255,0.15))",
-            color: "var(--text-secondary, #9ca3af)", borderRadius: 8, padding: "4px 10px", cursor: "pointer", fontSize: 12,
+            color: "var(--text-secondary, #9ca3af)", borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontSize: 12,
           }}>Close</button>
         </div>
-        <div style={{ overflowY: "auto", padding: "16px 18px", flex: 1 }}>{children}</div>
+        <div style={{ overflowY: "auto", WebkitOverflowScrolling: "touch", padding: "16px 18px", flex: 1 }}>{children}</div>
       </div>
     </div>
   );
+  // Portal to <body> so the fixed overlay escapes any transformed ancestor
+  // (the view-transition animations create a containing block that would
+  // otherwise trap position:fixed and stop the phone bottom sheet from
+  // spanning full width).
+  return mounted ? createPortal(overlay, document.body) : null;
 }
 
 // Collapsible section used inside panels: keeps detail tucked away by default.
@@ -1752,9 +1863,11 @@ export function SchedulerCalendar({ agents, onSelect }: { agents: AgentCard[]; o
     .sort((a, b) => a.sortMin - b.sortMin);
 
   return (
-    <div>
-      {/* week grid: days as columns, runs as chips/bands at their time slot */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
+    <div className="mo-cal">
+      {/* week grid: days as columns, runs as chips/bands at their time slot.
+          On phone this scrolls horizontally inside its own container so it never
+          pushes the page wide (see .mo-cal in globals.css). */}
+      <div className="mo-cal-grid" style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
         {DAY_LABELS.map((dl, di) => (
           <div key={dl}>
             <div style={{
@@ -1991,10 +2104,14 @@ export function ClientPanel({ name, data, onClose }: { name: string; data: Missi
 // ── Watchdog report panel (opened from the overseer node on the map) ───────
 function WatchdogPanel({ watchdog, onClose, onRechecked }: { watchdog?: WatchdogData | null; onClose: () => void; onRechecked?: () => void }) {
   const hasProblems = !!watchdog && (watchdog.overall === "problems" || Math.max(watchdog.problemCount, watchdog.problems.length) > 0);
-  const accent = hasProblems ? "#f87171" : "#34d399";
+  const accent = hasProblems ? "#f87171" : BOSS_CLEAR;
   const ageMin = watchdog ? watchdogAgeMin(watchdog.updated) : null;
   return (
     <SlideOver title="DA BOSS" accent={accent} onClose={onClose}>
+      {/* One-tap full patrol at the top of the report; granular Recheck stays below */}
+      <div style={{ marginBottom: 10 }}>
+        <RunDaBossButton onRechecked={onRechecked} block />
+      </div>
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 4 }}>
         <RecheckButton onRechecked={onRechecked} />
       </div>

@@ -400,6 +400,7 @@ export default function JarvisButton() {
 
       {/* Floating trigger button */}
       <button
+        className="jarvis-fab"
         onClick={() => setOpen((o) => { sfx.play(o ? "close" : "chime"); return !o; })}
         title="Jarvis AI"
         style={{
@@ -442,6 +443,7 @@ export default function JarvisButton() {
       {/* Chat panel */}
       {open && (
         <div
+          className="jarvis-panel"
           style={{
             position: "fixed",
             bottom: 92,

@@ -55,7 +55,7 @@ export default function MissionControl() {
   const crew = useMemo(() => data?.agents.filter((a) => a.kind === "crew") ?? [], [data]);
 
   return (
-    <div style={{ height: "100vh", overflowY: "auto", padding: "18px 22px 40px" }}>
+    <div className="mission-page" style={{ height: "100vh", overflowY: "auto", padding: "18px 22px 40px" }}>
       <MissionStyles />
       {/* Watchdog problems banner — always the very first thing on screen */}
       {data && (
@@ -117,7 +117,7 @@ export default function MissionControl() {
           </div>
 
           {/* Main grid: agents + focus | feed */}
-          <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.6fr) minmax(300px, 1fr)", gap: 16, alignItems: "start" }}>
+          <div className="mission-ops-grid" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.6fr) minmax(300px, 1fr)", gap: 16, alignItems: "start" }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 20, minWidth: 0 }}>
               <section>
                 <h2 style={{ fontSize: 11, letterSpacing: "0.14em", color: "var(--text-muted)", marginBottom: 8 }}>SCHEDULED AGENTS</h2>

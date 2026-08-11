@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import JarvisButton from "./components/JarvisButton";
 import SwRegister from "./components/SwRegister";
@@ -6,6 +6,16 @@ import SwRegister from "./components/SwRegister";
 export const metadata: Metadata = {
   title: "Wing Digital OS",
   description: "Wing Digital Operating System",
+};
+
+// viewport-fit=cover lets env(safe-area-inset-*) resolve to real notch/home-indicator
+// insets when installed as a PWA. maximumScale is left open so pinch-zoom still works
+// on the ops map / vault graph.
+export const viewport: Viewport = {
+  themeColor: "#0a0a0a",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

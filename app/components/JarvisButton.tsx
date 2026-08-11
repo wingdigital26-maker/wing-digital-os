@@ -475,9 +475,17 @@ export default function JarvisButton() {
                 Jarvis
               </span>
               {speaking && (
-                <span
-                  title="Jarvis is speaking"
-                  style={{ display: "inline-flex", alignItems: "center", gap: 3 }}
+                /* The equalizer doubles as the stop button: click to cut the
+                   current audio (ElevenLabs + speechSynthesis). Voice stays on
+                   for the next reply. */
+                <button
+                  onClick={stopAudio}
+                  title="Stop speaking"
+                  style={{
+                    display: "inline-flex", alignItems: "center", gap: 4,
+                    background: "rgba(16,192,240,0.12)", border: "1px solid rgba(16,192,240,0.4)",
+                    borderRadius: 6, padding: "2px 7px", cursor: "pointer",
+                  }}
                 >
                   {[0, 1, 2].map((n) => (
                     <span key={n} className="jarvis-dot" style={{
@@ -487,7 +495,10 @@ export default function JarvisButton() {
                       animationDelay: `${n * 0.15}s`,
                     }} />
                   ))}
-                </span>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="#10C0F0" style={{ marginLeft: 2 }}>
+                    <rect x="4" y="4" width="16" height="16" rx="2"/>
+                  </svg>
+                </button>
               )}
               {engine && (
                 <span style={{ color: engine === "limited" ? "#fb923c" : "#556", fontSize: 10, fontFamily: "Inter, sans-serif", border: `1px solid ${engine === "limited" ? "rgba(251,146,60,0.4)" : "rgba(16,192,240,0.2)"}`, borderRadius: 6, padding: "1px 6px" }}>
@@ -535,6 +546,18 @@ export default function JarvisButton() {
                 Ask Jarvis anything about Wing Digital OS...
               </div>
             )}
+            {messages.length === 0 && (
+              /* Quick-ask chips: one tap fires a common question at Jarvis. */
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, justifyContent: "center", marginTop: 8 }}>
+                {["What ran today?", "How's outreach?", "Any red flags?", "When do things run?"].map((q) => (
+                  <button key={q} onClick={() => sendMessageRef.current(q)} style={{
+                    background: "rgba(16,192,240,0.08)", border: "1px solid rgba(16,192,240,0.25)",
+                    borderRadius: 99, color: "#8ab", cursor: "pointer", fontSize: 11,
+                    padding: "4px 10px", fontFamily: "Inter, sans-serif",
+                  }}>{q}</button>
+                ))}
+              </div>
+            )}
             {messages.map((msg, i) => (
               <div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>
                 <div style={{
@@ -571,6 +594,20 @@ export default function JarvisButton() {
                 </div>
               </div>
             ))}
+            {speaking && (
+              /* Small stop control next to the reply being read aloud. */
+              <div style={{ display: "flex", justifyContent: "flex-start" }}>
+                <button onClick={stopAudio} title="Stop reading this reply" style={{
+                  display: "inline-flex", alignItems: "center", gap: 5,
+                  background: "none", border: "1px solid rgba(16,192,240,0.3)", borderRadius: 99,
+                  color: "#10C0F0", cursor: "pointer", fontSize: 10, padding: "2px 9px",
+                  fontFamily: "Inter, sans-serif",
+                }}>
+                  <svg width="8" height="8" viewBox="0 0 24 24" fill="#10C0F0"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+                  stop voice
+                </button>
+              </div>
+            )}
             <div ref={messagesEndRef}/>
           </div>
 

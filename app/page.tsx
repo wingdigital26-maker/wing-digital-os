@@ -5,6 +5,7 @@ import { motion, MotionConfig } from "motion/react";
 import { Bolt, Users, Cpu, Bulb, Plus, Calendar, Note, Sparkles } from "reicon-react";
 import { staggerContainer, riseItem, hoverSpring, cardHover, cardTap } from "./components/motion";
 import { Sparkline, Delta, buildDailySeries } from "./components/Charts";
+import { StatTiles, MissionPanels, MissionStyles, Selection, StatTile } from "./components/MissionControlCore";
 
 type IconType = React.ComponentType<{ size?: number; color?: string }>;
 
@@ -56,6 +57,17 @@ export default function Home() {
   const [openNotePath, setOpenNotePath] = useState<string | undefined>();
   const [newLeadCount, setNewLeadCount] = useState(0);
   const prevLeadCount = useRef(0);
+
+  // Panels (e.g. the Active Clients stat breakdown) can ask the shell to jump
+  // to a section: window.dispatchEvent(new CustomEvent("os:navigate", { detail: "clients" })).
+  useEffect(() => {
+    const onNav = (e: Event) => {
+      const id = (e as CustomEvent).detail;
+      if (typeof id === "string" && NAV.some(g => g.subs.some(s => s.id === id))) setActive(id);
+    };
+    window.addEventListener("os:navigate", onNav);
+    return () => window.removeEventListener("os:navigate", onNav);
+  }, []);
 
   function handleSearchOpenNote(path: string) {
     setActive("knowledge");
@@ -260,7 +272,8 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
   const [camp, setCamp] = useState<any>(null);
   const [sentToday, setSentToday] = useState<number | null>(null);
   const [agentHealth, setAgentHealth] = useState<any[]>([]);
-  const [missionStats, setMissionStats] = useState<{ tiles: { label: string; value: string; sub: string | null }[]; updated: string | null } | null>(null);
+  const [missionStats, setMissionStats] = useState<{ tiles: StatTile[]; updated: string | null } | null>(null);
+  const [statSelection, setStatSelection] = useState<Selection>(null);
   const stats = data?.stats;
 
   // Command Center absorbs the mission stats row (MRR, active clients,
@@ -518,21 +531,14 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
         </motion.div>
       )}
 
-      {/* Mission stats row — the essential numbers, no filters, no config */}
+      {/* Mission stats row — every tile clicks through to its breakdown panel */}
       {missionStats && missionStats.tiles.length > 0 && (
-        <motion.div variants={riseItem} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
-          {missionStats.tiles.map(t => (
-            <div key={t.label} style={{
-              background: "linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))",
-              border: "1px solid var(--border)", borderRadius: 14, padding: "14px 18px",
-            }}>
-              <div style={{ fontSize: 10, letterSpacing: "0.12em", color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 700 }}>{t.label}</div>
-              <div style={{ fontSize: 28, fontWeight: 800, color: "var(--text-primary)", fontFamily: "'Space Grotesk', sans-serif", marginTop: 4 }}>{t.value}</div>
-              {t.sub && <div style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 2 }}>{t.sub}</div>}
-            </div>
-          ))}
+        <motion.div variants={riseItem}>
+          <MissionStyles />
+          <StatTiles tiles={missionStats.tiles} onSelect={setStatSelection} />
         </motion.div>
       )}
+      <MissionPanels selection={statSelection} data={null} onSelect={setStatSelection} />
 
       {/* Dispatch agent briefing */}
       {brief && (

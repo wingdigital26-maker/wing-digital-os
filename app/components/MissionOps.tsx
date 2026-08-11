@@ -8,7 +8,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   MissionData, Selection, Dot, MissionStyles, OpsMap, AgentTile, FeedTicker,
-  MissionPanels,
+  MissionPanels, NextUpStrip,
 } from "./MissionControlCore";
 
 export default function MissionOps() {
@@ -73,6 +73,9 @@ export default function MissionOps() {
 
       {data && (
         <>
+          {/* What fires in the next 24 hours, in order */}
+          <NextUpStrip agents={data.agents} onSelect={setSelection} />
+
           {/* Ops map: click an agent or system for its detail panel */}
           <OpsMap agents={data.agents} volumes={data.volumes} onSelect={setSelection} />
 

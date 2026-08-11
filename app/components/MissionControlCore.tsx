@@ -31,7 +31,16 @@ export interface ClientHealth {
   pillars: string[];
   redFlags: { text: string; link: string | null }[];
 }
-export interface StatTile { label: string; value: string; sub: string | null }
+export interface StatTile { key: string; label: string; value: string; sub: string | null; updated: string | null }
+export interface StatDetail {
+  id: string;
+  title: string;
+  updated: string | null;
+  available: boolean;
+  summary: string[];
+  items: { label: string; value: string; note: string | null }[];
+  note: string | null;
+}
 export interface VolumeBadge { value: string; sub: string | null }
 export interface Volumes {
   systems: Record<string, VolumeBadge>;
@@ -107,7 +116,7 @@ export const ARTIFACTS = [
   { id: "business-snapshot", label: "biz snapshot", system: "vault", producedBy: "dispatch" },
   { id: "outreach-snapshot", label: "outreach snap", system: "email", producedBy: "outreach" },
   { id: "content-calendar", label: "content cal", system: "website", producedBy: "content-engine-weekly" },
-  { id: "prospects-db", label: "prospects.db", system: "ghl-wing", producedBy: "prospector" },
+  { id: "prospects-db", label: "prospects.db", system: "ghl-wing", producedBy: "b2b-prospector-daily" },
   { id: "replies-inbox", label: "replies inbox", system: "ghl-wing", producedBy: "reply-triage" },
 ];
 
@@ -116,11 +125,9 @@ export const AGENT_WIRES: Record<string, string[]> = {
   "chronicler-end-of-day": ["vault", "scheduler"],
   "content-engine-weekly": ["vault", "clients", "website", "scheduler"],
   "renewal-content-weekly": ["vault", "clients", "website", "scheduler"],
-  "wing-digital-daily-outreach": ["email", "scheduler"],
-  "wing-audit-roofing-batch": ["vault", "ghl-wing"],
+  "b2b-outreach-engine": ["email", "ghl-wing", "scheduler"],
+  "b2b-prospector-daily": ["vault", "ghl-wing", "scheduler"],
   dispatch: ["vault", "ghl-clients", "ghl-wing"],
-  prospector: ["vault", "ghl-wing"],
-  outreach: ["email", "ghl-wing"],
   "reply-triage": ["vault", "ghl-clients", "ghl-wing", "email"],
   builder: ["ghl-clients", "clients"],
 };
@@ -132,13 +139,25 @@ export const AGENT_MATCH: Record<string, RegExp> = {
   "chronicler-end-of-day": /\bchronicler\b/i,
   "content-engine-weekly": /content[- ]engine|jackson.*(blog|content|post)/i,
   "renewal-content-weekly": /\brenewal\b/i,
-  "wing-digital-daily-outreach": /daily outreach/i,
-  "wing-audit-roofing-batch": /\baudit\b/i,
+  "b2b-outreach-engine": /outreach|cold email|b2b/i,
+  "b2b-prospector-daily": /prospector|lead scan|lead-find|b2b lead/i,
   dispatch: /dispatch/i,
-  prospector: /prospector|lead scan|lead-find/i,
-  outreach: /outreach|cold email|b2b/i,
   "reply-triage": /reply-triage|triage/i,
   builder: /builder|onboard/i,
+};
+
+// The OS is read-only: it never triggers agents. These are the exact phrases
+// Jack says to Claude to run one by hand, shown as a hint in agent panels.
+export const RUN_PHRASE: Record<string, string> = {
+  "sentinel-daily": "run sentinel",
+  "chronicler-end-of-day": "run chronicler",
+  "content-engine-weekly": "run content-engine",
+  "renewal-content-weekly": "run renewal-content-engine",
+  "b2b-outreach-engine": "run outreach",
+  "b2b-prospector-daily": "find B2B leads",
+  dispatch: "run dispatch",
+  "reply-triage": "run reply-triage",
+  builder: "run builder for [client]",
 };
 
 export const PILLAR_NAMES = [
@@ -169,6 +188,7 @@ export type Selection =
   | { type: "system"; id: string }
   | { type: "artifact"; id: string }
   | { type: "client"; name: string }
+  | { type: "stat"; key: string }
   | null;
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -180,6 +200,20 @@ export function fmtCountdown(iso: string): string {
   const h = Math.floor(min / 60);
   if (h < 48) return `in ${h}h ${min % 60}m`;
   return `in ${Math.floor(h / 24)}d`;
+}
+
+// Staleness label for snapshot timestamps like "2026-08-10 13:43": "2h ago".
+export function fmtAge(updated: string | null): string | null {
+  if (!updated) return null;
+  const m = updated.match(/^(\d{4})-(\d{2})-(\d{2})(?:\s+(\d{2}):(\d{2}))?/);
+  if (!m) return null;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4] ?? 12), Number(m[5] ?? 0));
+  const min = Math.floor((Date.now() - d.getTime()) / 60000);
+  if (min < 0) return null;
+  if (min < 60) return `${min}m ago`;
+  const h = Math.floor(min / 60);
+  if (h < 48) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
 }
 
 // "2026-08-07" -> "Aug 7" (falls back to the raw string).
@@ -511,6 +545,53 @@ export function AgentTile({ a, onSelect }: { a: AgentCard; onSelect: (s: Selecti
   );
 }
 
+// ── Stat tiles (clickable: each opens its breakdown panel) ─────────────────
+export function StatTiles({ tiles, onSelect }: { tiles: StatTile[]; onSelect: (s: Selection) => void }) {
+  if (!tiles.length) return null;
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
+      {tiles.map((t) => {
+        const age = fmtAge(t.updated);
+        return (
+          <div key={t.label} className="mo-click" onClick={() => onSelect({ type: "stat", key: t.key })}
+            title="Click for the breakdown"
+            style={{ background: "var(--bg-card, #0d1117)", border: "1px solid var(--border, rgba(255,255,255,0.08))", borderRadius: 12, padding: "14px 16px", position: "relative" }}>
+            <div style={{ fontSize: 26, fontWeight: 700, color: "var(--text-primary)", fontFamily: "'Space Grotesk', sans-serif" }}>{t.value}</div>
+            <div style={{ fontSize: 10, letterSpacing: "0.12em", color: "var(--text-muted)", textTransform: "uppercase" }}>
+              {t.label}{t.sub ? <span style={{ textTransform: "none", letterSpacing: 0 }}> · {t.sub}</span> : null}
+            </div>
+            {age && (
+              <span style={{ position: "absolute", top: 8, right: 10, fontSize: 9, color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace" }}>{age}</span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Next-24h schedule strip: what fires next, in firing order ──────────────
+export function NextUpStrip({ agents, onSelect }: { agents: AgentCard[]; onSelect: (s: Selection) => void }) {
+  const upcoming = agents
+    .filter((a) => a.kind === "scheduled" && a.enabled && a.nextRunAt)
+    .filter((a) => new Date(a.nextRunAt as string).getTime() - Date.now() < 24 * 3600_000)
+    .sort((a, b) => new Date(a.nextRunAt as string).getTime() - new Date(b.nextRunAt as string).getTime());
+  if (!upcoming.length) return null;
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", background: "var(--bg-card, #0d1117)", border: "1px solid var(--border, rgba(255,255,255,0.08))", borderRadius: 12, padding: "8px 14px" }}>
+      <span style={{ fontSize: 10, letterSpacing: "0.12em", color: "var(--text-muted)" }}>NEXT 24H</span>
+      {upcoming.map((a) => (
+        <span key={a.key} className="mo-click" onClick={() => onSelect({ type: "agent", key: a.key })}
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", color: "var(--text-secondary)", border: "1px solid var(--border, rgba(255,255,255,0.1))", borderRadius: 99, padding: "3px 10px" }}>
+          <Dot color="#22d3ee" />
+          {a.name}
+          <span style={{ color: "var(--accent, #22d3ee)" }}>{fmtCountdown(a.nextRunAt as string)}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 // ── Feed list (click a line to expand the full entry) ──────────────────────
 export function FeedList({ feed, limit }: { feed: FeedEntry[]; limit?: number }) {
   const [open, setOpen] = useState<number | null>(null);
@@ -771,6 +852,12 @@ function AgentPanel({ agentKey, onClose, onSelect }: {
               {detail.lastRunAt && <>last run {new Date(detail.lastRunAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</>}
               {!detail.nextRunAt && !detail.lastRunAt && "no recorded runs"}
             </div>
+            {RUN_PHRASE[detail.key] && (
+              <div style={{ marginTop: 10, fontSize: 12, color: "var(--text-secondary)", background: "var(--bg-card, #0d1117)", border: "1px solid var(--border, rgba(255,255,255,0.08))", borderRadius: 8, padding: "8px 10px", lineHeight: 1.5 }}>
+                Run it now: the OS is read-only, so tell Claude{" "}
+                <span style={{ fontFamily: "'JetBrains Mono', monospace", color: "var(--accent, #22d3ee)" }}>&quot;{RUN_PHRASE[detail.key]}&quot;</span>
+              </div>
+            )}
           </Section>
 
           <Section title="Connections">
@@ -860,6 +947,80 @@ function ArtifactPanel({ artifactId, onClose, onSelect }: {
             <DistilledExcerpt distilled={detail.distilled ?? []} raw={detail.lines} accent={accent} />
             <div style={{ fontSize: 10, color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace", marginTop: 6 }}>{detail.path}</div>
           </Section>
+        </>
+      )}
+    </SlideOver>
+  );
+}
+
+// ── Stat breakdown panel (fetches /api/mission?stat=key) ───────────────────
+function StatPanel({ statKey, onClose, onSelect }: {
+  statKey: string; onClose: () => void; onSelect: (s: Selection) => void;
+}) {
+  const [detail, setDetail] = useState<StatDetail | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    setDetail(null); setErr(null);
+    fetch(`/api/mission?stat=${encodeURIComponent(statKey)}`, { cache: "no-store" })
+      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+      .then(j => { if (alive) setDetail(j); })
+      .catch(e => { if (alive) setErr(e instanceof Error ? e.message : "fetch failed"); });
+    return () => { alive = false; };
+  }, [statKey]);
+
+  const accent = "#22d3ee";
+  const age = fmtAge(detail?.updated ?? null);
+  return (
+    <SlideOver title={detail ? detail.title.toUpperCase() : "STAT"} accent={accent} onClose={onClose}>
+      {!detail && !err && <div style={{ fontSize: 12, color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace" }}>Loading breakdown...</div>}
+      {err && <div style={{ fontSize: 12, color: "#f87171" }}>Could not load breakdown ({err})</div>}
+      {detail && (
+        <>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
+            {age && <Pill text={`SNAPSHOT ${age.toUpperCase()}`} color="var(--text-muted, #6b7280)" />}
+            {!detail.available && <Pill text="SNAPSHOT UNAVAILABLE" color="#fb923c" />}
+          </div>
+          <SummaryBlock accent={accent} lines={detail.summary} />
+          {detail.items.length > 0 && (
+            <Section title={`Breakdown (${detail.items.length})`} defaultOpen>
+              {detail.items.map((it, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "baseline", gap: 10, fontSize: 12.5, marginBottom: 7, borderBottom: "1px solid var(--border, rgba(255,255,255,0.05))", paddingBottom: 6 }}>
+                  <span style={{ color: "var(--text-secondary)", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.label}</span>
+                  <span style={{ fontFamily: "'JetBrains Mono', monospace", color: "var(--text-primary)", flexShrink: 0 }}>{it.value}</span>
+                  {it.note && <span style={{ color: "var(--text-muted)", fontSize: 11, flexShrink: 0 }}>{it.note}</span>}
+                </div>
+              ))}
+            </Section>
+          )}
+          {detail.note && (
+            <div style={{ fontSize: 11, color: "var(--text-muted)", lineHeight: 1.5, marginTop: 12, borderLeft: "2px solid var(--border, rgba(255,255,255,0.15))", paddingLeft: 10 }}>
+              {detail.note}
+            </div>
+          )}
+          {statKey === "clients" && (
+            <div style={{ marginTop: 14 }}>
+              <a href="/?section=clients" style={{ fontSize: 12, color: accent, textDecoration: "none", border: `1px solid ${accent}55`, borderRadius: 8, padding: "6px 12px", display: "inline-block" }}
+                onClick={(e) => {
+                  // In the main app, jump to the Clients section in place.
+                  if (typeof window !== "undefined" && window.location.pathname === "/") {
+                    e.preventDefault();
+                    window.dispatchEvent(new CustomEvent("os:navigate", { detail: "clients" }));
+                    onClose();
+                  }
+                }}>
+                Open Clients section →
+              </a>
+            </div>
+          )}
+          {statKey === "pipeline" && (
+            <div style={{ marginTop: 14 }}>
+              <span className="mo-click" onClick={() => onSelect({ type: "artifact", id: "outreach-snapshot" })}>
+                <Pill text="OUTREACH SNAPSHOT" color={accent} />
+              </span>
+            </div>
+          )}
         </>
       )}
     </SlideOver>
@@ -984,6 +1145,7 @@ export function MissionPanels({ selection, data, onSelect }: {
   const close = () => onSelect(null);
   if (selection.type === "agent") return <AgentPanel agentKey={selection.key} onClose={close} onSelect={onSelect} />;
   if (selection.type === "artifact") return <ArtifactPanel artifactId={selection.id} onClose={close} onSelect={onSelect} />;
+  if (selection.type === "stat") return <StatPanel statKey={selection.key} onClose={close} onSelect={onSelect} />;
   if (!data) return null;
   if (selection.type === "system") return <SystemPanel systemId={selection.id} data={data} onSelect={onSelect} onClose={close} />;
   if (selection.type === "client") return <ClientPanel name={selection.name} data={data} onClose={close} />;

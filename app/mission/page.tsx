@@ -9,7 +9,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   MissionData, Selection, Dot, Pill, MissionStyles, OpsMap, AgentTile,
-  FeedTicker, ClientHealthStrip, MissionPanels,
+  FeedTicker, ClientHealthStrip, MissionPanels, StatTiles, NextUpStrip,
 } from "../components/MissionControlCore";
 
 const STATUS_COLOR: Record<string, string> = {
@@ -81,17 +81,17 @@ export default function MissionControl() {
 
       {data && (
         <>
-          {/* Stats row */}
+          {/* Stats row — every tile clicks through to its breakdown panel */}
           {data.stats.tiles.length > 0 && (
-            <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fit, minmax(150px, 1fr))`, gap: 12, marginBottom: 16 }}>
-              {data.stats.tiles.map((t) => (
-                <div key={t.label} style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 16px" }}>
-                  <div style={{ fontSize: 26, fontWeight: 700, color: "var(--text-primary)", fontFamily: "'Space Grotesk', sans-serif" }}>{t.value}</div>
-                  <div style={{ fontSize: 10, letterSpacing: "0.12em", color: "var(--text-muted)", textTransform: "uppercase" }}>{t.label}</div>
-                </div>
-              ))}
+            <div style={{ marginBottom: 16 }}>
+              <StatTiles tiles={data.stats.tiles} onSelect={setSelection} />
             </div>
           )}
+
+          {/* What fires in the next 24 hours, in order */}
+          <div style={{ marginBottom: 16 }}>
+            <NextUpStrip agents={data.agents} onSelect={setSelection} />
+          </div>
 
           {/* Client health strip — click a dot for the full pillar breakdown */}
           {data.health && (

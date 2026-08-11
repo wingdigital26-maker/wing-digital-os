@@ -68,21 +68,36 @@ function nextWeekly(dow: number, hour: number, minute: number): Date {
   d.setDate(d.getDate() + delta);
   return d;
 }
+// cron "*/30 8-19 * * *": next :00/:30 boundary between 8:00 and 19:30, else 8:00 tomorrow.
+function nextEvery30(): Date {
+  const d = new Date();
+  d.setSeconds(0, 0);
+  // advance to the next 30-minute boundary strictly after now
+  d.setMinutes(d.getMinutes() < 30 ? 30 : 60, 0, 0);
+  if (d.getHours() < 8) { d.setHours(8, 0, 0, 0); }
+  else if (d.getHours() > 19 || (d.getHours() === 19 && d.getMinutes() > 30)) {
+    d.setDate(d.getDate() + 1);
+    d.setHours(8, 0, 0, 0);
+  }
+  return d;
+}
 
 const SCHEDULED: ScheduledMeta[] = [
   { key: "sentinel-daily", name: "Sentinel", role: "Per-client health monitor, 5-pillar daily checkup", schedule: "Daily 7:00am", enabled: true, match: /\bsentinel\b/i, next: () => nextDaily(7, 0) },
   { key: "chronicler-end-of-day", name: "Chronicler", role: "End-of-day vault historian, digests chats into the brain", schedule: "Daily 9:52pm", enabled: true, match: /\bchronicler\b/i, next: () => nextDaily(21, 52) },
   { key: "content-engine-weekly", name: "Content Engine", role: "Jackson Roofing weekly SEO content producer", schedule: "Mon 7:10am", enabled: true, match: /content[- ]engine|jackson.*(blog|content|post)/i, next: () => nextWeekly(1, 7, 10) },
   { key: "renewal-content-weekly", name: "Renewal Engine", role: "Renewal Health weekly content, health-gated publishing", schedule: "Mon 7:44am", enabled: true, match: /\brenewal\b/i, next: () => nextWeekly(1, 7, 44) },
-  { key: "wing-digital-daily-outreach", name: "Daily Outreach Task", role: "Scheduled outreach runner (superseded by the live sender)", schedule: "Disabled", enabled: false, match: /daily outreach/i, next: () => null },
-  { key: "wing-audit-roofing-batch", name: "Audit Batch", role: "Batch sales audits for roofing prospects", schedule: "Disabled", enabled: false, match: /\baudit\b/i, next: () => null },
+  { key: "b2b-outreach-engine", name: "Outreach", role: "B2B cold email sender, LIVE since 8/6 — window + cap check, dry-run, then live send", schedule: "Every 30 min, 8am-8pm", enabled: true, match: /outreach|cold email|b2b/i, next: nextEvery30 },
+  { key: "b2b-prospector-daily", name: "Prospector", role: "Daily B2B lead scout — refills the pipeline so outreach never runs dry", schedule: "Daily 6:15am", enabled: true, match: /prospector|lead scan|lead-find|b2b lead/i, next: () => nextDaily(6, 15) },
 ];
+
+// Note: wing-digital-daily-outreach and wing-audit-roofing-batch still exist on
+// disk but are superseded Apollo-era relics. They are intentionally absent from
+// SCHEDULED (shown nowhere) so they can never be confused with the live tasks.
 
 // On-demand crew: static roster, last-seen resolved from log.md.
 const CREW = [
   { key: "dispatch", name: "Dispatch", role: "Morning briefing, orders the day's dial list", match: /dispatch/i },
-  { key: "prospector", name: "Prospector", role: "Lead scout, scans DFW cities for prospects", match: /prospector|lead scan|lead-find/i },
-  { key: "outreach", name: "Outreach", role: "B2B cold email sender, LIVE since 8/6", match: /outreach|cold email|b2b/i },
   { key: "reply-triage", name: "Reply-Triage", role: "Classifies inbound replies HOT/WARM/COLD", match: /reply-triage|triage/i },
   { key: "builder", name: "Builder", role: "Client onboarding runner in GHL", match: /builder|onboard/i },
 ];
@@ -235,28 +250,137 @@ function parseHealthBoard(raw: string): { runDate: string | null; clients: Clien
 }
 
 // ── stats parsing ──────────────────────────────────────────────────────────
-interface StatTile { label: string; value: string; sub: string | null }
+// Each tile carries a stable key so the UI can open the matching breakdown
+// panel (/api/mission?stat=key), plus the snapshot timestamp it came from.
+interface StatTile { key: string; label: string; value: string; sub: string | null; updated: string | null }
 
 function parseStats(biz: string | null, outreach: string | null): { tiles: StatTile[]; updated: string | null } {
   const tiles: StatTile[] = [];
   let updated: string | null = null;
+  const bizUpdated = biz?.match(/_Last updated:\s*([^_]+)_/)?.[1]?.trim() ?? null;
+  const outUpdated = outreach?.match(/_Last updated:\s*([^_]+)_/)?.[1]?.trim() ?? null;
   if (biz) {
     const mrr = biz.match(/\*\*MRR:\*\*\s*\$?([\d,]+)/);
     const active = biz.match(/\*\*Active clients:\*\*\s*(\d+)/);
-    if (mrr) tiles.push({ label: "MRR", value: "$" + mrr[1] + "/mo", sub: null });
-    if (active) tiles.push({ label: "Active Clients", value: active[1], sub: null });
-    updated = biz.match(/_Last updated:\s*([^_]+)_/)?.[1]?.trim() ?? null;
+    if (mrr) tiles.push({ key: "clients", label: "MRR", value: "$" + mrr[1] + "/mo", sub: null, updated: bizUpdated });
+    if (active) tiles.push({ key: "clients", label: "Active Clients", value: active[1], sub: null, updated: bizUpdated });
+    updated = bizUpdated;
   }
   if (outreach) {
     const pipeline = outreach.match(/\*\*Pipeline:\*\*\s*([\d,]+)/);
     const emailed = outreach.match(/\*\*Emailed:\*\*\s*([\d,]+)/);
     const remaining = outreach.match(/\*\*Remaining[^:]*:\*\*\s*([\d,]+)/);
     const today = outreach.match(/\*\*Sent today:\*\*\s*([\d,]+)/);
-    if (pipeline) tiles.push({ label: "Pipeline", value: pipeline[1], sub: "prospects" });
-    if (emailed) tiles.push({ label: "Emails Sent", value: emailed[1], sub: today ? `${today[1]} today` : null });
-    if (remaining) tiles.push({ label: "Untouched Leads", value: remaining[1], sub: "new + enriching" });
+    if (pipeline) tiles.push({ key: "pipeline", label: "Pipeline", value: pipeline[1], sub: "prospects", updated: outUpdated });
+    if (emailed) tiles.push({ key: "emails", label: "Emails Sent", value: emailed[1], sub: today ? `${today[1]} today` : null, updated: outUpdated });
+    if (remaining) tiles.push({ key: "untouched", label: "Untouched Leads", value: remaining[1], sub: "new + enriching", updated: outUpdated });
   }
   return { tiles, updated };
+}
+
+// ── Stat breakdown panels (?stat=key) ──────────────────────────────────────
+// Everything shown is parsed from the real snapshots. Where per-item data is
+// not derivable from the snapshot, the panel says so instead of faking rows.
+
+// Rows of the "Last 15 Companies Emailed" table: | Company | City | 2026-08-10 18:31 |
+function parseEmailedRows(outreach: string): { company: string; city: string; when: string }[] {
+  const rows: { company: string; city: string; when: string }[] = [];
+  for (const line of outreach.split(/\r?\n/)) {
+    const m = line.match(/^\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*(\d{4}-\d{2}-\d{2}[^|]*?)\s*\|/);
+    if (m && !/^-+$/.test(m[1]) && !/^Company$/i.test(m[1])) {
+      rows.push({ company: redact(m[1]), city: redact(m[2]), when: m[3].trim() });
+    }
+  }
+  return rows;
+}
+
+async function statDetail(id: string) {
+  const [biz, outreach] = await Promise.all([
+    readVaultFile("wiki/state/business-snapshot.md"),
+    readVaultFile("wiki/state/outreach-snapshot.md"),
+  ]);
+  const outUpdated = outreach?.match(/_Last updated:\s*([^_]+)_/)?.[1]?.trim() ?? null;
+  const bizUpdated = biz?.match(/_Last updated:\s*([^_]+)_/)?.[1]?.trim() ?? null;
+  const num = (src: string | null, re: RegExp) => src?.match(re)?.[1] ?? null;
+
+  if (id === "pipeline") {
+    const pipeline = num(outreach, /\*\*Pipeline:\*\*\s*([\d,]+)/);
+    const emailed = num(outreach, /\*\*Emailed:\*\*\s*([\d,]+)/);
+    const remaining = num(outreach, /\*\*Remaining[^:]*:\*\*\s*([\d,]+)/);
+    const sentToday = num(outreach, /\*\*Sent today:\*\*\s*([\d,]+)/);
+    const p = Number((pipeline ?? "0").replace(/,/g, ""));
+    const e = Number((emailed ?? "0").replace(/,/g, ""));
+    const r = Number((remaining ?? "0").replace(/,/g, ""));
+    const other = p - e - r;
+    return NextResponse.json({
+      id, title: "Pipeline breakdown", updated: outUpdated, available: !!outreach,
+      summary: [
+        `${pipeline ?? "?"} prospects total in prospects.db.`,
+        "Sourced by the daily B2B prospector (free Google Maps + OSM scrapers).",
+      ],
+      items: outreach ? [
+        { label: "Emailed", value: emailed ?? "?", note: sentToday ? `${sentToday} of those today` : null },
+        { label: "Untouched (new + enriching)", value: remaining ?? "?", note: "staged, not yet armed" },
+        ...(other > 0 ? [{ label: "Other statuses (ready / closed / dead)", value: String(other), note: "derived: total minus emailed minus untouched" }] : []),
+      ] : [],
+      note: "Per-status detail beyond this lives in prospects.db on Jack's PC; the snapshot publishes totals only.",
+    });
+  }
+
+  if (id === "emails") {
+    const rows = outreach ? parseEmailedRows(outreach) : [];
+    // today = the snapshot's own updated date (its rows share that date format)
+    const today = (outUpdated ?? new Date().toISOString()).slice(0, 10);
+    const todayRows = rows.filter((r) => r.when.startsWith(today));
+    const sentToday = num(outreach, /\*\*Sent today:\*\*\s*([\d,]+)/);
+    return NextResponse.json({
+      id, title: "Emails sent today", updated: outUpdated, available: !!outreach,
+      summary: [
+        `${sentToday ?? todayRows.length} sends today per the outreach snapshot.`,
+        todayRows.length && sentToday && Number(sentToday) > todayRows.length
+          ? `Snapshot lists the most recent ${todayRows.length}; the rest scrolled off the last-15 table.`
+          : "Recipient businesses and send times below.",
+      ],
+      items: todayRows.map((r) => ({ label: r.company, value: r.when.slice(11) || r.when, note: r.city })),
+      note: null,
+    });
+  }
+
+  if (id === "untouched") {
+    const remaining = num(outreach, /\*\*Remaining[^:]*:\*\*\s*([\d,]+)/);
+    return NextResponse.json({
+      id, title: "Untouched leads", updated: outUpdated, available: !!outreach,
+      summary: [
+        `${remaining ?? "?"} prospects staged but not yet emailed.`,
+        "These sit at status new (just scraped) or enriching (contact + QA pass in progress). They only become sends after rank, QA, and activation.",
+      ],
+      items: [],
+      note: "The new-vs-enriching split lives in prospects.db on Jack's PC; the snapshot publishes the combined count.",
+    });
+  }
+
+  if (id === "clients") {
+    const items: { label: string; value: string; note: string | null }[] = [];
+    if (biz) {
+      for (const line of biz.split(/\r?\n/)) {
+        const m = line.match(/^\|\s*([^|*]+?)\s*\|\s*\$?([\d,]+)\s*\|\s*([^|]+?)\s*\|/);
+        if (m && !/^Client$/i.test(m[1]) && !/^-+$/.test(m[1])) {
+          items.push({ label: redact(m[1]), value: "$" + m[2] + "/mo", note: m[3].trim() });
+        }
+      }
+    }
+    return NextResponse.json({
+      id, title: "Active clients", updated: bizUpdated, available: !!biz,
+      summary: [
+        `${num(biz, /\*\*Active clients:\*\*\s*(\d+)/) ?? items.length} active client${items.length === 1 ? "" : "s"}, $${num(biz, /\*\*MRR:\*\*\s*\$?([\d,]+)/) ?? "?"}/mo MRR.`,
+        "Full client detail lives in the Clients section of the OS.",
+      ],
+      items,
+      note: null,
+    });
+  }
+
+  return NextResponse.json({ error: `unknown stat '${id}'` }, { status: 404 });
 }
 
 // ── Per-agent detail data ──────────────────────────────────────────────────
@@ -286,26 +410,20 @@ const AGENT_SYSTEMS: Record<string, Wire[]> = {
     { id: "clients", label: "CLIENTS", direction: "writes" },
     { id: "scheduler", label: "SCHEDULER", direction: "reads" },
   ],
-  "wing-digital-daily-outreach": [
+  "b2b-outreach-engine": [
     { id: "email", label: "EMAIL", direction: "writes" },
+    { id: "ghl-wing", label: "GHL WING", direction: "both" },
     { id: "scheduler", label: "SCHEDULER", direction: "reads" },
   ],
-  "wing-audit-roofing-batch": [
+  "b2b-prospector-daily": [
     { id: "vault", label: "VAULT", direction: "writes" },
     { id: "ghl-wing", label: "GHL WING", direction: "reads" },
+    { id: "scheduler", label: "SCHEDULER", direction: "reads" },
   ],
   dispatch: [
     { id: "vault", label: "VAULT", direction: "writes" },
     { id: "ghl-clients", label: "GHL", direction: "reads" },
     { id: "ghl-wing", label: "GHL WING", direction: "reads" },
-  ],
-  prospector: [
-    { id: "vault", label: "VAULT", direction: "writes" },
-    { id: "ghl-wing", label: "GHL WING", direction: "reads" },
-  ],
-  outreach: [
-    { id: "email", label: "EMAIL", direction: "writes" },
-    { id: "ghl-wing", label: "GHL WING", direction: "both" },
   ],
   "reply-triage": [
     { id: "ghl-clients", label: "GHL", direction: "reads" },
@@ -333,9 +451,9 @@ interface ArtifactMeta {
 const ARTIFACTS: ArtifactMeta[] = [
   { id: "health-board", label: "Health board", system: "clients", producedBy: "sentinel-daily", path: "wiki/state/health-board.md", blurb: "Sentinel's master per-client health table with red flags." },
   { id: "business-snapshot", label: "Biz snapshot", system: "vault", producedBy: "dispatch", path: "wiki/state/business-snapshot.md", blurb: "The live business state: MRR, active clients, pipeline." },
-  { id: "outreach-snapshot", label: "Outreach snapshot", system: "email", producedBy: "outreach", path: "wiki/state/outreach-snapshot.md", blurb: "Cold-email pipeline counts and send totals." },
+  { id: "outreach-snapshot", label: "Outreach snapshot", system: "email", producedBy: "b2b-outreach-engine", path: "wiki/state/outreach-snapshot.md", blurb: "Cold-email pipeline counts and send totals." },
   { id: "content-calendar", label: "Content calendar", system: "website", producedBy: "content-engine-weekly", path: "wiki/campaigns/jackson-social-calendar.md", blurb: "Jackson Roofing's rolling content and social calendar." },
-  { id: "prospects-db", label: "prospects.db", system: "ghl-wing", producedBy: "prospector", path: "wiki/automations/prospects-db.md", blurb: "The self-refilling prospect database behind outreach." },
+  { id: "prospects-db", label: "prospects.db", system: "ghl-wing", producedBy: "b2b-prospector-daily", path: "wiki/automations/prospects-db.md", blurb: "The self-refilling prospect database behind outreach." },
   { id: "replies-inbox", label: "Replies inbox", system: "ghl-wing", producedBy: "reply-triage", path: "wiki/state/replies-inbox.md", blurb: "Triage page of inbound replies, HOT flagged loudly." },
 ];
 
@@ -417,8 +535,8 @@ const CRON_HUMAN: Record<string, string> = {
   "chronicler-end-of-day": "Runs every day at 9:52 at night, after the workday ends.",
   "content-engine-weekly": "Runs every Monday morning at 7:10.",
   "renewal-content-weekly": "Runs every Monday morning at 7:44.",
-  "wing-digital-daily-outreach": "Disabled. Superseded by the live outreach sender.",
-  "wing-audit-roofing-batch": "Disabled. Runs only when triggered by hand.",
+  "b2b-outreach-engine": "Runs every 30 minutes from 8 in the morning to 8 at night, every day. Each run checks the send window and daily cap, dry-runs, then fires for real if clean.",
+  "b2b-prospector-daily": "Runs every day at 6:15 in the morning, before the outreach window opens, to refill the lead pipeline.",
 };
 
 // Concise role text used when no SKILL.md is on disk (cloud mode, crew agents).
@@ -431,10 +549,10 @@ const ROLE_LONG: Record<string, string> = {
     "Jackson Roofing weekly SEO content producer. Refreshes the live content calendar, writes the week's 2 blog drafts plus the Google Business post copy and the Wednesday rotation outline. Never produces insurance content.",
   "renewal-content-weekly":
     "Renewal Health (Lynette Wing) weekly content engine. Mirror of Jackson's content engine adapted for her static site and health/YMYL rules: 2 blog posts and a service page, Pexels images, health-claim gate, then publishes via the static-site publisher. No diagnose/treat/cure claims, ever.",
-  "wing-digital-daily-outreach":
-    "Legacy scheduled outreach runner. Superseded by the live outreach sender that runs every 15 minutes during business hours.",
-  "wing-audit-roofing-batch":
-    "Batch sales-audit generator. Runs Wing Digital audits on roofing prospects and produces a branded one-page PDF per business, wired into the call sheet.",
+  "b2b-outreach-engine":
+    "Wing Digital's live B2B cold-email campaign, approved live by Jack on 2026-08-06. Every 30 minutes between 8am and 8pm it checks the send window and daily cap, dry-runs the outreach script, and only fires real sends when the dry run is clean. Never exceeds the daily cap, never touches client subaccounts, and stops loudly if anything looks broken.",
+  "b2b-prospector-daily":
+    "Daily 6:15am lead scout. Runs b2b-lead-find to scan DFW for high-value B2B, warehouse, and commercial-ops leads using the free scrapers (Google Maps + OpenStreetMap) and stages them in prospects.db so the outreach engine never runs dry. Finds and stages only, never sends.",
   dispatch:
     "Morning briefing agent. Regenerates campaign data, orders the day's dial list, checks GHL, and writes a one-page briefing so Jack is call-ready.",
   prospector:
@@ -486,7 +604,7 @@ async function buildArtifact(key: string): Promise<{ title: string; lines: strin
     return lines.length ? { title, lines, distilled: distill(raw) } : null;
   };
   if (key === "sentinel-daily") return pick("wiki/state/health-board.md", "Latest health board", 18);
-  if (key === "outreach" || key === "wing-digital-daily-outreach")
+  if (key === "b2b-outreach-engine" || key === "b2b-prospector-daily")
     return pick("wiki/state/outreach-snapshot.md", "Outreach snapshot");
   if (key === "dispatch") return pick("wiki/state/business-snapshot.md", "Business snapshot");
   if (key === "reply-triage") return pick("wiki/state/reply-triage.md", "Latest triage page");
@@ -569,6 +687,8 @@ export async function GET(req: NextRequest) {
   if (agentKey) return agentDetail(agentKey);
   const artifactId = req.nextUrl.searchParams.get("artifact");
   if (artifactId) return artifactDetail(artifactId);
+  const statId = req.nextUrl.searchParams.get("stat");
+  if (statId) return statDetail(statId);
 
   const cloud = isGithubVault();
 

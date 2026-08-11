@@ -850,6 +850,16 @@ async function buildOsContext(): Promise<string> {
   ]);
   const parts: string[] = [];
   const cap = (s: string, n: number) => (s.length > n ? s.slice(0, n) + "\n...[truncated]" : s);
+  // Ground truth on WHEN things run, so Jarvis answers schedule questions correctly.
+  parts.push(
+    "## AGENT SCHEDULE (ground truth)\n" +
+    "- Outreach (b2b-outreach-engine): SCHEDULED, every 30 minutes from 8am to 8pm daily. Each run checks the send window and daily cap, dry-runs, then sends live if clean. Live since 2026-08-06.\n" +
+    "- Prospector (b2b-prospector-daily): SCHEDULED, daily at 6:15am. Refills prospects.db with fresh DFW B2B leads via free scrapers. Finds and stages only, never sends.\n" +
+    "- Sentinel: daily 7:00am (client health). Chronicler: daily 9:52pm (vault historian).\n" +
+    "- Content Engine (Jackson): Mondays 7:10am. Renewal Engine (Lynette): Mondays 7:44am.\n" +
+    "- Dispatch, Reply-Triage, and Builder run on demand when Jack asks.\n" +
+    "- The old wing-digital-daily-outreach and wing-audit-roofing-batch tasks are retired Apollo-era relics, superseded by the two live B2B tasks above. Never present them as current."
+  );
   if (biz) parts.push("## BUSINESS SNAPSHOT (live)\n" + cap(biz.trim(), 2500));
   if (outreach) parts.push("## OUTREACH SNAPSHOT (live)\n" + cap(outreach.trim(), 2500));
   if (hot) parts.push("## CURRENT FOCUS (hot.md)\n" + cap(hot.trim(), 3000));

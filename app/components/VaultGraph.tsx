@@ -31,7 +31,9 @@ interface GLink {
   target: string | GNode;
 }
 
-const LS_LAYOUT = "wingos-vault-graph-layout-v1";
+// v2: bumped for the harmonized palette + per-folder centroid clustering force,
+// so the layout recomputes once with the new forces and then persists as before.
+const LS_LAYOUT = "wingos-vault-graph-layout-v2";
 
 // ── Warm the graph API as soon as this module loads ──
 // Once per session, low priority: by the time Jack opens the vault view the
@@ -47,21 +49,55 @@ if (typeof window !== "undefined") {
   }
 }
 
-// Folder palette — strongly differentiated, Obsidian-style. Keys match the
-// API's classified buckets (wiki/clients/x.md classifies as "clients").
-const GROUP_COLORS: Record<string, string> = {
-  wiki: "#38bdf8",        // sky blue
-  clients: "#22c55e",     // green
-  campaigns: "#f59e0b",   // amber
-  automations: "#a855f7", // purple
-  agents: "#ec4899",      // pink
-  state: "#f97316",       // orange
-  syntheses: "#eab308",   // yellow
-  inbox: "#ef4444",       // red
-  root: "#94a3b8",        // slate
+// Folder palette — harmonized into 5 hue families instead of a 12-hue rainbow,
+// so the graph reads as organized zones. Related folders get shades/tints of
+// the same family. Keys match the API's classified buckets.
+const FAMILY_ORDER = ["business", "clients", "automation", "knowledge", "other"] as const;
+const FAMILY_LABEL: Record<string, string> = {
+  business: "business / campaigns",
+  clients: "clients / partners",
+  automation: "automations / agents",
+  knowledge: "wiki / knowledge",
+  other: "root / other",
 };
-// Deterministic distinct color for any unmapped folder, so new buckets never
-// all collapse into one grey.
+const GROUP_FAMILY: Record<string, string> = {
+  // warm amber-gold: the money-making side
+  campaigns: "business", seo: "business", outreach: "business", business: "business",
+  // green-teal: the people we serve
+  clients: "clients", partners: "clients",
+  // violet: the machine that runs itself
+  automations: "automation", agents: "automation", state: "automation",
+  // cyan-blue: the knowledge layer
+  wiki: "knowledge", concepts: "knowledge", syntheses: "knowledge", personas: "knowledge", inbox: "knowledge",
+  // slate: everything else
+  root: "other",
+};
+// Shades within each family (must be 6-digit hex: sprite rendering appends
+// hex alpha like "cc").
+const GROUP_COLORS: Record<string, string> = {
+  // business family: warm amber-gold range
+  campaigns: "#f59e0b",
+  seo: "#fbbf24",
+  outreach: "#d97706",
+  business: "#fcd34d",
+  // clients family: green-teal range
+  clients: "#34d399",
+  partners: "#2dd4bf",
+  // automation family: violet range
+  automations: "#a78bfa",
+  agents: "#8b5cf6",
+  state: "#c4b5fd",
+  // knowledge family: cyan-blue range
+  wiki: "#38bdf8",
+  concepts: "#7dd3fc",
+  syntheses: "#22d3ee",
+  personas: "#60a5fa",
+  inbox: "#93c5fd",
+  // other
+  root: "#94a3b8",
+};
+// Any unmapped folder falls into the slate "other" family, on a deterministic
+// slate-range shade so new buckets stay quiet instead of adding a new hue.
 const fallbackCache = new Map<string, string>();
 function colorOf(g: string): string {
   const known = GROUP_COLORS[g];
@@ -70,11 +106,14 @@ function colorOf(g: string): string {
   if (!c) {
     let h = 0;
     for (let i = 0; i < g.length; i++) h = (h * 31 + g.charCodeAt(i)) >>> 0;
-    // Must be 6-digit hex: sprite rendering appends hex alpha ("cc" etc).
-    c = hslToHex(h % 360, 75, 62);
+    // slate family: hue pinned to 210-230, low saturation, varied lightness
+    c = hslToHex(210 + (h % 20), 18, 55 + (h % 4) * 6);
     fallbackCache.set(g, c);
   }
   return c;
+}
+function familyOf(g: string): string {
+  return GROUP_FAMILY[g] ?? "other";
 }
 
 function hslToHex(h: number, s: number, l: number): string {
@@ -140,7 +179,7 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
   const [loading, setLoading] = useState(true);
   const [restored, setRestored] = useState(false);
   const [stats, setStats] = useState({ nodes: 0, links: 0 });
-  const [legend, setLegend] = useState<[string, string][]>([]);
+  const [legend, setLegend] = useState<{ family: string; groups: [string, string][] }[]>([]);
   const [query, setQuery] = useState("");
   const queryRef = useRef("");
   queryRef.current = query.trim().toLowerCase();
@@ -157,6 +196,9 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
     transform: d3.ZoomTransform;
     hoverId: string | null;
     focusId: string | null;
+    topHubs: Set<string>;   // top-N hubs by degree (mid-zoom labels)
+    dimEase: number;        // 0..1 eased amount of hover/search dimming
+    gestureUntil: number;   // suppress hover highlighting during pan/zoom
     hash: string;
     raf: number;
     driftT0: number;
@@ -173,6 +215,9 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
     transform: d3.zoomIdentity,
     hoverId: null,
     focusId: null,
+    topHubs: new Set(),
+    dimEase: 0,
+    gestureUntil: 0,
     hash: "",
     raf: 0,
     driftT0: 0,
@@ -264,14 +309,30 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
     s.hash = hash;
     setStats({ nodes: nodes.length, links: links.length });
 
-    // Dynamic legend: buckets actually present, biggest first.
+    // Dynamic legend: buckets actually present, grouped by hue family.
     const groupCounts = new Map<string, number>();
     for (const n of nodes) groupCounts.set(n.group, (groupCounts.get(n.group) ?? 0) + 1);
+    const byFamily = new Map<string, [string, number][]>();
+    for (const [g, cnt] of groupCounts) {
+      const f = familyOf(g);
+      const arr = byFamily.get(f) ?? [];
+      arr.push([g, cnt]);
+      byFamily.set(f, arr);
+    }
     setLegend(
-      [...groupCounts.entries()]
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 8)
-        .map(([g]) => [g, colorOf(g)] as [string, string])
+      FAMILY_ORDER
+        .filter(f => byFamily.has(f))
+        .map(f => ({
+          family: FAMILY_LABEL[f] ?? f,
+          groups: (byFamily.get(f) ?? [])
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5)
+            .map(([g]) => [g, colorOf(g)] as [string, string]),
+        }))
+    );
+    // Top-N hubs by degree: the only nodes labeled at mid zoom.
+    s.topHubs = new Set(
+      [...degree.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([id]) => id)
     );
     // Debug/verification hook: bucket distribution + radius range.
     const degs = nodes.map(n => degree.get(n.id) ?? 0);
@@ -287,11 +348,36 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
       if (!s.sprites.has(c)) s.sprites.set(c, makeGlowSprite(c));
     }
 
+    // Per-folder centroid attraction: each tick, nodes are pulled toward the
+    // live centroid of their folder so same-colored nodes settle into
+    // neighborhoods and the family palette reads as spatial zones.
+    const groupCentroidForce = (strength: number) => {
+      let fNodes: GNode[] = [];
+      const force = (alpha: number) => {
+        const cents = new Map<string, { x: number; y: number; n: number }>();
+        for (const n of fNodes) {
+          const c = cents.get(n.group) ?? { x: 0, y: 0, n: 0 };
+          c.x += n.x ?? 0; c.y += n.y ?? 0; c.n++;
+          cents.set(n.group, c);
+        }
+        for (const n of fNodes) {
+          const c = cents.get(n.group);
+          if (!c || c.n < 2) continue;
+          const cx = c.x / c.n, cy = c.y / c.n;
+          n.vx = (n.vx ?? 0) + (cx - (n.x ?? 0)) * strength * alpha;
+          n.vy = (n.vy ?? 0) + (cy - (n.y ?? 0)) * strength * alpha;
+        }
+      };
+      force.initialize = (ns: GNode[]) => { fNodes = ns; };
+      return force;
+    };
+
     const sim = d3.forceSimulation<GNode>(nodes)
       .force("link", d3.forceLink<GNode, GLink>(links as unknown as GLink[]).id(d => d.id).distance(85).strength(0.12))
       .force("charge", d3.forceManyBody().strength(-220).distanceMin(8).distanceMax(800))
       .force("x", d3.forceX(W / 2).strength(0.02))
       .force("y", d3.forceY(H / 2).strength(0.02))
+      .force("cluster", groupCentroidForce(0.35))
       .force("collision", d3.forceCollide<GNode>(d => radiusOf(d.id) + 10))
       .alphaDecay(0.03)
       .velocityDecay(0.4);
@@ -426,6 +512,12 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
       .scaleExtent([0.06, 8])
       .on("zoom", (e) => {
         s.transform = e.transform;
+        if (e.sourceEvent) {
+          // Real pan/zoom gesture: suppress hover highlighting entirely so
+          // browsing never dims the graph mid-move.
+          s.gestureUntil = performance.now() + 250;
+          s.hoverId = null;
+        }
         if (Math.abs(Math.log(e.transform.k / lastK)) > 0.3) {
           lastK = e.transform.k;
           if (e.sourceEvent) sfx.play("graph-zoom");
@@ -452,6 +544,12 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
     };
 
     const onMove = (e: MouseEvent) => {
+      // No hover highlighting while a pan/zoom gesture is in flight (or for a
+      // beat after) so movement never triggers the dimmed state.
+      if (e.buttons !== 0 || performance.now() < s.gestureUntil) {
+        if (s.hoverId) s.hoverId = null;
+        return;
+      }
       const r = canvas.getBoundingClientRect();
       const hit = pick(e.clientX - r.left, e.clientY - r.top);
       const id = hit?.id ?? null;
@@ -586,6 +684,12 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
         for (const n of s.nodes) if (n.name.toLowerCase().includes(q)) active.add(n.id);
       }
 
+      // Smoothly ease the dim state in/out (~200ms) so hover highlighting
+      // never snaps; blend() mixes base and dimmed alphas by that ease.
+      s.dimEase += ((active ? 1 : 0) - s.dimEase) * 0.16;
+      if (s.dimEase < 0.01) s.dimEase = 0;
+      const blend = (base: number, dimmed: number) => base + (dimmed - base) * s.dimEase;
+
       ctx.save();
       ctx.translate(t.x, t.y);
       ctx.scale(t.k, t.k);
@@ -601,7 +705,8 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
             (s.focusId != null && (l.source.id === s.focusId || l.target.id === s.focusId))
           : false;
         ctx.strokeStyle = hot ? colorOf(l.source.group) : "#7fa8d9";
-        ctx.globalAlpha = active ? (hot ? 0.55 : 0.03) : 0.1;
+        // dimmed links keep a visible floor instead of vanishing to near-zero
+        ctx.globalAlpha = hot ? blend(0.1, 0.55) : blend(0.1, 0.06);
         ctx.lineWidth = (hot ? 1.4 : 0.6) / t.k;
         ctx.beginPath();
         const mx = (x1 + x2) / 2 - (y2 - y1) * 0.12;
@@ -621,21 +726,25 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
         const isHot = !active || active.has(n.id);
         const isFocal = n.id === s.hoverId || n.id === s.focusId;
         const isHub = deg >= HUB_DEG;
-        ctx.globalAlpha = isHot ? 1 : 0.13;
         const sprite = s.sprites.get(color);
         if (sprite) {
           // Hubs get a clearly wider, brighter halo than leaves.
           const gs = r * (isFocal ? 7 : isHub ? 5.8 : 4);
-          ctx.globalAlpha = (isHot ? (isFocal ? 0.95 : isHub ? 0.75 : 0.45) : 0.06);
+          const full = isFocal ? 0.95 : isHub ? 0.75 : 0.45;
+          ctx.globalAlpha = isHot ? full : blend(full, 0.16);
           ctx.drawImage(sprite, x - gs / 2, y - gs / 2, gs, gs);
         }
-        ctx.globalAlpha = isHot ? (isHub ? 1 : 0.92) : 0.18;
+        // dim floor raised to 0.35: non-neighborhood nodes stay clearly visible
+        {
+          const full = isHub ? 1 : 0.92;
+          ctx.globalAlpha = isHot ? full : blend(full, 0.35);
+        }
         ctx.fillStyle = color;
         ctx.beginPath();
         ctx.arc(x, y, r, 0, Math.PI * 2);
         ctx.fill();
         if (isFocal || isHub) {
-          ctx.globalAlpha = isHot ? 0.9 : 0.2;
+          ctx.globalAlpha = isHot ? 0.9 : blend(0.9, 0.3);
           ctx.fillStyle = "#ffffff";
           ctx.beginPath();
           ctx.arc(x, y, Math.max(1.2, r * 0.35), 0, Math.PI * 2);
@@ -643,8 +752,11 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
         }
       }
 
-      // labels: fade in by zoom level; hovered/focused/hub always
-      const labelAlpha = Math.max(0, Math.min(0.9, (t.k - 1.0) / 0.8));
+      // labels: quiet by default. Every label only appears at deep zoom; at
+      // mid zoom only the top-8 hubs by degree get a label; hovered, focused
+      // and search-matched nodes are always labeled. All fades are smooth.
+      const labelAlpha = Math.max(0, Math.min(0.9, (t.k - 2.4) / 0.9));   // deep zoom only
+      const hubAlpha = Math.max(0, Math.min(0.65, (t.k - 1.15) / 0.7));   // mid zoom, top hubs only
       ctx.textAlign = "center";
       ctx.font = `${Math.max(9, 11 / t.k)}px system-ui, sans-serif`;
       for (let i = 0; i < s.nodes.length; i++) {
@@ -653,9 +765,9 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
         const isFocal = n.id === s.hoverId || n.id === s.focusId;
         const inHood = active?.has(n.id) ?? false;
         let a = labelAlpha;
+        if (s.topHubs.has(n.id)) a = Math.max(a, hubAlpha);
+        if (active) a = inHood ? Math.max(a, 0.85 * s.dimEase) : a * (1 - s.dimEase);
         if (isFocal) a = 1;
-        else if (active) a = inHood ? Math.max(labelAlpha, 0.85) : 0;
-        else if (deg >= HUB_DEG) a = Math.max(labelAlpha, 0.6);
         if (a <= 0.02) continue;
         const x = driftX(n, i), y = driftY(n, i);
         const r = nodeRadius(deg);
@@ -727,10 +839,15 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
         border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: "8px 12px",
         display: "flex", flexDirection: "column", gap: 4,
       }}>
-        {legend.map(([name, color]) => (
-          <div key={name} style={{ display: "flex", alignItems: "center", gap: 7 }}>
-            <span style={{ width: 7, height: 7, borderRadius: "50%", background: color, boxShadow: `0 0 6px ${color}` }} />
-            <span style={{ fontSize: 10, color: "var(--text-secondary)", textTransform: "capitalize" }}>{name}</span>
+        {legend.map(({ family, groups }) => (
+          <div key={family}>
+            <p style={{ fontSize: 8.5, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 2 }}>{family}</p>
+            {groups.map(([name, color]) => (
+              <div key={name} style={{ display: "flex", alignItems: "center", gap: 7, paddingLeft: 6 }}>
+                <span style={{ width: 7, height: 7, borderRadius: "50%", background: color, boxShadow: `0 0 6px ${color}` }} />
+                <span style={{ fontSize: 10, color: "var(--text-secondary)", textTransform: "capitalize" }}>{name}</span>
+              </div>
+            ))}
           </div>
         ))}
       </div>

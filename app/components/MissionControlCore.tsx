@@ -211,6 +211,7 @@ export type Selection =
   | { type: "artifact"; id: string }
   | { type: "client"; name: string }
   | { type: "stat"; key: string }
+  | { type: "watchdog" }
   | null;
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -311,6 +312,7 @@ type Hover =
   | { kind: "agent"; key: string }
   | { kind: "system"; id: string }
   | { kind: "artifact"; id: string }
+  | { kind: "watchdog" }
   | null;
 
 // Tiny volume pill rendered inside the SVG map (numbers only, no clutter).
@@ -326,9 +328,13 @@ function VolPill({ x, y, text, color }: { x: number; y: number; text: string; co
   );
 }
 
-export function OpsMap({ agents, volumes, onSelect }: { agents: AgentCard[]; volumes?: Volumes; onSelect: (s: Selection) => void }) {
+export function OpsMap({ agents, volumes, watchdog, onSelect }: {
+  agents: AgentCard[]; volumes?: Volumes; watchdog?: WatchdogData | null; onSelect: (s: Selection) => void;
+}) {
   const [hover, setHover] = useState<Hover>(null);
   const W = 960, H = 500;
+  // Extra headroom above the agents arc for the watchdog overseer node.
+  const TOP = watchdog?.available ? 74 : 0;
   const shown = agents.filter(a => a.enabled);
   const agentPos = shown.map((a, i) => {
     const x = (W / (shown.length + 1)) * (i + 1);
@@ -368,7 +374,20 @@ export function OpsMap({ agents, volumes, onSelect }: { agents: AgentCard[]; vol
       hoverAgents.add(art.producedBy);
     }
   }
+
+  // Agents the watchdog is currently flagging: any non-OK state (LATE, SILENT,
+  // NEVER RUN) or an agent named in a problem line. The overseer node draws
+  // animated red alert lines down to exactly these.
+  const badState = (st?: string | null) => !!st && st !== "OK" && st !== "DISABLED";
+  const implicated = shown.filter(a =>
+    badState(a.watchdogState) ||
+    (watchdog?.problems ?? []).some(p => AGENT_MATCH[a.key]?.test(p.text))
+  );
+  if (hover?.kind === "watchdog") for (const a of implicated) hoverAgents.add(a.key);
   const hovering = hover !== null;
+  const wdProblems = !!watchdog && (watchdog.overall === "problems" || Math.max(watchdog.problemCount, watchdog.problems.length) > 0);
+  const wdColor = wdProblems ? "#f87171" : "#34d399";
+  const wdX = W / 2, wdY = -TOP + 30;
 
   return (
     <div style={{
@@ -376,7 +395,7 @@ export function OpsMap({ agents, volumes, onSelect }: { agents: AgentCard[]; vol
       border: "1px solid var(--border, rgba(255,255,255,0.08))",
       borderRadius: 14, padding: 8, overflowX: "auto",
     }}>
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", minWidth: 680, display: "block" }}>
+      <svg viewBox={`0 ${-TOP} ${W} ${H + TOP}`} style={{ width: "100%", minWidth: 680, display: "block" }}>
         <defs>
           <radialGradient id="mo-glow" cx="50%" cy="50%" r="50%">
             <stop offset="0%" stopColor="rgba(34,211,238,0.25)" />
@@ -435,6 +454,44 @@ export function OpsMap({ agents, volumes, onSelect }: { agents: AgentCard[]; vol
             </g>
           );
         })}
+
+        {/* watchdog overseer: alert lines down to implicated agents */}
+        {watchdog?.available && implicated.map(a => {
+          const p = agentPos.find(ap => ap.a.key === a.key);
+          if (!p) return null;
+          const midY = (wdY + p.y) / 2;
+          const d = `M ${wdX} ${wdY + 18} C ${wdX} ${midY}, ${p.x} ${midY}, ${p.x} ${p.y - 26}`;
+          return (
+            <g key={`wd-${a.key}`}>
+              <path d={d} fill="none" stroke="#f87171" strokeOpacity={0.5} strokeWidth={1.6} />
+              <path d={d} fill="none" stroke="#f87171" strokeWidth={2.4}
+                strokeDasharray="4 14" strokeLinecap="round" className="mo-flow" />
+            </g>
+          );
+        })}
+
+        {/* watchdog overseer node */}
+        {watchdog?.available && (
+          <g className="mo-click"
+            onMouseEnter={() => { sfx.play("hover"); setHover({ kind: "watchdog" }); }}
+            onMouseLeave={() => setHover(h => (h?.kind === "watchdog" ? null : h))}
+            onClick={() => { sfx.play("blip-watchdog"); onSelect({ type: "watchdog" }); }}>
+            {wdProblems && <circle cx={wdX} cy={wdY} r={34} fill="url(#mo-glow)" />}
+            <circle cx={wdX} cy={wdY} r={18} fill="rgba(13,17,23,0.95)" stroke={wdColor}
+              strokeWidth={2} className={wdProblems ? "mo-node-pulse" : undefined} />
+            <circle cx={wdX} cy={wdY - 25} r={3.5} fill={wdColor} className={wdProblems ? "mo-pulse" : undefined} />
+            <text x={wdX} y={wdY + 3.5} textAnchor="middle" fill={wdColor} fontSize="8.5"
+              fontFamily="'JetBrains Mono', monospace" letterSpacing="0.06em" style={{ pointerEvents: "none" }}>
+              WATCHDOG
+            </text>
+            <text x={wdX} y={wdY + 34} textAnchor="middle" fill={wdProblems ? "#f87171" : "#6b7280"} fontSize="8.5"
+              fontFamily="'JetBrains Mono', monospace" style={{ pointerEvents: "none" }}>
+              {wdProblems
+                ? `${Math.max(watchdog.problemCount, watchdog.problems.length)} problem${Math.max(watchdog.problemCount, watchdog.problems.length) === 1 ? "" : "s"}`
+                : "all clear"}
+            </text>
+          </g>
+        )}
 
         {/* agent nodes */}
         {agentPos.map(({ a, x, y }) => {
@@ -583,6 +640,72 @@ function relAge(min: number | null): string {
   return `${Math.floor(h / 24)}d ago`;
 }
 
+// Build the full watchdog report as clean plain text for pasting elsewhere.
+function watchdogReportText(w: WatchdogData): string {
+  const lines: string[] = [];
+  const count = Math.max(w.problemCount, w.problems.length);
+  lines.push(
+    w.overall === "problems" || count > 0
+      ? `WATCHDOG REPORT: ${count} problem${count === 1 ? "" : "s"} reported`
+      : "WATCHDOG REPORT: all systems reporting, no problems"
+  );
+  if (w.problems.length) {
+    lines.push("");
+    lines.push("Problems:");
+    for (const p of w.problems) lines.push(`- ${p.text}${p.url && !p.text.includes(p.url) ? ` (${p.url})` : ""}`);
+  }
+  if (w.resolved.length) {
+    lines.push("");
+    lines.push("Resolved:");
+    for (const r of w.resolved) lines.push(`- ${r}`);
+  }
+  const agentKeys = Object.keys(w.agents ?? {});
+  if (agentKeys.length) {
+    lines.push("");
+    lines.push("Agent states:");
+    for (const k of agentKeys) lines.push(`- ${k}: ${w.agents[k]}`);
+  }
+  lines.push("");
+  lines.push(`Last watchdog report: ${w.updated ?? "unknown"}`);
+  return lines.join("\n");
+}
+
+// Small copy-icon button that copies the full watchdog report as plain text.
+function WatchdogCopyButton({ watchdog, color }: { watchdog: WatchdogData; color: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      title="Copy the full watchdog report"
+      aria-label="Copy watchdog report"
+      onClick={(e) => {
+        e.stopPropagation();
+        navigator.clipboard?.writeText(watchdogReportText(watchdog)).then(() => {
+          sfx.play("send");
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        }).catch(() => {});
+      }}
+      style={{
+        background: "none", border: `1px solid ${copied ? "#34d399" : color}55`,
+        color: copied ? "#34d399" : color, borderRadius: 6, padding: "2px 8px",
+        cursor: "pointer", fontSize: 10, display: "inline-flex", alignItems: "center", gap: 5,
+        fontFamily: "'JetBrains Mono', monospace", flexShrink: 0,
+      }}>
+      {copied ? (
+        "Copied"
+      ) : (
+        <>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <rect x="9" y="9" width="13" height="13" rx="2" />
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+          </svg>
+          copy
+        </>
+      )}
+    </button>
+  );
+}
+
 export function WatchdogBanner({ watchdog }: { watchdog?: WatchdogData | null }) {
   const [expanded, setExpanded] = useState<boolean | null>(null);
   const mono = "'JetBrains Mono', monospace";
@@ -621,6 +744,9 @@ export function WatchdogBanner({ watchdog }: { watchdog?: WatchdogData | null })
           <span style={{ fontSize: 11, letterSpacing: "0.1em", color: "#34d399" }}>
             ALL SYSTEMS REPORTING - watchdog checked {relAge(ageMin)}
           </span>
+          <span style={{ marginLeft: "auto" }}>
+            <WatchdogCopyButton watchdog={watchdog} color="#34d399" />
+          </span>
         </div>
       </div>
     );
@@ -655,8 +781,11 @@ export function WatchdogBanner({ watchdog }: { watchdog?: WatchdogData | null })
             report is also late ({relAge(ageMin)})
           </span>
         )}
-        <span style={{ marginLeft: "auto", fontSize: 10, color: "var(--text-muted, #6b7280)" }}>
-          {isOpen ? "collapse" : "expand"}
+        <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 8 }}>
+          <WatchdogCopyButton watchdog={watchdog} color={color} />
+          <span style={{ fontSize: 10, color: "var(--text-muted, #6b7280)" }}>
+            {isOpen ? "collapse" : "expand"}
+          </span>
         </span>
       </div>
 
@@ -1266,6 +1395,157 @@ function StatPanel({ statKey, onClose, onSelect }: {
   );
 }
 
+// ── Scheduler calendar (the known cron schedule as a week grid + today list)
+// Derived from the crons the mission API already knows about. Times are local.
+interface CalEntry {
+  key: string; // agent key, or "watchdog" for the overseer
+  label: string;
+  color: string;
+  days: number[]; // 0=Mon .. 6=Sun
+  time?: string; // "07:00" single daily/weekly fire
+  band?: { start: string; end: string; every: string; everyMin: number }; // high-frequency window
+}
+const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
+const CAL_ENTRIES: CalEntry[] = [
+  { key: "b2b-prospector-daily", label: "Prospector", color: "#fbbf24", days: ALL_DAYS, time: "06:15" },
+  { key: "sentinel-daily", label: "Sentinel", color: "#34d399", days: ALL_DAYS, time: "07:00" },
+  { key: "content-engine-weekly", label: "Content Engine", color: "#f472b6", days: [0], time: "07:00" },
+  { key: "renewal-content-weekly", label: "Renewal Content", color: "#a78bfa", days: [0], time: "07:40" },
+  { key: "chronicler-end-of-day", label: "Chronicler", color: "#60a5fa", days: ALL_DAYS, time: "21:47" },
+  { key: "b2b-outreach-engine", label: "Outreach", color: "#22d3ee", days: ALL_DAYS, band: { start: "08:00", end: "20:00", every: "every 30 min", everyMin: 30 } },
+  { key: "watchdog", label: "Watchdog", color: "#f87171", days: ALL_DAYS, band: { start: "06:00", end: "22:00", every: "every 2h", everyMin: 120 } },
+];
+const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const CAL_START_MIN = 5 * 60 + 30; // grid spans 5:30am
+const CAL_END_MIN = 22 * 60 + 45;  // ...to 10:45pm
+
+function hm(t: string): number {
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + m;
+}
+function fmtClock(t: string): string {
+  const [h, m] = t.split(":").map(Number);
+  const hr = ((h + 11) % 12) + 1;
+  return `${hr}:${String(m).padStart(2, "0")}${h < 12 ? "am" : "pm"}`;
+}
+// Monday-based day index for a Date.
+function dayIdx(d: Date): number {
+  return (d.getDay() + 6) % 7;
+}
+// Next fire time for an entry, from now.
+function nextFire(e: CalEntry): Date | null {
+  const now = new Date();
+  for (let add = 0; add < 8; add++) {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + add);
+    if (!e.days.includes(dayIdx(d))) continue;
+    if (e.time) {
+      const cand = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, hm(e.time));
+      if (cand.getTime() > now.getTime()) return cand;
+    } else if (e.band) {
+      const start = hm(e.band.start), end = hm(e.band.end);
+      for (let t = start; t <= end; t += e.band.everyMin) {
+        const cand = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, t);
+        if (cand.getTime() > now.getTime()) return cand;
+      }
+    }
+  }
+  return null;
+}
+
+export function SchedulerCalendar({ agents, onSelect }: { agents: AgentCard[]; onSelect: (s: Selection) => void }) {
+  const byKey = new Map(agents.map(a => [a.key, a]));
+  // Only show entries for agents that exist and are enabled (watchdog always shows).
+  const entries = CAL_ENTRIES.filter(e => e.key === "watchdog" || (byKey.get(e.key)?.enabled ?? false));
+  const gridH = 200;
+  const yOf = (min: number) => ((min - CAL_START_MIN) / (CAL_END_MIN - CAL_START_MIN)) * gridH;
+  const today = dayIdx(new Date());
+  const open = (e: CalEntry) => {
+    sfx.play("blip");
+    onSelect(e.key === "watchdog" ? { type: "watchdog" } : { type: "agent", key: e.key });
+  };
+
+  // Today's ordered timeline: one row per entry that fires today.
+  const todayRows = entries
+    .filter(e => e.days.includes(today))
+    .map(e => {
+      const nf = nextFire(e);
+      const when = e.time ? fmtClock(e.time) : `${fmtClock(e.band!.start)}-${fmtClock(e.band!.end)} ${e.band!.every}`;
+      return { e, when, sortMin: e.time ? hm(e.time) : hm(e.band!.start), next: nf };
+    })
+    .sort((a, b) => a.sortMin - b.sortMin);
+
+  return (
+    <div>
+      {/* week grid: days as columns, runs as chips/bands at their time slot */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
+        {DAY_LABELS.map((dl, di) => (
+          <div key={dl}>
+            <div style={{
+              fontSize: 9, letterSpacing: "0.1em", textAlign: "center", marginBottom: 4,
+              fontFamily: "'JetBrains Mono', monospace",
+              color: di === today ? "var(--accent, #22d3ee)" : "var(--text-muted)",
+            }}>{dl.toUpperCase()}</div>
+            <div style={{
+              position: "relative", height: gridH, borderRadius: 6,
+              background: di === today ? "rgba(34,211,238,0.05)" : "rgba(255,255,255,0.02)",
+              border: `1px solid ${di === today ? "rgba(34,211,238,0.25)" : "var(--border, rgba(255,255,255,0.06))"}`,
+              overflow: "hidden",
+            }}>
+              {entries.filter(e => e.days.includes(di)).map(e => e.band ? (
+                <div key={e.key} className="mo-click" onClick={() => open(e)}
+                  title={`${e.label}: ${e.band.every}, ${fmtClock(e.band.start)}-${fmtClock(e.band.end)}`}
+                  style={{
+                    position: "absolute", left: "12%", width: "20%",
+                    top: yOf(hm(e.band.start)), height: yOf(hm(e.band.end)) - yOf(hm(e.band.start)),
+                    background: `${e.color}22`, borderLeft: `2px solid ${e.color}`, borderRadius: 3,
+                  }} />
+              ) : (
+                <div key={e.key} className="mo-click" onClick={() => open(e)}
+                  title={`${e.label} at ${fmtClock(e.time!)}`}
+                  style={{
+                    position: "absolute", left: "38%", right: "6%",
+                    top: Math.max(0, yOf(hm(e.time!)) - 3), height: 6,
+                    background: e.color, borderRadius: 3, opacity: 0.9,
+                  }} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* legend for the chips */}
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 8 }}>
+        {entries.map(e => (
+          <span key={e.key} className="mo-click" onClick={() => open(e)}
+            style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 10, color: "var(--text-secondary)", fontFamily: "'JetBrains Mono', monospace" }}>
+            <span style={{ width: 8, height: 8, borderRadius: 2, background: e.color, flexShrink: 0 }} />
+            {e.label}
+          </span>
+        ))}
+      </div>
+
+      {/* today: ordered timeline with next-fire countdowns */}
+      <div style={{ marginTop: 14 }}>
+        <div style={{ fontSize: 10, letterSpacing: "0.14em", color: "var(--text-muted)", textTransform: "uppercase", marginBottom: 6 }}>
+          Today ({DAY_LABELS[today]})
+        </div>
+        {todayRows.length === 0 && <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Nothing scheduled today.</div>}
+        {todayRows.map(({ e, when, next }) => (
+          <div key={e.key} className="mo-click" onClick={() => open(e)}
+            style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, marginBottom: 6 }}>
+            <Dot color={e.color} />
+            <span style={{ fontWeight: 600 }}>{byKey.get(e.key)?.name ?? e.label}</span>
+            <span style={{ color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace", fontSize: 10.5 }}>{when}</span>
+            <span style={{ marginLeft: "auto", color: "var(--accent, #22d3ee)", fontFamily: "'JetBrains Mono', monospace", fontSize: 10.5 }}>
+              {next ? `next ${fmtCountdown(next.toISOString())}` : "done for today"}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── System panel (computed client-side from the main payload) ──────────────
 function SystemPanel({ systemId, data, onSelect, onClose }: {
   systemId: string; data: MissionData; onSelect: (s: Selection) => void; onClose: () => void;
@@ -1313,6 +1593,12 @@ function SystemPanel({ systemId, data, onSelect, onClose }: {
         </Section>
       )}
 
+      {systemId === "scheduler" && (
+        <Section title="Calendar">
+          <SchedulerCalendar agents={data.agents} onSelect={onSelect} />
+        </Section>
+      )}
+
       <Section title={`Agents (${touching.length})`} defaultOpen>
         {touching.map(a => (
           <div key={a.key} className="mo-click" style={{
@@ -1351,7 +1637,8 @@ function SystemPanel({ systemId, data, onSelect, onClose }: {
 }
 
 // ── Client health panel ────────────────────────────────────────────────────
-function ClientPanel({ name, data, onClose }: { name: string; data: MissionData; onClose: () => void }) {
+// Exported so the main app's Clients section reuses the exact same panel.
+export function ClientPanel({ name, data, onClose }: { name: string; data: MissionData; onClose: () => void }) {
   const c = data.health?.clients.find(x => x.client === name);
   if (!c) return null;
   const accent = STATUS_COLOR[c.overall];
@@ -1424,6 +1711,110 @@ function ClientPanel({ name, data, onClose }: { name: string; data: MissionData;
   );
 }
 
+// ── Watchdog report panel (opened from the overseer node on the map) ───────
+function WatchdogPanel({ watchdog, onClose }: { watchdog?: WatchdogData | null; onClose: () => void }) {
+  const hasProblems = !!watchdog && (watchdog.overall === "problems" || Math.max(watchdog.problemCount, watchdog.problems.length) > 0);
+  const accent = hasProblems ? "#f87171" : "#34d399";
+  const ageMin = watchdog ? watchdogAgeMin(watchdog.updated) : null;
+  return (
+    <SlideOver title="WATCHDOG" accent={accent} onClose={onClose}>
+      {(!watchdog || !watchdog.available) && (
+        <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>The watchdog has not reported yet.</div>
+      )}
+      {watchdog?.available && (
+        <>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <Pill text={hasProblems ? `${Math.max(watchdog.problemCount, watchdog.problems.length)} PROBLEMS` : "ALL CLEAR"} color={accent} />
+            <Pill text={`REPORT ${relAge(ageMin).toUpperCase()}`} color="var(--text-muted, #6b7280)" />
+            <span style={{ marginLeft: "auto" }}>
+              <WatchdogCopyButton watchdog={watchdog} color={accent} />
+            </span>
+          </div>
+
+          <SummaryBlock accent={accent} lines={[
+            hasProblems
+              ? `The watchdog is reporting ${Math.max(watchdog.problemCount, watchdog.problems.length)} open problem${Math.max(watchdog.problemCount, watchdog.problems.length) === 1 ? "" : "s"}.`
+              : "Every agent is reporting on schedule. Nothing needs attention.",
+            `Last watchdog report ${relAge(ageMin)}.`,
+          ]} />
+
+          <Section title={`Problems (${watchdog.problems.length})`} defaultOpen={hasProblems}>
+            {watchdog.problems.length === 0 && <div style={{ fontSize: 12, color: "#34d399" }}>No problems listed.</div>}
+            {watchdog.problems.map((p, i) => (
+              <div key={i} style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 8, lineHeight: 1.5, borderLeft: `2px solid ${accent}55`, paddingLeft: 8 }}>
+                <ProblemLine p={p} color={accent} />
+              </div>
+            ))}
+          </Section>
+
+          {watchdog.resolved.length > 0 && (
+            <Section title={`Resolved (${watchdog.resolved.length})`}>
+              {watchdog.resolved.map((r, i) => (
+                <div key={i} style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 6, lineHeight: 1.5 }}>{r}</div>
+              ))}
+            </Section>
+          )}
+
+          <Section title={`Agent states (${Object.keys(watchdog.agents ?? {}).length})`} defaultOpen>
+            {Object.entries(watchdog.agents ?? {}).map(([k, v]) => (
+              <div key={k} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, marginBottom: 6 }}>
+                <Dot color={v === "SILENT" ? "#f87171" : v === "LATE" ? "#fb923c" : v === "DISABLED" ? "#6b7280" : "#34d399"} />
+                <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>{k}</span>
+                <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace" }}>{v}</span>
+              </div>
+            ))}
+            {Object.keys(watchdog.agents ?? {}).length === 0 && (
+              <div style={{ fontSize: 12, color: "var(--text-muted)" }}>No per-agent states in the report.</div>
+            )}
+          </Section>
+        </>
+      )}
+    </SlideOver>
+  );
+}
+
+// ── Standalone client health slide-over ────────────────────────────────────
+// Fetches mission data on demand and opens the SAME ClientPanel used in
+// Mission Control. Used by the main app's Clients section, where the mission
+// payload is not already loaded. Matches the health-board client name against
+// the given client name loosely (substring, either direction).
+export function ClientHealthSlideOver({ clientName, onClose }: { clientName: string; onClose: () => void }) {
+  const [data, setData] = useState<MissionData | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/mission", { cache: "no-store" })
+      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+      .then(j => { if (alive) setData(j); })
+      .catch(e => { if (alive) setErr(e instanceof Error ? e.message : "fetch failed"); });
+    return () => { alive = false; };
+  }, []);
+
+  const match = data?.health?.clients.find(c => {
+    const a = c.client.toLowerCase().trim();
+    const b = clientName.toLowerCase().trim();
+    return a === b || a.includes(b) || b.includes(a);
+  });
+
+  if (data && match) return <ClientPanel name={match.client} data={data} onClose={onClose} />;
+
+  return (
+    <SlideOver title={clientName.toUpperCase()} accent="#22d3ee" onClose={onClose}>
+      {!data && !err && (
+        <div style={{ fontSize: 12, color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace" }}>Loading client health...</div>
+      )}
+      {err && <div style={{ fontSize: 12, color: "#f87171" }}>Could not load client health ({err})</div>}
+      {data && !match && (
+        <div style={{ fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.6 }}>
+          No health-board entry for this client yet. Sentinel adds one on its next run
+          once the client is on the board.
+        </div>
+      )}
+    </SlideOver>
+  );
+}
+
 // ── Selection router: render whichever panel is open ───────────────────────
 export function MissionPanels({ selection, data, onSelect }: {
   selection: Selection; data: MissionData | null; onSelect: (s: Selection) => void;
@@ -1436,5 +1827,6 @@ export function MissionPanels({ selection, data, onSelect }: {
   if (!data) return null;
   if (selection.type === "system") return <SystemPanel systemId={selection.id} data={data} onSelect={onSelect} onClose={close} />;
   if (selection.type === "client") return <ClientPanel name={selection.name} data={data} onClose={close} />;
+  if (selection.type === "watchdog") return <WatchdogPanel watchdog={data.watchdog} onClose={close} />;
   return null;
 }

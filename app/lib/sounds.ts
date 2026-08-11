@@ -28,7 +28,8 @@ type SoundName =
   | "graph-zoom" // significant zoom change: very subtle woosh, throttled
   | "tree-open" // folder open: paper-ish tick up
   | "tree-close" // folder close: paper-ish tick down
-  | "graph-arrive"; // graph settle/load complete: quiet three-note arrival chime
+  | "graph-arrive" // graph settle/load complete: quiet three-note arrival chime
+  | "blip-watchdog"; // watchdog overseer node click: distinct lower-toned click
 
 class SfxEngine {
   private ctx: AudioContext | null = null;
@@ -261,6 +262,11 @@ class SfxEngine {
         this.tone({ freq: 523.25, type: "sine", decay: 0.2, gain: 0.28 });
         this.tone({ freq: 659.25, type: "sine", decay: 0.22, gain: 0.26, delay: 0.11 });
         this.tone({ freq: 783.99, type: "sine", decay: 0.34, gain: 0.24, delay: 0.22 });
+        break;
+      case "blip-watchdog": // watchdog overseer: low, serious double-thump click
+        this.tone({ freq: 180, endFreq: 150, type: "sine", attack: 0.004, decay: 0.14, gain: 0.8 });
+        this.tone({ freq: 360, type: "triangle", decay: 0.08, gain: 0.25, delay: 0.02 });
+        this.tone({ freq: 150, type: "sine", decay: 0.1, gain: 0.3, delay: 0.11 });
         break;
       case "hover": {
         // VERY quiet tick, throttled to at most ~8/sec

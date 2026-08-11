@@ -80,7 +80,7 @@ export default function MissionOps() {
           <NextUpStrip agents={data.agents} onSelect={setSelection} />
 
           {/* Ops map: click an agent or system for its detail panel */}
-          <OpsMap agents={data.agents} volumes={data.volumes} onSelect={setSelection} />
+          <OpsMap agents={data.agents} volumes={data.volumes} watchdog={data.watchdog} onSelect={setSelection} />
 
           <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.6fr) minmax(280px, 1fr)", gap: 20, alignItems: "start" }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 20, minWidth: 0 }}>

@@ -1,5 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
+import { ClientHealthSlideOver, MissionStyles } from "./MissionControlCore";
+import { sfx } from "../lib/sounds";
 
 const INDUSTRY_ICON: Record<string, string> = {
   roofing: "🏠", "roofing / exteriors": "🏠", paving: "🛣️", electrical: "⚡",
@@ -11,6 +13,10 @@ export default function ClientsBoard() {
   const [err, setErr] = useState("");
   const [showPipeline, setShowPipeline] = useState(false);
   const [ghlSnaps, setGhlSnaps] = useState<Record<string, any>>({});
+  // Clicking a client card opens the same health slide-over used in Mission
+  // Control (overall status, 5 pillars, flags, live site). The card content
+  // (GHL stats, contact links) stays visible behind the panel.
+  const [healthClient, setHealthClient] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/clients")
@@ -82,11 +88,14 @@ export default function ClientsBoard() {
         {paying.map((c: any) => {
           const icon = INDUSTRY_ICON[(c.industry || "").toLowerCase()] ?? "🏢";
           return (
-            <div key={c.file} style={{
-              background: "radial-gradient(ellipse 90% 70% at 50% -20%, rgba(52,211,153,0.12), transparent 60%), linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))",
-              border: "1px solid rgba(52,211,153,0.35)",
-              borderRadius: 14, padding: "16px 18px",
-            }}>
+            <div key={c.file}
+              onClick={() => { sfx.play("blip"); setHealthClient(c.name); }}
+              title="Click for client health"
+              style={{
+                background: "radial-gradient(ellipse 90% 70% at 50% -20%, rgba(52,211,153,0.12), transparent 60%), linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))",
+                border: "1px solid rgba(52,211,153,0.35)",
+                borderRadius: 14, padding: "16px 18px", cursor: "pointer",
+              }}>
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
                 <div style={{ display: "flex", gap: 10, alignItems: "center", minWidth: 0 }}>
                   <span style={{ fontSize: 20 }}>{icon}</span>
@@ -126,10 +135,11 @@ export default function ClientsBoard() {
               )}
               {(c.email || c.phone || c.ghlLocationId) && (
                 <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", marginTop: 12, paddingTop: 10, display: "flex", flexDirection: "column", gap: 4 }}>
-                  {c.email && <a href={`mailto:${c.email}`} style={{ fontSize: 11.5, color: "var(--text-secondary)", textDecoration: "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>✉ {c.email}</a>}
-                  {c.phone && <a href={`tel:${c.phone.replace(/\D/g, "")}`} style={{ fontSize: 11.5, color: "var(--text-secondary)", textDecoration: "none" }}>☎ {c.phone}</a>}
+                  {c.email && <a href={`mailto:${c.email}`} onClick={(e) => e.stopPropagation()} style={{ fontSize: 11.5, color: "var(--text-secondary)", textDecoration: "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>✉ {c.email}</a>}
+                  {c.phone && <a href={`tel:${c.phone.replace(/\D/g, "")}`} onClick={(e) => e.stopPropagation()} style={{ fontSize: 11.5, color: "var(--text-secondary)", textDecoration: "none" }}>☎ {c.phone}</a>}
                   {c.ghlLocationId && (
                     <a href={`https://app.gohighlevel.com/v2/location/${c.ghlLocationId}/`} target="_blank" rel="noreferrer"
+                      onClick={(e) => e.stopPropagation()}
                       style={{
                         marginTop: 6, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6,
                         fontSize: 11.5, fontWeight: 700, color: "#07080f", textDecoration: "none",
@@ -159,10 +169,13 @@ export default function ClientsBoard() {
               {pipeline.map((c: any) => {
                 const icon = INDUSTRY_ICON[(c.industry || "").toLowerCase()] ?? "🏢";
                 return (
-                  <div key={c.file} style={{
-                    background: "linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))",
-                    border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "12px 14px",
-                  }}>
+                  <div key={c.file}
+                    onClick={() => { sfx.play("blip"); setHealthClient(c.name); }}
+                    title="Click for client health"
+                    style={{
+                      background: "linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))",
+                      border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "12px 14px", cursor: "pointer",
+                    }}>
                     <div style={{ display: "flex", gap: 9, alignItems: "center", minWidth: 0 }}>
                       <span style={{ fontSize: 16 }}>{icon}</span>
                       <div style={{ minWidth: 0 }}>
@@ -176,6 +189,13 @@ export default function ClientsBoard() {
             </div>
           )}
         </div>
+      )}
+
+      {healthClient && (
+        <>
+          <MissionStyles />
+          <ClientHealthSlideOver clientName={healthClient} onClose={() => setHealthClient(null)} />
+        </>
       )}
     </div>
   );

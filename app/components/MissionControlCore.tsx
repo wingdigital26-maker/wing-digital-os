@@ -23,6 +23,7 @@ export interface AgentCard {
   role: string;
   schedule: string;
   enabled: boolean;
+  trial?: boolean; // disabled but in a trial period (amber), not retired (dimmed)
   pcNeeded: boolean;
   installed: boolean | null;
   lastRunAt: string | null;
@@ -106,6 +107,7 @@ export interface AgentDetail {
   schedule: string;
   scheduleHuman: string;
   enabled: boolean;
+  trial?: boolean;
   status: string;
   watchdogState?: string | null;
   installed: boolean | null;
@@ -162,6 +164,9 @@ export const AGENT_WIRES: Record<string, string[]> = {
   "renewal-content-weekly": ["vault", "clients", "website", "scheduler"],
   "b2b-outreach-engine": ["email", "ghl-wing", "scheduler"],
   "b2b-prospector-daily": ["vault", "ghl-wing", "scheduler"],
+  closer: ["ghl-wing", "email", "vault", "scheduler"],
+  "call-prep": ["vault", "clients", "ghl-wing", "scheduler"],
+  "client-report": ["ghl-clients", "clients", "website", "vault", "scheduler"],
   dispatch: ["vault", "ghl-clients", "ghl-wing"],
   "reply-triage": ["vault", "ghl-clients", "ghl-wing", "email"],
   builder: ["ghl-clients", "clients"],
@@ -176,6 +181,9 @@ export const AGENT_MATCH: Record<string, RegExp> = {
   "renewal-content-weekly": /\brenewal\b/i,
   "b2b-outreach-engine": /outreach|cold email|b2b/i,
   "b2b-prospector-daily": /prospector|lead scan|lead-find|b2b lead/i,
+  closer: /\bcloser\b/i,
+  "call-prep": /call[- ]prep/i,
+  "client-report": /client[- ]report/i,
   dispatch: /dispatch/i,
   "reply-triage": /reply-triage|triage/i,
   builder: /builder|onboard/i,
@@ -190,6 +198,9 @@ export const RUN_PHRASE: Record<string, string> = {
   "renewal-content-weekly": "run renewal-content-engine",
   "b2b-outreach-engine": "run outreach",
   "b2b-prospector-daily": "find B2B leads",
+  closer: "run closer",
+  "call-prep": "run call-prep",
+  "client-report": "run client-report for [client]",
   dispatch: "run dispatch",
   "reply-triage": "run reply-triage",
   builder: "run builder for [client]",
@@ -356,7 +367,8 @@ export function OpsMap({ agents, volumes, watchdog, onSelect, hero }: {
   // Extra headroom above the agents arc for the watchdog overseer node.
   // Extra headroom for the oversized boss orb (1.5x the agent nodes).
   const TOP = watchdog?.available ? 100 : 0;
-  const shown = agents.filter(a => a.enabled);
+  // Enabled agents plus trial agents (disabled but intentional, shown amber).
+  const shown = agents.filter(a => a.enabled || a.trial);
   const agentPos = shown.map((a, i) => {
     const x = (W / (shown.length + 1)) * (i + 1);
     // gentle arc: edges sit a bit lower than the middle
@@ -522,9 +534,10 @@ export function OpsMap({ agents, volumes, watchdog, onSelect, hero }: {
         {/* agent nodes */}
         {agentPos.map(({ a, x, y }) => {
           const active = isRecentlyActive(a);
+          const trial = !a.enabled && !!a.trial;
           const highlighted = hovering && hoverAgents.has(a.key);
           const dimmed = hovering && !highlighted;
-          const color = highlighted || active ? "#22d3ee" : "#4b5563";
+          const color = trial ? "#fb923c" : highlighted || active ? "#22d3ee" : "#4b5563";
           return (
             <g key={a.key} className="mo-click" opacity={dimmed ? 0.3 : 1}
               onMouseEnter={() => { sfx.play("hover"); setHover({ kind: "agent", key: a.key }); }}
@@ -533,17 +546,18 @@ export function OpsMap({ agents, volumes, watchdog, onSelect, hero }: {
               {(active || highlighted) && <circle cx={x} cy={y} r={32} fill="url(#mo-glow)" />}
               <circle cx={x} cy={y} r={21} fill="rgba(13,17,23,0.95)" stroke={color}
                 strokeWidth={highlighted ? 2.2 : 1.5}
+                strokeDasharray={trial ? "3 3" : undefined}
                 className={active ? "mo-node-pulse" : undefined} />
               <circle cx={x} cy={y - 28} r={3.5}
-                fill={a.watchdogState === "SILENT" ? "#f87171" : a.watchdogState === "LATE" ? "#fb923c" : active ? "#34d399" : "#4b5563"}
+                fill={a.watchdogState === "SILENT" ? "#f87171" : a.watchdogState === "LATE" ? "#fb923c" : trial ? "#fb923c" : active ? "#34d399" : "#4b5563"}
                 className={active || (a.watchdogState && a.watchdogState !== "OK") ? "mo-pulse" : undefined} />
-              <text x={x} y={y + 4} textAnchor="middle" fill={active || highlighted ? "#e5e7eb" : "#9ca3af"}
+              <text x={x} y={y + 4} textAnchor="middle" fill={trial ? "#fbbf24" : active || highlighted ? "#e5e7eb" : "#9ca3af"}
                 fontSize="9.5" fontFamily="'JetBrains Mono', monospace" style={{ pointerEvents: "none" }}>
                 {a.name.split(" ")[0].slice(0, 9).toUpperCase()}
               </text>
-              <text x={x} y={y + 40} textAnchor="middle" fill="#6b7280" fontSize="8.5"
+              <text x={x} y={y + 40} textAnchor="middle" fill={trial ? "#fb923c" : "#6b7280"} fontSize="8.5"
                 fontFamily="'JetBrains Mono', monospace" style={{ pointerEvents: "none" }}>
-                {a.nextRunAt ? fmtCountdown(a.nextRunAt) : a.lastLogDate ?? ""}
+                {trial ? "TRIAL" : a.nextRunAt ? fmtCountdown(a.nextRunAt) : a.lastLogDate ?? ""}
               </text>
             </g>
           );
@@ -1167,7 +1181,9 @@ export function AgentTile({ a, onSelect }: { a: AgentCard; onSelect: (s: Selecti
   let color = "var(--text-muted, #6b7280)";
   let pulse = false;
   let line = a.schedule;
-  if (!a.enabled) { line = "disabled"; }
+  const trial = !a.enabled && !!a.trial;
+  if (trial) { color = "#fb923c"; line = "TRIAL"; }
+  else if (!a.enabled) { line = "disabled"; }
   else if (a.watchdogState === "SILENT") { color = "#f87171"; pulse = true; line = "SILENT (Da Boss)"; }
   else if (a.watchdogState === "LATE") { color = "#fb923c"; pulse = true; line = "LATE (Da Boss)"; }
   else if (a.pcNeeded && a.kind === "scheduled") { color = "#fb923c"; line = "PC needed"; }
@@ -1184,14 +1200,19 @@ export function AgentTile({ a, onSelect }: { a: AgentCard; onSelect: (s: Selecti
         border: "1px solid var(--border, rgba(255,255,255,0.06))",
         borderRadius: 12, padding: "12px 16px",
         display: "flex", alignItems: "center", gap: 10,
-        opacity: a.enabled ? 1 : 0.5,
+        opacity: a.enabled || trial ? 1 : 0.5,
+        borderColor: trial ? "rgba(251,146,60,0.4)" : undefined,
       }}
     >
       <Dot color={color} pulse={pulse} />
       <span style={{ fontWeight: 600, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.name}</span>
-      <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace", whiteSpace: "nowrap" }}>
-        {line}
-      </span>
+      {trial ? (
+        <span style={{ marginLeft: "auto" }}><Pill text="TRIAL" color="#fb923c" /></span>
+      ) : (
+        <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace", whiteSpace: "nowrap" }}>
+          {line}
+        </span>
+      )}
     </div>
   );
 }
@@ -1560,6 +1581,7 @@ function AgentPanel({ agentKey, onClose, onSelect }: {
   const statusColor =
     detail?.status === "active" ? "#34d399" :
     detail?.status === "scheduled" ? "#22d3ee" :
+    detail?.status === "trial" ? "#fb923c" :
     detail?.status === "disabled" ? "#6b7280" : "#9ca3af";
 
   const producedArtifacts = ARTIFACTS.filter(a => a.producedBy === agentKey);

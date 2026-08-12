@@ -99,11 +99,21 @@ const SCHEDULED: ScheduledMeta[] = [
   { key: "renewal-content-weekly", name: "Renewal Engine", role: "Renewal Health weekly content, health-gated publishing", schedule: "Mon 7:44am", enabled: true, match: /\brenewal\b/i, next: () => nextWeekly(1, 7, 44) },
   { key: "b2b-outreach-engine", name: "Outreach", role: "B2B cold email sender, LIVE since 8/6 — window + cap check, dry-run, then live send", schedule: "Every 30 min, 8am-8pm", enabled: true, match: /outreach|cold email|b2b/i, next: nextEvery30 },
   { key: "b2b-prospector-daily", name: "Prospector", role: "Daily B2B lead scout — refills the pipeline so outreach never runs dry", schedule: "Daily 6:15am", enabled: true, match: /prospector|lead scan|lead-find|b2b lead/i, next: () => nextDaily(6, 15) },
+  // TRIAL agents: real scheduled tasks that are DISABLED (in a trial period).
+  // They render as amber "TRIAL" (intentional, invites a Run-now), never as the
+  // dimmed "retired" look reserved for the superseded relics below.
+  { key: "closer", name: "Closer", role: "Turns hot replies into booked calls, draft-only", schedule: "Every 30-60 min, 8am-6pm (trial)", enabled: false, match: /\bcloser\b/i, next: () => null },
+  { key: "call-prep", name: "Call Prep", role: "One-page research brief per prospect before calls", schedule: "Early morning after Dispatch (trial)", enabled: false, match: /call[- ]prep/i, next: () => null },
+  { key: "client-report", name: "Client Report", role: "Monthly branded value report per paying client", schedule: "1st of the month, per client (trial)", enabled: false, match: /client[- ]report/i, next: () => null },
 ];
 
-// Note: wing-digital-daily-outreach and wing-audit-roofing-batch still exist on
-// disk but are superseded Apollo-era relics. They are intentionally absent from
-// SCHEDULED (shown nowhere) so they can never be confused with the live tasks.
+// Retired: superseded Apollo-era relics that still exist on disk. A DISABLED task
+// in this set stays dimmed "retired"; a DISABLED task NOT in this set is a live
+// "trial". wing-digital-daily-outreach / wing-audit-roofing-batch are also absent
+// from SCHEDULED entirely so they can never be confused with the live tasks.
+const RETIRED = new Set<string>(["wing-digital-daily-outreach", "wing-audit-roofing-batch"]);
+// A disabled task is a "trial" (amber, Run-now) unless it is a retired relic.
+const isTrial = (key: string, enabled: boolean) => !enabled && !RETIRED.has(key);
 
 // On-demand crew: static roster, last-seen resolved from log.md.
 const CREW = [
@@ -691,6 +701,25 @@ const AGENT_SYSTEMS: Record<string, Wire[]> = {
     { id: "ghl-wing", label: "GHL WING", direction: "reads" },
     { id: "scheduler", label: "SCHEDULER", direction: "reads" },
   ],
+  closer: [
+    { id: "ghl-wing", label: "GHL WING", direction: "both" },
+    { id: "email", label: "EMAIL", direction: "reads" },
+    { id: "vault", label: "VAULT", direction: "writes" },
+    { id: "scheduler", label: "SCHEDULER", direction: "reads" },
+  ],
+  "call-prep": [
+    { id: "vault", label: "VAULT", direction: "both" },
+    { id: "clients", label: "CLIENTS", direction: "reads" },
+    { id: "ghl-wing", label: "GHL WING", direction: "reads" },
+    { id: "scheduler", label: "SCHEDULER", direction: "reads" },
+  ],
+  "client-report": [
+    { id: "ghl-clients", label: "GHL", direction: "reads" },
+    { id: "clients", label: "CLIENTS", direction: "reads" },
+    { id: "website", label: "WEB/SEO", direction: "reads" },
+    { id: "vault", label: "VAULT", direction: "writes" },
+    { id: "scheduler", label: "SCHEDULER", direction: "reads" },
+  ],
   dispatch: [
     { id: "vault", label: "VAULT", direction: "writes" },
     { id: "ghl-clients", label: "GHL", direction: "reads" },
@@ -819,6 +848,9 @@ const CRON_HUMAN: Record<string, string> = {
   "renewal-content-weekly": "Runs every Monday morning at 7:44.",
   "b2b-outreach-engine": "Runs every 30 minutes from 8 in the morning to 8 at night, every day. Each run checks the send window and daily cap, dry-runs, then fires for real if clean.",
   "b2b-prospector-daily": "Runs every day at 6:15 in the morning, before the outreach window opens, to refill the lead pipeline.",
+  closer: "In trial, currently disabled in the scheduler. When armed it would run every 30 to 60 minutes during business hours (8am to 6pm). For now, run it by hand: say \"run closer\".",
+  "call-prep": "In trial, currently disabled in the scheduler. When armed it would run early each morning right after Dispatch. For now, run it by hand: say \"run call-prep\".",
+  "client-report": "In trial, currently disabled in the scheduler. When armed it would run on the 1st of each month for each paying client. For now, run it by hand: say \"run client-report for [client]\".",
 };
 
 // Concise role text used when no SKILL.md is on disk (cloud mode, crew agents).
@@ -835,6 +867,12 @@ const ROLE_LONG: Record<string, string> = {
     "Wing Digital's live B2B cold-email campaign, approved live by Jack on 2026-08-06. Every 30 minutes between 8am and 8pm it checks the send window and daily cap, dry-runs the outreach script, and only fires real sends when the dry run is clean. Never exceeds the daily cap, never touches client subaccounts, and stops loudly if anything looks broken.",
   "b2b-prospector-daily":
     "Daily 6:15am lead scout. Runs b2b-lead-find to scan DFW for high-value B2B, warehouse, and commercial-ops leads using the free scrapers (Google Maps + OpenStreetMap) and stages them in prospects.db so the outreach engine never runs dry. Finds and stages only, never sends.",
+  closer:
+    "Closer agent, in trial (disabled). Turns HOT and WARM cold-email replies from Wing Digital's own B2B outreach into booked 15-minute calls. Reads each prospect's full GHL thread, drafts a personalized, human, non-salesy reply that drives to the booking link, and queues it. Draft-only by default: it never sends to a real prospect without the closer:reply autonomy grant. Surfaces HOT drafts loudly so no hot lead rots.",
+  "call-prep":
+    "Call-Prep agent, in trial (disabled). Consumes Dispatch's ordered dial list and, for each prospect, produces a skimmable one-page brief: overview, the online-presence gaps Wing fixes, the decision-maker, a tailored opener, and the single strongest value hook, so Jack walks into every call informed.",
+  "client-report":
+    "Client-Report agent, in trial (disabled). On the 1st of each month, for each paying client, it pulls the month's real numbers (new leads, appointments, opportunities, content published with live links, GSC rankings and traffic, wins), computes month-over-month deltas, and assembles a branded, client-facing value report. Honest: zeros and declines are shown with context, never faked. Never auto-sends; it builds the deliverable and surfaces it for Jack to review and send.",
   dispatch:
     "Morning briefing agent. Regenerates campaign data, orders the day's dial list, checks GHL, and writes a one-page briefing so Jack is call-ready.",
   prospector:
@@ -928,8 +966,9 @@ async function agentDetail(key: string) {
   const description = readSkillDescription(key) ?? ROLE_LONG[key] ?? meta.role;
   const artifact = await buildArtifact(key);
 
+  const trial = isTrial(meta.key, meta.enabled);
   let status = "idle";
-  if (!meta.enabled) status = "disabled";
+  if (!meta.enabled) status = trial ? "trial" : "disabled";
   else if (activity.length && (Date.now() - new Date(activity[0].date).getTime()) / 86400000 <= 2) status = "active";
   else if (nextAt) status = "scheduled";
 
@@ -945,7 +984,9 @@ async function agentDetail(key: string) {
         ? `Last run ${new Date(st.lastRunAt ?? st.lastRun).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}.`
         : "No recorded activity yet.",
     next: !meta.enabled
-      ? "Disabled. Nothing scheduled."
+      ? trial
+        ? "In trial, disabled in the scheduler. Run it now: tell Claude to run it by hand."
+        : "Disabled. Nothing scheduled."
       : nextAt
         ? `Next run ${nextAt.toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit" })}.`
         : isScheduled
@@ -962,6 +1003,7 @@ async function agentDetail(key: string) {
     schedule: meta.schedule,
     scheduleHuman: isScheduled ? CRON_HUMAN[key] ?? meta.schedule : "Runs on demand, when Jack asks for it.",
     enabled: meta.enabled,
+    trial,
     status,
     watchdogState,
     installed: present.size > 0 ? present.has(key) : null,
@@ -1020,6 +1062,7 @@ export async function GET(req: NextRequest) {
       role: s.role,
       schedule: s.schedule,
       enabled: s.enabled,
+      trial: isTrial(s.key, s.enabled),
       pcNeeded: !localDiskOk,
       installed: localDiskOk ? present.has(s.key) : null,
       lastRunAt,
@@ -1039,6 +1082,7 @@ export async function GET(req: NextRequest) {
       role: c.role,
       schedule: "On demand",
       enabled: true,
+      trial: false,
       pcNeeded: false,
       installed: null,
       lastRunAt: null,

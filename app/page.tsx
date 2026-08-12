@@ -53,6 +53,12 @@ function groupOf(viewId: string): NavGroup {
 
 export default function Home() {
   const [active, setActive] = useState("command");
+  // Keep-alive: once a section is visited it stays MOUNTED (hidden when not
+  // active), so switching back is instant with no refetch or graph rebuild.
+  const [visited, setVisited] = useState<Set<string>>(() => new Set(["command"]));
+  useEffect(() => {
+    setVisited(v => (v.has(active) ? v : new Set(v).add(active)));
+  }, [active]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [ghlData, setGhlData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -299,15 +305,15 @@ export default function Home() {
           {/* CSS-only section transition: the new view mounts IMMEDIATELY
               (no JS-gated exit animation that can stall in background tabs). */}
           <style>{`@keyframes viewIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }`}</style>
-          <div key={active} className="app-view" style={{ animation: "viewIn 0.25s ease-out" }}>
-              {active === "command" && <CommandCenter data={ghlData} loading={loading} onSendToAI={sendToAI} />}
-              {active === "clients" && <ClientsBoard />}
-              {active === "competitors" && <CompetitorIntel onSendToAI={sendToAI} />}
-              {active === "knowledge" && <KnowledgeBase initialPath={openNotePath} onSendToAI={sendToAI} />}
-              {active === "agent" && <MissionOps />}
-              {active === "log" && <ActivityLog />}
-              {active === "personal" && <PersonalSection data={ghlData} />}
-          </div>
+          {/* Keep-alive views: each visited section stays mounted; only the
+              active one is shown. Switching is instant, no reload/refetch. */}
+          {visited.has("command") && <div className="app-view" style={{ display: active === "command" ? "block" : "none" }}><CommandCenter data={ghlData} loading={loading} onSendToAI={sendToAI} /></div>}
+          {visited.has("clients") && <div className="app-view" style={{ display: active === "clients" ? "block" : "none" }}><ClientsBoard /></div>}
+          {visited.has("competitors") && <div className="app-view" style={{ display: active === "competitors" ? "block" : "none" }}><CompetitorIntel onSendToAI={sendToAI} /></div>}
+          {visited.has("knowledge") && <div className="app-view" style={{ display: active === "knowledge" ? "block" : "none" }}><KnowledgeBase initialPath={openNotePath} onSendToAI={sendToAI} /></div>}
+          {visited.has("agent") && <div className="app-view" style={{ display: active === "agent" ? "block" : "none" }}><MissionOps /></div>}
+          {visited.has("log") && <div className="app-view" style={{ display: active === "log" ? "block" : "none" }}><ActivityLog /></div>}
+          {visited.has("personal") && <div className="app-view" style={{ display: active === "personal" ? "block" : "none" }}><PersonalSection data={ghlData} /></div>}
         </div>
       </main>
 

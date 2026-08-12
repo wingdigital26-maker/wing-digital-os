@@ -215,7 +215,7 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
   const [loading, setLoading] = useState(true);
   const [restored, setRestored] = useState(false);
   const [query, setQuery] = useState("");
-  const [flow, setFlow] = useState(true);
+  const [flow, setFlow] = useState(false); // off by default: particles force constant redraw
   // 2D canvas is the reliable DEFAULT. 3D is an opt-in enhancement.
   const [is3D, setIs3D] = useState(false);
   // Glow (bloom / depth-of-field) is a 3D-only, opt-in flourish.
@@ -557,11 +557,11 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
           linkWidth={(l: GLink) => (highlightLinks.current.has(l) ? 1.4 : 0.3)}
           linkCurvature={0.12}
           linkDirectionalParticles={(l: GLink) => {
-            if (!flow || interacting.current) return 0; // no particles while busy
-            // Only flow on highlighted links (hover/search); a cheap global 1
-            // otherwise. Never 2+ across the whole graph on idle.
-            if (anyHi) return highlightLinks.current.has(l) ? 2 : 0;
-            return 1;
+            // Particles animate every frame, forcing a full-canvas redraw for as
+            // long as ANY exist. So: NONE at idle (graph stays static and cheap),
+            // and only on the few highlighted links while hovering/searching.
+            if (!flow || interacting.current || !anyHi) return 0;
+            return highlightLinks.current.has(l) ? 2 : 0;
           }}
           linkDirectionalParticleSpeed={0.004}
           linkDirectionalParticleWidth={1.4}

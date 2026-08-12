@@ -217,7 +217,7 @@ export default function VaultGraph({ onSelectNode, onToggleTree }: { onSelectNod
   const [query, setQuery] = useState("");
   const [flow, setFlow] = useState(false); // off by default: particles force constant redraw
   // 2D canvas is the reliable DEFAULT. 3D is an opt-in enhancement.
-  const [is3D, setIs3D] = useState(false);
+  const [is3D, setIs3D] = useState(true); // open in 3D; effectiveIs3D still gates on webglOK so it falls back to 2D safely
   // Glow (bloom / depth-of-field) is a 3D-only, opt-in flourish.
   const [glow, setGlow] = useState(false);
   // Set by the error boundary / WebGL probe: forces the reliable 2D render.

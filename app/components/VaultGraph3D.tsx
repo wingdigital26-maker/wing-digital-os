@@ -178,7 +178,7 @@ export default function VaultGraph3D(props: {
     const fg = fgRef.current;
     if (!fg || !graph.nodes.length) return;
     if (!force && hasUserInteracted.current) return; // never fight manual nav
-    try { fg.zoomToFit(600, mobile ? 40 : 80); } catch { /* pre-layout */ }
+    try { fg.zoomToFit(600, mobile ? 18 : 40); } catch { /* pre-layout */ } // tighter padding = opens a touch more zoomed in
   }, [graph.nodes.length, mobile]);
   useEffect(() => {
     if (!graph.nodes.length) return;

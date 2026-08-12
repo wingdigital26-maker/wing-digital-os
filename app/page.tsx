@@ -60,6 +60,19 @@ export default function Home() {
   const [newLeadCount, setNewLeadCount] = useState(0);
   const prevLeadCount = useRef(0);
 
+  // Phone flag: on mobile the secondary Intel views (Competitor Intel, Activity
+  // Log) are dropped from the sub-tab strip so the Vault tab opens straight to
+  // the graph. Desktop keeps the full set.
+  const [isPhone, setIsPhone] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 768px)");
+    const on = () => setIsPhone(mq.matches);
+    on(); mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
+  // Views hidden from the phone sub-tab strip (still reachable on desktop).
+  const MOBILE_HIDDEN_SUBS = new Set(["competitors", "log"]);
+
   // ── Pull-to-refresh (phone only, Command + Mission views) ───────────────
   const scrollRef = useRef<HTMLDivElement>(null);
   const pullStart = useRef<number | null>(null);
@@ -251,13 +264,15 @@ export default function Home() {
           </div>
         </header>
 
-        {/* Sub-tabs for the active group */}
-        {groupOf(active).subs.length > 1 && (
+        {/* Sub-tabs for the active group (phone drops the secondary Intel views) */}
+        {(() => {
+          const subs = groupOf(active).subs.filter(s => !(isPhone && MOBILE_HIDDEN_SUBS.has(s.id)));
+          return subs.length > 1 && (
           <div style={{
             display: "flex", gap: 6, padding: "10px 24px 0 24px",
             background: "var(--bg-primary)", flexShrink: 0, flexWrap: "wrap",
           }}>
-            {groupOf(active).subs.map(sub => (
+            {subs.map(sub => (
               <button key={sub.id} onClick={() => { sfx.play("nav"); setActive(sub.id); }} style={{
                 padding: "7px 16px", borderRadius: 999, fontSize: 12.5, cursor: "pointer",
                 fontWeight: active === sub.id ? 700 : 500,
@@ -270,7 +285,8 @@ export default function Home() {
               </button>
             ))}
           </div>
-        )}
+          );
+        })()}
 
         <div
           ref={scrollRef}
@@ -322,9 +338,13 @@ function MobileNav({ active, onNavigate, newLeadCount }: {
   active: string; onNavigate: (id: string) => void; newLeadCount: number;
 }) {
   const activeGroup = groupOf(active).id;
+  // The five essentials only. Agents = Mission Control, Vault = the knowledge
+  // graph (its folder tree lives INSIDE the vault view as a slide-in drawer, so
+  // there is no Competitor Intel / Activity Log / table-of-contents clutter in
+  // the bar). Jarvis is the merged assistant; tapping it opens the panel.
   const tabs: { id: string; label: string; icon: IconType; group: string; badge?: number }[] = [
     { id: "command", label: "Command", icon: Bolt, group: "command", badge: newLeadCount },
-    { id: "agent", label: "Mission", icon: Cpu, group: "agent" },
+    { id: "agent", label: "Agents", icon: Cpu, group: "agent" },
     { id: "knowledge", label: "Vault", icon: Bulb, group: "intel" },
     { id: "clients", label: "Clients", icon: Users, group: "clients" },
   ];
@@ -342,9 +362,12 @@ function MobileNav({ active, onNavigate, newLeadCount }: {
           </button>
         );
       })}
-      {/* No Jarvis tab here: the floating Jarvis FAB (bottom-right) is the single
-          Jarvis trigger on phone. A nav tab used to sit directly under the FAB,
-          producing two stacked Jarvis buttons in the same corner. */}
+      {/* Jarvis lives in the bar as the fifth essential; the floating FAB is
+          hidden on phone (globals.css) so there is only ever one Jarvis trigger. */}
+      <button className="mobile-nav-btn jarvis" onClick={() => { sfx.play("nav"); window.dispatchEvent(new CustomEvent("jarvis:open")); }}>
+        <span className="mobile-nav-ico"><Sparkles size={21} /></span>
+        <span>Jarvis</span>
+      </button>
     </nav>
   );
 }
@@ -366,7 +389,12 @@ function GlobalDaBoss() {
     const id = setInterval(load, 60 * 1000);
     const onPull = () => load();
     window.addEventListener("os:pull-refresh", onPull);
-    return () => { clearInterval(id); window.removeEventListener("os:pull-refresh", onPull); };
+    window.addEventListener("os:mission-refresh", onPull);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener("os:pull-refresh", onPull);
+      window.removeEventListener("os:mission-refresh", onPull);
+    };
   }, [load]);
 
   const wd = data?.watchdog;
@@ -424,7 +452,7 @@ function GlobalDaBoss() {
           }
         }
       `}</style>
-      {sel && <MissionPanels selection={sel} data={data} onSelect={setSel} onRechecked={load} />}
+      {sel && <MissionPanels selection={sel} data={data} onSelect={setSel} onRechecked={() => { load(); window.dispatchEvent(new CustomEvent("os:mission-refresh")); }} />}
     </>
   );
 }
@@ -452,18 +480,31 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
 
   // Command Center absorbs the mission stats row (MRR, active clients,
   // pipeline size, emails sent) — big tiles, zero configuration.
-  useEffect(() => {
-    const load = () => fetch("/api/mission")
+  // Da Boss coherence: the banner, the global chip, and the report panel all
+  // read the SAME /api/mission watchdog block. Any refresh (Run Da Boss, the
+  // granular recheck, pull-to-refresh, or the poll) broadcasts os:mission-refresh
+  // so every surface re-pulls together and none is left showing a stale count.
+  const loadMission = useCallback(() => {
+    fetch("/api/mission", { cache: "no-store" })
       .then(r => r.json())
       .then(d => {
         if (d?.stats?.tiles) setMissionStats(d.stats);
         setWatchdog(d?.watchdog ?? null);
       })
       .catch(() => {});
-    load();
-    const id = setInterval(load, 5 * 60 * 1000);
-    return () => clearInterval(id);
   }, []);
+  useEffect(() => {
+    loadMission();
+    const id = setInterval(loadMission, 5 * 60 * 1000);
+    const onRefresh = () => loadMission();
+    window.addEventListener("os:mission-refresh", onRefresh);
+    window.addEventListener("os:pull-refresh", onRefresh);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener("os:mission-refresh", onRefresh);
+      window.removeEventListener("os:pull-refresh", onRefresh);
+    };
+  }, [loadMission]);
 
   useEffect(() => {
     fetch("/api/agents/brief")
@@ -581,8 +622,14 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
   return (
     <motion.div style={{ display: "flex", flexDirection: "column", gap: 24 }}
       variants={staggerContainer} initial="hidden" animate="show">
-      {/* Watchdog problems banner — always the very first thing on screen */}
-      {watchdog !== undefined && <WatchdogBanner watchdog={watchdog} />}
+      {/* Watchdog problems banner — always the very first thing on screen.
+          onRechecked broadcasts so the banner, chip and copy all re-pull together. */}
+      {watchdog !== undefined && (
+        <WatchdogBanner
+          watchdog={watchdog}
+          onRechecked={() => { loadMission(); window.dispatchEvent(new CustomEvent("os:mission-refresh")); }}
+        />
+      )}
 
       {/* Toast */}
       {toast && (

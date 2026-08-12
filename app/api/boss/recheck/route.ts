@@ -69,6 +69,16 @@ function bodyHasLeak(body: string): boolean {
 const PUSH_VAULT_PS1 = "C:\\Users\\wjack\\ghl-cli\\push_vault.ps1";
 const WATCHDOG_ABS = () => path.resolve(VAULT_PATH, WATCHDOG_REL);
 
+// LOCAL ground-truth probe: the SAME script the hardened watchdog SKILL runs.
+// Prints current-state KEY=VALUE facts so the recheck can resolve/keep each
+// PROBLEM against reality instead of re-reading yesterday's report.
+const WATCHDOG_PROBE_PY = "C:\\Users\\wjack\\ghl-cli\\watchdog_probe.py";
+const GHL_CLI_DIR = "C:\\Users\\wjack\\ghl-cli";
+// Thresholds mirrored from watchdog-heartbeat/SKILL.md so the route agrees with
+// the scheduled watchdog to the letter.
+const POOL_FLOOR = 20; // ELIGIBLE_POOL below this = "nothing to send / pool low"
+const CADENCE_WINDOW_DAYS = 4; // 2 blogs/week; stale only past this window
+
 // ── redaction: never echo credential-looking strings ───────────────────────
 const SECRET_PATTERNS: RegExp[] = [
   /\b(sk|pk|rk)-[A-Za-z0-9_-]{16,}\b/g,
@@ -493,91 +503,187 @@ function checkHeartbeats(cloud: boolean): CheckResult {
   };
 }
 
-// ── classifier: which PROBLEM blocks did the recheck TRULY verify as fixed ──
-// The recheck may only clear a block on a signal that actually tested it. Every
-// other block — especially anything needing PC-only state (log.md appends,
-// task heartbeats, cron/lastRunAt, code-line fixes) — is left exactly as-is.
+// ── LOCAL live probe: watchdog_probe.py KEY=VALUE ground truth ──────────────
+// Runs the SAME script the hardened watchdog SKILL runs and parses its facts.
+// LOCAL only. Never logs stdout (it is data, not secrets, but we stay quiet).
+// Returns null on cloud, on any spawn error, or if python is unavailable.
+interface Probe {
+  eligiblePool: number | null;
+  wrongCompanyUnsentFails: number | null;
+  budgetAgentsAtCap: string; // "none" or "agent n/cap;agent2 n/cap"
+  lastBlogDate: string | null;
+  cadenceStaleDays: number | null;
+}
+function runProbe(): Promise<Probe | null> {
+  return new Promise((resolve) => {
+    try {
+      execFile(
+        "python",
+        [WATCHDOG_PROBE_PY],
+        { timeout: 30_000, windowsHide: true, cwd: GHL_CLI_DIR },
+        (err, stdout) => {
+          if (err || !stdout) { resolve(null); return; }
+          const map = new Map<string, string>();
+          for (const line of String(stdout).split(/\r?\n/)) {
+            const m = line.match(/^([A-Z0-9_]+)=(.*)$/);
+            if (m) map.set(m[1], m[2].trim());
+          }
+          if (!map.has("ELIGIBLE_POOL")) { resolve(null); return; }
+          const numOrNull = (k: string): number | null => {
+            const v = map.get(k);
+            if (v == null || v === "" || v === "None" || /ERROR/i.test(v)) return null;
+            const n = Number(v);
+            return Number.isFinite(n) ? n : null;
+          };
+          const lbd = map.get("LAST_BLOG_DATE");
+          resolve({
+            eligiblePool: numOrNull("ELIGIBLE_POOL"),
+            wrongCompanyUnsentFails: numOrNull("WRONG_COMPANY_UNSENT_FAILS"),
+            budgetAgentsAtCap: (map.get("BUDGET_AGENTS_AT_CAP") || "none").trim(),
+            lastBlogDate: lbd && lbd !== "" ? lbd : null,
+            cadenceStaleDays: numOrNull("CADENCE_STALE_DAYS"),
+          });
+        }
+      );
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
+// ── classifier: keep a PROBLEM only if LIVE state confirms it is still broken ─
+// This is the honesty inversion aligned with the hardened watchdog SKILL: a
+// block does NOT survive just because it exists. Every block is verified against
+// current reality (live probe on LOCAL, live fetch / snapshot on either host):
+//   still-broken  -> KEEP (survives, stays a live problem)
+//   healthy now   -> RESOLVE (moved to RESOLVED, dropped from PROBLEMS)
+//   unverifiable  -> NEEDS-PC (kept in the file, never resurrected, never
+//                    dropped blindly, and never counted as a fresh red)
+// The route can therefore only ever REDUCE or CONFIRM problems against reality;
+// it never adds a block, so a fixed alarm can never be resurrected.
 //
-// Verifiable clears:
-//   URL block       -> has allowed-host URLs AND every one came back clean-2xx
-//                      (2xx AND no build-note leak in the body).
-//   Freshness block -> is purely about snapshot staleness AND every named
-//                      snapshot is now fresh. Never cleared if it also mentions
-//                      heartbeat/cron/never-run/log.md (that needs the PC).
-//   Outreach block  -> the specific outreach dimension it complains about
-//                      (sending, or ready-pool >= 20) now reads healthy from a
-//                      FRESH outreach snapshot. A stale snapshot never clears it.
+// Honesty rules (mirrors SKILL.md thresholds exactly):
+//   URL            -> every allowed-host URL now clean-2xx (no build-note leak).
+//   SMTP / Sentinel-> retired false alarm (brief is rerouted to the vault); a
+//                     block about SMTP/email delivery is always RESOLVED.
+//   wrong-company  -> count UNSENT eligible rows failing the guard; 0 = resolved
+//                     (never read historical sends).
+//   nothing-to-send-> live ELIGIBLE_POOL; only keep if under the floor (20).
+//   budget         -> only keep an agent actually at its per-agent cap
+//                     (respecting per_agent overrides via the probe).
+//   cadence        -> LAST_BLOG_DATE age; keep only if genuinely stale (> 4d or
+//                     missing), never restamp an already-current date.
+//   freshness      -> named snapshots re-read fresh clears it.
 interface ResolvedMark {
   index: number;
   bullet: string;
 }
-// PC-only / deeper-state signals that forbid an automatic clear no matter what.
-const PC_ONLY = /\b(log\.md|append|heartbeat|lastRunAt|last run|never run|cron|nextRunAt|STOP_WING|\.py:\d+|flag)\b/i;
+type BlockCategory =
+  | "url" | "smtp" | "wrong_company" | "nothing_to_send"
+  | "budget" | "cadence" | "freshness" | "other";
+type Verdict = "resolve" | "keep" | "needs-pc";
+
 const FRESHNESS_HINT = /\b(stale|aging|ages?|\d+(\.\d+)?h old|hours? old|snapshot.*old|keep aging)\b/i;
 const SNAPSHOT_NAME = /(business-snapshot|outreach-snapshot|health-board)/i;
-const OUTREACH_SENDING_HINT = /\b(sends?|sending|sender|no-?op|emailed today|0 sent)\b/i;
-const OUTREACH_POOL_HINT = /\b(pool|send-?ready|campaign[_ ]?ready|armed)\b/i;
+const AGENT_NAME = /\b(dispatch|prospector|outreach|chronicler|content|renewal|sentinel|builder|reply[- ]?triage)\b/i;
 
-function itemStatus(result: CheckResult | null, labelRe: RegExp): CheckStatus | null {
-  if (!result) return null;
-  const it = (result.items ?? []).find((i) => labelRe.test(i.label));
-  return it ? it.status : null;
+function categorize(b: ProblemBlock): BlockCategory {
+  const t = b.text;
+  // SMTP / Sentinel-email delivery: retired false alarm, rerouted to the vault.
+  if (/\b(smtp|report_smtp_pass|email password|mail password)\b/i.test(t)) return "smtp";
+  if (/sentinel/i.test(t) && /(email|smtp|brief|deliver|mail)/i.test(t)) return "smtp";
+  // URL availability is the strongest live signal.
+  if (b.urls.length > 0) return "url";
+  if (/wrong[- ]?company|domain.*(mismatch|company)|company.*mismatch|guard (is )?missing|no guard|domain_company_mismatch/i.test(t)) return "wrong_company";
+  // Budget before nothing-to-send so a cap throttle is never read as an empty pool.
+  if (/budget|daily cap|per[- ]?agent cap|hit its cap|at its cap|\bat cap\b|max_runs/i.test(t)) return "budget";
+  if (/cadence|last[_ ]?blog|blog.*(stale|cadence|overdue)|content.*(stale|cadence)|stamp.*date/i.test(t)) return "cadence";
+  if (/nothing to send|empty pool|pool (is )?(empty|low|0|under)|no (send-?ready|eligible|leads|prospects)|out of (leads|prospects)|sender.*(down|stopped)|not sending|0 sent/i.test(t)) return "nothing_to_send";
+  if (FRESHNESS_HINT.test(t) && SNAPSHOT_NAME.test(t)) return "freshness";
+  return "other";
 }
 
-function classifyResolved(
+function verifyBlock(
+  b: ProblemBlock,
+  cat: BlockCategory,
+  probe: Probe | null,
+  cleanUrls: Set<string>,
+  freshnessStale: boolean
+): Verdict {
+  switch (cat) {
+    case "smtp":
+      return "resolve"; // never a live problem anymore
+    case "url":
+      return b.urls.every((u) => cleanUrls.has(u)) ? "resolve" : "keep";
+    case "freshness":
+      return freshnessStale ? "keep" : "resolve";
+    case "wrong_company":
+      if (!probe || probe.wrongCompanyUnsentFails == null) return "needs-pc";
+      return probe.wrongCompanyUnsentFails > 0 ? "keep" : "resolve";
+    case "nothing_to_send":
+      if (!probe || probe.eligiblePool == null) return "needs-pc";
+      return probe.eligiblePool < POOL_FLOOR ? "keep" : "resolve";
+    case "budget": {
+      if (!probe) return "needs-pc";
+      const cap = probe.budgetAgentsAtCap;
+      if (!cap || cap.toLowerCase() === "none") return "resolve";
+      const named = b.text.match(AGENT_NAME)?.[0]?.toLowerCase().replace(/\s|-/g, "");
+      if (named && !cap.toLowerCase().replace(/\s|-/g, "").includes(named)) return "resolve";
+      return "keep"; // an agent genuinely at its per-agent cap survives
+    }
+    case "cadence":
+      if (!probe) return "needs-pc";
+      if (probe.cadenceStaleDays == null) return "keep"; // missing = genuinely stale per SKILL
+      return probe.cadenceStaleDays > CADENCE_WINDOW_DAYS ? "keep" : "resolve";
+    default:
+      // Unknown category: never resurrect, never blind-drop. Keep it, but on
+      // cloud (no probe) label it needs-pc so it is not read as a fresh red.
+      return probe ? "keep" : "needs-pc";
+  }
+}
+
+function resolveReason(cat: BlockCategory, b: ProblemBlock, probe: Probe | null, stamp: string): string {
+  switch (cat) {
+    case "url":
+      return `- **Cleared by Run Da Boss ${stamp}.** ${b.urls.join(", ")} now HTTP 200 and clean of build-note leaks.`;
+    case "smtp":
+      return `- **Cleared by Run Da Boss ${stamp}.** SMTP/email delivery is retired; Sentinel's brief is rerouted to the vault, so this is no longer a problem.`;
+    case "freshness":
+      return `- **Cleared by Run Da Boss ${stamp}.** Named snapshots re-read fresh (within threshold).`;
+    case "wrong_company":
+      return `- **Cleared by Run Da Boss ${stamp}.** 0 unsent eligible rows fail the wrong-company guard (checked live, not historical sends).`;
+    case "nothing_to_send":
+      return `- **Cleared by Run Da Boss ${stamp}.** Live eligible pool is ${probe?.eligiblePool ?? "?"}, at or above the ${POOL_FLOOR} floor.`;
+    case "budget":
+      return `- **Cleared by Run Da Boss ${stamp}.** No agent is at its per-agent cap right now (live budget check).`;
+    case "cadence":
+      return `- **Cleared by Run Da Boss ${stamp}.** last_blog_date is ${probe?.lastBlogDate ?? "current"} (${probe?.cadenceStaleDays ?? 0}d), within the cadence window.`;
+    default:
+      return `- **Cleared by Run Da Boss ${stamp}.** Live check confirms this is no longer broken.`;
+  }
+}
+
+// Classify every block, returning the RESOLVE marks (verdict === "resolve") plus
+// the per-block verdicts for the JSON overlay. KEEP and NEEDS-PC stay in the file.
+function classifyBlocks(
   blocks: ProblemBlock[],
   cleanUrls: Set<string>,
   freshness: CheckResult | null,
-  outreach: CheckResult | null,
-  outreachSnapshotFresh: boolean
-): ResolvedMark[] {
+  probe: Probe | null
+): { marks: ResolvedMark[]; verdicts: { index: number; category: BlockCategory; verdict: Verdict }[] } {
   const stamp = new Date().toISOString().slice(0, 16).replace("T", " ");
+  const freshnessStale = (freshness?.items ?? []).some((i) => i.status === "problem");
   const marks: ResolvedMark[] = [];
+  const verdicts: { index: number; category: BlockCategory; verdict: Verdict }[] = [];
   for (const b of blocks) {
-    // 1) URL blocks — the primary, strongest signal.
-    if (b.urls.length > 0) {
-      if (b.urls.every((u) => cleanUrls.has(u))) {
-        marks.push({
-          index: b.index,
-          bullet: `- **Cleared by manual recheck ${stamp}.** ${b.urls.join(", ")} now HTTP 200 and clean of build-note leaks.`,
-        });
-      }
-      continue; // URL block that is not all-clean stays a live problem, untouched.
-    }
-    // Never auto-clear anything that hangs on PC-only / deeper local state.
-    if (PC_ONLY.test(b.text)) continue;
-
-    // 2) Freshness-only blocks.
-    if (FRESHNESS_HINT.test(b.text) && SNAPSHOT_NAME.test(b.text)) {
-      const anyStale = (freshness?.items ?? []).some((i) => i.status === "problem");
-      if (freshness && !anyStale) {
-        marks.push({
-          index: b.index,
-          bullet: `- **Cleared by manual recheck ${stamp}.** Named snapshots re-read fresh (within threshold).`,
-        });
-      }
-      continue;
-    }
-
-    // 3) Outreach blocks — only on a FRESH outreach snapshot.
-    if (outreachSnapshotFresh) {
-      if (OUTREACH_SENDING_HINT.test(b.text) && itemStatus(outreach, /sent today/i) === "ok") {
-        marks.push({
-          index: b.index,
-          bullet: `- **Cleared by manual recheck ${stamp}.** Outreach is sending again per a fresh snapshot.`,
-        });
-        continue;
-      }
-      if (OUTREACH_POOL_HINT.test(b.text) && itemStatus(outreach, /ready pool/i) === "ok") {
-        marks.push({
-          index: b.index,
-          bullet: `- **Cleared by manual recheck ${stamp}.** Ready pool is back over the 20 line per a fresh snapshot.`,
-        });
-        continue;
-      }
+    const cat = categorize(b);
+    const verdict = verifyBlock(b, cat, probe, cleanUrls, freshnessStale);
+    verdicts.push({ index: b.index, category: cat, verdict });
+    if (verdict === "resolve") {
+      marks.push({ index: b.index, bullet: resolveReason(cat, b, probe, stamp) });
     }
   }
-  return marks;
+  return { marks, verdicts };
 }
 
 // ── writer: move verified-resolved blocks to RESOLVED, renumber, restamp ─────
@@ -705,18 +811,19 @@ export async function POST(req: NextRequest) {
   let resolvedCount = 0;
   let refetchMission = false;
   let writeNote: string | null = null; // kept for backward-compat with the overlay UI
+  let needsPcCount = 0;
 
   if (watchdogRaw) {
-    // outreach snapshot freshness gates outreach-block clears (never clear on stale data)
-    let outreachSnapshotFresh = false;
-    if (outreachResult) {
-      outreachSnapshotFresh = itemStatus(freshnessResult, /outreach-snapshot/i) === "ok"
-        || (freshnessResult === null && (parseUpdated((await readVaultFile("wiki/state/outreach-snapshot.md")) ?? "").ageHours ?? 999) <= 24);
-    }
+    // Ground truth: on LOCAL run the same probe the hardened watchdog SKILL uses
+    // so outreach/budget/cadence/wrong-company blocks are verified against the
+    // live DB/files, not carried forward blindly. On CLOUD the probe is null and
+    // those categories fall to needs-pc (kept, never resurrected as red).
+    const probe = cloud ? null : await runProbe();
 
     const { blocks } = parseProblemBlocks(watchdogRaw);
-    const resolvedMarks = classifyResolved(blocks, cleanUrls, freshnessResult, outreachResult, outreachSnapshotFresh);
+    const { marks: resolvedMarks, verdicts } = classifyBlocks(blocks, cleanUrls, freshnessResult, probe);
     resolvedCount = resolvedMarks.length;
+    needsPcCount = verdicts.filter((v) => v.verdict === "needs-pc").length;
     const next = resolvedMarks.length ? rewriteWatchdog(watchdogRaw, resolvedMarks) : null;
 
     if (next && next !== watchdogRaw) {
@@ -774,6 +881,7 @@ export async function POST(req: NextRequest) {
     commit,
     reason,
     resolvedCount,
+    needsPcCount,
     refetchMission,
     wrote: persisted, // backward-compat
     writeNote,

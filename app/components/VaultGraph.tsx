@@ -179,6 +179,18 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
   const [flow, setFlow] = useState(true);
   const [is3D, setIs3D] = useState(true);
   const [mobile] = useState<boolean>(detectMobile);
+  // WebGL capability: if the browser cannot create a WebGL context at all, the
+  // force-graph canvas would paint pure black. Detect it up front so we can show
+  // a visible fallback instead of a blank void.
+  const [webglOK] = useState<boolean>(() => {
+    if (typeof document === "undefined") return true;
+    try {
+      const c = document.createElement("canvas");
+      return !!(c.getContext("webgl2") || c.getContext("webgl") || c.getContext("experimental-webgl"));
+    } catch {
+      return false;
+    }
+  });
 
   const onSelectRef = useRef(onSelectNode);
   onSelectRef.current = onSelectNode;
@@ -206,14 +218,24 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
   const stats = { nodes: graph.nodes.length, links: graph.links.length };
 
   // ── Size tracking ──
+  // The 3D canvas needs explicit pixel dimensions. If the wrapper ever measures
+  // 0 (a collapsed flex/absolute parent), fall back to the real viewport so the
+  // galaxy is NEVER rendered into a zero-height (invisible) canvas.
   useEffect(() => {
     const wrap = wrapRef.current;
     if (!wrap) return;
-    const apply = () => setSize({ w: wrap.clientWidth || 800, h: wrap.clientHeight || 600 });
+    const apply = () => {
+      const vw = typeof window !== "undefined" ? window.innerWidth : 800;
+      const vh = typeof window !== "undefined" ? window.innerHeight : 600;
+      const w = wrap.clientWidth || vw || 800;
+      const h = wrap.clientHeight || Math.max(320, Math.round(vh * 0.6)) || 600;
+      setSize({ w, h });
+    };
     apply();
     const ro = new ResizeObserver(apply);
     ro.observe(wrap);
-    return () => ro.disconnect();
+    window.addEventListener("resize", apply);
+    return () => { ro.disconnect(); window.removeEventListener("resize", apply); };
   }, []);
 
   // ── Load: cache instantly, then reconcile with the API ──
@@ -310,6 +332,25 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
     return () => { cancelled = true; window.clearTimeout(id); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [is3D, graph.nodes.length, mobile]);
+
+  // ── Frame the whole galaxy in view once it exists ──
+  // Without this the default camera can sit off to one side of a wide force
+  // layout, leaving the viewport looking empty (Jack's "I can't see it"). We fit
+  // the camera to the node bounding box shortly after the graph mounts/settles.
+  const didFit = useRef(false);
+  const fitToView = useCallback(() => {
+    const fg = fgRef.current;
+    if (!fg || !graph.nodes.length) return;
+    try { fg.zoomToFit(600, mobile ? 40 : 80); } catch { /* pre-layout: retry on engine stop */ }
+  }, [graph.nodes.length, mobile]);
+  useEffect(() => {
+    if (!graph.nodes.length) return;
+    didFit.current = false;
+    // a couple of nudges while the sim warms so the fit lands on real positions
+    const t1 = window.setTimeout(fitToView, 400);
+    const t2 = window.setTimeout(fitToView, 1500);
+    return () => { window.clearTimeout(t1); window.clearTimeout(t2); };
+  }, [graph.nodes.length, fitToView]);
 
   // ── Slow auto-orbit camera (~0.4 rpm) so the galaxy always breathes ──
   const interacting = useRef(false);
@@ -481,14 +522,21 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
   const anyHi = highlightNodes.current.size > 0;
 
   return (
-    <div ref={wrapRef} style={{ position: "relative", width: "100%", height: "100%", borderRadius: 16, overflow: "hidden", border: "1px solid rgba(255,255,255,0.07)", background: "#04050a" }}>
+    <div ref={wrapRef} className="vault-graph" style={{ position: "relative", width: "100%", height: "100%", minHeight: "60vh", borderRadius: 16, overflow: "hidden", border: "1px solid rgba(255,255,255,0.07)", background: "#04050a" }}>
+      {!webglOK && (
+        <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, textAlign: "center", padding: 24, zIndex: 4, color: "var(--text-muted)" }}>
+          <p style={{ fontSize: 14, fontWeight: 700, color: "var(--text-secondary)" }}>Graph needs WebGL</p>
+          <p style={{ fontSize: 12 }}>This browser has WebGL disabled, so the galaxy cannot draw. Open the vault tree from the button on the left to browse notes.</p>
+          <p style={{ fontSize: 11 }}>{stats.nodes} notes, {stats.links} threads</p>
+        </div>
+      )}
       {loading && (
         <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 14, zIndex: 2 }}>
           Charting the galaxy...
         </div>
       )}
 
-      {graph.nodes.length > 0 && (
+      {webglOK && graph.nodes.length > 0 && (
         <ForceGraph3D
           ref={fgRef}
           width={size.w}
@@ -524,6 +572,8 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
           onNodeClick={onNodeClick}
           onBackgroundClick={onBgClick}
           onEngineStop={() => {
+            // Frame the settled layout so the galaxy is centered and visible.
+            if (!didFit.current) { didFit.current = true; fitToView(); }
             if (!restored) sfx.playWhenReady("graph-arrive");
           }}
         />
@@ -550,7 +600,7 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
         border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: "8px 12px",
       }}>
         <p style={{ fontSize: 9.5, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 3 }}>
-          Jack&apos;s AI Brain
+          Vault Map
         </p>
         <p style={{ fontSize: 10.5, color: "var(--text-muted)" }}>
           {stats.nodes} notes · {stats.links} threads{restored ? " · restored" : ""}

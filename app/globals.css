@@ -270,11 +270,22 @@ main > div:last-child > div > *:nth-child(6) { animation-delay: 0.27s; }
   .mission-page .mo-cal-grid { grid-template-columns: repeat(7, 1fr) !important; }
   .mission-page header h1 { font-size: 17px !important; }
 
-  /* 5 ─ Ops map: let it shrink to fit; keep its own scroll as a fallback */
-  .mo-map { overflow-x: auto; }
-  .mo-map-svg { min-width: 520px !important; }
+  /* 5 ─ Ops map: FIT the phone width, no sideways scrolling. The SVG scales to
+     100% of the viewport via its viewBox; drop the inline min-width so it never
+     forces the container wider than the screen. */
+  .mo-map { overflow-x: hidden !important; }
+  .mo-map-svg { min-width: 0 !important; width: 100% !important; max-width: 100%; }
   /* Hero ops map (Agents tab): tall on phone too, so it stays the focal point */
   .mo-map-hero { height: clamp(360px, 60vh, 620px) !important; }
+
+  /* Vault graph fills the vault view width and height (never a blank void). */
+  .kb-graph, .vault-graph { min-width: 0; }
+  .vault-graph { min-height: 60vh; }
+  .vault-graph canvas { max-width: 100% !important; display: block; }
+
+  /* Jarvis now lives in the bottom tab bar, so hide the floating FAB on phone
+     to avoid two Jarvis triggers stacked in the same corner. */
+  .jarvis-fab { display: none !important; }
 
   /* 6 ─ Week-grid calendar scrolls inside its own container */
   .app-view .mo-cal-grid {
@@ -369,7 +380,7 @@ main > div:last-child > div > *:nth-child(6) { animation-delay: 0.27s; }
 @media (max-width: 480px) {
   .app-view [style*="grid-template-columns"] { grid-template-columns: minmax(0, 1fr) !important; }
   .app-header h1 { font-size: 15px !important; }
-  .mo-map-svg { min-width: 460px !important; }
+  .mo-map-svg { min-width: 0 !important; width: 100% !important; }
 }
 
 /* Standalone (installed PWA): no browser chrome — lean into app framing */

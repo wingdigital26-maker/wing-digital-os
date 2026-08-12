@@ -1,55 +1,52 @@
 // Wing OS service worker.
-// Strategy:
+// Strategy (network-first so a new deploy is ALWAYS picked up):
 //   - /api/*        network only (never cache authed API data)
-//   - static assets cache-first (icons, fonts, _next/static)
-//   - navigations   network-first with a cached fallback
-const STATIC_CACHE = "wing-os-static-v1";
-const STATIC_PATTERNS = [/^\/_next\/static\//, /^\/icon-\d+\.png$/, /^\/manifest\.json$/, /^\/favicon\.ico$/];
+//   - everything    network-first; cache is only an OFFLINE fallback
+// Bump CACHE_VERSION on any strategy change to purge old caches.
+const CACHE_VERSION = "wing-os-v3";
+const OFFLINE_ASSETS = ["/manifest.json", "/icon-192.png", "/icon-512.png"];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(STATIC_CACHE).then((c) => c.addAll(["/manifest.json", "/icon-192.png", "/icon-512.png"]))
-  );
+  event.waitUntil(caches.open(CACHE_VERSION).then((c) => c.addAll(OFFLINE_ASSETS)));
+  // Activate this new worker immediately instead of waiting for old tabs to close.
   self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== STATIC_CACHE).map((k) => caches.delete(k)))
-    ).then(() => self.clients.claim())
+    caches
+      .keys()
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE_VERSION).map((k) => caches.delete(k))))
+      .then(() => self.clients.claim())
   );
+});
+
+// Let the page tell a waiting worker to take over now.
+self.addEventListener("message", (event) => {
+  if (event.data === "SKIP_WAITING") self.skipWaiting();
 });
 
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
   if (event.request.method !== "GET" || url.origin !== self.location.origin) return;
 
-  // Never cache API responses (they are authed and live).
+  // Authed, live API data: always straight to network, never cached.
   if (url.pathname.startsWith("/api/")) return;
 
-  // Static assets: cache-first.
-  if (STATIC_PATTERNS.some((re) => re.test(url.pathname))) {
-    event.respondWith(
-      caches.match(event.request).then(
-        (hit) =>
-          hit ||
-          fetch(event.request).then((res) => {
-            if (res.ok) {
-              const copy = res.clone();
-              caches.open(STATIC_CACHE).then((c) => c.put(event.request, copy));
-            }
-            return res;
-          })
+  // Everything else: network-first. Serve fresh on every load; fall back to
+  // cache only when the network is unavailable (offline). Hashed _next assets
+  // and the app shell therefore always reflect the latest deploy.
+  event.respondWith(
+    fetch(event.request)
+      .then((res) => {
+        if (res && res.ok) {
+          const copy = res.clone();
+          caches.open(CACHE_VERSION).then((c) => c.put(event.request, copy));
+        }
+        return res;
+      })
+      .catch(() =>
+        caches.match(event.request).then((hit) => hit || caches.match("/manifest.json"))
       )
-    );
-    return;
-  }
-
-  // Navigations: network-first, fall back to any cached copy when offline.
-  if (event.request.mode === "navigate") {
-    event.respondWith(
-      fetch(event.request).catch(() => caches.match(event.request).then((hit) => hit || caches.match("/")))
-    );
-  }
+  );
 });

@@ -242,6 +242,24 @@ export default function VaultGraph({ onSelectNode, onToggleTree }: { onSelectNod
   const effectiveIs3D = is3D && webglOK && !safeMode;
   const effectiveGlow = glow && effectiveIs3D;
 
+  // ── 3D "did it actually paint?" watchdog ──
+  // Even with WebGL available, the 3D scene can occasionally mount but never
+  // frame the layout (a slow three.js init, a lost context, a fit that fired
+  // pre-layout) — leaving a black void. VaultGraph3D calls onFramed() the moment
+  // it successfully frames. If that has NOT happened ~1.5s after 3D mounts with
+  // real data, we fall back to the always-reliable 2D canvas so SOMETHING is
+  // always visible on every load.
+  const threeFramed = useRef(false);
+  const markThreeFramed = useCallback(() => { threeFramed.current = true; }, []);
+  useEffect(() => {
+    if (!effectiveIs3D || !graph.nodes.length) return;
+    threeFramed.current = false;
+    const t = window.setTimeout(() => {
+      if (!threeFramed.current) setSafeMode(true); // 3D produced nothing → 2D
+    }, 1800); // just past VaultGraph3D's own 1500ms reframe so real 3D isn't downgraded
+    return () => window.clearTimeout(t);
+  }, [effectiveIs3D, graph.nodes.length]);
+
   const onSelectRef = useRef(onSelectNode);
   onSelectRef.current = onSelectNode;
 
@@ -319,28 +337,54 @@ export default function VaultGraph({ onSelectNode, onToggleTree }: { onSelectNod
   }, []);
 
   // ── Load: cache instantly, then reconcile with the API ──
+  // The blank-graph bug was partly an empty first paint: a cache miss plus a slow
+  // or momentarily-empty /api/vault/graph response left graph.nodes at [] and
+  // neither the 2D nor 3D branch (both gated on nodes.length > 0) ever mounted.
+  // We now keep the cache-first paint AND retry the fetch until it returns a
+  // non-empty graph, so nodes are reliably populated on every load.
   useEffect(() => {
+    let cancelled = false;
     const cached = loadCache();
-    if (cached && cached.nodes.length) {
-      setGraph(buildGraph(cached));
+    const haveCache = !!(cached && cached.nodes.length);
+    if (haveCache) {
+      setGraph(buildGraph(cached!));
       setLoading(false);
       setRestored(true);
     }
-    fetch("/api/vault/graph")
-      .then(r => r.json())
-      .then((g: RawGraph) => {
-        try {
-          window.localStorage.setItem(LS_DATA, JSON.stringify({ nodes: g.nodes, links: g.links, hash: g.hash }));
-        } catch { /* storage full */ }
-        if (cached && cached.hash && g.hash && cached.hash === g.hash) {
+    const attempt = (tries: number) => {
+      fetch("/api/vault/graph", { cache: "no-store" })
+        .then(r => r.json())
+        .then((g: RawGraph) => {
+          if (cancelled) return;
+          const ok = g && Array.isArray(g.nodes) && g.nodes.length > 0;
+          if (!ok) {
+            // Empty/invalid payload: keep any cached paint and retry a few times
+            // with backoff before giving up (never leaves a blank void if the
+            // API is briefly warming up).
+            if (tries < 4) { window.setTimeout(() => attempt(tries + 1), 400 * (tries + 1)); return; }
+            setLoading(false);
+            return;
+          }
+          try {
+            window.localStorage.setItem(LS_DATA, JSON.stringify({ nodes: g.nodes, links: g.links, hash: g.hash }));
+          } catch { /* storage full */ }
+          if (haveCache && cached!.hash && g.hash && cached!.hash === g.hash) {
+            setLoading(false);
+            return;
+          }
+          setGraph(buildGraph(g));
           setLoading(false);
-          return;
-        }
-        setGraph(buildGraph(g));
-        setLoading(false);
-        setRestored(false);
-      })
-      .catch(() => setLoading(false));
+          setRestored(false);
+        })
+        .catch(() => {
+          if (cancelled) return;
+          // Network error: retry with backoff; fall back to cache paint if any.
+          if (tries < 4) { window.setTimeout(() => attempt(tries + 1), 400 * (tries + 1)); return; }
+          setLoading(false);
+        });
+    };
+    attempt(0);
+    return () => { cancelled = true; };
   }, []);
 
   // Debug hook
@@ -635,6 +679,7 @@ export default function VaultGraph({ onSelectNode, onToggleTree }: { onSelectNod
             onNodeHover={onNodeHover}
             onNodeClick={onNodeClick}
             onBackgroundClick={onBgClick}
+            onFramed={markThreeFramed}
           />
         </GraphErrorBoundary>
       )}

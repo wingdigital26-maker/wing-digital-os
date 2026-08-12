@@ -289,6 +289,30 @@ main > div:last-child > div > *:nth-child(6) { animation-delay: 0.27s; }
      to avoid two Jarvis triggers stacked in the same corner. */
   .jarvis-fab { display: none !important; }
 
+  /* ── Morning Briefing hero: was cramped/clipping on phone ──
+     The 32px gaps + big numbers pushed a metric column past the card's
+     overflow:hidden edge, clipping the sparkline. Tighten padding + gaps,
+     let every metric block shrink, and stack the "Ask Claude" CTA full-width
+     so nothing is cut off. */
+  .briefing-hero { padding: 18px 16px !important; }
+  .briefing-metrics { gap: 16px 20px !important; }
+  .briefing-metrics > * { min-width: 0; }
+  .briefing-metrics > button {
+    margin-left: 0 !important;
+    width: 100%;
+    min-height: 44px;
+  }
+  /* Slightly smaller hero numbers so they don't force a too-wide column */
+  .briefing-metrics p[style*="font-size: 36"] { font-size: 30px !important; }
+
+  /* ── Comfortable touch targets (>=44px) for the primary controls ──
+     Several action buttons rendered at 40px tall on phone; nudge the header,
+     sub-tab and in-view buttons up to a 44px touch height without touching the
+     desktop layout. */
+  .app-header button,
+  .app-view .wd-banner button,
+  .app-view button[style*="border-radius: 999"] { min-height: 44px; }
+
   /* 6 ─ Week-grid calendar scrolls inside its own container */
   .app-view .mo-cal-grid {
     min-width: 560px;

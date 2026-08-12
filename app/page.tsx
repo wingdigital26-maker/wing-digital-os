@@ -215,17 +215,11 @@ export default function Home() {
           })}
         </nav>
 
-        {/* Jarvis — the one merged assistant (AI brain + voice), opens the panel */}
-        <button onClick={() => window.dispatchEvent(new CustomEvent("jarvis:open"))} style={{ /* chime plays in JarvisButton */
-          display: "flex", alignItems: "center", gap: 10,
-          margin: "0 8px 4px", padding: "10px 10px", borderRadius: 8,
-          background: "var(--accent-glow)", border: "1px solid var(--accent)",
-          color: "var(--accent)", cursor: "pointer",
-          fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden",
-        }}>
-          <span style={{ display: "inline-flex", flexShrink: 0 }}><Sparkles size={16} /></span>
-          {sidebarOpen && <span>Jarvis</span>}
-        </button>
+        {/* NOTE: the sidebar Jarvis launcher was removed — it was a second AI
+            trigger sitting bottom-left (right by the Da Boss chip), duplicating
+            the floating Jarvis FAB (JarvisButton, bottom-right). Jarvis is now
+            reached from exactly ONE place per screen: the FAB on desktop and the
+            Jarvis tab in the bottom bar on phone. */}
 
         <button onClick={() => { sfx.play(sidebarOpen ? "toggle-off" : "toggle-on"); setSidebarOpen(!sidebarOpen); }} style={{
           margin: "8px", padding: "8px", borderRadius: 8, border: "none",
@@ -410,8 +404,16 @@ function GlobalDaBoss() {
   const color = state === "red" ? "#f87171" : state === "amber" ? "#fb923c" : "#60a5fa";
   const label = state === "red" ? `${count} problem${count === 1 ? "" : "s"}` : state === "amber" ? "late" : "all clear";
 
+  // Only surface the floating chip when there is something to act on: a real
+  // problem COUNT > 0, or the amber stale/late state. We key on the actual count
+  // (not watchdog.overall, which can read "problems" with a 0 count) so an
+  // all-clear patrol shows no chip at all. Da Boss stays openable from the
+  // Agents/Mission view; the report panel still renders if it was opened.
+  const showChip = count > 0 || stale;
+
   return (
     <>
+      {showChip && (
       <button
         className={`daboss-chip${state === "red" ? " alert" : ""}`}
         onClick={() => { sfx.play("blip-watchdog"); setSel({ type: "watchdog" }); }}
@@ -434,6 +436,7 @@ function GlobalDaBoss() {
         <span className="daboss-dot" style={{ width: 7, height: 7, borderRadius: "50%", background: color, boxShadow: `0 0 8px ${color}` }} />
         <span>{label}</span>
       </button>
+      )}
       <style>{`
         /* Desktop: bottom-left corner (opposite the bottom-right Jarvis FAB) */
         .daboss-chip { bottom: 22px; left: 22px; }
@@ -658,7 +661,7 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
 
       {/* Morning Briefing — hero banner */}
       {!loading && (
-        <motion.div variants={riseItem} style={{
+        <motion.div className="briefing-hero" variants={riseItem} style={{
           position: "relative",
           background: "linear-gradient(120deg, rgba(34,211,238,0.10), rgba(167,139,250,0.08) 55%, rgba(16,19,31,0.4))",
           border: "1px solid rgba(34,211,238,0.25)",
@@ -678,7 +681,7 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
           }}>
             ⚡ Morning Briefing · {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
           </p>
-          <div style={{ display: "flex", gap: 32, flexWrap: "wrap", alignItems: "flex-end" }}>
+          <div className="briefing-metrics" style={{ display: "flex", gap: 32, flexWrap: "wrap", alignItems: "flex-end" }}>
             <div>
               <div style={{ display: "flex", alignItems: "flex-end", gap: 10 }}>
                 <p style={{ fontSize: 36, fontWeight: 800, color: "#22d3ee", lineHeight: 1, textShadow: "0 0 24px rgba(34,211,238,0.35)", fontFamily: "'Space Grotesk', sans-serif" }}><CountUp value={sentToday ?? camp?.by_day?.[new Date().toLocaleDateString("en-CA")] ?? 0} /></p>

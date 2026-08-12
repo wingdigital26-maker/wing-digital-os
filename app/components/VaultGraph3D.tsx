@@ -62,11 +62,12 @@ export default function VaultGraph3D(props: {
   onNodeHover: (n: GNode | null) => void;
   onNodeClick: (n: GNode) => void;
   onBackgroundClick: () => void;
+  onFramed?: () => void;
 }) {
   const {
     graph, size, mobile, flow, glow, restored,
     highlightNodes, highlightLinks, tick, recenterN,
-    onNodeHover, onNodeClick, onBackgroundClick,
+    onNodeHover, onNodeClick, onBackgroundClick, onFramed,
   } = props;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -178,8 +179,13 @@ export default function VaultGraph3D(props: {
     const fg = fgRef.current;
     if (!fg || !graph.nodes.length) return;
     if (!force && hasUserInteracted.current) return; // never fight manual nav
-    try { fg.zoomToFit(600, mobile ? 18 : 40); } catch { /* pre-layout */ } // tighter padding = opens a touch more zoomed in
-  }, [graph.nodes.length, mobile]);
+    try {
+      fg.zoomToFit(600, mobile ? 18 : 40); // tighter padding = opens a touch more zoomed in
+      // Tell the parent the 3D scene actually mounted + framed real geometry, so
+      // its blank-graph watchdog does NOT fall back to 2D.
+      onFramed?.();
+    } catch { /* pre-layout */ }
+  }, [graph.nodes.length, mobile, onFramed]);
   useEffect(() => {
     if (!graph.nodes.length) return;
     didFit.current = false;
@@ -309,6 +315,7 @@ export default function VaultGraph3D(props: {
       onBackgroundClick={handleBg}
       onEngineStop={() => {
         if (!didFit.current) { didFit.current = true; fitToView(); }
+        onFramed?.(); // engine settled = scene is live; keep us in 3D
         if (!restored) sfx.playWhenReady("graph-arrive");
       }}
     />

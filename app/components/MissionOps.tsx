@@ -81,11 +81,13 @@ export default function MissionOps() {
 
       {data && (
         <>
-          {/* What fires in the next 24 hours, in order */}
-          <NextUpStrip agents={data.agents} onSelect={setSelection} />
+          {/* HERO: the ops map is the primary presented thing — full width and
+              tall, filling the viewport so the moving parts are legible. The
+              scheduled/on-demand lists, next-up strip, and activity live below. */}
+          <OpsMap agents={data.agents} volumes={data.volumes} watchdog={data.watchdog} onSelect={setSelection} hero />
 
-          {/* Ops map: click an agent or system for its detail panel */}
-          <OpsMap agents={data.agents} volumes={data.volumes} watchdog={data.watchdog} onSelect={setSelection} />
+          {/* What fires in the next 24 hours, in order (secondary, below the map) */}
+          <NextUpStrip agents={data.agents} onSelect={setSelection} />
 
           <div className="mission-ops-grid" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.6fr) minmax(280px, 1fr)", gap: 20, alignItems: "start" }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 20, minWidth: 0 }}>

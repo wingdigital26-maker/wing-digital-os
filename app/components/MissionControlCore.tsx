@@ -347,8 +347,9 @@ function VolPill({ x, y, text, color, live, stale }: { x: number; y: number; tex
   );
 }
 
-export function OpsMap({ agents, volumes, watchdog, onSelect }: {
+export function OpsMap({ agents, volumes, watchdog, onSelect, hero }: {
   agents: AgentCard[]; volumes?: Volumes; watchdog?: WatchdogData | null; onSelect: (s: Selection) => void;
+  hero?: boolean;
 }) {
   const [hover, setHover] = useState<Hover>(null);
   const W = 960, H = 500;
@@ -371,8 +372,8 @@ export function OpsMap({ agents, volumes, watchdog, onSelect }: {
     const sp = sysMap.get(art.system);
     if (!sp) return null;
     const off = (idx - (siblings.length - 1) / 2) * 74;
-    return { art, x: sp.x + off, y: 430, color: sp.s.color };
-  }).filter(Boolean) as { art: typeof ARTIFACTS[number]; x: number; y: number; color: string }[];
+    return { art, x: sp.x + off, y: 430, color: sp.s.color, si: idx, sn: siblings.length };
+  }).filter(Boolean) as { art: typeof ARTIFACTS[number]; x: number; y: number; color: string; si: number; sn: number }[];
 
   // hover relationships
   const hoverSystems = new Set<string>();
@@ -412,12 +413,15 @@ export function OpsMap({ agents, volumes, watchdog, onSelect }: {
   const wdR = 31.5;
 
   return (
-    <div className="mo-map" style={{
+    <div className={`mo-map${hero ? " mo-map-hero" : ""}`} style={{
       background: "linear-gradient(180deg, var(--bg-card, #0d1117), rgba(10,12,20,0.9))",
       border: "1px solid var(--border, rgba(255,255,255,0.08))",
       borderRadius: 14, padding: 8, overflowX: "auto", WebkitOverflowScrolling: "touch",
+      ...(hero ? { height: "clamp(440px, 74vh, 900px)", display: "flex" } : {}),
     }}>
-      <svg className="mo-map-svg" viewBox={`0 ${-TOP} ${W} ${H + TOP}`} style={{ width: "100%", minWidth: 680, display: "block" }}>
+      <svg className="mo-map-svg" viewBox={`0 ${-TOP} ${W} ${H + TOP}`}
+        preserveAspectRatio={hero ? "xMidYMid meet" : undefined}
+        style={{ width: "100%", minWidth: 680, display: "block", ...(hero ? { height: "100%" } : {}) }}>
         <defs>
           <radialGradient id="mo-glow" cx="50%" cy="50%" r="50%">
             <stop offset="0%" stopColor="rgba(34,211,238,0.25)" />
@@ -599,14 +603,18 @@ export function OpsMap({ agents, volumes, watchdog, onSelect }: {
             </g>
           );
         })}
-        {volumes && artPos.map(({ art, x, y, color }) => {
+        {volumes && artPos.map(({ art, x, y, color, si }) => {
           const v = volumes.artifacts[art.id];
           const sp = sysMap.get(art.system);
           if (!v || !sp) return null;
           const dimmed = hovering && !hoverArtifacts.has(art.id);
+          // Anchor the pill just above its own artifact node (not the shared
+          // wire midpoint) and stagger siblings vertically, so two artifacts on
+          // the same system never stack their pills on top of each other.
+          const stagger = (si % 2) * 20;
           return (
             <g key={`vola-${art.id}`} opacity={dimmed ? 0.2 : 1}>
-              <VolPill x={(sp.x + x) / 2} y={(sp.y + 22 + y - 14) / 2}
+              <VolPill x={x} y={y - 26 - stagger}
                 text={v.sub ? `${v.value} ${v.sub}` : v.value} color={color}
                 live={v.source === "live-db" || v.source === "live-ghl"} stale={v.stale} />
             </g>
@@ -1236,16 +1244,22 @@ export function StatTiles({ tiles, onSelect }: { tiles: StatTile[]; onSelect: (s
               style={{
                 background: "var(--bg-card, #0d1117)",
                 border: `1px solid ${t.stale ? "rgba(251,146,60,0.4)" : "var(--border, rgba(255,255,255,0.08))"}`,
-                borderRadius: 12, padding: "14px 16px", position: "relative",
+                borderRadius: 12, padding: "14px 16px", minWidth: 0, overflow: "hidden",
                 opacity: t.stale ? 0.85 : 1,
               }}>
-              <div style={{ fontSize: 26, fontWeight: 700, color: valueColor, fontFamily: "'Space Grotesk', sans-serif" }}>{t.value}</div>
-              <div style={{ fontSize: 10, letterSpacing: "0.12em", color: "var(--text-muted)", textTransform: "uppercase" }}>
+              {/* Value + freshness mark share a row so the mark can never sit on
+                  top of a wide value; the mark holds its own column and wraps. */}
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+                <div style={{ fontSize: 26, fontWeight: 700, color: valueColor, fontFamily: "'Space Grotesk', sans-serif", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.value}</div>
+                <span style={{ flexShrink: 0, marginTop: 2, textAlign: "right", maxWidth: "45%" }}>
+                  <FreshnessMark source={t.source} updated={t.updated} stale={t.stale} />
+                </span>
+              </div>
+              {/* Label + provenance sub truncate to one line; full text in tooltip. */}
+              <div title={t.sub ? `${t.label} · ${t.sub}` : t.label}
+                style={{ fontSize: 10, letterSpacing: "0.12em", color: "var(--text-muted)", textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: 2 }}>
                 {t.label}{t.sub ? <span style={{ textTransform: "none", letterSpacing: 0 }}> · {t.sub}</span> : null}
               </div>
-              <span style={{ position: "absolute", top: 8, right: 10 }}>
-                <FreshnessMark source={t.source} updated={t.updated} stale={t.stale} />
-              </span>
             </div>
           );
         })}

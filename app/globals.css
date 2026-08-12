@@ -32,6 +32,21 @@ body {
   position: relative;
 }
 
+/* ── Lock the app shell like a native app ─────────────────────────────
+   Block pinch-zoom and rubber-band distortion of the whole page. Panning
+   (vertical scroll) is still allowed; the ops map and vault graph opt back
+   into their own gestures via .mo-map / .vault-graph below. */
+html, body {
+  touch-action: pan-x pan-y;
+  overscroll-behavior: none;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+/* Interactive pan/zoom surfaces keep their own gestures */
+.mo-map, .vault-graph, .vault-graph canvas, .vault-graph svg {
+  touch-action: auto;
+}
+
 /* Ambient glow — two soft radial blooms + faint grid, fixed behind everything */
 body::before {
   content: "";
@@ -258,6 +273,8 @@ main > div:last-child > div > *:nth-child(6) { animation-delay: 0.27s; }
   /* 5 ─ Ops map: let it shrink to fit; keep its own scroll as a fallback */
   .mo-map { overflow-x: auto; }
   .mo-map-svg { min-width: 520px !important; }
+  /* Hero ops map (Agents tab): tall on phone too, so it stays the focal point */
+  .mo-map-hero { height: clamp(360px, 60vh, 620px) !important; }
 
   /* 6 ─ Week-grid calendar scrolls inside its own container */
   .app-view .mo-cal-grid {

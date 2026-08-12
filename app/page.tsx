@@ -342,10 +342,9 @@ function MobileNav({ active, onNavigate, newLeadCount }: {
           </button>
         );
       })}
-      <button className="mobile-nav-btn jarvis" onClick={() => { sfx.play("nav"); window.dispatchEvent(new CustomEvent("jarvis:open")); }}>
-        <span className="mobile-nav-ico"><Sparkles size={21} /></span>
-        <span>Jarvis</span>
-      </button>
+      {/* No Jarvis tab here: the floating Jarvis FAB (bottom-right) is the single
+          Jarvis trigger on phone. A nav tab used to sit directly under the FAB,
+          producing two stacked Jarvis buttons in the same corner. */}
     </nav>
   );
 }
@@ -412,9 +411,17 @@ function GlobalDaBoss() {
         .daboss-chip { bottom: 22px; left: 22px; }
         .daboss-chip.alert { animation: dabossPulse 1.8s ease-in-out infinite; }
         @keyframes dabossPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(248,113,113,0.5); } 50% { box-shadow: 0 0 0 8px rgba(248,113,113,0); } }
-        /* Phone: top-right status area, clear of the bottom tab bar + Jarvis */
+        /* Phone: dock at bottom-LEFT, above the tab bar and opposite the
+           bottom-right Jarvis FAB. This keeps it fully clear of the header
+           title/date and the header's search + mute controls, which the old
+           top-right placement used to cover. */
         @media (max-width: 768px) {
-          .daboss-chip { top: calc(env(safe-area-inset-top, 0px) + 10px); right: 12px; bottom: auto; left: auto; padding: 6px 10px !important; font-size: 11px !important; }
+          .daboss-chip {
+            top: auto; right: auto;
+            left: 12px;
+            bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+            padding: 6px 10px !important; font-size: 11px !important;
+          }
         }
       `}</style>
       {sel && <MissionPanels selection={sel} data={data} onSelect={setSel} onRechecked={load} />}

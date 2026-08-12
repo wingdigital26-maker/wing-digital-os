@@ -425,17 +425,18 @@ export default function JarvisButton() {
         onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
       >
         {listening ? (
-          /* Waveform stop icon */
+          /* Stop icon while capturing voice */
           <svg width="22" height="22" viewBox="0 0 24 24" fill="white">
             <rect x="3" y="3" width="18" height="18" rx="3"/>
           </svg>
         ) : (
-          /* Microphone icon */
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/>
-            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-            <line x1="12" y1="19" x2="12" y2="23"/>
-            <line x1="8" y1="23" x2="16" y2="23"/>
+          /* Assistant mark: a neon orb with a four-point sparkle — tasteful,
+             matches the dark UI, and reads as "AI assistant" not "microphone". */
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="12" cy="12" r="8.5" stroke="white" strokeWidth="1.4" strokeOpacity="0.55" />
+            <path d="M12 6.2c.35 2.9 1.9 4.45 4.8 4.8-2.9.35-4.45 1.9-4.8 4.8-.35-2.9-1.9-4.45-4.8-4.8 2.9-.35 4.45-1.9 4.8-4.8Z"
+              fill="white" />
+            <circle cx="17" cy="7" r="1.15" fill="white" fillOpacity="0.9" />
           </svg>
         )}
       </button>

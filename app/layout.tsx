@@ -9,12 +9,15 @@ export const metadata: Metadata = {
 };
 
 // viewport-fit=cover lets env(safe-area-inset-*) resolve to real notch/home-indicator
-// insets when installed as a PWA. maximumScale is left open so pinch-zoom still works
-// on the ops map / vault graph.
+// insets when installed as a PWA. maximumScale:1 + userScalable:false lock the app
+// shell so it never pinch-zooms or rubber-band-distorts — it sticks like a native
+// app. The ops map and vault graph keep their OWN internal pan/zoom.
 export const viewport: Viewport = {
   themeColor: "#0a0a0a",
   width: "device-width",
   initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
   viewportFit: "cover",
 };
 

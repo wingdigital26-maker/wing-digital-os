@@ -25,7 +25,7 @@ function makeLabelSprite(text: string): THREE.Sprite | null {
   if (typeof document === "undefined") return null;
   const cached = labelSpriteCache.get(text);
   if (cached) return cached.clone();
-  const pad = 10, fontPx = 46;
+  const pad = 12, fontPx = 58;
   const c = document.createElement("canvas");
   const g = c.getContext("2d");
   if (!g) return null;
@@ -42,7 +42,7 @@ function makeLabelSprite(text: string): THREE.Sprite | null {
   const tex = new THREE.CanvasTexture(c);
   tex.minFilter = THREE.LinearFilter;
   const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
-  const scale = 0.52;
+  const scale = 0.66;
   spr.scale.set((w / h) * fontPx * scale * 0.1 + 4, fontPx * scale * 0.1 + 2, 1);
   labelSpriteCache.set(text, spr);
   return spr.clone();
@@ -212,22 +212,24 @@ export default function VaultGraph3D(props: {
     let started = false;
     let raf = 0;
     let last = performance.now();
+    let lastInteract = 0; // when the user last touched the camera
     const controls = fg.controls?.();
-    // Any manual camera control (drag/zoom) permanently stops the auto-orbit so
-    // the view stays where Jack leaves it, until an explicit Recenter.
+    // The galaxy slowly spins on its own. Manual drag/zoom pauses it; it resumes
+    // a few seconds after the user stops, so the view keeps gently rotating.
+    const RESUME_MS = 3500;
     const onStart = () => { interacting.current = true; hasUserInteracted.current = true; };
-    const onEnd = () => { interacting.current = false; };
+    const onEnd = () => { interacting.current = false; lastInteract = performance.now(); started = false; };
     controls?.addEventListener?.("start", onStart);
     controls?.addEventListener?.("end", onEnd);
-    const RPM = 0.4;
+    const RPM = 0.32; // slow, gentle spin
     const step = (now: number) => {
       raf = requestAnimationFrame(step);
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
-      // Hold still until the graph has been framed at least once, and while the
-      // user is interacting or a node is focused. And once Jack has taken manual
-      // control of the camera, stop orbiting entirely (resumes on Recenter).
-      if (!didFit.current || interacting.current || focusId.current || hasUserInteracted.current) { last = now; return; }
+      // Hold still until the graph has been framed once, while the user is
+      // actively interacting or a node is focused, and for a short beat after
+      // they let go. Otherwise keep the gentle spin going.
+      if (!didFit.current || interacting.current || focusId.current || (now - lastInteract < RESUME_MS)) { last = now; return; }
       const cam = fg.camera?.();
       if (!cam) return;
       // Orbit center = current look-at target (graph centroid), fall back to 0.

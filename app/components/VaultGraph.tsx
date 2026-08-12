@@ -95,6 +95,32 @@ function hslToHex(h: number, s: number, l: number): string {
 
 const HUB_DEG = 8; // degree at which a node reads as a hub (bigger, brighter)
 
+// ── Pre-rendered glow sprites ──
+// shadowBlur is one of the most expensive canvas ops; running it per-node
+// per-frame across 150+ nodes destroys pan/drag framerate. Instead we bake a
+// soft radial-gradient glow ONCE per color into a tiny offscreen canvas and
+// drawImage() it — effectively free in the hot path. Cached by color.
+const glowSpriteCache = new Map<string, HTMLCanvasElement>();
+function glowSprite(color: string): HTMLCanvasElement | null {
+  if (typeof document === "undefined") return null;
+  let c = glowSpriteCache.get(color);
+  if (!c) {
+    const S = 64; // sprite is drawn scaled to the node, so a small base is fine
+    c = document.createElement("canvas");
+    c.width = S; c.height = S;
+    const g = c.getContext("2d");
+    if (!g) return null;
+    const grad = g.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
+    grad.addColorStop(0, color);
+    grad.addColorStop(0.35, color);
+    grad.addColorStop(1, "rgba(0,0,0,0)");
+    g.fillStyle = grad;
+    g.fillRect(0, 0, S, S);
+    glowSpriteCache.set(color, c);
+  }
+  return c;
+}
+
 // Node size by degree, wide range so hubs are dramatically bigger.
 function nodeVal(deg: number): number {
   return 1.6 + Math.sqrt(deg) * 2.2;
@@ -223,6 +249,23 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
   const [tick, setTick] = useState(0);
   const bump = useCallback(() => setTick(t => (t + 1) % 1e9), []);
 
+  // ── Interaction flag ──
+  // While panning / zooming / dragging (or while the sim is still hot) we draw
+  // simplified nodes (plain discs, no glow sprite, no labels) and drop link
+  // particles, then restore the pretty render when idle. Kept in a ref so the
+  // canvas painter reads it without forcing a React re-render every frame.
+  const interacting = useRef(false);
+  const interactTimer = useRef<number | null>(null);
+  const markInteracting = useCallback(() => {
+    interacting.current = true;
+    if (interactTimer.current) window.clearTimeout(interactTimer.current);
+    // settle back to the pretty render shortly after the last interaction event
+    interactTimer.current = window.setTimeout(() => {
+      interacting.current = false;
+      bump(); // repaint pretty once idle
+    }, 220);
+  }, [bump]);
+
   // adjacency for neighborhood highlighting
   const adj = useMemo(() => {
     const m = new Map<string, Set<string>>();
@@ -293,7 +336,11 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
     };
   }, [graph, mobile, effectiveIs3D, webglOK]);
 
-  // ── 2D force tuning: wide spacing + warm settling ──
+  // ── 2D force tuning: wide spacing, then settle FAST and stay static ──
+  // A faster alpha decay means the layout converges in far fewer ticks and then
+  // freezes, so panning/zooming after settle are cheap redraws (no re-sim). We
+  // only reheat once, when new graph data actually arrives — never on pan/zoom.
+  const lastHeatedFor = useRef<number>(-1);
   useEffect(() => {
     if (effectiveIs3D) return; // 3D tunes its own forces
     const fg = fg2dRef.current;
@@ -301,8 +348,16 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
     fg.d3Force("charge")?.strength(mobile ? -120 : -200).distanceMax(1000);
     fg.d3Force("link")?.distance(mobile ? 50 : 80).strength(0.08);
     if (fg.d3Force("center")) fg.d3Force("center").strength(0.04);
-    fg.d3ReheatSimulation?.();
-  }, [graph, mobile, effectiveIs3D]);
+    // Settle fast and freeze: higher decay = fewer ticks to cool, cheaper idle.
+    fg.d3AlphaDecay?.(0.045);
+    fg.d3VelocityDecay?.(0.4);
+    // Reheat ONCE per distinct dataset (restored cache is already settled), so a
+    // re-render from a pan/hover never re-runs the whole simulation.
+    if (lastHeatedFor.current !== graph.nodes.length && !restored) {
+      lastHeatedFor.current = graph.nodes.length;
+      fg.d3ReheatSimulation?.();
+    }
+  }, [graph, mobile, effectiveIs3D, restored]);
 
   // ── Frame the whole layout in view (2D) ──
   const didFit = useRef(false);
@@ -384,36 +439,62 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
   // Node: a filled glowing circle, hubs bigger + brighter, dimmed nodes kept
   // visible (0.22 floor). Labels fade in once zoomed in enough to read them.
   const anyHi = highlightNodes.current.size > 0;
+  // NOTE: no shadowBlur anywhere in this painter (the hot path). The glow look
+  // comes from a pre-baked radial-gradient sprite drawn with drawImage, and it
+  // is skipped entirely while interacting so pan/drag stay buttery.
   const paintNode = useCallback((node: GNode, ctx: CanvasRenderingContext2D, scale: number) => {
     const x = node.x ?? 0, y = node.y ?? 0;
     const on = !anyHi || highlightNodes.current.has(node.id);
     const r = Math.max(1.5, (node.val ?? 1.6));
     const color = node.color ?? "#94a3b8";
+    const busy = interacting.current;
     ctx.save();
     ctx.globalAlpha = on ? 1 : 0.22;
-    // glow halo
-    ctx.shadowColor = color;
-    ctx.shadowBlur = (node.isHub ? 16 : 8) * (on ? 1 : 0.4);
+
+    // Soft glow via a pre-rendered sprite (cheap drawImage) — pretty render only.
+    if (!busy) {
+      const sprite = glowSprite(color);
+      if (sprite) {
+        const gr = r * (node.isHub ? 3.4 : 2.6);
+        ctx.globalAlpha = (on ? 1 : 0.22) * (node.isHub ? 0.5 : 0.35);
+        ctx.drawImage(sprite, x - gr, y - gr, gr * 2, gr * 2);
+        ctx.globalAlpha = on ? 1 : 0.22;
+      }
+    }
+
+    // Solid disc (always).
     ctx.beginPath();
     ctx.arc(x, y, r, 0, 2 * Math.PI);
     ctx.fillStyle = color;
     ctx.fill();
+
     if (node.isHub) {
       // bright ring so hubs read as hubs even before you zoom in
-      ctx.shadowBlur = 0;
       ctx.lineWidth = 0.6;
       ctx.strokeStyle = "rgba(255,255,255,0.85)";
       ctx.stroke();
     }
-    ctx.shadowBlur = 0;
-    // labels once zoomed in (or always for hubs when zoomed a little)
-    const showLabel = on && (scale > 2.4 || (node.isHub && scale > 1.3));
-    if (showLabel) {
-      const fontSize = Math.min(5, 11 / scale);
-      ctx.font = `${fontSize}px ui-sans-serif, system-ui, sans-serif`;
-      ctx.fillStyle = "rgba(226,232,240,0.92)";
+
+    // Labels.
+    //  · HUBS: always labeled at any zoom, and kept even during pan/drag (there
+    //    are only a handful, so it stays cheap). A dark halo keeps text legible
+    //    over nodes and links.
+    //  · Leaves: fade in only when zoomed in enough, and hidden while busy.
+    const hubLabel = on && node.isHub;
+    const leafLabel = !busy && on && !node.isHub && scale > 2.4;
+    if (hubLabel || leafLabel) {
+      const fontSize = node.isHub
+        ? Math.min(7, Math.max(3.2, 12 / scale)) // hubs stay readable when zoomed out
+        : Math.min(5, 11 / scale);
+      ctx.font = `${node.isHub ? "600 " : ""}${fontSize}px ui-sans-serif, system-ui, sans-serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "top";
+      // subtle dark halo/background so the label stays legible
+      ctx.lineWidth = fontSize * (node.isHub ? 0.5 : 0.4);
+      ctx.strokeStyle = "rgba(4,5,10,0.85)";
+      ctx.lineJoin = "round";
+      ctx.strokeText(node.name, x, y + r + 1);
+      ctx.fillStyle = node.isHub ? "rgba(241,245,249,0.98)" : "rgba(226,232,240,0.92)";
       ctx.fillText(node.name, x, y + r + 1);
     }
     ctx.restore();
@@ -473,11 +554,15 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
             const base = src?.color ?? "#7fa8d9";
             return on ? base : "rgba(127,168,217,0.08)";
           }}
-          linkWidth={(l: GLink) => (highlightLinks.current.has(l) ? 1.6 : 0.35)}
+          linkWidth={(l: GLink) => (highlightLinks.current.has(l) ? 1.4 : 0.3)}
           linkCurvature={0.12}
-          linkDirectionalParticles={(l: GLink) =>
-            flow ? (anyHi ? (highlightLinks.current.has(l) ? 3 : 0) : 2) : 0
-          }
+          linkDirectionalParticles={(l: GLink) => {
+            if (!flow || interacting.current) return 0; // no particles while busy
+            // Only flow on highlighted links (hover/search); a cheap global 1
+            // otherwise. Never 2+ across the whole graph on idle.
+            if (anyHi) return highlightLinks.current.has(l) ? 2 : 0;
+            return 1;
+          }}
           linkDirectionalParticleSpeed={0.004}
           linkDirectionalParticleWidth={1.4}
           linkDirectionalParticleColor={(l: GLink) => {
@@ -485,9 +570,13 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
             return src?.color ?? "#7fa8d9";
           }}
           warmupTicks={mobile ? 30 : 60}
-          cooldownTicks={mobile ? 120 : 240}
+          cooldownTicks={mobile ? 90 : 140}
           onNodeHover={onNodeHover}
           onNodeClick={onNodeClick}
+          onNodeDrag={markInteracting}
+          onNodeDragEnd={markInteracting}
+          onZoom={markInteracting}
+          onZoomEnd={markInteracting}
           onBackgroundClick={onBgClick}
           onEngineStop={() => {
             if (!didFit.current) { didFit.current = true; fitToView2D(); }

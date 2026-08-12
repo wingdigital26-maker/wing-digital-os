@@ -18,6 +18,36 @@ function lid(x: string | GNode): string {
   return typeof x === "string" ? x : x.id;
 }
 
+// Cheap canvas-texture label sprite (used only for the handful of hub nodes),
+// with a dark halo so the text stays legible over nodes and links.
+const labelSpriteCache = new Map<string, THREE.Sprite>();
+function makeLabelSprite(text: string): THREE.Sprite | null {
+  if (typeof document === "undefined") return null;
+  const cached = labelSpriteCache.get(text);
+  if (cached) return cached.clone();
+  const pad = 8, fontPx = 34;
+  const c = document.createElement("canvas");
+  const g = c.getContext("2d");
+  if (!g) return null;
+  g.font = `600 ${fontPx}px ui-sans-serif, system-ui, sans-serif`;
+  const w = Math.ceil(g.measureText(text).width) + pad * 2;
+  const h = fontPx + pad * 2;
+  c.width = w; c.height = h;
+  g.font = `600 ${fontPx}px ui-sans-serif, system-ui, sans-serif`;
+  g.textAlign = "center"; g.textBaseline = "middle";
+  g.lineJoin = "round"; g.lineWidth = 6; g.strokeStyle = "rgba(4,5,10,0.9)";
+  g.strokeText(text, w / 2, h / 2);
+  g.fillStyle = "rgba(241,245,249,0.98)";
+  g.fillText(text, w / 2, h / 2);
+  const tex = new THREE.CanvasTexture(c);
+  tex.minFilter = THREE.LinearFilter;
+  const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
+  const scale = 0.35;
+  spr.scale.set((w / h) * fontPx * scale * 0.1 + 4, fontPx * scale * 0.1 + 2, 1);
+  labelSpriteCache.set(text, spr);
+  return spr.clone();
+}
+
 export default function VaultGraph3D(props: {
   graph: { nodes: GNode[]; links: GLink[] };
   size: { w: number; h: number };
@@ -67,7 +97,14 @@ export default function VaultGraph3D(props: {
     }
     const mat = new THREE.MeshBasicMaterial({ color: node.color ?? "#94a3b8", transparent: true, opacity: 1 });
     nodeMats.current.set(node.id, mat);
-    return new THREE.Mesh(geom, mat);
+    const mesh = new THREE.Mesh(geom, mat);
+    // Hubs are always labeled (there are only a handful) via a cheap canvas-
+    // texture sprite with a dark halo, so the name reads over nodes and links.
+    if (node.isHub) {
+      const label = makeLabelSprite(node.name);
+      if (label) { label.position.set(0, val * 1.9, 0); mesh.add(label); }
+    }
+    return mesh;
   }, []);
 
   // Keep material opacity in sync with highlight (visible floor, no blackout).
@@ -139,11 +176,18 @@ export default function VaultGraph3D(props: {
   }, [graph.nodes.length, fitToView]);
 
   // ── Slow auto-orbit camera (~0.4 rpm) so the galaxy always breathes ──
+  // CRITICAL: orbit around the controls' look-at TARGET (the graph centroid),
+  // not the world origin. The 2D center force is weak so the settled layout can
+  // sit far from (0,0,0); orbiting the origin while zoomToFit framed the offset
+  // nodes used to shove every node out of view every frame — the "toggle 3D and
+  // see nothing" bug. We also wait until the first fit has run before orbiting,
+  // so the camera never fights the initial framing.
   const interacting = useRef(false);
   useEffect(() => {
     const fg = fgRef.current;
     if (!fg || !graph.nodes.length) return;
     let angle = 0;
+    let started = false;
     let raf = 0;
     let last = performance.now();
     const controls = fg.controls?.();
@@ -156,15 +200,20 @@ export default function VaultGraph3D(props: {
       raf = requestAnimationFrame(step);
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
-      if (interacting.current || focusId.current) return;
-      angle += dt * (RPM * Math.PI * 2 / 60);
+      // Hold still until the graph has been framed at least once, and while the
+      // user is interacting or a node is focused.
+      if (!didFit.current || interacting.current || focusId.current) { last = now; return; }
       const cam = fg.camera?.();
       if (!cam) return;
-      const r = Math.hypot(cam.position.x, cam.position.z) || 900;
-      fg.cameraPosition({ x: r * Math.sin(angle), z: r * Math.cos(angle) });
+      // Orbit center = current look-at target (graph centroid), fall back to 0.
+      const tgt = controls?.target ?? { x: 0, y: 0, z: 0 };
+      const dx = cam.position.x - tgt.x;
+      const dz = cam.position.z - tgt.z;
+      const r = Math.hypot(dx, dz) || 900;
+      if (!started) { angle = Math.atan2(dx, dz); started = true; }
+      angle += dt * (RPM * Math.PI * 2 / 60);
+      fg.cameraPosition({ x: tgt.x + r * Math.sin(angle), z: tgt.z + r * Math.cos(angle) });
     };
-    const cam0 = fg.camera?.();
-    if (cam0) angle = Math.atan2(cam0.position.x, cam0.position.z);
     raf = requestAnimationFrame(step);
     return () => {
       cancelAnimationFrame(raf);

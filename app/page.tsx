@@ -1459,6 +1459,72 @@ function Clients({ data, loading }: { data: any; loading: boolean }) {
   );
 }
 
+// Lightweight, dependency-free markdown -> React renderer for the note viewer.
+// Handles headings, bold/italic/inline-code/links, bullet + numbered lists,
+// fenced code blocks and blank-line paragraphs. Good enough to read a vault note
+// without pulling in a markdown library.
+function renderInline(text: string, keyBase: string): React.ReactNode[] {
+  const out: React.ReactNode[] = [];
+  // links [label](url)
+  const parts = text.split(/(\[[^\]]+\]\([^)]+\)|\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*)/g);
+  parts.forEach((p, i) => {
+    const k = `${keyBase}-${i}`;
+    let m: RegExpMatchArray | null;
+    if ((m = p.match(/^\[([^\]]+)\]\(([^)]+)\)$/))) {
+      out.push(<a key={k} href={m[2]} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)", textDecoration: "underline" }}>{m[1]}</a>);
+    } else if ((m = p.match(/^\*\*([^*]+)\*\*$/))) {
+      out.push(<strong key={k}>{m[1]}</strong>);
+    } else if ((m = p.match(/^`([^`]+)`$/))) {
+      out.push(<code key={k} style={{ background: "rgba(255,255,255,0.08)", padding: "1px 5px", borderRadius: 4, fontSize: "0.9em" }}>{m[1]}</code>);
+    } else if ((m = p.match(/^\*([^*]+)\*$/))) {
+      out.push(<em key={k}>{m[1]}</em>);
+    } else if (p) {
+      out.push(<span key={k}>{p}</span>);
+    }
+  });
+  return out;
+}
+function renderMarkdown(md: string): React.ReactNode {
+  const lines = md.replace(/\r\n/g, "\n").split("\n");
+  const blocks: React.ReactNode[] = [];
+  let i = 0, key = 0;
+  const hSize: Record<number, number> = { 1: 22, 2: 18, 3: 15.5, 4: 14, 5: 13, 6: 12.5 };
+  while (i < lines.length) {
+    const line = lines[i];
+    if (/^```/.test(line)) {
+      const buf: string[] = []; i++;
+      while (i < lines.length && !/^```/.test(lines[i])) { buf.push(lines[i]); i++; }
+      i++;
+      blocks.push(<pre key={key++} style={{ background: "rgba(0,0,0,0.35)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: 12, overflowX: "auto", fontSize: 12.5, lineHeight: 1.6 }}>{buf.join("\n")}</pre>);
+      continue;
+    }
+    const h = line.match(/^(#{1,6})\s+(.*)$/);
+    if (h) {
+      const lvl = h[1].length;
+      blocks.push(<p key={key++} style={{ fontSize: hSize[lvl], fontWeight: 700, margin: "16px 0 6px", color: "var(--text-primary)" }}>{renderInline(h[2], `h${key}`)}</p>);
+      i++; continue;
+    }
+    if (/^\s*([-*])\s+/.test(line)) {
+      const items: string[] = [];
+      while (i < lines.length && /^\s*([-*])\s+/.test(lines[i])) { items.push(lines[i].replace(/^\s*([-*])\s+/, "")); i++; }
+      blocks.push(<ul key={key++} style={{ margin: "6px 0", paddingLeft: 20, lineHeight: 1.7 }}>{items.map((it, j) => <li key={j}>{renderInline(it, `li${key}-${j}`)}</li>)}</ul>);
+      continue;
+    }
+    if (/^\s*\d+\.\s+/.test(line)) {
+      const items: string[] = [];
+      while (i < lines.length && /^\s*\d+\.\s+/.test(lines[i])) { items.push(lines[i].replace(/^\s*\d+\.\s+/, "")); i++; }
+      blocks.push(<ol key={key++} style={{ margin: "6px 0", paddingLeft: 22, lineHeight: 1.7 }}>{items.map((it, j) => <li key={j}>{renderInline(it, `ol${key}-${j}`)}</li>)}</ol>);
+      continue;
+    }
+    if (!line.trim()) { i++; continue; }
+    // paragraph: gather until blank
+    const buf: string[] = [];
+    while (i < lines.length && lines[i].trim() && !/^(#{1,6}\s|```|\s*[-*]\s|\s*\d+\.\s)/.test(lines[i])) { buf.push(lines[i]); i++; }
+    blocks.push(<p key={key++} style={{ margin: "8px 0", lineHeight: 1.75 }}>{renderInline(buf.join(" "), `p${key}`)}</p>);
+  }
+  return <>{blocks}</>;
+}
+
 function KnowledgeBase({ initialPath, onSendToAI }: { initialPath?: string; onSendToAI: (ctx: string) => void }) {
   const [tree, setTree] = useState<any[]>([]);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
@@ -1666,6 +1732,65 @@ function KnowledgeBase({ initialPath, onSendToAI }: { initialPath?: string; onSe
       <div className="kb-graph" style={{ flex: 1, position: "relative", minWidth: 0 }}>
         <VaultGraph onSelectNode={(p) => openFile(p)} />
       </div>
+
+      {/* Note viewer — clicking a graph node (or tree file) opens the real note
+          here. On desktop it's a right-side reading panel; on phone it's a
+          bottom-sheet overlaying the graph (never pushes the graph around). */}
+      {selectedFile && (
+        <>
+          {isPhone && (
+            <div onClick={() => setSelectedFile(null)} style={{ position: "absolute", inset: 0, zIndex: 45, background: "rgba(0,0,0,0.45)" }} />
+          )}
+          <div
+            className="kb-viewer"
+            style={isPhone ? {
+              position: "absolute", left: 0, right: 0, bottom: 0, zIndex: 46,
+              height: "72%", borderTopLeftRadius: 18, borderTopRightRadius: 18,
+              background: "rgba(9,11,20,0.98)", backdropFilter: "blur(14px)",
+              borderTop: "1px solid rgba(255,255,255,0.1)", boxShadow: "0 -12px 40px rgba(0,0,0,0.6)",
+              display: "flex", flexDirection: "column",
+            } : {
+              width: 460, flexShrink: 0, height: "100%",
+              borderLeft: "1px solid rgba(255,255,255,0.07)",
+              background: "rgba(9,11,20,0.72)", backdropFilter: "blur(10px)",
+              display: "flex", flexDirection: "column",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 16px", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+              {isPhone && <span style={{ position: "absolute", top: 6, left: "50%", transform: "translateX(-50%)", width: 36, height: 4, borderRadius: 2, background: "rgba(255,255,255,0.25)" }} />}
+              <span style={{ flex: 1, fontSize: 13, fontWeight: 700, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {selectedFile.split("/").pop()}
+              </span>
+              {!loadingFile && (
+                <button onClick={() => { setEditing(e => !e); setEditContent(content); }}
+                  style={{ background: "transparent", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text-secondary)", cursor: "pointer", fontSize: 11.5, padding: "5px 10px" }}>
+                  {editing ? "Preview" : "Edit"}
+                </button>
+              )}
+              {editing && (
+                <button onClick={saveFile} disabled={saving}
+                  style={{ background: "linear-gradient(135deg, var(--accent), var(--accent-2))", border: "none", borderRadius: 8, color: "#07080f", cursor: "pointer", fontSize: 11.5, fontWeight: 700, padding: "5px 10px" }}>
+                  {saving ? "Saving..." : "Save"}
+                </button>
+              )}
+              <button onClick={() => setSelectedFile(null)} aria-label="Close note"
+                style={{ background: "transparent", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 20, lineHeight: 1, padding: "0 2px" }}>×</button>
+            </div>
+            <div style={{ flex: 1, overflow: "auto", padding: "16px 18px" }}>
+              {loadingFile ? (
+                <p style={{ color: "var(--text-muted)", fontSize: 13 }}>Opening note...</p>
+              ) : editing ? (
+                <textarea value={editContent} onChange={e => setEditContent(e.target.value)}
+                  style={{ width: "100%", height: "100%", minHeight: 300, resize: "none", background: "rgba(0,0,0,0.3)", border: "1px solid var(--border)", borderRadius: 10, color: "var(--text-primary)", fontSize: 13, lineHeight: 1.7, padding: 12, outline: "none", fontFamily: "ui-monospace, monospace" }} />
+              ) : content ? (
+                <div style={{ fontSize: 13.5, color: "var(--text-secondary)" }}>{renderMarkdown(content)}</div>
+              ) : (
+                <p style={{ color: "var(--text-muted)", fontSize: 13 }}>This note is empty.</p>
+              )}
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Toast */}
       {toast && (

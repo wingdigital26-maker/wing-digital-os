@@ -506,17 +506,17 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
     const leafLabel = !busy && on && !node.isHub && scale > 2.4;
     if (hubLabel || leafLabel) {
       const fontSize = node.isHub
-        ? Math.min(7, Math.max(3.2, 12 / scale)) // hubs stay readable when zoomed out
+        ? Math.min(10, Math.max(4.5, 17 / scale)) // hubs bigger, readable when zoomed out
         : Math.min(5, 11 / scale);
-      ctx.font = `${node.isHub ? "600 " : ""}${fontSize}px ui-sans-serif, system-ui, sans-serif`;
+      ctx.font = `${node.isHub ? "700 " : ""}${fontSize}px ui-sans-serif, system-ui, sans-serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "top";
-      // subtle dark halo/background so the label stays legible
-      ctx.lineWidth = fontSize * (node.isHub ? 0.5 : 0.4);
-      ctx.strokeStyle = "rgba(4,5,10,0.85)";
+      // dark halo/background so the label stays legible over nodes and links
+      ctx.lineWidth = fontSize * (node.isHub ? 0.6 : 0.4);
+      ctx.strokeStyle = "rgba(3,4,8,0.92)";
       ctx.lineJoin = "round";
       ctx.strokeText(node.name, x, y + r + 1);
-      ctx.fillStyle = node.isHub ? "rgba(241,245,249,0.98)" : "rgba(226,232,240,0.92)";
+      ctx.fillStyle = node.isHub ? "#ffffff" : "rgba(226,232,240,0.92)";
       ctx.fillText(node.name, x, y + r + 1);
     }
     ctx.restore();

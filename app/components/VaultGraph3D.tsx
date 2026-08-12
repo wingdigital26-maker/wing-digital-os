@@ -25,7 +25,7 @@ function makeLabelSprite(text: string): THREE.Sprite | null {
   if (typeof document === "undefined") return null;
   const cached = labelSpriteCache.get(text);
   if (cached) return cached.clone();
-  const pad = 8, fontPx = 34;
+  const pad = 10, fontPx = 46;
   const c = document.createElement("canvas");
   const g = c.getContext("2d");
   if (!g) return null;
@@ -35,14 +35,14 @@ function makeLabelSprite(text: string): THREE.Sprite | null {
   c.width = w; c.height = h;
   g.font = `600 ${fontPx}px ui-sans-serif, system-ui, sans-serif`;
   g.textAlign = "center"; g.textBaseline = "middle";
-  g.lineJoin = "round"; g.lineWidth = 6; g.strokeStyle = "rgba(4,5,10,0.9)";
+  g.lineJoin = "round"; g.lineWidth = 9; g.strokeStyle = "rgba(3,4,8,0.95)";
   g.strokeText(text, w / 2, h / 2);
-  g.fillStyle = "rgba(241,245,249,0.98)";
+  g.fillStyle = "#ffffff";
   g.fillText(text, w / 2, h / 2);
   const tex = new THREE.CanvasTexture(c);
   tex.minFilter = THREE.LinearFilter;
   const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
-  const scale = 0.35;
+  const scale = 0.52;
   spr.scale.set((w / h) * fontPx * scale * 0.1 + 4, fontPx * scale * 0.1 + 2, 1);
   labelSpriteCache.set(text, spr);
   return spr.clone();
@@ -80,9 +80,10 @@ export default function VaultGraph3D(props: {
   useEffect(() => {
     const fg = fgRef.current;
     if (!fg || !graph.nodes.length) return;
-    fg.d3Force("charge")?.strength(mobile ? -140 : -230).distanceMax(1200);
-    fg.d3Force("link")?.distance(mobile ? 60 : 90).strength(0.08);
-    if (fg.d3Force("center")) fg.d3Force("center").strength(0.03);
+    // Spread out like a galaxy: stronger repulsion, longer links, weaker center pull.
+    fg.d3Force("charge")?.strength(mobile ? -260 : -430).distanceMax(2200);
+    fg.d3Force("link")?.distance(mobile ? 100 : 155).strength(0.07);
+    if (fg.d3Force("center")) fg.d3Force("center").strength(0.015);
     fg.d3ReheatSimulation?.();
   }, [graph, mobile]);
 
@@ -152,9 +153,9 @@ export default function VaultGraph3D(props: {
         //  · small radius so glow hugs each node instead of smearing across
         const bloom = new UnrealBloomPass(
           new THREE.Vector2(size.w || window.innerWidth, size.h || window.innerHeight),
-          mobile ? 0.6 : 0.8, // strength (was 2.0)
-          0.35,               // radius (was 0.75)
-          0.6                 // threshold (was 0), keeps the background dark
+          mobile ? 0.3 : 0.4, // strength: gentle halo, not a full-screen wash
+          0.2,                // radius: hug each node tightly
+          0.82                // threshold: only the brightest node cores bloom, background/links stay dark
         );
         composer.addPass(bloom);
         added.push(bloom);

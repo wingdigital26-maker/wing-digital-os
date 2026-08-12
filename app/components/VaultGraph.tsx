@@ -15,7 +15,8 @@
 // This whole component is only ever loaded client-side (page.tsx imports it via
 // next/dynamic { ssr:false }), so the WebGL library and its window/three usage
 // never run during SSR.
-import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback, Component } from "react";
+import type { ReactNode } from "react";
 import ForceGraph3D from "react-force-graph-3d";
 import * as THREE from "three";
 import { UnrealBloomPass, BokehPass } from "three-stdlib";
@@ -167,6 +168,31 @@ function buildGraph(raw: RawGraph): { nodes: GNode[]; links: GLink[] } {
   return { nodes, links };
 }
 
+// ── Error boundary ──
+// Any runtime throw from inside the WebGL / three scene (a bad postprocessing
+// pass, a shader compile failure, a library version mismatch) would otherwise
+// unmount the whole graph and leave a blank void. We catch it here and tell the
+// parent to fall back to a plainer, reliable render instead.
+class GraphErrorBoundary extends Component<
+  { onError: () => void; children: ReactNode },
+  { failed: boolean }
+> {
+  constructor(props: { onError: () => void; children: ReactNode }) {
+    super(props);
+    this.state = { failed: false };
+  }
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  componentDidCatch() {
+    this.props.onError();
+  }
+  render() {
+    if (this.state.failed) return null;
+    return this.props.children;
+  }
+}
+
 export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: string) => void }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -178,6 +204,17 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
   const [query, setQuery] = useState("");
   const [flow, setFlow] = useState(true);
   const [is3D, setIs3D] = useState(true);
+  // Glow (bloom / depth-of-field post-processing) is the fragile, "fancy" layer.
+  // Under some three.js / three-stdlib version combos it silently renders the
+  // whole scene to black WITHOUT throwing — the exact "graph is a black void"
+  // symptom. So it is OPT-IN: the graph draws plain, bright, reliable nodes
+  // first, and glow only layers on when Jack explicitly turns it on.
+  const [glow, setGlow] = useState(false);
+  // Set by the error boundary if the 3D scene throws: forces the reliable 2D
+  // render so the graph is never a blank void.
+  const [safeMode, setSafeMode] = useState(false);
+  const effectiveIs3D = is3D && !safeMode;
+  const effectiveGlow = glow && !safeMode;
   const [mobile] = useState<boolean>(detectMobile);
   // WebGL capability: if the browser cannot create a WebGL context at all, the
   // force-graph canvas would paint pure black. Detect it up front so we can show
@@ -287,11 +324,16 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
     fg.d3ReheatSimulation?.();
   }, [graph, mobile, is3D]);
 
-  // ── Post-processing: bloom (always) + bokeh DoF (desktop only) ──
+  // ── Post-processing: bloom + bokeh DoF, BEST-EFFORT and OPT-IN ──
+  // Only runs when Jack turns Glow on. Every pass is added defensively, and the
+  // effect removes exactly the passes it added on cleanup / when glow turns off,
+  // so the graph always reverts to the reliable direct render. If any pass fails
+  // to construct we bail — plain nodes keep drawing regardless.
   useEffect(() => {
     const fg = fgRef.current;
-    if (!fg || !is3D || !graph.nodes.length) return;
+    if (!fg || !effectiveIs3D || !effectiveGlow || !graph.nodes.length) return;
     let cancelled = false;
+    const added: unknown[] = [];
     const id = window.setTimeout(() => {
       if (cancelled) return;
       try {
@@ -314,6 +356,7 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
               maxblur: 0.01,
             });
             composer.addPass(bokeh);
+            added.push(bokeh);
           }
         }
 
@@ -325,13 +368,22 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
           0                   // threshold: everything blooms a little
         );
         composer.addPass(bloom);
+        added.push(bloom);
       } catch {
         /* postprocessing unavailable — graph still renders, just no glow */
       }
     }, 120);
-    return () => { cancelled = true; window.clearTimeout(id); };
+    return () => {
+      cancelled = true;
+      window.clearTimeout(id);
+      // Remove exactly what we added so the composer returns to direct render.
+      try {
+        const composer = fg.postProcessingComposer?.();
+        if (composer?.removePass) for (const p of added) composer.removePass(p);
+      } catch { /* noop */ }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [is3D, graph.nodes.length, mobile]);
+  }, [effectiveIs3D, effectiveGlow, graph.nodes.length, mobile]);
 
   // ── Frame the whole galaxy in view once it exists ──
   // Without this the default camera can sit off to one side of a wide force
@@ -356,7 +408,7 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
   const interacting = useRef(false);
   useEffect(() => {
     const fg = fgRef.current;
-    if (!fg || !is3D || !graph.nodes.length) return;
+    if (!fg || !effectiveIs3D || !graph.nodes.length) return;
     let angle = 0;
     let raf = 0;
     let last = performance.now();
@@ -393,7 +445,7 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
       controls?.removeEventListener?.("end", onEnd);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [is3D, graph.nodes.length]);
+  }, [effectiveIs3D, graph.nodes.length]);
 
   // ── Search highlight: matches drive the same dim/highlight machinery ──
   useEffect(() => {
@@ -480,7 +532,7 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
     setNeighborhood(node.id);
     sfx.play("graph-focus");
     // ease the camera to frame the node
-    if (fg && is3D) {
+    if (fg && effectiveIs3D) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const n = node as any;
       const dist = 120;
@@ -494,7 +546,7 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
     }
     // open the note through the existing contract
     onSelectRef.current(node.path);
-  }, [is3D, setNeighborhood]);
+  }, [effectiveIs3D, setNeighborhood]);
 
   const onBgClick = useCallback(() => {
     focusId.current = null;
@@ -537,13 +589,14 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
       )}
 
       {webglOK && graph.nodes.length > 0 && (
+        <GraphErrorBoundary onError={() => { setSafeMode(true); setGlow(false); }}>
         <ForceGraph3D
           ref={fgRef}
           width={size.w}
           height={size.h}
           graphData={graph as unknown as { nodes: GNode[]; links: GLink[] }}
           backgroundColor="#04050a"
-          numDimensions={is3D ? 3 : 2}
+          numDimensions={effectiveIs3D ? 3 : 2}
           showNavInfo={false}
           nodeLabel={(n: GNode) => n.name}
           nodeThreeObject={nodeThreeObject}
@@ -577,10 +630,12 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
             if (!restored) sfx.playWhenReady("graph-arrive");
           }}
         />
+        </GraphErrorBoundary>
       )}
 
       {/* Search-to-highlight */}
       <input
+        className="vg-search"
         value={query}
         onChange={e => setQuery(e.target.value)}
         placeholder="Search notes..."
@@ -594,7 +649,7 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
       />
 
       {/* Stats chip */}
-      <div style={{
+      <div className="vg-stats" style={{
         position: "absolute", top: 12, left: 12, zIndex: 3,
         background: "rgba(8,9,15,0.7)", backdropFilter: "blur(6px)",
         border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: "8px 12px",
@@ -608,21 +663,29 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
       </div>
 
       {/* Toggles */}
-      <div style={{ position: "absolute", top: 54, right: 12, zIndex: 3, display: "flex", gap: 6 }}>
+      <div className="vg-toggles" style={{ position: "absolute", top: 54, right: 12, zIndex: 3, display: "flex", gap: 6 }}>
         <button
           onClick={() => setFlow(f => !f)}
           aria-pressed={flow}
           style={toggleStyle(flow)}
         >Flow</button>
+        {/* Glow is opt-in; if it ever blanks the scene, Jack just taps it back off. */}
         <button
-          onClick={() => setIs3D(v => !v)}
-          aria-pressed={is3D}
-          style={toggleStyle(is3D)}
-        >{is3D ? "3D" : "2D"}</button>
+          onClick={() => setGlow(g => !g)}
+          aria-pressed={effectiveGlow}
+          disabled={!effectiveIs3D}
+          title="Bloom / depth-of-field glow (fancy, optional)"
+          style={{ ...toggleStyle(effectiveGlow), opacity: effectiveIs3D ? 1 : 0.4, cursor: effectiveIs3D ? "pointer" : "not-allowed" }}
+        >Glow</button>
+        <button
+          onClick={() => { setSafeMode(false); setIs3D(v => !v); }}
+          aria-pressed={effectiveIs3D}
+          style={toggleStyle(effectiveIs3D)}
+        >{effectiveIs3D ? "3D" : "2D"}</button>
       </div>
 
       {/* Legend */}
-      <div style={{
+      <div className="vg-legend" style={{
         position: "absolute", bottom: 12, left: 12, zIndex: 3,
         background: "rgba(8,9,15,0.7)", backdropFilter: "blur(6px)",
         border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: "8px 12px",

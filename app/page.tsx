@@ -1480,12 +1480,20 @@ function KnowledgeBase({ initialPath, onSendToAI }: { initialPath?: string; onSe
   const [treeOpen, setTreeOpen] = useState<boolean>(() => {
     try { return window.localStorage.getItem(LS_PANEL) !== "0"; } catch { return true; }
   });
-  const [isPhone, setIsPhone] = useState(false);
+  // Initialize synchronously so the very first render is already correct on a
+  // phone (avoids a flash where the tree renders as an in-flow column beside the
+  // graph). Update on BOTH matchMedia change and window resize so an orientation
+  // change or resize can never leave the drawer stuck in the desktop layout.
+  const [isPhone, setIsPhone] = useState<boolean>(() => {
+    try { return window.matchMedia("(max-width: 768px)").matches; } catch { return false; }
+  });
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 768px)");
     const on = () => setIsPhone(mq.matches);
-    on(); mq.addEventListener("change", on);
-    return () => mq.removeEventListener("change", on);
+    on();
+    mq.addEventListener("change", on);
+    window.addEventListener("resize", on);
+    return () => { mq.removeEventListener("change", on); window.removeEventListener("resize", on); };
   }, []);
 
   useEffect(() => {

@@ -283,6 +283,20 @@ main > div:last-child > div > *:nth-child(6) { animation-delay: 0.27s; }
   .vault-graph { min-height: 60vh; }
   .vault-graph canvas { max-width: 100% !important; display: block; }
 
+  /* Graph controls: stack cleanly so nothing overlaps on a narrow screen.
+     Row 1 = stats (left, width-capped) + toggles (right); row 2 = full-width
+     search below both. The stats chip is capped so it can never grow into the
+     toggles, and the search sits clear beneath the tallest row-1 element. */
+  .vault-graph .vg-stats {
+    top: 10px !important; left: 10px !important; max-width: 150px !important;
+  }
+  .vault-graph .vg-toggles { top: 10px !important; right: 10px !important; }
+  .vault-graph .vg-search {
+    top: 88px !important; left: 10px !important; right: 10px !important;
+    width: auto !important;
+  }
+  .vault-graph .vg-legend { max-width: 62vw !important; bottom: 10px !important; }
+
   /* Jarvis now lives in the bottom tab bar, so hide the floating FAB on phone
      to avoid two Jarvis triggers stacked in the same corner. */
   .jarvis-fab { display: none !important; }

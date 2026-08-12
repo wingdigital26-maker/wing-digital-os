@@ -1081,7 +1081,9 @@ export function WatchdogBanner({ watchdog, onRechecked }: { watchdog?: WatchdogD
 
   // Problems (red) and/or the watchdog itself late (amber).
   const color = hasProblems ? "#f87171" : "#fb923c";
-  const isOpen = expanded ?? (hasProblems ? count <= 2 : false);
+  // Always start COLLAPSED. Only an explicit user tap expands it; every load and
+  // every recheck/refresh must default to the tight banner, never auto-open.
+  const isOpen = expanded ?? false;
   const toggle = () => {
     sfx.play(isOpen ? "toggle-off" : "toggle-on");
     setExpanded(!isOpen);

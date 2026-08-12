@@ -206,7 +206,7 @@ class GraphErrorBoundary extends Component<
   }
 }
 
-export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: string) => void }) {
+export default function VaultGraph({ onSelectNode, onToggleTree }: { onSelectNode: (path: string) => void; onToggleTree?: () => void }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fg2dRef = useRef<any>(null);
@@ -223,6 +223,11 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
   // Set by the error boundary / WebGL probe: forces the reliable 2D render.
   const [safeMode, setSafeMode] = useState(false);
   const [mobile] = useState<boolean>(detectMobile);
+  // Mobile-only: the cluttered control row collapses into one compact bar.
+  // Search expands inline, and Flow/Glow/legend/stats live in a tap-to-open
+  // popover so they stay out of the way until Jack wants them.
+  const [mSearchOpen, setMSearchOpen] = useState(false);
+  const [mMenuOpen, setMMenuOpen] = useState(false);
   // WebGL capability probe. If the browser cannot create a WebGL context, 3D is
   // disabled entirely and we never leave the always-visible 2D canvas.
   const [webglOK] = useState<boolean>(() => {
@@ -634,6 +639,101 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
         </GraphErrorBoundary>
       )}
 
+      {/* ═══════════ MOBILE: one compact, unobtrusive control bar ═══════════ */}
+      {/* The graph is the hero. All chrome collapses into a single quiet row of
+          icon buttons floating over the graph: contents (tree) · search ·
+          recenter · 3D · more. Search expands inline; Flow/Glow/legend/stats
+          live in the "more" popover so they never take standing space. */}
+      {mobile && (
+        <>
+          <div className="vg-mbar" style={{
+            position: "absolute", top: 10, left: 10, right: 10, zIndex: 4,
+            display: "flex", alignItems: "center", gap: 6,
+          }}>
+            {onToggleTree && (
+              <button onClick={onToggleTree} aria-label="Vault contents" title="Contents" style={mIconStyle(false)}>
+                <IconTree />
+              </button>
+            )}
+            <button onClick={() => { setMSearchOpen(o => !o); setMMenuOpen(false); }} aria-pressed={mSearchOpen} aria-label="Search notes" title="Search" style={mIconStyle(mSearchOpen || !!query)}>
+              <IconSearch />
+            </button>
+            <div style={{ flex: 1 }} />
+            <button
+              onClick={() => {
+                hasUserInteracted.current = false;
+                if (effectiveIs3D) setRecenterN(n => n + 1);
+                else fitToView2D(true);
+              }}
+              aria-label="Recenter map" title="Recenter" style={mIconStyle(false)}
+            ><IconRecenter /></button>
+            <button
+              onClick={() => { setSafeMode(false); setIs3D(v => !v); }}
+              aria-pressed={effectiveIs3D}
+              disabled={!webglOK}
+              aria-label="Toggle 3D" title={webglOK ? "Toggle 3D" : "3D needs WebGL"}
+              style={{ ...mIconStyle(effectiveIs3D), opacity: webglOK ? 1 : 0.4 }}
+            ><span style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.02em" }}>{effectiveIs3D ? "3D" : "2D"}</span></button>
+            <button onClick={() => { setMMenuOpen(o => !o); setMSearchOpen(false); }} aria-pressed={mMenuOpen} aria-label="More controls" title="More" style={mIconStyle(mMenuOpen)}>
+              <IconSliders />
+            </button>
+          </div>
+
+          {/* Inline search — only when tapped */}
+          {mSearchOpen && (
+            <input
+              className="vg-msearch"
+              value={query}
+              autoFocus
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Search notes..."
+              aria-label="Search graph nodes"
+              style={{
+                position: "absolute", top: 52, left: 10, right: 10, zIndex: 4,
+                background: "rgba(8,9,15,0.92)", backdropFilter: "blur(8px)",
+                border: "1px solid rgba(96,165,250,0.4)", borderRadius: 10,
+                padding: "9px 12px", color: "var(--text-primary)", fontSize: 13, outline: "none",
+              }}
+            />
+          )}
+
+          {/* "More" popover — secondary toggles + legend + stats, tucked away */}
+          {mMenuOpen && (
+            <div className="vg-mpop" style={{
+              position: "absolute", top: 52, right: 10, zIndex: 5, width: "min(72vw, 260px)",
+              background: "rgba(8,9,15,0.94)", backdropFilter: "blur(10px)",
+              border: "1px solid rgba(255,255,255,0.1)", borderRadius: 14, padding: 12,
+              boxShadow: "0 12px 40px rgba(0,0,0,0.5)",
+              display: "flex", flexDirection: "column", gap: 12,
+            }}>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={() => setFlow(f => !f)} aria-pressed={flow} style={{ ...toggleStyle(flow), flex: 1, textAlign: "center" }}>Flow</button>
+                <button
+                  onClick={() => setGlow(g => !g)}
+                  aria-pressed={effectiveGlow}
+                  disabled={!effectiveIs3D}
+                  title={effectiveIs3D ? "Bloom / depth-of-field glow" : "Glow is available in 3D"}
+                  style={{ ...toggleStyle(effectiveGlow), flex: 1, textAlign: "center", opacity: effectiveIs3D ? 1 : 0.4 }}
+                >Glow</button>
+              </div>
+              <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 10, display: "flex", flexDirection: "column", gap: 6, maxHeight: "34vh", overflow: "auto" }}>
+                <p style={{ fontSize: 9, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                  {stats.nodes} notes · {stats.links} threads
+                </p>
+                {legend.map(({ family, color }) => (
+                  <div key={family} style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: color, boxShadow: `0 0 8px ${color}`, flexShrink: 0 }} />
+                    <span style={{ fontSize: 10.5, color: "var(--text-secondary)", textTransform: "capitalize" }}>{family}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ═══════════ DESKTOP: the full, always-visible control layout ═══════════ */}
+      {!mobile && (<>
       {/* Search-to-highlight */}
       <input
         className="vg-search"
@@ -724,11 +824,31 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
 
       {/* Hint */}
       <div style={{ position: "absolute", bottom: 12, right: 12, zIndex: 3, fontSize: 9.5, color: "rgba(157,180,204,0.5)" }}>
-        {mobile ? "tap to open · drag to pan" : "hover to light · click to open · scroll to zoom"}
+        hover to light · click to open · scroll to zoom
       </div>
+      </>)}
     </div>
   );
 }
+
+// Compact, quiet icon button used only in the mobile control bar.
+function mIconStyle(active: boolean): React.CSSProperties {
+  return {
+    display: "inline-flex", alignItems: "center", justifyContent: "center",
+    width: 34, height: 34, minHeight: 34, padding: 0, flexShrink: 0,
+    background: active ? "rgba(96,165,250,0.22)" : "rgba(8,9,15,0.72)",
+    backdropFilter: "blur(6px)",
+    border: `1px solid ${active ? "rgba(96,165,250,0.55)" : "rgba(255,255,255,0.12)"}`,
+    borderRadius: 10,
+    color: active ? "#dbeafe" : "var(--text-muted)",
+    cursor: "pointer",
+  };
+}
+const ICO = { width: 16, height: 16, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, "aria-hidden": true };
+function IconSearch() { return <svg {...ICO}><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></svg>; }
+function IconTree() { return <svg {...ICO}><path d="M3 6h13M3 12h13M3 18h13M20 6h.01M20 12h.01M20 18h.01" /></svg>; }
+function IconRecenter() { return <svg {...ICO}><circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" /></svg>; }
+function IconSliders() { return <svg {...ICO}><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6" /></svg>; }
 
 function toggleStyle(active: boolean): React.CSSProperties {
   return {

@@ -1714,7 +1714,7 @@ function KnowledgeBase({ initialPath, onSendToAI }: { initialPath?: string; onSe
           <FileTree nodes={tree} />
         </div>
       </div>
-      {!treeOpen && (
+      {!treeOpen && !isPhone && (
         <button onClick={togglePanel} aria-label="Expand vault tree" title="Show tree" style={{
           position: "absolute", top: "50%", left: 0, transform: "translateY(-50%)", zIndex: 5,
           width: 26, height: 92, borderRadius: "0 10px 10px 0", border: "1px solid var(--accent)",
@@ -1730,7 +1730,7 @@ function KnowledgeBase({ initialPath, onSendToAI }: { initialPath?: string; onSe
 
       {/* Middle: Graph always visible (full width on phone; tree opens over it) */}
       <div className="kb-graph" style={{ flex: 1, position: "relative", minWidth: 0 }}>
-        <VaultGraph onSelectNode={(p) => openFile(p)} />
+        <VaultGraph onSelectNode={(p) => openFile(p)} onToggleTree={isPhone ? togglePanel : undefined} />
       </div>
 
       {/* Note viewer — clicking a graph node (or tree file) opens the real note

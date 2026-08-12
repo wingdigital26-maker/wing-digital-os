@@ -278,24 +278,12 @@ main > div:last-child > div > *:nth-child(6) { animation-delay: 0.27s; }
   /* Hero ops map (Agents tab): tall on phone too, so it stays the focal point */
   .mo-map-hero { height: clamp(360px, 60vh, 620px) !important; }
 
-  /* Vault graph fills the vault view width and height (never a blank void). */
+  /* Vault graph is the HERO on phone: it fills the whole view. All chrome is
+     consolidated into one compact floating bar (rendered in VaultGraph on the
+     mobile branch), so no stats/legend/toggle overlays take standing space. */
   .kb-graph, .vault-graph { min-width: 0; }
-  .vault-graph { min-height: 60vh; }
+  .vault-graph { min-height: 0; height: 100%; border-radius: 14px; }
   .vault-graph canvas { max-width: 100% !important; display: block; }
-
-  /* Graph controls: stack cleanly so nothing overlaps on a narrow screen.
-     Row 1 = stats (left, width-capped) + toggles (right); row 2 = full-width
-     search below both. The stats chip is capped so it can never grow into the
-     toggles, and the search sits clear beneath the tallest row-1 element. */
-  .vault-graph .vg-stats {
-    top: 10px !important; left: 10px !important; max-width: 150px !important;
-  }
-  .vault-graph .vg-toggles { top: 10px !important; right: 10px !important; }
-  .vault-graph .vg-search {
-    top: 88px !important; left: 10px !important; right: 10px !important;
-    width: auto !important;
-  }
-  .vault-graph .vg-legend { max-width: 62vw !important; bottom: 10px !important; }
 
   /* Jarvis now lives in the bottom tab bar, so hide the floating FAB on phone
      to avoid two Jarvis triggers stacked in the same corner. */
@@ -347,7 +335,13 @@ main > div:last-child > div > *:nth-child(6) { animation-delay: 0.27s; }
   /* Vault: graph full width; tree slides in as a drawer over it.
      The drawer's position/slide is set via React-owned inline styles in
      KnowledgeBase (page.tsx) to avoid a stylesheet cascade quirk. */
-  .kb-root { margin: -16px -14px !important; height: calc(100vh - 200px) !important; }
+  /* Pull the vault view to every edge and absorb the scroll area's bottom
+     padding so the GRAPH fills the viewport minus the slim header and the
+     bottom tab bar (no page scroll, graph is the dominant element). */
+  .kb-root {
+    margin: -16px -14px calc(-84px - env(safe-area-inset-bottom, 0px)) !important;
+    height: calc(100dvh - 150px) !important;
+  }
   /* Slide via a one-shot animation (a transition here gets stuck because the
      subtree re-renders); the animation plays once when the drawer opens. */
   .kb-drawer-in { animation: kbDrawerIn 0.26s cubic-bezier(0.22, 0.8, 0.36, 1) both; }

@@ -248,6 +248,9 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
   const focusId = useRef<string | null>(null);
   const [tick, setTick] = useState(0);
   const bump = useCallback(() => setTick(t => (t + 1) % 1e9), []);
+  // Bumped by the explicit Recenter button; the ONLY sanctioned way to re-fit
+  // after Jack has taken control of the view.
+  const [recenterN, setRecenterN] = useState(0);
 
   // ── Interaction flag ──
   // While panning / zooming / dragging (or while the sim is still hot) we draw
@@ -256,8 +259,17 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
   // canvas painter reads it without forcing a React re-render every frame.
   const interacting = useRef(false);
   const interactTimer = useRef<number | null>(null);
+  // Once Jack pans/zooms/drags, we NEVER auto-fit/auto-center again (that was the
+  // "zips back" bug: the fit-to-view kept re-firing and fought his navigation).
+  // Only an explicit mode-switch or Recenter button clears this.
+  const hasUserInteracted = useRef(false);
+  // zoomToFit() itself emits onZoom/onZoomEnd; while this is set we treat those
+  // as OUR framing, not a user pan, so auto-fit doesn't mark itself "interacted".
+  const suppressZoom = useRef(false);
   const markInteracting = useCallback(() => {
+    if (suppressZoom.current) return; // ignore our own programmatic zoomToFit
     interacting.current = true;
+    hasUserInteracted.current = true;
     if (interactTimer.current) window.clearTimeout(interactTimer.current);
     // settle back to the pretty render shortly after the last interaction event
     interactTimer.current = window.setTimeout(() => {
@@ -360,17 +372,27 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
   }, [graph, mobile, effectiveIs3D, restored]);
 
   // ── Frame the whole layout in view (2D) ──
+  // Auto-fit runs ONLY before Jack has interacted. After any pan/zoom/drag the
+  // view stays exactly where he left it (see hasUserInteracted). A mode switch
+  // clears the flag so the fresh render gets framed once.
   const didFit = useRef(false);
-  const fitToView2D = useCallback(() => {
+  const fitToView2D = useCallback((force = false) => {
     const fg = fg2dRef.current;
     if (!fg || !graph.nodes.length) return;
+    if (!force && hasUserInteracted.current) return; // never fight manual nav
+    suppressZoom.current = true;
     try { fg.zoomToFit(600, mobile ? 30 : 60); } catch { /* pre-layout: retry on engine stop */ }
+    // Release after the zoom animation (600ms) plus a margin so the trailing
+    // onZoomEnd from our own framing doesn't count as a user interaction.
+    window.setTimeout(() => { suppressZoom.current = false; }, 750);
   }, [graph.nodes.length, mobile]);
   useEffect(() => {
     if (effectiveIs3D || !graph.nodes.length) return;
+    // Entering (or re-entering) 2D is a fresh view; allow one framing pass.
+    hasUserInteracted.current = false;
     didFit.current = false;
-    const t1 = window.setTimeout(fitToView2D, 400);
-    const t2 = window.setTimeout(fitToView2D, 1500);
+    const t1 = window.setTimeout(() => fitToView2D(), 400);
+    const t2 = window.setTimeout(() => fitToView2D(), 1500);
     return () => { window.clearTimeout(t1); window.clearTimeout(t2); };
   }, [graph.nodes.length, fitToView2D, effectiveIs3D]);
 
@@ -569,8 +591,9 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
             const src = typeof l.source === "object" ? (l.source as GNode) : graph.nodes.find(n => n.id === lid(l.source));
             return src?.color ?? "#7fa8d9";
           }}
-          warmupTicks={mobile ? 30 : 60}
-          cooldownTicks={mobile ? 90 : 140}
+          warmupTicks={restored ? 0 : (mobile ? 12 : 20)}
+          cooldownTicks={mobile ? 60 : 80}
+          cooldownTime={8000}
           onNodeHover={onNodeHover}
           onNodeClick={onNodeClick}
           onNodeDrag={markInteracting}
@@ -579,7 +602,12 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
           onZoomEnd={markInteracting}
           onBackgroundClick={onBgClick}
           onEngineStop={() => {
-            if (!didFit.current) { didFit.current = true; fitToView2D(); }
+            // Frame once when the layout first settles, but never after Jack has
+            // already moved the view (that re-fit was the "zips back" bug).
+            if (!didFit.current && !hasUserInteracted.current) {
+              didFit.current = true;
+              fitToView2D();
+            }
             if (!restored) sfx.playWhenReady("graph-arrive");
           }}
         />
@@ -598,6 +626,7 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
             highlightNodes={highlightNodes}
             highlightLinks={highlightLinks}
             tick={tick}
+            recenterN={recenterN}
             onNodeHover={onNodeHover}
             onNodeClick={onNodeClick}
             onBackgroundClick={onBgClick}
@@ -636,6 +665,16 @@ export default function VaultGraph({ onSelectNode }: { onSelectNode: (path: stri
 
       {/* Toggles */}
       <div className="vg-toggles" style={{ position: "absolute", top: 54, right: 12, zIndex: 3, display: "flex", gap: 6 }}>
+        <button
+          onClick={() => {
+            // Explicit re-frame. Clears the "hands off" flag and fits once.
+            hasUserInteracted.current = false;
+            if (effectiveIs3D) setRecenterN(n => n + 1);
+            else fitToView2D(true);
+          }}
+          title="Re-frame the whole map"
+          style={toggleStyle(false)}
+        >Recenter</button>
         <button
           onClick={() => setFlow(f => !f)}
           aria-pressed={flow}

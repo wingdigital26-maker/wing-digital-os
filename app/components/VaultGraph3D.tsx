@@ -58,19 +58,23 @@ export default function VaultGraph3D(props: {
   highlightNodes: MutableRefObject<Set<string>>;
   highlightLinks: MutableRefObject<Set<GLink>>;
   tick: number;
+  recenterN: number;
   onNodeHover: (n: GNode | null) => void;
   onNodeClick: (n: GNode) => void;
   onBackgroundClick: () => void;
 }) {
   const {
     graph, size, mobile, flow, glow, restored,
-    highlightNodes, highlightLinks, tick,
+    highlightNodes, highlightLinks, tick, recenterN,
     onNodeHover, onNodeClick, onBackgroundClick,
   } = props;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fgRef = useRef<any>(null);
   const focusId = useRef<string | null>(null);
+  // Once Jack drags/zooms the camera we stop the auto-orbit and never auto-fit
+  // again (the "zips back" bug), until an explicit Recenter.
+  const hasUserInteracted = useRef(false);
 
   // ── Force tuning: wide spacing + warm settling ──
   useEffect(() => {
@@ -141,9 +145,16 @@ export default function VaultGraph3D(props: {
             added.push(bokeh);
           }
         }
+        // Subtle PER-NODE glow, never a full-screen blue wash.
+        //  · strength LOW (~0.6-0.8) so it doesn't flood the scene
+        //  · threshold HIGH (0.6) so only bright node cores bloom; the dark
+        //    background (#04050a) and dim links stay below the cutoff
+        //  · small radius so glow hugs each node instead of smearing across
         const bloom = new UnrealBloomPass(
           new THREE.Vector2(size.w || window.innerWidth, size.h || window.innerHeight),
-          mobile ? 1.4 : 2.0, 0.75, 0
+          mobile ? 0.6 : 0.8, // strength (was 2.0)
+          0.35,               // radius (was 0.75)
+          0.6                 // threshold (was 0), keeps the background dark
         );
         composer.addPass(bloom);
         added.push(bloom);
@@ -162,18 +173,28 @@ export default function VaultGraph3D(props: {
 
   // ── Frame the whole galaxy in view once it exists ──
   const didFit = useRef(false);
-  const fitToView = useCallback(() => {
+  const fitToView = useCallback((force = false) => {
     const fg = fgRef.current;
     if (!fg || !graph.nodes.length) return;
+    if (!force && hasUserInteracted.current) return; // never fight manual nav
     try { fg.zoomToFit(600, mobile ? 40 : 80); } catch { /* pre-layout */ }
   }, [graph.nodes.length, mobile]);
   useEffect(() => {
     if (!graph.nodes.length) return;
     didFit.current = false;
-    const t1 = window.setTimeout(fitToView, 400);
-    const t2 = window.setTimeout(fitToView, 1500);
+    const t1 = window.setTimeout(() => fitToView(), 400);
+    const t2 = window.setTimeout(() => fitToView(), 1500);
     return () => { window.clearTimeout(t1); window.clearTimeout(t2); };
   }, [graph.nodes.length, fitToView]);
+
+  // Explicit Recenter from the parent toolbar: clear the "hands off" flag and
+  // re-frame + resume the auto-orbit.
+  useEffect(() => {
+    if (!recenterN) return;
+    hasUserInteracted.current = false;
+    didFit.current = true; // treat as framed so orbit may resume immediately
+    fitToView(true);
+  }, [recenterN, fitToView]);
 
   // ── Slow auto-orbit camera (~0.4 rpm) so the galaxy always breathes ──
   // CRITICAL: orbit around the controls' look-at TARGET (the graph centroid),
@@ -191,7 +212,9 @@ export default function VaultGraph3D(props: {
     let raf = 0;
     let last = performance.now();
     const controls = fg.controls?.();
-    const onStart = () => { interacting.current = true; };
+    // Any manual camera control (drag/zoom) permanently stops the auto-orbit so
+    // the view stays where Jack leaves it, until an explicit Recenter.
+    const onStart = () => { interacting.current = true; hasUserInteracted.current = true; };
     const onEnd = () => { interacting.current = false; };
     controls?.addEventListener?.("start", onStart);
     controls?.addEventListener?.("end", onEnd);
@@ -201,8 +224,9 @@ export default function VaultGraph3D(props: {
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
       // Hold still until the graph has been framed at least once, and while the
-      // user is interacting or a node is focused.
-      if (!didFit.current || interacting.current || focusId.current) { last = now; return; }
+      // user is interacting or a node is focused. And once Jack has taken manual
+      // control of the camera, stop orbiting entirely (resumes on Recenter).
+      if (!didFit.current || interacting.current || focusId.current || hasUserInteracted.current) { last = now; return; }
       const cam = fg.camera?.();
       if (!cam) return;
       // Orbit center = current look-at target (graph centroid), fall back to 0.

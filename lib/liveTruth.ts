@@ -4,19 +4,22 @@
 // the real source right now) or clearly carries the real age of the snapshot it
 // came from, so a stale value can NEVER masquerade as current.
 //
-// The TRUE source of outreach truth is C:\Users\wjack\ghl-cli\prospects.db
-// (sqlite). It is LOCAL (Jack's PC) only. In cloud mode it is unreachable, so
-// callers fall back to the vault snapshot BUT must compute staleness from the
-// snapshot's real asOf and degrade honestly (see sendsTodayHonest).
+// The TRUE source of outreach truth is now the CLOUD: Supabase project
+// ikgnhieorzjaxtjoneye (the sender moved off Jack's PC). readOutreachLive()
+// reads Supabase first (source "live-cloud"), falls back to the LOCAL
+// prospects.db (source "live-db") only if the cloud is unreachable, and finally
+// to the vault snapshot BUT must compute staleness from the snapshot's real
+// asOf and degrade honestly (see sendsTodayHonest) — never a false live 0.
 //
-// This module reads the DB read-only via the Node builtin `node:sqlite`
-// (dynamic import so it is never bundled and never breaks the build). It never
-// writes anything and never reads or logs secrets.
+// The local DB is read read-only via the Node builtin `node:sqlite` (dynamic
+// import so it is never bundled and never breaks the build). Supabase is read
+// over its PostgREST REST endpoint with the service key used only as an auth
+// header. This module never writes anything and never reads or logs secrets.
 
 import fs from "fs";
 import { isGithubVault } from "./vaultSource";
 
-export type MetricSource = "live-db" | "live-ghl" | "snapshot";
+export type MetricSource = "live-db" | "live-cloud" | "live-ghl" | "snapshot";
 
 // Staleness thresholds (hours) per metric family, per the honesty design.
 export const STALE_HOURS = {
@@ -34,6 +37,7 @@ const DB_PATH =
 
 export interface LiveOutreach {
   asOf: string; // ISO timestamp — these values were true just now
+  source: "live-db" | "live-cloud"; // local prospects.db vs Supabase (cloud)
   sendsToday: number;
   pipeline: number;
   emailed: number;
@@ -97,7 +101,7 @@ export async function readProspectsLive(): Promise<LiveOutreach | null> {
         .all(today + "%")
         .map((r) => ({ name: String(r.name ?? ""), city: String(r.city ?? ""), when: String(r.emailed_at ?? "") }));
     } catch { /* ignore */ }
-    return { asOf: now.toISOString(), sendsToday, pipeline, emailed, untouched, armed, statuses, recentToday };
+    return { asOf: now.toISOString(), source: "live-db", sendsToday, pipeline, emailed, untouched, armed, statuses, recentToday };
   } catch {
     return null;
   } finally {
@@ -105,6 +109,109 @@ export async function readProspectsLive(): Promise<LiveOutreach | null> {
       db?.close();
     } catch { /* ignore */ }
   }
+}
+
+// ── Cloud (Supabase) outreach truth ────────────────────────────────────────
+//
+// Outreach now SENDS from the cloud (Supabase project ikgnhieorzjaxtjoneye),
+// so the LOCAL prospects.db is no longer written to and would report a false
+// "0 sent" / wrong pool. Supabase is the source of truth. On Vercel the
+// OS_SUPABASE_* env is set, so the deployed app queries it directly over the
+// PostgREST REST endpoint with the service key (no Postgres driver dependency,
+// so the build never changes). The service key is used only as an auth header;
+// it is never logged, returned, or embedded in any rendered value.
+
+const SUPABASE_URL = process.env.OS_SUPABASE_URL;
+const SUPABASE_KEY = process.env.OS_SUPABASE_SERVICE_KEY;
+
+// Armed pool gate, same value the local path uses. Mirrors the Postgres send
+// gate closely enough for an honest "ready" count.
+
+export function cloudOutreachAvailable(): boolean {
+  return !!(SUPABASE_URL && SUPABASE_KEY);
+}
+
+// Count rows matching a PostgREST filter via the exact-count header. Returns
+// the total from the Content-Range response header ("0-0/1394" -> 1394).
+async function restCount(filter: string): Promise<number> {
+  const url = `${SUPABASE_URL}/rest/v1/prospects?select=id${filter ? "&" + filter : ""}`;
+  const res = await fetch(url, {
+    headers: {
+      apikey: SUPABASE_KEY as string,
+      Authorization: `Bearer ${SUPABASE_KEY as string}`,
+      Prefer: "count=exact",
+      Range: "0-0",
+    },
+    cache: "no-store",
+  });
+  if (!res.ok && res.status !== 206 && res.status !== 200) {
+    throw new Error(`supabase count ${res.status}`);
+  }
+  // Drain the small body so the connection is released cleanly.
+  try { await res.text(); } catch { /* ignore */ }
+  const cr = res.headers.get("content-range") || "";
+  const total = cr.split("/")[1];
+  return Number(total) || 0;
+}
+
+// Read the live outreach truth from Supabase. Returns null on any config/
+// connectivity problem so callers degrade (local live, else honest snapshot) —
+// never a false live 0.
+export async function readCloudOutreach(): Promise<LiveOutreach | null> {
+  if (!cloudOutreachAvailable()) return null;
+  try {
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    const [pipeline, emailed, sendsToday, untouched, armed] = await Promise.all([
+      restCount(""),
+      restCount("emailed_at=not.is.null"),
+      restCount(`emailed_at=like.${today}*`),
+      restCount("status=in.(new,enriching)"),
+      restCount(`intent_score=gte.${ARMED_MIN}&emailed_at=is.null`),
+    ]);
+    // Today's send rows for the "emails sent today" panel.
+    let recentToday: { name: string; city: string; when: string }[] = [];
+    try {
+      const url = `${SUPABASE_URL}/rest/v1/prospects?select=name,city,emailed_at&emailed_at=like.${today}*&order=emailed_at.desc&limit=40`;
+      const res = await fetch(url, {
+        headers: {
+          apikey: SUPABASE_KEY as string,
+          Authorization: `Bearer ${SUPABASE_KEY as string}`,
+        },
+        cache: "no-store",
+      });
+      if (res.ok) {
+        const rows = (await res.json()) as { name?: string; city?: string; emailed_at?: string }[];
+        recentToday = rows.map((r) => ({
+          name: String(r.name ?? ""),
+          city: String(r.city ?? ""),
+          when: String(r.emailed_at ?? ""),
+        }));
+      }
+    } catch { /* best-effort; counts already captured */ }
+    return {
+      asOf: now.toISOString(),
+      source: "live-cloud",
+      sendsToday,
+      pipeline,
+      emailed,
+      untouched,
+      armed,
+      statuses: {}, // per-status grouping isn't fetched over REST; not consumed downstream
+      recentToday,
+    };
+  } catch {
+    return null;
+  }
+}
+
+// The single outreach-truth resolver the app should call. Cloud (Supabase) is
+// the source of truth now; fall back to the local prospects.db only if the
+// cloud is unreachable, and to the honest snapshot if neither is available.
+export async function readOutreachLive(): Promise<LiveOutreach | null> {
+  const cloud = await readCloudOutreach();
+  if (cloud) return cloud;
+  return readProspectsLive();
 }
 
 // ── Snapshot provenance helpers ────────────────────────────────────────────
@@ -174,7 +281,7 @@ export function sendsTodayHonest(
     return {
       value: live.sendsToday,
       display: `${live.sendsToday} today`,
-      source: "live-db",
+      source: live.source, // "live-cloud" (Supabase) or "live-db" (local PC)
       asOf: live.asOf,
       stale: false,
       note: null,
@@ -209,6 +316,7 @@ export function sendsTodayHonest(
 //   "Live from prospects.db, just now"
 //   "From snapshot, 20h old - run state-sync or connect PC"
 export function provenanceLine(p: Provenance, subject = "snapshot"): string {
+  if (p.source === "live-cloud") return "Live from Supabase (cloud), just now";
   if (p.source === "live-db") return "Live from prospects.db, just now";
   if (p.source === "live-ghl") return "Live from the GHL API, just now";
   const d = asOfToDate(p.asOf);

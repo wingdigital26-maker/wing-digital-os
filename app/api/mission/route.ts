@@ -3,7 +3,7 @@ import fs from "fs";
 import path from "path";
 import { readVaultFile, isGithubVault } from "../../../lib/vaultSource";
 import {
-  readProspectsLive,
+  readOutreachLive,
   sendsTodayHonest,
   parseSnapshotAsOf,
   isStale,
@@ -511,11 +511,12 @@ function buildStats(
   const st = sendsTodayHonest(live, outreach, outUpdated);
 
   if (live) {
-    // LOCAL live mode: pipeline / emailed / untouched come straight from the DB.
-    const liveProv = provenanceLine({ source: "live-db", asOf: live.asOf, stale: false });
-    tiles.push({ key: "pipeline", label: "Pipeline", value: String(live.pipeline), sub: "prospects", updated: live.asOf, source: "live-db", stale: false, provenance: liveProv });
-    tiles.push({ key: "emails", label: "Emails Sent", value: String(live.emailed), sub: st.display, updated: live.asOf, source: "live-db", stale: false, provenance: liveProv });
-    tiles.push({ key: "untouched", label: "Untouched Leads", value: String(live.untouched), sub: "new + enriching", updated: live.asOf, source: "live-db", stale: false, provenance: liveProv });
+    // LIVE mode: pipeline / emailed / untouched come straight from the live
+    // source (Supabase cloud, else local prospects.db) — labeled per live.source.
+    const liveProv = provenanceLine({ source: live.source, asOf: live.asOf, stale: false });
+    tiles.push({ key: "pipeline", label: "Pipeline", value: String(live.pipeline), sub: "prospects", updated: live.asOf, source: live.source, stale: false, provenance: liveProv });
+    tiles.push({ key: "emails", label: "Emails Sent", value: String(live.emailed), sub: st.display, updated: live.asOf, source: live.source, stale: false, provenance: liveProv });
+    tiles.push({ key: "untouched", label: "Untouched Leads", value: String(live.untouched), sub: "new + enriching", updated: live.asOf, source: live.source, stale: false, provenance: liveProv });
   } else if (outreach) {
     // CLOUD / degraded: prospects.db unreachable — snapshot with real staleness.
     const outStale = isStale(outUpdated, STALE_HOURS.pipeline);
@@ -551,13 +552,13 @@ async function statDetail(id: string) {
   const [biz, outreach, live] = await Promise.all([
     readVaultFile("wiki/state/business-snapshot.md"),
     readVaultFile("wiki/state/outreach-snapshot.md"),
-    readProspectsLive(),
+    readOutreachLive(),
   ]);
   const outUpdated = parseSnapshotAsOf(outreach);
   const bizUpdated = parseSnapshotAsOf(biz);
   const num = (src: string | null, re: RegExp) => src?.match(re)?.[1] ?? null;
   // The source line the panel leads with, so every panel states its provenance.
-  const outSource: MetricSource = live ? "live-db" : "snapshot";
+  const outSource: MetricSource = live ? live.source : "snapshot";
   const outAsOf = live ? live.asOf : outUpdated;
   const outStale = live ? false : isStale(outUpdated, STALE_HOURS.pipeline);
   const outProvenance = provenanceLine({ source: outSource, asOf: outAsOf, stale: outStale }, "outreach snapshot");
@@ -993,7 +994,7 @@ export async function GET(req: NextRequest) {
     readVaultFile("wiki/state/outreach-snapshot.md"),
     readVaultFile("wiki/state/replies-inbox.md"),
     readVaultFile("wiki/state/watchdog.md"),
-    readProspectsLive(),
+    readOutreachLive(),
   ]);
 
   const watchdog = parseWatchdog(watchdogRaw);
@@ -1084,7 +1085,7 @@ export async function GET(req: NextRequest) {
     const emailed = live ? String(live.emailed) : outreachRaw?.match(/\*\*Emailed:\*\*\s*([\d,]+)/)?.[1];
     const pipeline = live ? String(live.pipeline) : outreachRaw?.match(/\*\*Pipeline:\*\*\s*([\d,]+)/)?.[1];
     const outStale = live ? false : isStale(parseSnapshotAsOf(outreachRaw), STALE_HOURS.pipeline);
-    const src: MetricSource = live ? "live-db" : "snapshot";
+    const src: MetricSource = live ? live.source : "snapshot";
     // EMAIL badge shows sends-today honestly (0 today, not yesterday's count).
     if (st.value != null || emailed) {
       volumes.systems["email"] = {
@@ -1136,7 +1137,11 @@ export async function GET(req: NextRequest) {
       outreach: !!outreachRaw,
       scheduledDisk: localDiskOk,
       watchdog: watchdog.available,
-      prospectsDb: !!live, // live outreach truth reachable (local PC) vs snapshot-only
+      prospectsDb: !!live, // live outreach truth reachable vs snapshot-only
+      // Where the live outreach vitals came from this request: Supabase cloud
+      // (source of truth now that sending moved off the PC), the local
+      // prospects.db, or the honest snapshot fallback.
+      outreachSource: (live ? live.source : "snapshot") as MetricSource,
     },
     overall,
     watchdog,

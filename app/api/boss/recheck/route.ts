@@ -3,7 +3,7 @@ import fs from "fs";
 import path from "path";
 import { execFile } from "child_process";
 import { readVaultFile, isGithubVault, VAULT_PATH, commitVaultFile } from "../../../../lib/vaultSource";
-import { readProspectsLive, sendsTodayHonest, parseSnapshotAsOf } from "../../../../lib/liveTruth";
+import { readOutreachLive, sendsTodayHonest, parseSnapshotAsOf } from "../../../../lib/liveTruth";
 
 // ───────────────────────────────────────────────────────────────────────────
 // THE BOSS — live "Recheck" endpoint (POST).
@@ -366,13 +366,15 @@ async function checkOutreach(): Promise<CheckResult> {
     const m = raw.match(re);
     return m ? Number(m[1].replace(/,/g, "")) : null;
   };
-  // Sends-today truth: prefer the live prospects.db (local PC). Only fall back
-  // to the snapshot when the DB is unreachable — and never let a prior-day
-  // snapshot count read as today's (that is the exact bug we are killing).
-  const live = await readProspectsLive();
+  // Sends-today truth: prefer the CLOUD (Supabase) — the source of truth now
+  // that sending moved off the PC — then the local prospects.db, then the
+  // snapshot. Never let a prior-day snapshot count read as today's (that is the
+  // exact bug we are killing).
+  const live = await readOutreachLive();
+  const liveWhere = live ? (live.source === "live-cloud" ? "Supabase (cloud)" : "prospects.db") : "";
   const st = sendsTodayHonest(live, raw, parseSnapshotAsOf(raw));
   const sentToday = st.value; // number | null, honest (0 on prior-day snapshot)
-  const sentSourceLabel = live ? "live from prospects.db" : st.stale ? `snapshot, ${st.display}` : "snapshot";
+  const sentSourceLabel = live ? `live from ${liveWhere}` : st.stale ? `snapshot, ${st.display}` : "snapshot";
   // "Ready/armed" pool: prefer an explicit ready/armed/campaign_ready count if
   // the snapshot carries one, else fall back to the new+enriching remaining
   // pool (and say so). The true send-ready count lives in prospects.db (PC).
@@ -399,15 +401,15 @@ async function checkOutreach(): Promise<CheckResult> {
       label: "Sent today",
       status: "problem",
       line: live
-        ? "0 sent, and it is a weekday past 11am. Confirmed live from prospects.db — the sender is not sending (paused or broken)."
-        : `0 sent today (${sentSourceLabel}), a weekday past 11am. Real fault; live DB confirmation needs PC.`,
+        ? `0 sent, and it is a weekday past 11am. Confirmed live from ${liveWhere} — the sender is not sending (paused or broken).`
+        : `0 sent today (${sentSourceLabel}), a weekday past 11am. Real fault; live confirmation needs the cloud or PC.`,
     });
   } else {
     items.push({
       label: "Sent today",
       status: "ok",
       line: live
-        ? `${sentToday} sent today, counted live from prospects.db.`
+        ? `${sentToday} sent today, counted live from ${liveWhere}.`
         : `${sentToday} sent today per the snapshot (${ageWords(ageHours)}).`,
     });
   }
@@ -419,7 +421,7 @@ async function checkOutreach(): Promise<CheckResult> {
     items.push({
       label: "Ready pool",
       status: "problem",
-      line: `Pool is ${pool}, under the 20 line${live ? " (live armed count from prospects.db)" : poolIsExplicit ? "" : " (using new+enriching remaining; true armed count needs PC)"}.`,
+      line: `Pool is ${pool}, under the 20 line${live ? ` (live armed count from ${liveWhere})` : poolIsExplicit ? "" : " (using new+enriching remaining; true armed count needs the cloud or PC)"}.`,
     });
   } else {
     items.push({

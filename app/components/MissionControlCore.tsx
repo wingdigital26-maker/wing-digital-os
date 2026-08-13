@@ -53,6 +53,8 @@ export interface ClientHealth {
 }
 export interface PublishItem { date: string; title: string; url: string | null; note: string | null }
 export interface Publishes { windowDays: number; items: PublishItem[]; lastPriorPublish: string | null }
+export interface VaultToday { count: number; source: "git" | "mtime" }
+export interface ContentCalItem { client: string; platform: string; color: string; days: number[]; note: string }
 export interface RealLink { label: string; url: string }
 export type MetricSource = "live-db" | "live-ghl" | "snapshot";
 export interface StatTile {
@@ -96,6 +98,8 @@ export interface MissionData {
   volumes?: Volumes;
   publishes?: Publishes;
   watchdog?: WatchdogData;
+  vaultToday?: VaultToday | null;
+  scheduledContent?: ContentCalItem[];
 }
 export interface AgentWire { id: string; label: string; direction: "reads" | "writes" | "both" }
 export interface AgentDetail {
@@ -1842,8 +1846,6 @@ const CAL_ENTRIES: CalEntry[] = [
   { key: "watchdog", label: "Da Boss", color: "#f87171", days: ALL_DAYS, band: { start: "06:00", end: "22:00", every: "every 2h", everyMin: 120 } },
 ];
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const CAL_START_MIN = 5 * 60 + 30; // grid spans 5:30am
-const CAL_END_MIN = 22 * 60 + 45;  // ...to 10:45pm
 
 function hm(t: string): number {
   const [h, m] = t.split(":").map(Number);
@@ -1858,117 +1860,239 @@ function fmtClock(t: string): string {
 function dayIdx(d: Date): number {
   return (d.getDay() + 6) % 7;
 }
-// Next fire time for an entry, from now.
-function nextFire(e: CalEntry): Date | null {
-  const now = new Date();
-  for (let add = 0; add < 8; add++) {
-    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + add);
-    if (!e.days.includes(dayIdx(d))) continue;
-    if (e.time) {
-      const cand = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, hm(e.time));
-      if (cand.getTime() > now.getTime()) return cand;
-    } else if (e.band) {
-      const start = hm(e.band.start), end = hm(e.band.end);
-      for (let t = start; t <= end; t += e.band.everyMin) {
-        const cand = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, t);
-        if (cand.getTime() > now.getTime()) return cand;
-      }
-    }
-  }
-  return null;
+function startOfWeekMonday(d: Date): Date {
+  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  x.setDate(x.getDate() - dayIdx(x));
+  return x;
 }
+function addDays(d: Date, n: number): Date {
+  const x = new Date(d);
+  x.setDate(x.getDate() + n);
+  return x;
+}
+function sameDay(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+// A single thing scheduled on a given day: an agent task fire or a content post.
+type DayItem =
+  | { kind: "agent"; e: CalEntry; when: string; sortMin: number }
+  | { kind: "content"; c: ContentCalItem; when: string; sortMin: number };
 
-export function SchedulerCalendar({ agents, onSelect }: { agents: AgentCard[]; onSelect: (s: Selection) => void }) {
+export function SchedulerCalendar({ agents, content = [], onSelect }: {
+  agents: AgentCard[]; content?: ContentCalItem[]; onSelect: (s: Selection) => void;
+}) {
   const byKey = new Map(agents.map(a => [a.key, a]));
   // Only show entries for agents that exist and are enabled (watchdog always shows).
   const entries = CAL_ENTRIES.filter(e => e.key === "watchdog" || (byKey.get(e.key)?.enabled ?? false));
-  const gridH = 200;
-  const yOf = (min: number) => ((min - CAL_START_MIN) / (CAL_END_MIN - CAL_START_MIN)) * gridH;
-  const today = dayIdx(new Date());
-  const open = (e: CalEntry) => {
+  const now = new Date();
+
+  const [view, setView] = useState<"week" | "month">("week");
+  const [offset, setOffset] = useState(0); // weeks (week view) or months (month view)
+  const [detail, setDetail] = useState<Date | null>(null); // day whose items are expanded
+  const [pickedContent, setPickedContent] = useState<{ c: ContentCalItem; date: Date } | null>(null);
+  const switchView = (v: "week" | "month") => { setView(v); setOffset(0); setDetail(null); setPickedContent(null); };
+
+  // Everything scheduled on a specific calendar day, time-ordered.
+  const itemsOn = (d: Date): DayItem[] => {
+    const di = dayIdx(d);
+    const out: DayItem[] = [];
+    for (const e of entries) {
+      if (!e.days.includes(di)) continue;
+      const when = e.time ? fmtClock(e.time) : `${fmtClock(e.band!.start)}-${fmtClock(e.band!.end)} ${e.band!.every}`;
+      out.push({ kind: "agent", e, when, sortMin: e.time ? hm(e.time) : hm(e.band!.start) });
+    }
+    for (const c of content) {
+      if (!c.days.includes(di)) continue;
+      out.push({ kind: "content", c, when: "content post", sortMin: 9 * 60 });
+    }
+    return out.sort((a, b) => a.sortMin - b.sortMin);
+  };
+
+  const openAgent = (e: CalEntry) => {
     sfx.play("blip");
     onSelect(e.key === "watchdog" ? { type: "watchdog" } : { type: "agent", key: e.key });
   };
 
-  // Today's ordered timeline: one row per entry that fires today.
-  const todayRows = entries
-    .filter(e => e.days.includes(today))
-    .map(e => {
-      const nf = nextFire(e);
-      const when = e.time ? fmtClock(e.time) : `${fmtClock(e.band!.start)}-${fmtClock(e.band!.end)} ${e.band!.every}`;
-      return { e, when, sortMin: e.time ? hm(e.time) : hm(e.band!.start), next: nf };
-    })
-    .sort((a, b) => a.sortMin - b.sortMin);
+  const monday = addDays(startOfWeekMonday(now), offset * 7);
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(monday, i));
+  const monthAnchor = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+
+  const navBtn = (dir: -1 | 1, label: string) => (
+    <button onClick={() => { sfx.play("nav"); setOffset(o => o + dir); setDetail(null); setPickedContent(null); }}
+      aria-label={label}
+      style={{
+        background: "none", border: "1px solid var(--border, rgba(255,255,255,0.15))", color: "var(--text-secondary, #9ca3af)",
+        borderRadius: 6, padding: "2px 9px", cursor: "pointer", fontSize: 13, fontFamily: "'JetBrains Mono', monospace", lineHeight: 1.4,
+      }}>{dir < 0 ? "‹" : "›"}</button>
+  );
+
+  const rangeLabel = view === "week"
+    ? `${MONTHS[monday.getMonth()]} ${monday.getDate()} – ${MONTHS[weekDays[6].getMonth()]} ${weekDays[6].getDate()}`
+    : `${MONTHS[monthAnchor.getMonth()]} ${monthAnchor.getFullYear()}`;
+
+  // Small clickable chip for an item.
+  const ItemChip = ({ it, date }: { it: DayItem; date: Date }) => {
+    if (it.kind === "agent") {
+      const color = it.e.color;
+      return (
+        <div className="mo-click" onClick={() => openAgent(it.e)} title={`${byKey.get(it.e.key)?.name ?? it.e.label} — ${it.when}`}
+          style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10.5, marginBottom: 3, padding: "1px 4px", borderRadius: 4, background: `${color}18`, borderLeft: `2px solid ${color}` }}>
+          <span style={{ color: "var(--text-secondary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{byKey.get(it.e.key)?.name ?? it.e.label}</span>
+          <span style={{ marginLeft: "auto", color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace", fontSize: 9, flexShrink: 0 }}>{it.e.time ? fmtClock(it.e.time) : it.e.band!.every}</span>
+        </div>
+      );
+    }
+    const color = it.c.color;
+    return (
+      <div className="mo-click" onClick={() => { sfx.play("blip-artifact"); setPickedContent({ c: it.c, date }); }} title={`${it.c.platform} post — ${it.c.client}`}
+        style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10.5, marginBottom: 3, padding: "1px 4px", borderRadius: 4, background: `${color}18`, border: `1px dashed ${color}66` }}>
+        <span style={{ color: "var(--text-secondary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.c.platform}</span>
+        <span style={{ marginLeft: "auto", color: "var(--text-muted)", fontSize: 9, flexShrink: 0 }}>post</span>
+      </div>
+    );
+  };
 
   return (
     <div className="mo-cal">
-      {/* week grid: days as columns, runs as chips/bands at their time slot.
-          On phone this scrolls horizontally inside its own container so it never
-          pushes the page wide (see .mo-cal in globals.css). */}
-      <div className="mo-cal-grid" style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
-        {DAY_LABELS.map((dl, di) => (
-          <div key={dl}>
-            <div style={{
-              fontSize: 9, letterSpacing: "0.1em", textAlign: "center", marginBottom: 4,
-              fontFamily: "'JetBrains Mono', monospace",
-              color: di === today ? "var(--accent, #22d3ee)" : "var(--text-muted)",
-            }}>{dl.toUpperCase()}</div>
-            <div style={{
-              position: "relative", height: gridH, borderRadius: 6,
-              background: di === today ? "rgba(34,211,238,0.05)" : "rgba(255,255,255,0.02)",
-              border: `1px solid ${di === today ? "rgba(34,211,238,0.25)" : "var(--border, rgba(255,255,255,0.06))"}`,
-              overflow: "hidden",
-            }}>
-              {entries.filter(e => e.days.includes(di)).map(e => e.band ? (
-                <div key={e.key} className="mo-click" onClick={() => open(e)}
-                  title={`${e.label}: ${e.band.every}, ${fmtClock(e.band.start)}-${fmtClock(e.band.end)}`}
-                  style={{
-                    position: "absolute", left: "12%", width: "20%",
-                    top: yOf(hm(e.band.start)), height: yOf(hm(e.band.end)) - yOf(hm(e.band.start)),
-                    background: `${e.color}22`, borderLeft: `2px solid ${e.color}`, borderRadius: 3,
-                  }} />
-              ) : (
-                <div key={e.key} className="mo-click" onClick={() => open(e)}
-                  title={`${e.label} at ${fmtClock(e.time!)}`}
-                  style={{
-                    position: "absolute", left: "38%", right: "6%",
-                    top: Math.max(0, yOf(hm(e.time!)) - 3), height: 6,
-                    background: e.color, borderRadius: 3, opacity: 0.9,
-                  }} />
-              ))}
-            </div>
-          </div>
-        ))}
+      {/* nav header: prev/next + range + week/month toggle */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {navBtn(-1, "previous")}
+          <span style={{ fontSize: 12, fontWeight: 600, minWidth: 120, textAlign: "center", fontFamily: "'JetBrains Mono', monospace" }}>{rangeLabel}</span>
+          {navBtn(1, "next")}
+        </div>
+        {offset !== 0 && (
+          <button onClick={() => { sfx.play("nav"); setOffset(0); setDetail(null); }}
+            style={{ background: "none", border: "1px solid var(--border, rgba(255,255,255,0.15))", color: "var(--text-muted)", borderRadius: 6, padding: "2px 8px", cursor: "pointer", fontSize: 10, fontFamily: "'JetBrains Mono', monospace" }}>today</button>
+        )}
+        <div style={{ marginLeft: "auto", display: "inline-flex", border: "1px solid var(--border, rgba(255,255,255,0.15))", borderRadius: 6, overflow: "hidden" }}>
+          {(["week", "month"] as const).map(v => (
+            <button key={v} onClick={() => switchView(v)}
+              style={{ background: view === v ? "var(--accent, #22d3ee)22" : "none", border: "none", color: view === v ? "var(--accent, #22d3ee)" : "var(--text-muted)", padding: "3px 10px", cursor: "pointer", fontSize: 10.5, fontFamily: "'JetBrains Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em" }}>{v}</button>
+          ))}
+        </div>
       </div>
 
-      {/* legend for the chips */}
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 8 }}>
+      {view === "week" ? (
+        <div className="mo-cal-grid" style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
+          {weekDays.map((d, di) => {
+            const isToday = sameDay(d, now);
+            const items = itemsOn(d);
+            return (
+              <div key={di}>
+                <div style={{ fontSize: 9, letterSpacing: "0.08em", textAlign: "center", marginBottom: 4, fontFamily: "'JetBrains Mono', monospace", color: isToday ? "var(--accent, #22d3ee)" : "var(--text-muted)" }}>
+                  {DAY_LABELS[di].toUpperCase()} {d.getDate()}
+                </div>
+                <div style={{
+                  minHeight: 120, borderRadius: 6, padding: 3,
+                  background: isToday ? "rgba(34,211,238,0.05)" : "rgba(255,255,255,0.02)",
+                  border: `1px solid ${isToday ? "rgba(34,211,238,0.25)" : "var(--border, rgba(255,255,255,0.06))"}`,
+                }}>
+                  {items.length === 0 && <div style={{ fontSize: 9, color: "var(--text-muted)", textAlign: "center", marginTop: 8 }}>—</div>}
+                  {items.map((it, i) => <ItemChip key={i} it={it} date={d} />)}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <MonthGrid anchor={monthAnchor} now={now} itemsOn={itemsOn} onPick={(d) => { sfx.play("blip"); setDetail(dt => dt && sameDay(dt, d) ? null : d); setPickedContent(null); }} detail={detail} />
+      )}
+
+      {/* selected-day detail (month view) */}
+      {view === "month" && detail && (
+        <div style={{ marginTop: 12, borderTop: "1px solid var(--border, rgba(255,255,255,0.08))", paddingTop: 10 }}>
+          <div style={{ fontSize: 10, letterSpacing: "0.14em", color: "var(--text-muted)", textTransform: "uppercase", marginBottom: 6 }}>
+            {DAY_LABELS[dayIdx(detail)]}, {MONTHS[detail.getMonth()]} {detail.getDate()}
+          </div>
+          {itemsOn(detail).length === 0 && <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Nothing scheduled.</div>}
+          {itemsOn(detail).map((it, i) => (
+            it.kind === "agent" ? (
+              <div key={i} className="mo-click" onClick={() => openAgent(it.e)} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, marginBottom: 6 }}>
+                <Dot color={it.e.color} />
+                <span style={{ fontWeight: 600 }}>{byKey.get(it.e.key)?.name ?? it.e.label}</span>
+                <span style={{ marginLeft: "auto", color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace", fontSize: 10.5 }}>{it.when}</span>
+              </div>
+            ) : (
+              <div key={i} className="mo-click" onClick={() => setPickedContent({ c: it.c, date: detail })} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, marginBottom: 6 }}>
+                <span style={{ width: 9, height: 9, borderRadius: 2, background: it.c.color, flexShrink: 0 }} />
+                <span style={{ fontWeight: 600 }}>{it.c.platform} post</span>
+                <span style={{ marginLeft: "auto", color: "var(--text-muted)", fontSize: 10.5 }}>{it.c.client}</span>
+              </div>
+            )
+          ))}
+        </div>
+      )}
+
+      {/* content-post detail popover */}
+      {pickedContent && (
+        <div style={{ marginTop: 10, border: `1px solid ${pickedContent.c.color}55`, borderRadius: 8, padding: "10px 12px", background: "rgba(255,255,255,0.02)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+            <span style={{ width: 9, height: 9, borderRadius: 2, background: pickedContent.c.color }} />
+            <span style={{ fontWeight: 700, fontSize: 13 }}>{pickedContent.c.platform} post</span>
+            <button onClick={() => setPickedContent(null)} style={{ marginLeft: "auto", background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 14 }} aria-label="close">×</button>
+          </div>
+          <div style={{ fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.5 }}>
+            {pickedContent.c.client} · {DAY_LABELS[dayIdx(pickedContent.date)]} {MONTHS[pickedContent.date.getMonth()]} {pickedContent.date.getDate()}
+          </div>
+          <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6, lineHeight: 1.5 }}>{pickedContent.c.note}</div>
+        </div>
+      )}
+
+      {/* legend */}
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
         {entries.map(e => (
-          <span key={e.key} className="mo-click" onClick={() => open(e)}
+          <span key={e.key} className="mo-click" onClick={() => openAgent(e)}
             style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 10, color: "var(--text-secondary)", fontFamily: "'JetBrains Mono', monospace" }}>
             <span style={{ width: 8, height: 8, borderRadius: 2, background: e.color, flexShrink: 0 }} />
             {e.label}
           </span>
         ))}
-      </div>
-
-      {/* today: ordered timeline with next-fire countdowns */}
-      <div style={{ marginTop: 14 }}>
-        <div style={{ fontSize: 10, letterSpacing: "0.14em", color: "var(--text-muted)", textTransform: "uppercase", marginBottom: 6 }}>
-          Today ({DAY_LABELS[today]})
-        </div>
-        {todayRows.length === 0 && <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Nothing scheduled today.</div>}
-        {todayRows.map(({ e, when, next }) => (
-          <div key={e.key} className="mo-click" onClick={() => open(e)}
-            style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, marginBottom: 6 }}>
-            <Dot color={e.color} />
-            <span style={{ fontWeight: 600 }}>{byKey.get(e.key)?.name ?? e.label}</span>
-            <span style={{ color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace", fontSize: 10.5 }}>{when}</span>
-            <span style={{ marginLeft: "auto", color: "var(--accent, #22d3ee)", fontFamily: "'JetBrains Mono', monospace", fontSize: 10.5 }}>
-              {next ? `next ${fmtCountdown(next.toISOString())}` : "done for today"}
-            </span>
-          </div>
+        {content.map((c, i) => (
+          <span key={`c-${i}`} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 10, color: "var(--text-secondary)", fontFamily: "'JetBrains Mono', monospace" }}>
+            <span style={{ width: 8, height: 8, borderRadius: 2, background: c.color, flexShrink: 0, opacity: 0.8, border: `1px dashed ${c.color}` }} />
+            {c.platform}
+          </span>
         ))}
+      </div>
+    </div>
+  );
+}
+
+// Month grid for the scheduler: 6 rows x 7 days, colored dots per scheduled item.
+function MonthGrid({ anchor, now, itemsOn, onPick, detail }: {
+  anchor: Date; now: Date; itemsOn: (d: Date) => DayItem[]; onPick: (d: Date) => void; detail: Date | null;
+}) {
+  const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
+  const gridStart = addDays(first, -dayIdx(first));
+  const cells = Array.from({ length: 42 }, (_, i) => addDays(gridStart, i));
+  return (
+    <div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 3 }}>
+        {DAY_LABELS.map(dl => (
+          <div key={dl} style={{ fontSize: 8.5, letterSpacing: "0.06em", textAlign: "center", color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace", marginBottom: 2 }}>{dl.toUpperCase()}</div>
+        ))}
+        {cells.map((d, i) => {
+          const inMonth = d.getMonth() === anchor.getMonth();
+          const isToday = sameDay(d, now);
+          const isSel = detail && sameDay(detail, d);
+          const items = itemsOn(d);
+          const dots = [...new Set(items.map(it => it.kind === "agent" ? it.e.color : it.c.color))].slice(0, 5);
+          return (
+            <div key={i} className="mo-click" onClick={() => onPick(d)}
+              style={{
+                minHeight: 46, borderRadius: 5, padding: "2px 3px",
+                opacity: inMonth ? 1 : 0.35,
+                background: isSel ? "rgba(34,211,238,0.12)" : isToday ? "rgba(34,211,238,0.05)" : "rgba(255,255,255,0.02)",
+                border: `1px solid ${isSel ? "rgba(34,211,238,0.5)" : isToday ? "rgba(34,211,238,0.25)" : "var(--border, rgba(255,255,255,0.06))"}`,
+              }}>
+              <div style={{ fontSize: 9.5, textAlign: "right", color: isToday ? "var(--accent, #22d3ee)" : "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace" }}>{d.getDate()}</div>
+              <div style={{ display: "flex", gap: 2, flexWrap: "wrap", marginTop: 2 }}>
+                {dots.map((c, di) => <span key={di} style={{ width: 5, height: 5, borderRadius: "50%", background: c }} />)}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -1987,22 +2111,29 @@ function SystemPanel({ systemId, data, onSelect, onClose }: {
     matchers.some(m => m.test(e.title) || m.test(e.type) || e.lines.some(l => m.test(l)))
   ).slice(0, 25);
   const activeCount = touching.filter(isRecentlyActive).length;
+  const isWebsite = systemId === "website";
+  const publishItems = data.publishes?.items ?? [];
+  const windowDays = data.publishes?.windowDays ?? 14;
 
-  return (
-    <SlideOver title={sys.label} accent={sys.color} onClose={onClose}>
-      <SummaryBlock accent={sys.color} lines={[
-        sys.blurb,
-        `${touching.length} agent${touching.length === 1 ? "" : "s"} wired in, ${activeCount} recently active.`,
-        related.length ? `Last activity ${shortDate(related[0].date)}: ${tightLine(related[0].title, 80)}` : "No recent log activity for this system.",
-      ]} />
-
-      {systemId === "website" && (
-        <Section title="Published this week" defaultOpen>
-          {(data.publishes?.items ?? []).map((p, i) => (
-            <div key={i} style={{ fontSize: 12, marginBottom: 8, lineHeight: 1.5 }}>
-              <span style={{ color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace", fontSize: 10, marginRight: 8 }}>{shortDate(p.date)}</span>
+  // Web/SEO panel is PUBLISH-ONLY: it shows nothing but published blog posts and
+  // service pages (each a clickable link to the live URL). No Sentinel/Watchdog/
+  // health/agent-activity noise — those live on their own nodes.
+  if (isWebsite) {
+    const withLinks = publishItems.filter((p) => p.url).length;
+    return (
+      <SlideOver title={sys.label} accent={sys.color} onClose={onClose}>
+        <SummaryBlock accent={sys.color} lines={[
+          "Published blog posts and service pages, each linking to the live URL.",
+          publishItems.length
+            ? `${publishItems.length} publish${publishItems.length === 1 ? "" : "es"} in the last ${windowDays} days${withLinks ? `, ${withLinks} with a live link` : ""}.`
+            : `Nothing published in the last ${windowDays} days.`,
+        ]} />
+        <Section title={`Published (last ${windowDays} days)`} defaultOpen>
+          {publishItems.map((p, i) => (
+            <div key={i} style={{ fontSize: 12.5, marginBottom: 9, lineHeight: 1.5, display: "flex", gap: 8 }}>
+              <span style={{ color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace", fontSize: 10, flexShrink: 0, marginTop: 1 }}>{shortDate(p.date)}</span>
               {p.url ? (
-                <a href={p.url} target="_blank" rel="noreferrer" style={{ color: sys.color, textDecoration: "none" }}>
+                <a href={p.url} target="_blank" rel="noreferrer" style={{ color: sys.color, textDecoration: "underline" }}>
                   {tightLine(p.title, 110)} &#8599;
                 </a>
               ) : (
@@ -2012,18 +2143,44 @@ function SystemPanel({ systemId, data, onSelect, onClose }: {
               )}
             </div>
           ))}
-          {(data.publishes?.items ?? []).length === 0 && (
+          {publishItems.length === 0 && (
             <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
-              Nothing published in the last 7 days.
+              Nothing published in the last {windowDays} days.
               {data.publishes?.lastPriorPublish ? ` Most recent prior publish: ${shortDate(data.publishes.lastPriorPublish)}.` : ""}
             </div>
           )}
         </Section>
+      </SlideOver>
+    );
+  }
+
+  return (
+    <SlideOver title={sys.label} accent={sys.color} onClose={onClose}>
+      <SummaryBlock accent={sys.color} lines={[
+        sys.blurb,
+        `${touching.length} agent${touching.length === 1 ? "" : "s"} wired in, ${activeCount} recently active.`,
+        related.length ? `Last activity ${shortDate(related[0].date)}: ${tightLine(related[0].title, 80)}` : "No recent log activity for this system.",
+      ]} />
+
+      {systemId === "vault" && data.vaultToday && (
+        <Section title="Vault activity" defaultOpen>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
+            <span style={{ fontSize: 28, fontFamily: "'JetBrains Mono', monospace", color: sys.color, fontWeight: 700 }}>
+              {data.vaultToday.count}
+            </span>
+            <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>
+              file{data.vaultToday.count === 1 ? "" : "s"} updated today
+            </span>
+          </div>
+          <div style={{ fontSize: 10.5, color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace", marginTop: 4 }}>
+            {data.vaultToday.source === "git" ? "counted from vault git commits dated today" : "counted from vault file timestamps (git unavailable)"}
+          </div>
+        </Section>
       )}
 
       {systemId === "scheduler" && (
-        <Section title="Calendar">
-          <SchedulerCalendar agents={data.agents} onSelect={onSelect} />
+        <Section title="Calendar" defaultOpen>
+          <SchedulerCalendar agents={data.agents} content={data.scheduledContent ?? []} onSelect={onSelect} />
         </Section>
       )}
 

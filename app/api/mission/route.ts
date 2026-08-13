@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
-import { readVaultFile, isGithubVault } from "../../../lib/vaultSource";
+import { execSync } from "child_process";
+import { readVaultFile, isGithubVault, VAULT_PATH } from "../../../lib/vaultSource";
 import {
   readOutreachLive,
   sendsTodayHonest,
@@ -391,14 +392,28 @@ function extractLiveUrls(text: string): string[] {
   return out;
 }
 
-// Publish events from log.md in the last 7 days (rolling window), plus the
-// health board's "Published since last run" lines which carry real live URLs.
+// A clean, human title from a live post/page URL: the last path segment,
+// de-slugged and title-cased. ".../window-replacement/" -> "Window Replacement".
+function titleFromUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    if (u.searchParams.get("p")) return `Post ${u.searchParams.get("p")}`;
+    const seg = u.pathname.split("/").filter(Boolean).pop() ?? "";
+    if (!seg) return u.hostname;
+    return seg.replace(/[-_]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  } catch {
+    return url;
+  }
+}
+
+// Publish events from log.md in the rolling window, plus the health board's
+// "Published since last run" lines which carry real live URLs.
 function parsePublishes(feed: FeedEntry[], healthRaw: string | null): {
   windowDays: number;
   items: PublishItem[];
   lastPriorPublish: string | null;
 } {
-  const weekAgo = Date.now() - 7 * 86400000;
+  const weekAgo = Date.now() - 14 * 86400000;
   // A WEB publish, not a GHL workflow/template/campaign publish and not a
   // draft-only or rolled-back run. Title carries the verb, or a body line
   // explicitly says blogs/posts/pages were published.
@@ -411,17 +426,33 @@ function parsePublishes(feed: FeedEntry[], healthRaw: string | null): {
       /\b(blogs?|posts?|pages?)\b[^.]{0,40}\bpublished\b|\bpublished\b[^.]{0,40}\b(live|blogs?|posts?|pages?)\b/i.test(l)
     );
   };
+  // Agent status/report lines (Sentinel, Watchdog, health, refiner, client-report,
+  // etc.) are NOT publish events — this panel must stay publish-only. But those
+  // lines often carry the real live URL of a page that was published. So we still
+  // HARVEST any live URL out of a noise line, yet we render it as a clean row with
+  // a title derived from the URL slug — never the raw sentinel/watchdog sentence.
+  const NOISE = /^\s*(sentinel|watchdog|health|refine|refiner|client[- ]report|dispatch|reply[- ]?triage|closer|call[- ]prep|chronicler|prospector|da boss|boss)\b/i;
+  const seen = new Set<string>();
   const publishEntries = feed.filter(isPublish);
   const items: PublishItem[] = [];
 
   for (const e of publishEntries) {
     if (new Date(e.date).getTime() < weekAgo) continue;
+    const noise = NOISE.test(e.title);
     const text = e.title + "\n" + e.lines.join("\n");
     const urls = extractLiveUrls(text);
     if (urls.length) {
-      for (const url of urls) items.push({ date: e.date, title: e.title, url, note: null });
+      for (const url of urls) {
+        if (seen.has(url)) continue;
+        seen.add(url);
+        // Clean title: slug-derived for noise lines, the log title otherwise.
+        items.push({ date: e.date, title: noise ? titleFromUrl(url) : clean(redact(e.title)), url, note: null });
+      }
       continue;
     }
+    // A noise line with no URL is pure agent-activity — drop it entirely so the
+    // panel never shows a Sentinel/Watchdog sentence with "no link logged".
+    if (noise) continue;
     // Jackson WP posts logged by id only: ?p=<id> is WordPress's canonical
     // query permalink, built from the real post id in the publish line itself.
     if (/jackson/i.test(text)) {
@@ -429,12 +460,16 @@ function parsePublishes(feed: FeedEntry[], healthRaw: string | null): {
         .flatMap((m) => [m[1], m[2]])
         .filter(Boolean) as string[];
       if (ids.length) {
-        for (const id of [...new Set(ids)])
-          items.push({ date: e.date, title: `${e.title} (post ${id})`, url: `https://jacksonroofingco.com/?p=${id}`, note: null });
+        for (const id of [...new Set(ids)]) {
+          const url = `https://jacksonroofingco.com/?p=${id}`;
+          if (seen.has(url)) continue;
+          seen.add(url);
+          items.push({ date: e.date, title: `${clean(redact(e.title))} (post ${id})`, url, note: null });
+        }
         continue;
       }
     }
-    items.push({ date: e.date, title: e.title, url: null, note: "no link logged" });
+    items.push({ date: e.date, title: clean(redact(e.title)), url: null, note: "no link logged" });
   }
 
   // Health board: "- Title — https://..." under "Published since last run".
@@ -447,7 +482,8 @@ function parsePublishes(feed: FeedEntry[], healthRaw: string | null): {
           const m = line.match(/^-\s+(.+?)\s+[—-]+\s+(https?:\/\/\S+)/);
           if (m) {
             const url = m[2].replace(/[.,;:]+$/, "");
-            if (LIVE_HOSTS.some((h) => url.includes(h)) && !items.some((i) => i.url === url)) {
+            if (LIVE_HOSTS.some((h) => url.includes(h)) && !seen.has(url)) {
+              seen.add(url);
               items.push({ date: runDate, title: clean(redact(m[1])), url, note: null });
             }
           }
@@ -460,7 +496,7 @@ function parsePublishes(feed: FeedEntry[], healthRaw: string | null): {
   const lastPriorPublish = items.length
     ? null
     : publishEntries.length ? publishEntries[0].date : null;
-  return { windowDays: 7, items, lastPriorPublish };
+  return { windowDays: 14, items, lastPriorPublish };
 }
 
 // Derive each client's live-site origin from real links already on the board
@@ -1017,6 +1053,96 @@ async function agentDetail(key: string) {
   });
 }
 
+// ── Vault files updated today ──────────────────────────────────────────────
+// Best source: the vault git history (the vault is a git repo synced to
+// wing-os-vault). Count DISTINCT files touched in commits dated today. If git
+// is unavailable (e.g. cloud/GitHub-read mode has no local checkout), fall back
+// to scanning file mtimes under the vault. Returns null when neither works.
+function countVaultFilesToday(): { count: number; source: "git" | "mtime" } | null {
+  // Local git first.
+  if (!isGithubVault()) {
+    try {
+      const out = execSync(
+        'git log --since="midnight" --name-only --pretty=format:',
+        { cwd: VAULT_PATH, encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"], timeout: 8000 }
+      );
+      const files = new Set(
+        out.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
+      );
+      return { count: files.size, source: "git" };
+    } catch {
+      /* git missing or not a repo — fall through to mtime scan */
+    }
+    // mtime fallback: count .md files under the vault modified since midnight.
+    try {
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      const startMs = start.getTime();
+      let count = 0;
+      const walk = (dir: string) => {
+        let entries: fs.Dirent[] = [];
+        try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+        for (const e of entries) {
+          if (e.name.startsWith(".") || e.name === "node_modules") continue;
+          const full = path.join(dir, e.name);
+          if (e.isDirectory()) walk(full);
+          else {
+            try { if (fs.statSync(full).mtimeMs >= startMs) count++; } catch { /* skip */ }
+          }
+        }
+      };
+      walk(VAULT_PATH);
+      return { count, source: "mtime" };
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+// ── Scheduled content posts (from the content calendar cadence) ─────────────
+// The Jackson social calendar documents a real recurring cadence, e.g.
+// "Facebook 3x/week (Mon/Wed/Fri), Nextdoor 2x/week (Tue/Sat), Google Business
+// Profile 1x/week (Thu)". We surface that documented cadence as recurring
+// content-calendar entries so the scheduler shows planned posts alongside agent
+// task fires. Days are Monday-based indices (0=Mon..6=Sun). Never fabricated:
+// if the cadence line is absent, no content entries are returned.
+const DAY_TOKEN: Record<string, number> = {
+  mon: 0, tue: 1, tues: 1, wed: 2, weds: 2, thu: 3, thur: 3, thurs: 3,
+  fri: 4, sat: 5, sun: 6,
+};
+const PLATFORM_COLOR: Record<string, string> = {
+  facebook: "#60a5fa", nextdoor: "#34d399", "google business": "#fbbf24",
+  "google business profile": "#fbbf24", instagram: "#f472b6",
+};
+interface ContentCalItem { client: string; platform: string; color: string; days: number[]; note: string }
+
+function parseContentSchedule(calendarRaw: string | null): ContentCalItem[] {
+  if (!calendarRaw) return [];
+  const cadence = calendarRaw.match(/Cadence baseline:\s*([^\n]+)/i)?.[1];
+  if (!cadence) return [];
+  const items: ContentCalItem[] = [];
+  // Match "Facebook 3x/week (Mon/Wed/Fri)" style groups.
+  const re = /([A-Za-z][A-Za-z ]*?)\s*\d*\s*x?\s*\/\s*week\s*\(([^)]+)\)/gi;
+  for (const m of cadence.matchAll(re)) {
+    const platform = m[1].trim().replace(/\s+/g, " ");
+    const days = m[2]
+      .split(/[\/,]/)
+      .map((d) => DAY_TOKEN[d.trim().toLowerCase().slice(0, 5)] ?? DAY_TOKEN[d.trim().toLowerCase().slice(0, 4)] ?? DAY_TOKEN[d.trim().toLowerCase().slice(0, 3)])
+      .filter((n) => n !== undefined) as number[];
+    if (!days.length) continue;
+    const key = platform.toLowerCase();
+    items.push({
+      client: "Jackson Roofing",
+      platform,
+      color: PLATFORM_COLOR[key] ?? "#a78bfa",
+      days: [...new Set(days)],
+      note: redact(cadence.trim()).slice(0, 200),
+    });
+  }
+  return items;
+}
+
 // ── main handler ───────────────────────────────────────────────────────────
 export async function GET(req: NextRequest) {
   const agentKey = req.nextUrl.searchParams.get("agent");
@@ -1028,7 +1154,7 @@ export async function GET(req: NextRequest) {
 
   const cloud = isGithubVault();
 
-  const [logRaw, hotRaw, healthRaw, bizRaw, outreachRaw, repliesRaw, watchdogRaw, live] = await Promise.all([
+  const [logRaw, hotRaw, healthRaw, bizRaw, outreachRaw, repliesRaw, watchdogRaw, contentCalRaw, live] = await Promise.all([
     readVaultFile("wiki/log.md"),
     readVaultFile("wiki/hot.md"),
     readVaultFile("wiki/state/health-board.md"),
@@ -1036,8 +1162,13 @@ export async function GET(req: NextRequest) {
     readVaultFile("wiki/state/outreach-snapshot.md"),
     readVaultFile("wiki/state/replies-inbox.md"),
     readVaultFile("wiki/state/watchdog.md"),
+    readVaultFile("wiki/campaigns/jackson-social-calendar.md"),
     readOutreachLive(),
   ]);
+
+  // Vault activity today (git-first, mtime fallback) + scheduled content posts.
+  const vaultToday = countVaultFilesToday();
+  const scheduledContent = parseContentSchedule(contentCalRaw);
 
   const watchdog = parseWatchdog(watchdogRaw);
 
@@ -1196,5 +1327,7 @@ export async function GET(req: NextRequest) {
     stats,
     volumes,
     publishes,
+    vaultToday,
+    scheduledContent,
   });
 }

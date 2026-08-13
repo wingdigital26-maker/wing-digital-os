@@ -51,7 +51,7 @@ export interface ClientHealth {
   redFlags: { text: string; link: string | null }[];
   site?: string | null;
 }
-export interface PublishItem { date: string; title: string; url: string | null; note: string | null }
+export interface PublishItem { date: string; title: string; url: string | null; note: string | null; client?: string | null }
 export interface Publishes { windowDays: number; items: PublishItem[]; lastPriorPublish: string | null }
 export interface VaultToday { count: number; source: "git" | "mtime" }
 export interface ContentCalItem { client: string; platform: string; color: string; days: number[]; note: string }
@@ -1890,7 +1890,20 @@ export function SchedulerCalendar({ agents, content = [], onSelect }: {
   const [offset, setOffset] = useState(0); // weeks (week view) or months (month view)
   const [detail, setDetail] = useState<Date | null>(null); // day whose items are expanded
   const [pickedContent, setPickedContent] = useState<{ c: ContentCalItem; date: Date } | null>(null);
+  const [fullscreen, setFullscreen] = useState(false);
   const switchView = (v: "week" | "month") => { setView(v); setOffset(0); setDetail(null); setPickedContent(null); };
+
+  // Esc closes fullscreen; portal needs a mounted flag for SSR safety.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+  const openFull = () => { sfx.play("open"); setFullscreen(true); };
+  const closeFull = () => { sfx.play("close"); setFullscreen(false); };
+  useEffect(() => {
+    if (!fullscreen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") closeFull(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [fullscreen]);
 
   // Everything scheduled on a specific calendar day, time-ordered.
   const itemsOn = (d: Date): DayItem[] => {
@@ -1912,17 +1925,19 @@ export function SchedulerCalendar({ agents, content = [], onSelect }: {
     sfx.play("blip");
     onSelect(e.key === "watchdog" ? { type: "watchdog" } : { type: "agent", key: e.key });
   };
+  const labelFor = (it: DayItem) => it.kind === "agent" ? (byKey.get(it.e.key)?.name ?? it.e.label) : `${it.c.platform}`;
+  const colorFor = (it: DayItem) => it.kind === "agent" ? it.e.color : it.c.color;
 
   const monday = addDays(startOfWeekMonday(now), offset * 7);
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(monday, i));
   const monthAnchor = new Date(now.getFullYear(), now.getMonth() + offset, 1);
 
   const navBtn = (dir: -1 | 1, label: string) => (
-    <button onClick={() => { sfx.play("nav"); setOffset(o => o + dir); setDetail(null); setPickedContent(null); }}
+    <button className="mo-click" onClick={() => { sfx.play("nav"); setOffset(o => o + dir); setDetail(null); setPickedContent(null); }}
       aria-label={label}
       style={{
-        background: "none", border: "1px solid var(--border, rgba(255,255,255,0.15))", color: "var(--text-secondary, #9ca3af)",
-        borderRadius: 6, padding: "2px 9px", cursor: "pointer", fontSize: 13, fontFamily: "'JetBrains Mono', monospace", lineHeight: 1.4,
+        background: "var(--bg-card, rgba(255,255,255,0.02))", border: "1px solid var(--border, rgba(255,255,255,0.15))", color: "var(--text-secondary, #9ca3af)",
+        borderRadius: 8, padding: "3px 11px", cursor: "pointer", fontSize: 14, fontFamily: "'JetBrains Mono', monospace", lineHeight: 1.3,
       }}>{dir < 0 ? "‹" : "›"}</button>
   );
 
@@ -1930,91 +1945,113 @@ export function SchedulerCalendar({ agents, content = [], onSelect }: {
     ? `${MONTHS[monday.getMonth()]} ${monday.getDate()} – ${MONTHS[weekDays[6].getMonth()]} ${weekDays[6].getDate()}`
     : `${MONTHS[monthAnchor.getMonth()]} ${monthAnchor.getFullYear()}`;
 
-  // Small clickable chip for an item.
-  const ItemChip = ({ it, date }: { it: DayItem; date: Date }) => {
-    if (it.kind === "agent") {
-      const color = it.e.color;
-      return (
-        <div className="mo-click" onClick={() => openAgent(it.e)} title={`${byKey.get(it.e.key)?.name ?? it.e.label} — ${it.when}`}
-          style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10.5, marginBottom: 3, padding: "1px 4px", borderRadius: 4, background: `${color}18`, borderLeft: `2px solid ${color}` }}>
-          <span style={{ color: "var(--text-secondary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{byKey.get(it.e.key)?.name ?? it.e.label}</span>
-          <span style={{ marginLeft: "auto", color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace", fontSize: 9, flexShrink: 0 }}>{it.e.time ? fmtClock(it.e.time) : it.e.band!.every}</span>
-        </div>
-      );
-    }
-    const color = it.c.color;
+  // Clickable pill/band for one scheduled item (week view + fullscreen month).
+  const ItemChip = ({ it, date, big = false }: { it: DayItem; date: Date; big?: boolean }) => {
+    const name = labelFor(it);
+    const timeTxt = it.kind === "agent" ? (it.e.time ? fmtClock(it.e.time) : it.e.band!.every) : "post";
+    const isBand = it.kind === "agent" && !!it.e.band;
+    const color = colorFor(it);
+    const onClick = it.kind === "agent"
+      ? () => openAgent(it.e)
+      : () => { sfx.play("blip-artifact"); setPickedContent({ c: it.c, date }); };
     return (
-      <div className="mo-click" onClick={() => { sfx.play("blip-artifact"); setPickedContent({ c: it.c, date }); }} title={`${it.c.platform} post — ${it.c.client}`}
-        style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10.5, marginBottom: 3, padding: "1px 4px", borderRadius: 4, background: `${color}18`, border: `1px dashed ${color}66` }}>
-        <span style={{ color: "var(--text-secondary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.c.platform}</span>
-        <span style={{ marginLeft: "auto", color: "var(--text-muted)", fontSize: 9, flexShrink: 0 }}>post</span>
+      <div className="mo-click mo-cal-chip" onClick={onClick} title={`${name} — ${it.when}`}
+        style={{
+          display: "flex", alignItems: "center", gap: 6, fontSize: big ? 11.5 : 10.5, marginBottom: 4,
+          padding: big ? "3px 8px" : "2px 6px", borderRadius: 6, minWidth: 0,
+          background: isBand
+            ? `linear-gradient(90deg, ${color}22, ${color}0c)`
+            : `${color}1c`,
+          borderLeft: it.kind === "agent" ? `3px solid ${color}` : "none",
+          border: it.kind === "content" ? `1px dashed ${color}66` : undefined,
+        }}>
+        <span style={{ width: 6, height: 6, borderRadius: it.kind === "agent" ? "50%" : 1, background: color, flexShrink: 0, boxShadow: `0 0 5px ${color}88` }} />
+        <span style={{ color: "var(--text-secondary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>{name}</span>
+        <span style={{ marginLeft: "auto", color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace", fontSize: big ? 9.5 : 8.5, flexShrink: 0, whiteSpace: "nowrap" }}>{timeTxt}</span>
       </div>
     );
   };
 
-  return (
+  // The whole calendar body; `big` scales it up for the fullscreen overlay.
+  const body = (big: boolean) => (
     <div className="mo-cal">
-      {/* nav header: prev/next + range + week/month toggle */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+      {/* nav header: prev/next + range + week/month toggle + expand */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: big ? 16 : 10, flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           {navBtn(-1, "previous")}
-          <span style={{ fontSize: 12, fontWeight: 600, minWidth: 120, textAlign: "center", fontFamily: "'JetBrains Mono', monospace" }}>{rangeLabel}</span>
+          <span style={{ fontSize: big ? 15 : 12, fontWeight: 600, minWidth: big ? 190 : 130, textAlign: "center", fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.02em" }}>{rangeLabel}</span>
           {navBtn(1, "next")}
         </div>
         {offset !== 0 && (
-          <button onClick={() => { sfx.play("nav"); setOffset(0); setDetail(null); }}
-            style={{ background: "none", border: "1px solid var(--border, rgba(255,255,255,0.15))", color: "var(--text-muted)", borderRadius: 6, padding: "2px 8px", cursor: "pointer", fontSize: 10, fontFamily: "'JetBrains Mono', monospace" }}>today</button>
+          <button className="mo-click" onClick={() => { sfx.play("nav"); setOffset(0); setDetail(null); }}
+            style={{ background: "none", border: "1px solid var(--border, rgba(255,255,255,0.15))", color: "var(--text-muted)", borderRadius: 8, padding: "3px 9px", cursor: "pointer", fontSize: 10, fontFamily: "'JetBrains Mono', monospace" }}>today</button>
         )}
-        <div style={{ marginLeft: "auto", display: "inline-flex", border: "1px solid var(--border, rgba(255,255,255,0.15))", borderRadius: 6, overflow: "hidden" }}>
-          {(["week", "month"] as const).map(v => (
-            <button key={v} onClick={() => switchView(v)}
-              style={{ background: view === v ? "var(--accent, #22d3ee)22" : "none", border: "none", color: view === v ? "var(--accent, #22d3ee)" : "var(--text-muted)", padding: "3px 10px", cursor: "pointer", fontSize: 10.5, fontFamily: "'JetBrains Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em" }}>{v}</button>
-          ))}
+        <div style={{ marginLeft: "auto", display: "inline-flex", gap: 8, alignItems: "center" }}>
+          <div style={{ display: "inline-flex", border: "1px solid var(--border, rgba(255,255,255,0.15))", borderRadius: 8, overflow: "hidden" }}>
+            {(["week", "month"] as const).map(v => (
+              <button key={v} className="mo-click" onClick={() => switchView(v)}
+                style={{ background: view === v ? "var(--accent, #22d3ee)22" : "none", border: "none", color: view === v ? "var(--accent, #22d3ee)" : "var(--text-muted)", padding: big ? "5px 14px" : "4px 11px", cursor: "pointer", fontSize: 10.5, fontFamily: "'JetBrains Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em" }}>{v}</button>
+            ))}
+          </div>
+          <button className="mo-click" onClick={big ? closeFull : openFull} aria-label={big ? "exit full screen" : "full screen"}
+            title={big ? "Exit full screen (Esc)" : "Full screen"}
+            style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: big ? 34 : 28, height: big ? 34 : 28, background: "var(--bg-card, rgba(255,255,255,0.02))", border: "1px solid var(--border, rgba(255,255,255,0.15))", color: "var(--text-secondary, #9ca3af)", borderRadius: 8, cursor: "pointer" }}>
+            {big ? (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3v4a1 1 0 0 1-1 1H3M21 8h-4a1 1 0 0 1-1-1V3M16 21v-4a1 1 0 0 1 1-1h4M3 16h4a1 1 0 0 1 1 1v4" /></svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" /></svg>
+            )}
+          </button>
         </div>
       </div>
 
       {view === "week" ? (
-        <div className="mo-cal-grid" style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
+        <div className="mo-cal-grid" style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 5 }}>
           {weekDays.map((d, di) => {
             const isToday = sameDay(d, now);
+            const isWeekend = di >= 5;
             const items = itemsOn(d);
             return (
               <div key={di}>
-                <div style={{ fontSize: 9, letterSpacing: "0.08em", textAlign: "center", marginBottom: 4, fontFamily: "'JetBrains Mono', monospace", color: isToday ? "var(--accent, #22d3ee)" : "var(--text-muted)" }}>
-                  {DAY_LABELS[di].toUpperCase()} {d.getDate()}
+                <div style={{ fontSize: big ? 10 : 9, letterSpacing: "0.08em", textAlign: "center", marginBottom: 5, fontFamily: "'JetBrains Mono', monospace", color: isToday ? "var(--accent, #22d3ee)" : "var(--text-muted)", fontWeight: isToday ? 700 : 400 }}>
+                  {DAY_LABELS[di].toUpperCase()} <span style={{ fontWeight: 700 }}>{d.getDate()}</span>
                 </div>
                 <div style={{
-                  minHeight: 120, borderRadius: 6, padding: 3,
-                  background: isToday ? "rgba(34,211,238,0.05)" : "rgba(255,255,255,0.02)",
-                  border: `1px solid ${isToday ? "rgba(34,211,238,0.25)" : "var(--border, rgba(255,255,255,0.06))"}`,
+                  minHeight: big ? 260 : 124, borderRadius: 8, padding: 5,
+                  background: isToday ? "rgba(34,211,238,0.06)" : isWeekend ? "rgba(255,255,255,0.015)" : "rgba(255,255,255,0.025)",
+                  border: `1px solid ${isToday ? "rgba(34,211,238,0.3)" : "var(--border, rgba(255,255,255,0.06))"}`,
+                  boxShadow: isToday ? "0 0 0 1px rgba(34,211,238,0.15) inset" : "none",
                 }}>
-                  {items.length === 0 && <div style={{ fontSize: 9, color: "var(--text-muted)", textAlign: "center", marginTop: 8 }}>—</div>}
-                  {items.map((it, i) => <ItemChip key={i} it={it} date={d} />)}
+                  {items.length === 0 && <div style={{ fontSize: 10, color: "var(--text-muted)", textAlign: "center", marginTop: 10, opacity: 0.6 }}>·</div>}
+                  {items.map((it, i) => <ItemChip key={i} it={it} date={d} big={big} />)}
                 </div>
               </div>
             );
           })}
         </div>
       ) : (
-        <MonthGrid anchor={monthAnchor} now={now} itemsOn={itemsOn} onPick={(d) => { sfx.play("blip"); setDetail(dt => dt && sameDay(dt, d) ? null : d); setPickedContent(null); }} detail={detail} />
+        <MonthGrid anchor={monthAnchor} now={now} itemsOn={itemsOn} labelFor={labelFor} colorFor={colorFor} big={big}
+          onPick={(d) => { sfx.play("blip"); setDetail(dt => dt && sameDay(dt, d) ? null : d); setPickedContent(null); }}
+          onOpen={(it, d) => { if (it.kind === "agent") openAgent(it.e); else { sfx.play("blip-artifact"); setPickedContent({ c: it.c, date: d }); } }}
+          detail={detail} />
       )}
 
       {/* selected-day detail (month view) */}
       {view === "month" && detail && (
-        <div style={{ marginTop: 12, borderTop: "1px solid var(--border, rgba(255,255,255,0.08))", paddingTop: 10 }}>
-          <div style={{ fontSize: 10, letterSpacing: "0.14em", color: "var(--text-muted)", textTransform: "uppercase", marginBottom: 6 }}>
+        <div style={{ marginTop: 14, borderTop: "1px solid var(--border, rgba(255,255,255,0.08))", paddingTop: 12 }}>
+          <div style={{ fontSize: 10, letterSpacing: "0.14em", color: "var(--text-muted)", textTransform: "uppercase", marginBottom: 8 }}>
             {DAY_LABELS[dayIdx(detail)]}, {MONTHS[detail.getMonth()]} {detail.getDate()}
           </div>
           {itemsOn(detail).length === 0 && <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Nothing scheduled.</div>}
           {itemsOn(detail).map((it, i) => (
             it.kind === "agent" ? (
-              <div key={i} className="mo-click" onClick={() => openAgent(it.e)} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, marginBottom: 6 }}>
+              <div key={i} className="mo-click" onClick={() => openAgent(it.e)} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, marginBottom: 7 }}>
                 <Dot color={it.e.color} />
                 <span style={{ fontWeight: 600 }}>{byKey.get(it.e.key)?.name ?? it.e.label}</span>
                 <span style={{ marginLeft: "auto", color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace", fontSize: 10.5 }}>{it.when}</span>
               </div>
             ) : (
-              <div key={i} className="mo-click" onClick={() => setPickedContent({ c: it.c, date: detail })} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, marginBottom: 6 }}>
+              <div key={i} className="mo-click" onClick={() => setPickedContent({ c: it.c, date: detail })} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, marginBottom: 7 }}>
                 <span style={{ width: 9, height: 9, borderRadius: 2, background: it.c.color, flexShrink: 0 }} />
                 <span style={{ fontWeight: 600 }}>{it.c.platform} post</span>
                 <span style={{ marginLeft: "auto", color: "var(--text-muted)", fontSize: 10.5 }}>{it.c.client}</span>
@@ -2026,11 +2063,11 @@ export function SchedulerCalendar({ agents, content = [], onSelect }: {
 
       {/* content-post detail popover */}
       {pickedContent && (
-        <div style={{ marginTop: 10, border: `1px solid ${pickedContent.c.color}55`, borderRadius: 8, padding: "10px 12px", background: "rgba(255,255,255,0.02)" }}>
+        <div style={{ marginTop: 12, border: `1px solid ${pickedContent.c.color}55`, borderRadius: 8, padding: "10px 12px", background: "rgba(255,255,255,0.02)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
             <span style={{ width: 9, height: 9, borderRadius: 2, background: pickedContent.c.color }} />
             <span style={{ fontWeight: 700, fontSize: 13 }}>{pickedContent.c.platform} post</span>
-            <button onClick={() => setPickedContent(null)} style={{ marginLeft: "auto", background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 14 }} aria-label="close">×</button>
+            <button className="mo-click" onClick={() => setPickedContent(null)} style={{ marginLeft: "auto", background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 14 }} aria-label="close">×</button>
           </div>
           <div style={{ fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.5 }}>
             {pickedContent.c.client} · {DAY_LABELS[dayIdx(pickedContent.date)]} {MONTHS[pickedContent.date.getMonth()]} {pickedContent.date.getDate()}
@@ -2040,56 +2077,128 @@ export function SchedulerCalendar({ agents, content = [], onSelect }: {
       )}
 
       {/* legend */}
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 14, paddingTop: 10, borderTop: "1px solid var(--border, rgba(255,255,255,0.05))" }}>
         {entries.map(e => (
           <span key={e.key} className="mo-click" onClick={() => openAgent(e)}
-            style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 10, color: "var(--text-secondary)", fontFamily: "'JetBrains Mono', monospace" }}>
-            <span style={{ width: 8, height: 8, borderRadius: 2, background: e.color, flexShrink: 0 }} />
-            {e.label}
+            style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 10, color: "var(--text-secondary)", fontFamily: "'JetBrains Mono', monospace" }}>
+            <span style={{ width: 8, height: 8, borderRadius: "50%", background: e.color, flexShrink: 0, boxShadow: `0 0 5px ${e.color}88` }} />
+            {e.label}{e.band ? <span style={{ color: "var(--text-muted)", opacity: 0.7 }}> ·band</span> : null}
           </span>
         ))}
         {content.map((c, i) => (
-          <span key={`c-${i}`} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 10, color: "var(--text-secondary)", fontFamily: "'JetBrains Mono', monospace" }}>
-            <span style={{ width: 8, height: 8, borderRadius: 2, background: c.color, flexShrink: 0, opacity: 0.8, border: `1px dashed ${c.color}` }} />
+          <span key={`c-${i}`} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 10, color: "var(--text-secondary)", fontFamily: "'JetBrains Mono', monospace" }}>
+            <span style={{ width: 8, height: 8, borderRadius: 1, background: `${c.color}66`, flexShrink: 0, border: `1px dashed ${c.color}` }} />
             {c.platform}
           </span>
         ))}
       </div>
     </div>
   );
+
+  const overlay = (
+    <div style={{ position: "fixed", inset: 0, zIndex: 240 }}>
+      <div onClick={closeFull} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.72)", backdropFilter: "blur(3px)" }} />
+      <div style={{
+        position: "absolute", inset: 0, display: "flex", flexDirection: "column",
+        padding: "max(env(safe-area-inset-top), 14px) max(env(safe-area-inset-right), 14px) max(env(safe-area-inset-bottom), 14px) max(env(safe-area-inset-left), 14px)",
+      }}>
+        <div style={{
+          margin: "auto", width: "100%", maxWidth: 1100, maxHeight: "100%",
+          background: "var(--bg-secondary, #0a0d14)", border: "1px solid var(--accent, #22d3ee)44",
+          borderRadius: 14, boxShadow: "0 24px 80px rgba(0,0,0,0.6)",
+          display: "flex", flexDirection: "column", overflow: "hidden",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "13px 18px", borderBottom: "1px solid var(--border, rgba(255,255,255,0.08))" }}>
+            <Dot color="var(--accent, #22d3ee)" pulse />
+            <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.1em", fontFamily: "'JetBrains Mono', monospace" }}>SCHEDULER</span>
+            <button className="mo-click" onClick={closeFull} aria-label="close" style={{ marginLeft: "auto", background: "none", border: "1px solid var(--border, rgba(255,255,255,0.15))", color: "var(--text-secondary, #9ca3af)", borderRadius: 8, padding: "7px 14px", cursor: "pointer", fontSize: 12 }}>Close</button>
+          </div>
+          <div style={{ overflow: "auto", WebkitOverflowScrolling: "touch", padding: "18px 20px", flex: 1 }}>
+            {body(true)}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <>
+      {body(false)}
+      {fullscreen && mounted && createPortal(overlay, document.body)}
+    </>
+  );
 }
 
-// Month grid for the scheduler: 6 rows x 7 days, colored dots per scheduled item.
-function MonthGrid({ anchor, now, itemsOn, onPick, detail }: {
-  anchor: Date; now: Date; itemsOn: (d: Date) => DayItem[]; onPick: (d: Date) => void; detail: Date | null;
+// Month grid for the scheduler: 6 rows x 7 days. Compact mode shows colored
+// dots + a "+N" overflow count; fullscreen (`big`) shows titled entry pills.
+function MonthGrid({ anchor, now, itemsOn, labelFor, colorFor, onPick, onOpen, detail, big }: {
+  anchor: Date; now: Date;
+  itemsOn: (d: Date) => DayItem[];
+  labelFor: (it: DayItem) => string;
+  colorFor: (it: DayItem) => string;
+  onPick: (d: Date) => void;
+  onOpen: (it: DayItem, d: Date) => void;
+  detail: Date | null; big: boolean;
 }) {
   const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
   const gridStart = addDays(first, -dayIdx(first));
   const cells = Array.from({ length: 42 }, (_, i) => addDays(gridStart, i));
+  const maxPills = big ? 4 : 0; // compact mode uses dots, not pills
+  const maxDots = 5;
   return (
-    <div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 3 }}>
+    <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: big ? 5 : 3, minWidth: big ? 0 : 300 }}>
         {DAY_LABELS.map(dl => (
-          <div key={dl} style={{ fontSize: 8.5, letterSpacing: "0.06em", textAlign: "center", color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace", marginBottom: 2 }}>{dl.toUpperCase()}</div>
+          <div key={dl} style={{ fontSize: big ? 10 : 8.5, letterSpacing: "0.08em", textAlign: "center", color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace", marginBottom: 4, paddingBottom: 4, borderBottom: "1px solid var(--border, rgba(255,255,255,0.05))" }}>{dl.toUpperCase()}</div>
         ))}
         {cells.map((d, i) => {
           const inMonth = d.getMonth() === anchor.getMonth();
           const isToday = sameDay(d, now);
           const isSel = detail && sameDay(detail, d);
           const items = itemsOn(d);
-          const dots = [...new Set(items.map(it => it.kind === "agent" ? it.e.color : it.c.color))].slice(0, 5);
+          const dots = [...new Set(items.map(colorFor))].slice(0, maxDots);
           return (
             <div key={i} className="mo-click" onClick={() => onPick(d)}
               style={{
-                minHeight: 46, borderRadius: 5, padding: "2px 3px",
-                opacity: inMonth ? 1 : 0.35,
-                background: isSel ? "rgba(34,211,238,0.12)" : isToday ? "rgba(34,211,238,0.05)" : "rgba(255,255,255,0.02)",
-                border: `1px solid ${isSel ? "rgba(34,211,238,0.5)" : isToday ? "rgba(34,211,238,0.25)" : "var(--border, rgba(255,255,255,0.06))"}`,
+                minHeight: big ? 118 : 52, borderRadius: 7, padding: big ? "5px 6px" : "3px 4px",
+                display: "flex", flexDirection: "column",
+                opacity: inMonth ? 1 : 0.32,
+                background: isSel ? "rgba(34,211,238,0.14)" : isToday ? "rgba(34,211,238,0.06)" : inMonth ? "rgba(255,255,255,0.025)" : "rgba(255,255,255,0.01)",
+                border: `1px solid ${isSel ? "rgba(34,211,238,0.55)" : isToday ? "rgba(34,211,238,0.3)" : "var(--border, rgba(255,255,255,0.06))"}`,
+                boxShadow: isToday && !isSel ? "0 0 0 1px rgba(34,211,238,0.18) inset" : "none",
               }}>
-              <div style={{ fontSize: 9.5, textAlign: "right", color: isToday ? "var(--accent, #22d3ee)" : "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace" }}>{d.getDate()}</div>
-              <div style={{ display: "flex", gap: 2, flexWrap: "wrap", marginTop: 2 }}>
-                {dots.map((c, di) => <span key={di} style={{ width: 5, height: 5, borderRadius: "50%", background: c }} />)}
+              <div style={{
+                fontSize: big ? 12 : 10, textAlign: big ? "left" : "right", lineHeight: 1.1,
+                color: isToday ? "var(--accent, #22d3ee)" : inMonth ? "var(--text-secondary)" : "var(--text-muted)",
+                fontFamily: "'JetBrains Mono', monospace", fontWeight: isToday ? 700 : 500,
+                display: "flex", justifyContent: big ? "flex-start" : "flex-end", alignItems: "center", gap: 5,
+              }}>
+                {big && isToday && <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 20, height: 20, borderRadius: "50%", background: "var(--accent, #22d3ee)", color: "#04121a", fontWeight: 700 }}>{d.getDate()}</span>}
+                {!(big && isToday) && d.getDate()}
               </div>
+
+              {big ? (
+                <div style={{ marginTop: 5, display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
+                  {items.slice(0, maxPills).map((it, k) => {
+                    const color = colorFor(it);
+                    return (
+                      <div key={k} className="mo-click mo-cal-chip" onClick={(ev) => { ev.stopPropagation(); onOpen(it, d); }} title={labelFor(it)}
+                        style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10, padding: "2px 6px", borderRadius: 5, minWidth: 0, background: `${color}1c`, borderLeft: it.kind === "agent" ? `3px solid ${color}` : "none", border: it.kind === "content" ? `1px dashed ${color}66` : undefined }}>
+                        <span style={{ width: 5, height: 5, borderRadius: it.kind === "agent" ? "50%" : 1, background: color, flexShrink: 0 }} />
+                        <span style={{ color: "var(--text-secondary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>{labelFor(it)}</span>
+                      </div>
+                    );
+                  })}
+                  {items.length > maxPills && (
+                    <div style={{ fontSize: 9.5, color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace", paddingLeft: 2 }}>+{items.length - maxPills} more</div>
+                  )}
+                </div>
+              ) : (
+                <div style={{ display: "flex", gap: 3, flexWrap: "wrap", marginTop: "auto", alignItems: "center" }}>
+                  {dots.map((c, di) => <span key={di} style={{ width: 5, height: 5, borderRadius: "50%", background: c, boxShadow: `0 0 4px ${c}88` }} />)}
+                  {items.length > dots.length && <span style={{ fontSize: 8, color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace" }}>+{items.length - dots.length}</span>}
+                </div>
+              )}
             </div>
           );
         })}
@@ -2130,17 +2239,30 @@ function SystemPanel({ systemId, data, onSelect, onClose }: {
         ]} />
         <Section title={`Published (last ${windowDays} days)`} defaultOpen>
           {publishItems.map((p, i) => (
-            <div key={i} style={{ fontSize: 12.5, marginBottom: 9, lineHeight: 1.5, display: "flex", gap: 8 }}>
-              <span style={{ color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace", fontSize: 10, flexShrink: 0, marginTop: 1 }}>{shortDate(p.date)}</span>
-              {p.url ? (
-                <a href={p.url} target="_blank" rel="noreferrer" style={{ color: sys.color, textDecoration: "underline" }}>
-                  {tightLine(p.title, 110)} &#8599;
-                </a>
-              ) : (
-                <span style={{ color: "var(--text-secondary)" }}>
-                  {tightLine(p.title, 110)} <span style={{ color: "var(--text-muted)", fontSize: 10 }}>({p.note ?? "no link logged"})</span>
-                </span>
-              )}
+            <div key={i} style={{ fontSize: 12.5, marginBottom: 11, lineHeight: 1.5, display: "flex", gap: 8 }}>
+              <span style={{ color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace", fontSize: 10, flexShrink: 0, marginTop: 2 }}>{shortDate(p.date)}</span>
+              <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 3 }}>
+                {p.client && (
+                  <span style={{
+                    alignSelf: "flex-start", display: "inline-flex", alignItems: "center", gap: 5,
+                    fontSize: 9.5, fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.04em",
+                    color: sys.color, background: `${sys.color}18`, border: `1px solid ${sys.color}44`,
+                    borderRadius: 5, padding: "1px 7px", textTransform: "uppercase", whiteSpace: "nowrap",
+                  }}>
+                    <span style={{ width: 5, height: 5, borderRadius: "50%", background: sys.color, flexShrink: 0 }} />
+                    {p.client}
+                  </span>
+                )}
+                {p.url ? (
+                  <a href={p.url} target="_blank" rel="noreferrer" style={{ color: sys.color, textDecoration: "underline" }}>
+                    {tightLine(p.title, 110)} &#8599;
+                  </a>
+                ) : (
+                  <span style={{ color: "var(--text-secondary)" }}>
+                    {tightLine(p.title, 110)} <span style={{ color: "var(--text-muted)", fontSize: 10 }}>({p.note ?? "no link logged"})</span>
+                  </span>
+                )}
+              </div>
             </div>
           ))}
           {publishItems.length === 0 && (

@@ -376,7 +376,22 @@ const ghlContactsUrl = (loc: string) =>
 // vault text (or, for Jackson, when a real WP post id is logged).
 const LIVE_HOSTS = ["jacksonroofingco.com", "renewalhealth.life"];
 
-interface PublishItem { date: string; title: string; url: string | null; note: string | null }
+interface PublishItem { date: string; title: string; url: string | null; note: string | null; client: string | null }
+
+// A human client/company label derived from a live post URL's host. Known Wing
+// clients map to their brand name; any other host falls back to its registrable
+// domain (e.g. "example.com") so a new client is still legible before it's named.
+function clientFromUrl(url: string | null): string | null {
+  if (!url) return null;
+  let host: string;
+  try { host = new URL(url).hostname.toLowerCase().replace(/^www\./, ""); }
+  catch { return null; }
+  if (host.includes("jacksonroofingco.com")) return "Jackson Roofing";
+  if (host.includes("renewalhealth.life") || host.includes("renewalhealth")) return "Renewal Health";
+  // Registrable domain: last two labels (good enough for the common .com case).
+  const parts = host.split(".").filter(Boolean);
+  return parts.length >= 2 ? parts.slice(-2).join(".") : host;
+}
 
 // Pull live post URLs out of a blob of vault text: only whitelisted hosts,
 // never wp-admin or preview links, never localhost.
@@ -446,7 +461,7 @@ function parsePublishes(feed: FeedEntry[], healthRaw: string | null): {
         if (seen.has(url)) continue;
         seen.add(url);
         // Clean title: slug-derived for noise lines, the log title otherwise.
-        items.push({ date: e.date, title: noise ? titleFromUrl(url) : clean(redact(e.title)), url, note: null });
+        items.push({ date: e.date, title: noise ? titleFromUrl(url) : clean(redact(e.title)), url, note: null, client: clientFromUrl(url) });
       }
       continue;
     }
@@ -464,12 +479,12 @@ function parsePublishes(feed: FeedEntry[], healthRaw: string | null): {
           const url = `https://jacksonroofingco.com/?p=${id}`;
           if (seen.has(url)) continue;
           seen.add(url);
-          items.push({ date: e.date, title: `${clean(redact(e.title))} (post ${id})`, url, note: null });
+          items.push({ date: e.date, title: `${clean(redact(e.title))} (post ${id})`, url, note: null, client: clientFromUrl(url) });
         }
         continue;
       }
     }
-    items.push({ date: e.date, title: clean(redact(e.title)), url: null, note: "no link logged" });
+    items.push({ date: e.date, title: clean(redact(e.title)), url: null, note: "no link logged", client: null });
   }
 
   // Health board: "- Title — https://..." under "Published since last run".
@@ -484,7 +499,7 @@ function parsePublishes(feed: FeedEntry[], healthRaw: string | null): {
             const url = m[2].replace(/[.,;:]+$/, "");
             if (LIVE_HOSTS.some((h) => url.includes(h)) && !seen.has(url)) {
               seen.add(url);
-              items.push({ date: runDate, title: clean(redact(m[1])), url, note: null });
+              items.push({ date: runDate, title: clean(redact(m[1])), url, note: null, client: clientFromUrl(url) });
             }
           }
         }

@@ -1846,6 +1846,9 @@ const CAL_ENTRIES: CalEntry[] = [
   { key: "watchdog", label: "Da Boss", color: "#f87171", days: ALL_DAYS, band: { start: "06:00", end: "22:00", every: "every 2h", everyMin: 120 } },
 ];
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+// Green used across the calendar to mark an entry whose scheduled time is in the
+// past — i.e. it already ran this week. Upcoming entries stay neutral.
+const CAL_RAN_GREEN = "#4ade80";
 
 function hm(t: string): number {
   const [h, m] = t.split(":").map(Number);
@@ -1921,6 +1924,15 @@ export function SchedulerCalendar({ agents, content = [], onSelect }: {
     return out.sort((a, b) => a.sortMin - b.sortMin);
   };
 
+  // True when this item's scheduled fire time on `date` is already in the past
+  // (relative to now) — meaning the agent/content already ran. Uses sortMin,
+  // which is the fire time in minutes-from-midnight (band entries use start).
+  const hasRun = (it: DayItem, date: Date): boolean => {
+    const ran = new Date(date);
+    ran.setHours(0, it.sortMin, 0, 0);
+    return ran.getTime() < now.getTime();
+  };
+
   const openAgent = (e: CalEntry) => {
     sfx.play("blip");
     onSelect(e.key === "watchdog" ? { type: "watchdog" } : { type: "agent", key: e.key });
@@ -1949,25 +1961,24 @@ export function SchedulerCalendar({ agents, content = [], onSelect }: {
   const ItemChip = ({ it, date, big = false }: { it: DayItem; date: Date; big?: boolean }) => {
     const name = labelFor(it);
     const timeTxt = it.kind === "agent" ? (it.e.time ? fmtClock(it.e.time) : it.e.band!.every) : "post";
-    const isBand = it.kind === "agent" && !!it.e.band;
-    const color = colorFor(it);
+    const ran = hasRun(it, date);
+    // Dot carries the meaning: type color for upcoming, green once it has run.
+    const dotColor = ran ? CAL_RAN_GREEN : colorFor(it);
     const onClick = it.kind === "agent"
       ? () => openAgent(it.e)
       : () => { sfx.play("blip-artifact"); setPickedContent({ c: it.c, date }); };
     return (
-      <div className="mo-click mo-cal-chip" onClick={onClick} title={`${name} — ${it.when}`}
+      <div className="mo-click mo-cal-chip" onClick={onClick} title={`${name} — ${it.when}${ran ? " (ran)" : ""}`}
         style={{
-          display: "flex", alignItems: "center", gap: 6, fontSize: big ? 11.5 : 10.5, marginBottom: 4,
-          padding: big ? "3px 8px" : "2px 6px", borderRadius: 6, minWidth: 0,
-          background: isBand
-            ? `linear-gradient(90deg, ${color}22, ${color}0c)`
-            : `${color}1c`,
-          borderLeft: it.kind === "agent" ? `3px solid ${color}` : "none",
-          border: it.kind === "content" ? `1px dashed ${color}66` : undefined,
+          display: "flex", alignItems: "center", gap: 7, fontSize: big ? 11.5 : 10.5, marginBottom: 4,
+          padding: big ? "3px 8px" : "3px 7px", borderRadius: 6, minWidth: 0,
+          background: "var(--bg-card, rgba(255,255,255,0.03))",
+          border: "1px solid var(--border, rgba(255,255,255,0.08))",
+          borderLeft: ran ? `2px solid ${CAL_RAN_GREEN}` : "1px solid var(--border, rgba(255,255,255,0.08))",
         }}>
-        <span style={{ width: 6, height: 6, borderRadius: it.kind === "agent" ? "50%" : 1, background: color, flexShrink: 0, boxShadow: `0 0 5px ${color}88` }} />
+        <span style={{ width: 6, height: 6, borderRadius: it.kind === "agent" ? "50%" : 2, background: dotColor, flexShrink: 0 }} />
         <span style={{ color: "var(--text-secondary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>{name}</span>
-        <span style={{ marginLeft: "auto", color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace", fontSize: big ? 9.5 : 8.5, flexShrink: 0, whiteSpace: "nowrap" }}>{timeTxt}</span>
+        <span style={{ marginLeft: "auto", color: ran ? CAL_RAN_GREEN : "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace", fontSize: big ? 9.5 : 8.5, flexShrink: 0, whiteSpace: "nowrap" }}>{ran ? `✓ ${timeTxt}` : timeTxt}</span>
       </div>
     );
   };
@@ -2006,23 +2017,30 @@ export function SchedulerCalendar({ agents, content = [], onSelect }: {
       </div>
 
       {view === "week" ? (
-        <div className="mo-cal-grid" style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 5 }}>
+        <div className="mo-cal-grid" style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: big ? 6 : 4 }}>
           {weekDays.map((d, di) => {
             const isToday = sameDay(d, now);
-            const isWeekend = di >= 5;
             const items = itemsOn(d);
             return (
               <div key={di}>
-                <div style={{ fontSize: big ? 10 : 9, letterSpacing: "0.08em", textAlign: "center", marginBottom: 5, fontFamily: "'JetBrains Mono', monospace", color: isToday ? "var(--accent, #22d3ee)" : "var(--text-muted)", fontWeight: isToday ? 700 : 400 }}>
-                  {DAY_LABELS[di].toUpperCase()} <span style={{ fontWeight: 700 }}>{d.getDate()}</span>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, marginBottom: 6 }}>
+                  <span style={{ fontSize: big ? 9.5 : 8.5, letterSpacing: "0.1em", fontFamily: "'JetBrains Mono', monospace", color: "var(--text-muted)" }}>
+                    {DAY_LABELS[di].toUpperCase()}
+                  </span>
+                  <span style={{
+                    display: "inline-flex", alignItems: "center", justifyContent: "center",
+                    width: big ? 26 : 22, height: big ? 26 : 22, borderRadius: "50%",
+                    background: isToday ? "var(--accent, #22d3ee)" : "transparent",
+                    color: isToday ? "#04121a" : "var(--text-secondary)",
+                    fontWeight: isToday ? 700 : 500, fontSize: big ? 13 : 11, fontFamily: "'JetBrains Mono', monospace",
+                  }}>{d.getDate()}</span>
                 </div>
                 <div style={{
                   minHeight: big ? 260 : 124, borderRadius: 8, padding: 5,
-                  background: isToday ? "rgba(34,211,238,0.06)" : isWeekend ? "rgba(255,255,255,0.015)" : "rgba(255,255,255,0.025)",
-                  border: `1px solid ${isToday ? "rgba(34,211,238,0.3)" : "var(--border, rgba(255,255,255,0.06))"}`,
-                  boxShadow: isToday ? "0 0 0 1px rgba(34,211,238,0.15) inset" : "none",
+                  background: "var(--bg-card, rgba(255,255,255,0.02))",
+                  border: "1px solid var(--border, rgba(255,255,255,0.06))",
                 }}>
-                  {items.length === 0 && <div style={{ fontSize: 10, color: "var(--text-muted)", textAlign: "center", marginTop: 10, opacity: 0.6 }}>·</div>}
+                  {items.length === 0 && <div style={{ fontSize: 10, color: "var(--text-muted)", textAlign: "center", marginTop: 10, opacity: 0.5 }}>·</div>}
                   {items.map((it, i) => <ItemChip key={i} it={it} date={d} big={big} />)}
                 </div>
               </div>
@@ -2030,7 +2048,7 @@ export function SchedulerCalendar({ agents, content = [], onSelect }: {
           })}
         </div>
       ) : (
-        <MonthGrid anchor={monthAnchor} now={now} itemsOn={itemsOn} labelFor={labelFor} colorFor={colorFor} big={big}
+        <MonthGrid anchor={monthAnchor} now={now} itemsOn={itemsOn} labelFor={labelFor} colorFor={colorFor} hasRun={hasRun} big={big}
           onPick={(d) => { sfx.play("blip"); setDetail(dt => dt && sameDay(dt, d) ? null : d); setPickedContent(null); }}
           onOpen={(it, d) => { if (it.kind === "agent") openAgent(it.e); else { sfx.play("blip-artifact"); setPickedContent({ c: it.c, date: d }); } }}
           detail={detail} />
@@ -2043,27 +2061,29 @@ export function SchedulerCalendar({ agents, content = [], onSelect }: {
             {DAY_LABELS[dayIdx(detail)]}, {MONTHS[detail.getMonth()]} {detail.getDate()}
           </div>
           {itemsOn(detail).length === 0 && <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Nothing scheduled.</div>}
-          {itemsOn(detail).map((it, i) => (
-            it.kind === "agent" ? (
+          {itemsOn(detail).map((it, i) => {
+            const ran = hasRun(it, detail);
+            const dotColor = ran ? CAL_RAN_GREEN : colorFor(it);
+            return it.kind === "agent" ? (
               <div key={i} className="mo-click" onClick={() => openAgent(it.e)} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, marginBottom: 7 }}>
-                <Dot color={it.e.color} />
+                <span style={{ width: 9, height: 9, borderRadius: "50%", background: dotColor, flexShrink: 0 }} />
                 <span style={{ fontWeight: 600 }}>{byKey.get(it.e.key)?.name ?? it.e.label}</span>
-                <span style={{ marginLeft: "auto", color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace", fontSize: 10.5 }}>{it.when}</span>
+                <span style={{ marginLeft: "auto", color: ran ? CAL_RAN_GREEN : "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace", fontSize: 10.5 }}>{ran ? `✓ ${it.when}` : it.when}</span>
               </div>
             ) : (
               <div key={i} className="mo-click" onClick={() => setPickedContent({ c: it.c, date: detail })} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, marginBottom: 7 }}>
-                <span style={{ width: 9, height: 9, borderRadius: 2, background: it.c.color, flexShrink: 0 }} />
+                <span style={{ width: 9, height: 9, borderRadius: 2, background: dotColor, flexShrink: 0 }} />
                 <span style={{ fontWeight: 600 }}>{it.c.platform} post</span>
                 <span style={{ marginLeft: "auto", color: "var(--text-muted)", fontSize: 10.5 }}>{it.c.client}</span>
               </div>
-            )
-          ))}
+            );
+          })}
         </div>
       )}
 
       {/* content-post detail popover */}
       {pickedContent && (
-        <div style={{ marginTop: 12, border: `1px solid ${pickedContent.c.color}55`, borderRadius: 8, padding: "10px 12px", background: "rgba(255,255,255,0.02)" }}>
+        <div style={{ marginTop: 12, border: "1px solid var(--border, rgba(255,255,255,0.1))", borderRadius: 8, padding: "10px 12px", background: "var(--bg-card, rgba(255,255,255,0.02))" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
             <span style={{ width: 9, height: 9, borderRadius: 2, background: pickedContent.c.color }} />
             <span style={{ fontWeight: 700, fontSize: 13 }}>{pickedContent.c.platform} post</span>
@@ -2078,16 +2098,20 @@ export function SchedulerCalendar({ agents, content = [], onSelect }: {
 
       {/* legend */}
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 14, paddingTop: 10, borderTop: "1px solid var(--border, rgba(255,255,255,0.05))" }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 10, color: "var(--text-secondary)", fontFamily: "'JetBrains Mono', monospace" }}>
+          <span style={{ width: 8, height: 8, borderRadius: "50%", background: CAL_RAN_GREEN, flexShrink: 0 }} />
+          ran
+        </span>
         {entries.map(e => (
           <span key={e.key} className="mo-click" onClick={() => openAgent(e)}
             style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 10, color: "var(--text-secondary)", fontFamily: "'JetBrains Mono', monospace" }}>
-            <span style={{ width: 8, height: 8, borderRadius: "50%", background: e.color, flexShrink: 0, boxShadow: `0 0 5px ${e.color}88` }} />
-            {e.label}{e.band ? <span style={{ color: "var(--text-muted)", opacity: 0.7 }}> ·band</span> : null}
+            <span style={{ width: 8, height: 8, borderRadius: "50%", background: e.color, flexShrink: 0 }} />
+            {e.label}
           </span>
         ))}
         {content.map((c, i) => (
           <span key={`c-${i}`} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 10, color: "var(--text-secondary)", fontFamily: "'JetBrains Mono', monospace" }}>
-            <span style={{ width: 8, height: 8, borderRadius: 1, background: `${c.color}66`, flexShrink: 0, border: `1px dashed ${c.color}` }} />
+            <span style={{ width: 8, height: 8, borderRadius: 2, background: c.color, flexShrink: 0 }} />
             {c.platform}
           </span>
         ))}
@@ -2104,12 +2128,12 @@ export function SchedulerCalendar({ agents, content = [], onSelect }: {
       }}>
         <div style={{
           margin: "auto", width: "100%", maxWidth: 1100, maxHeight: "100%",
-          background: "var(--bg-secondary, #0a0d14)", border: "1px solid var(--accent, #22d3ee)44",
+          background: "var(--bg-secondary, #0a0d14)", border: "1px solid var(--border, rgba(255,255,255,0.12))",
           borderRadius: 14, boxShadow: "0 24px 80px rgba(0,0,0,0.6)",
           display: "flex", flexDirection: "column", overflow: "hidden",
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "13px 18px", borderBottom: "1px solid var(--border, rgba(255,255,255,0.08))" }}>
-            <Dot color="var(--accent, #22d3ee)" pulse />
+            <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--accent, #22d3ee)", flexShrink: 0 }} />
             <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.1em", fontFamily: "'JetBrains Mono', monospace" }}>SCHEDULER</span>
             <button className="mo-click" onClick={closeFull} aria-label="close" style={{ marginLeft: "auto", background: "none", border: "1px solid var(--border, rgba(255,255,255,0.15))", color: "var(--text-secondary, #9ca3af)", borderRadius: 8, padding: "7px 14px", cursor: "pointer", fontSize: 12 }}>Close</button>
           </div>
@@ -2131,11 +2155,12 @@ export function SchedulerCalendar({ agents, content = [], onSelect }: {
 
 // Month grid for the scheduler: 6 rows x 7 days. Compact mode shows colored
 // dots + a "+N" overflow count; fullscreen (`big`) shows titled entry pills.
-function MonthGrid({ anchor, now, itemsOn, labelFor, colorFor, onPick, onOpen, detail, big }: {
+function MonthGrid({ anchor, now, itemsOn, labelFor, colorFor, hasRun, onPick, onOpen, detail, big }: {
   anchor: Date; now: Date;
   itemsOn: (d: Date) => DayItem[];
   labelFor: (it: DayItem) => string;
   colorFor: (it: DayItem) => string;
+  hasRun: (it: DayItem, d: Date) => boolean;
   onPick: (d: Date) => void;
   onOpen: (it: DayItem, d: Date) => void;
   detail: Date | null; big: boolean;
@@ -2156,35 +2181,40 @@ function MonthGrid({ anchor, now, itemsOn, labelFor, colorFor, onPick, onOpen, d
           const isToday = sameDay(d, now);
           const isSel = detail && sameDay(detail, d);
           const items = itemsOn(d);
-          const dots = [...new Set(items.map(colorFor))].slice(0, maxDots);
+          // Dot color per item: green once it has run, otherwise its type color.
+          const dots = [...new Set(items.map(it => hasRun(it, d) ? CAL_RAN_GREEN : colorFor(it)))].slice(0, maxDots);
           return (
             <div key={i} className="mo-click" onClick={() => onPick(d)}
               style={{
                 minHeight: big ? 118 : 52, borderRadius: 7, padding: big ? "5px 6px" : "3px 4px",
                 display: "flex", flexDirection: "column",
                 opacity: inMonth ? 1 : 0.32,
-                background: isSel ? "rgba(34,211,238,0.14)" : isToday ? "rgba(34,211,238,0.06)" : inMonth ? "rgba(255,255,255,0.025)" : "rgba(255,255,255,0.01)",
-                border: `1px solid ${isSel ? "rgba(34,211,238,0.55)" : isToday ? "rgba(34,211,238,0.3)" : "var(--border, rgba(255,255,255,0.06))"}`,
-                boxShadow: isToday && !isSel ? "0 0 0 1px rgba(34,211,238,0.18) inset" : "none",
+                background: isSel ? "rgba(34,211,238,0.10)" : "var(--bg-card, rgba(255,255,255,0.02))",
+                border: `1px solid ${isSel ? "rgba(34,211,238,0.5)" : "var(--border, rgba(255,255,255,0.06))"}`,
               }}>
               <div style={{
-                fontSize: big ? 12 : 10, textAlign: big ? "left" : "right", lineHeight: 1.1,
-                color: isToday ? "var(--accent, #22d3ee)" : inMonth ? "var(--text-secondary)" : "var(--text-muted)",
-                fontFamily: "'JetBrains Mono', monospace", fontWeight: isToday ? 700 : 500,
+                fontSize: big ? 12 : 10, lineHeight: 1.1,
+                fontFamily: "'JetBrains Mono', monospace",
                 display: "flex", justifyContent: big ? "flex-start" : "flex-end", alignItems: "center", gap: 5,
               }}>
-                {big && isToday && <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 20, height: 20, borderRadius: "50%", background: "var(--accent, #22d3ee)", color: "#04121a", fontWeight: 700 }}>{d.getDate()}</span>}
-                {!(big && isToday) && d.getDate()}
+                <span style={{
+                  display: "inline-flex", alignItems: "center", justifyContent: "center",
+                  minWidth: big ? 20 : 17, height: big ? 20 : 17, borderRadius: "50%",
+                  background: isToday ? "var(--accent, #22d3ee)" : "transparent",
+                  color: isToday ? "#04121a" : inMonth ? "var(--text-secondary)" : "var(--text-muted)",
+                  fontWeight: isToday ? 700 : 500,
+                }}>{d.getDate()}</span>
               </div>
 
               {big ? (
                 <div style={{ marginTop: 5, display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
                   {items.slice(0, maxPills).map((it, k) => {
-                    const color = colorFor(it);
+                    const ran = hasRun(it, d);
+                    const dotColor = ran ? CAL_RAN_GREEN : colorFor(it);
                     return (
-                      <div key={k} className="mo-click mo-cal-chip" onClick={(ev) => { ev.stopPropagation(); onOpen(it, d); }} title={labelFor(it)}
-                        style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10, padding: "2px 6px", borderRadius: 5, minWidth: 0, background: `${color}1c`, borderLeft: it.kind === "agent" ? `3px solid ${color}` : "none", border: it.kind === "content" ? `1px dashed ${color}66` : undefined }}>
-                        <span style={{ width: 5, height: 5, borderRadius: it.kind === "agent" ? "50%" : 1, background: color, flexShrink: 0 }} />
+                      <div key={k} className="mo-click mo-cal-chip" onClick={(ev) => { ev.stopPropagation(); onOpen(it, d); }} title={labelFor(it) + (ran ? " (ran)" : "")}
+                        style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10, padding: "2px 6px", borderRadius: 5, minWidth: 0, background: "var(--bg-card, rgba(255,255,255,0.03))", border: "1px solid var(--border, rgba(255,255,255,0.08))", borderLeft: ran ? `2px solid ${CAL_RAN_GREEN}` : "1px solid var(--border, rgba(255,255,255,0.08))" }}>
+                        <span style={{ width: 5, height: 5, borderRadius: it.kind === "agent" ? "50%" : 2, background: dotColor, flexShrink: 0 }} />
                         <span style={{ color: "var(--text-secondary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>{labelFor(it)}</span>
                       </div>
                     );
@@ -2195,7 +2225,7 @@ function MonthGrid({ anchor, now, itemsOn, labelFor, colorFor, onPick, onOpen, d
                 </div>
               ) : (
                 <div style={{ display: "flex", gap: 3, flexWrap: "wrap", marginTop: "auto", alignItems: "center" }}>
-                  {dots.map((c, di) => <span key={di} style={{ width: 5, height: 5, borderRadius: "50%", background: c, boxShadow: `0 0 4px ${c}88` }} />)}
+                  {dots.map((c, di) => <span key={di} style={{ width: 5, height: 5, borderRadius: "50%", background: c }} />)}
                   {items.length > dots.length && <span style={{ fontSize: 8, color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace" }}>+{items.length - dots.length}</span>}
                 </div>
               )}

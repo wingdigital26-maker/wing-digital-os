@@ -1,0 +1,21 @@
+# Cloud watchdog trigger. Vercel Hobby caps crons at once/day, so GitHub
+# Actions fires the check every 30 minutes instead (same pattern as the
+# outreach cloud sender). The route itself lives in the Vercel deploy.
+name: watchdog
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Ping cloud watchdog
+        run: |
+          code=$(curl -s -o /tmp/out -w '%{http_code}' \
+            -H "x-heartbeat-key: ${{ secrets.HEARTBEAT_KEY }}" \
+            https://wing-digital-os.vercel.app/api/cron/watchdog)
+          cat /tmp/out
+          [ "$code" = "200" ] || { echo "watchdog returned $code"; exit 1; }

@@ -3,7 +3,7 @@
 //   - /api/*        network only (never cache authed API data)
 //   - everything    network-first; cache is only an OFFLINE fallback
 // Bump CACHE_VERSION on any strategy change to purge old caches.
-const CACHE_VERSION = "wing-os-v3";
+const CACHE_VERSION = "wing-os-v4";
 const OFFLINE_ASSETS = ["/manifest.json", "/icon-192.png", "/icon-512.png"];
 
 self.addEventListener("install", (event) => {
@@ -48,5 +48,34 @@ self.addEventListener("fetch", (event) => {
       .catch(() =>
         caches.match(event.request).then((hit) => hit || caches.match("/manifest.json"))
       )
+  );
+});
+
+// ── Web push (24/7 watchdog alerts) ──────────────────────────────────────────
+self.addEventListener("push", (event) => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; } catch { data = { title: "Wing OS" }; }
+  const title = data.title || "Wing OS";
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body: data.body || "",
+      icon: "/icon-192.png",
+      badge: "/icon-192.png",
+      tag: data.tag || "wing-os",
+      data: { url: data.url || "/mission" },
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || "/mission";
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((wins) => {
+      for (const w of wins) {
+        if (new URL(w.url).origin === self.location.origin) { w.focus(); w.navigate(url); return; }
+      }
+      return clients.openWindow(url);
+    })
   );
 });

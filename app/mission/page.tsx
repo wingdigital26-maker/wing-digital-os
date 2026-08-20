@@ -13,6 +13,7 @@ import {
   WatchdogBanner,
 } from "../components/MissionControlCore";
 import SfxMuteButton from "../components/SfxMuteButton";
+import PushToggle from "../components/PushToggle";
 
 const STATUS_COLOR: Record<string, string> = {
   green: "var(--green)",
@@ -77,6 +78,7 @@ export default function MissionControl() {
           </h1>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <PushToggle />
           <SfxMuteButton />
           {data?.cloud && <Pill text="CLOUD MODE" color="var(--accent-2)" />}
           {error && <Pill text={`FEED ERROR ${error}`} color="var(--red)" />}

@@ -1,6 +1,7 @@
-# Cloud watchdog trigger. Vercel Hobby caps crons at once/day, so GitHub
-# Actions fires the check every 30 minutes instead (same pattern as the
-# outreach cloud sender). The route itself lives in the Vercel deploy.
+# Cloud watchdog trigger + site uptime. Vercel Hobby caps crons at once/day, so
+# GitHub Actions fires the check every 30 minutes instead (same pattern as the
+# outreach cloud sender). The Claude cloud routine can't reach the open web
+# (sandbox egress policy), so the mechanical uptime checks live here too.
 name: watchdog
 on:
   schedule:
@@ -10,8 +11,33 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 5
     steps:
+      - name: Site uptime checks
+        run: |
+          fails=""
+          for url in \
+            "https://wing-digital-os.vercel.app/manifest.json" \
+            "https://jacksonroofingco.com" \
+            "https://herosjunkremovaltx.com" \
+            "https://renewalhealth.life"; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' -m 20 "$url" || echo 000)
+            if [ "$code" != "200" ]; then
+              sleep 5
+              code=$(curl -s -o /dev/null -w '%{http_code}' -m 20 "$url" || echo 000)
+            fi
+            echo "$url -> $code"
+            [ "$code" = "200" ] || fails="$fails $url($code)"
+          done
+          if [ -n "$fails" ]; then
+            body="{\"agent\":\"site-uptime\",\"status\":\"error\",\"message\":\"down:$fails\"}"
+          else
+            body='{"agent":"site-uptime","status":"ok","message":"all sites 200"}'
+          fi
+          curl -s -X POST https://wing-digital-os.vercel.app/api/heartbeat \
+            -H "x-heartbeat-key: ${{ secrets.HEARTBEAT_KEY }}" \
+            -H "Content-Type: application/json" -d "$body"
+
       - name: Ping cloud watchdog
         run: |
           code=$(curl -s -o /tmp/out -w '%{http_code}' \

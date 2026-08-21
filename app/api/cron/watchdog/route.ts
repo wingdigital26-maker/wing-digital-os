@@ -17,6 +17,7 @@ const REPUSH_MS = 6 * 60 * 60 * 1000;
 const EXPECTED: { agent: string; staleMin: number; windowed: boolean; label: string }[] = [
   { agent: "pc-alive", staleMin: 45, windowed: true, label: "PC heartbeat" },
   { agent: "watchdog-heartbeat", staleMin: 200, windowed: true, label: "Watchdog patrol" },
+  { agent: "cloud-patrol", staleMin: 200, windowed: false, label: "Cloud patrol" },
   { agent: "sentinel-daily", staleMin: 26 * 60, windowed: false, label: "Sentinel daily" },
   { agent: "b2b-prospector-daily", staleMin: 26 * 60, windowed: false, label: "B2B prospector" },
   { agent: "state-sync-daily", staleMin: 26 * 60, windowed: false, label: "State sync" },

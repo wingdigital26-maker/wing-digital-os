@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import { execSync } from "child_process";
 import { readVaultFile, isGithubVault, VAULT_PATH } from "../../../lib/vaultSource";
+import { sbSelect } from "../../../lib/osSupabase";
 import {
   readOutreachLive,
   sendsTodayHonest,
@@ -100,12 +101,8 @@ const SCHEDULED: ScheduledMeta[] = [
   { key: "renewal-content-weekly", name: "Renewal Engine", role: "Renewal Health weekly content, health-gated publishing", schedule: "Mon 7:44am", enabled: true, match: /\brenewal\b/i, next: () => nextWeekly(1, 7, 44) },
   { key: "b2b-outreach-engine", name: "Outreach", role: "B2B cold email sender, LIVE since 8/6 — window + cap check, dry-run, then live send", schedule: "Every 30 min, 8am-8pm", enabled: true, match: /outreach|cold email|b2b/i, next: nextEvery30 },
   { key: "b2b-prospector-daily", name: "Prospector", role: "Daily B2B lead scout — refills the pipeline so outreach never runs dry", schedule: "Daily 6:15am", enabled: true, match: /prospector|lead scan|lead-find|b2b lead/i, next: () => nextDaily(6, 15) },
-  // TRIAL agents: real scheduled tasks that are DISABLED (in a trial period).
-  // They render as amber "TRIAL" (intentional, invites a Run-now), never as the
-  // dimmed "retired" look reserved for the superseded relics below.
-  { key: "closer", name: "Closer", role: "Turns hot replies into booked calls, draft-only", schedule: "Every 30-60 min, 8am-6pm (trial)", enabled: false, match: /\bcloser\b/i, next: () => null },
-  { key: "call-prep", name: "Call Prep", role: "One-page research brief per prospect before calls", schedule: "Early morning after Dispatch (trial)", enabled: false, match: /call[- ]prep/i, next: () => null },
-  { key: "client-report", name: "Client Report", role: "Monthly branded value report per paying client", schedule: "1st of the month, per client (trial)", enabled: false, match: /client[- ]report/i, next: () => null },
+  // TRIAL agents (closer, call-prep, client-report) removed 2026-08-22 on Jack's
+  // call — he does not want them anymore. Their scheduled tasks were deleted too.
 ];
 
 // Retired: superseded Apollo-era relics that still exist on disk. A DISABLED task
@@ -1158,6 +1155,35 @@ function parseContentSchedule(calendarRaw: string | null): ContentCalItem[] {
   return items;
 }
 
+// ── agent feed (os_feed) ───────────────────────────────────────────────────
+// What the scheduled agents reported through /api/notify. Read here with the
+// service key so the browser never sees the ingest key. Degrades to [] when
+// Supabase is unreachable or the table has not been created yet.
+interface AgentFeedRow {
+  id: number;
+  agent: string;
+  title: string;
+  body: string | null;
+  url: string | null;
+  level: string;
+  created_at: string;
+}
+
+async function readAgentFeed(): Promise<AgentFeedRow[]> {
+  const rows = await sbSelect<AgentFeedRow>({
+    table: "os_feed",
+    select: "id,agent,title,body,url,level,created_at",
+    service: true,
+    query: "order=created_at.desc&limit=25",
+  });
+  return rows.map((r) => ({
+    ...r,
+    agent: clean(redact(r.agent)).slice(0, 80),
+    title: clean(redact(r.title)).slice(0, 120),
+    body: r.body ? clean(redact(r.body)).slice(0, 500) : null,
+  }));
+}
+
 // ── main handler ───────────────────────────────────────────────────────────
 export async function GET(req: NextRequest) {
   const agentKey = req.nextUrl.searchParams.get("agent");
@@ -1180,6 +1206,9 @@ export async function GET(req: NextRequest) {
     readVaultFile("wiki/campaigns/jackson-social-calendar.md"),
     readOutreachLive(),
   ]);
+
+  // What the agents reported through /api/notify since the last look.
+  const agentFeed = await readAgentFeed();
 
   // Vault activity today (git-first, mtime fallback) + scheduled content posts.
   const vaultToday = countVaultFilesToday();
@@ -1337,6 +1366,7 @@ export async function GET(req: NextRequest) {
     watchdog,
     agents: [...scheduledAgents, ...crewAgents],
     feed,
+    agentFeed,
     focus,
     health,
     stats,

@@ -20,10 +20,11 @@ function isPublicPath(pathname: string): boolean {
     pathname === "/jackson" ||
     pathname === "/jackson-v2" ||
     pathname.startsWith("/api/jackson") ||
-    // Machine endpoints: heartbeat ingest (PC posts with x-heartbeat-key) and
-    // the Vercel cron watchdog (Bearer CRON_SECRET). Both verify their own key
-    // inside the route and fail closed without it.
+    // Machine endpoints: heartbeat ingest (PC posts with x-heartbeat-key), the
+    // agent notification pipe (same key), and the Vercel cron watchdog (Bearer
+    // CRON_SECRET). All verify their own key inside the route and fail closed.
     pathname === "/api/heartbeat" ||
+    pathname === "/api/notify" ||
     pathname === "/api/cron/watchdog" ||
     pathname.startsWith("/demo-freshco") ||
     pathname.startsWith("/demo-roofing") ||

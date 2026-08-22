@@ -86,6 +86,7 @@ export interface MissionData {
   overall: "green" | "yellow" | "red";
   agents: AgentCard[];
   feed: FeedEntry[];
+  agentFeed?: AgentFeedEntry[];
   focus?: {
     currentFocus: string[];
     openQuestions: string[];
@@ -100,6 +101,17 @@ export interface MissionData {
   watchdog?: WatchdogData;
   vaultToday?: VaultToday | null;
   scheduledContent?: ContentCalItem[];
+}
+// One result an agent reported through /api/notify. level "push" also went to
+// Jack's phone, so it renders louder than a plain feed line.
+export interface AgentFeedEntry {
+  id: number;
+  agent: string;
+  title: string;
+  body: string | null;
+  url: string | null;
+  level: string;
+  created_at: string;
 }
 export interface AgentWire { id: string; label: string; direction: "reads" | "writes" | "both" }
 export interface AgentDetail {
@@ -1383,6 +1395,71 @@ export function FeedTicker({ feed }: { feed: FeedEntry[] }) {
         }}>view all ({feed.length})</button>
       )}
     </div>
+  );
+}
+
+// ── Agent feed (os_feed via /api/notify) ───────────────────────────────────
+// Relative age for a full ISO timestamp: "12m ago", "3h ago", "2d ago".
+function isoAge(iso: string): string {
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return "";
+  const min = Math.floor((Date.now() - t) / 60000);
+  if (min < 1) return "just now";
+  if (min < 60) return `${min}m ago`;
+  const h = Math.floor(min / 60);
+  if (h < 48) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+
+// What the scheduled agents reported back, newest first. Push-level entries
+// (the ones that also hit Jack's phone) carry an accent rail and label.
+export function AgentFeed({ entries }: { entries: AgentFeedEntry[] }) {
+  const [all, setAll] = useState(false);
+  const shown = all ? entries.slice(0, 25) : entries.slice(0, 6);
+  return (
+    <section style={{ background: "var(--bg-card, #0d1117)", border: "1px solid var(--border, rgba(255,255,255,0.08))", borderRadius: 12, padding: 16 }}>
+      <h2 style={{ fontSize: 11, letterSpacing: "0.14em", color: "var(--text-muted)", marginBottom: 10 }}>AGENT FEED</h2>
+      {entries.length === 0 && (
+        <div style={{ fontSize: 12, color: "var(--text-muted)" }}>no agent reports yet</div>
+      )}
+      {shown.map((e) => {
+        const push = e.level === "push";
+        return (
+          <div
+            key={e.id}
+            style={{
+              borderLeft: `2px solid ${push ? "var(--accent, #22d3ee)" : "var(--border, rgba(255,255,255,0.08))"}`,
+              paddingLeft: 10,
+              marginBottom: 10,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", fontFamily: "'JetBrains Mono', monospace" }}>
+              <span style={{ fontSize: 10, letterSpacing: "0.1em", color: push ? "var(--accent, #22d3ee)" : "var(--accent-2, #a78bfa)" }}>
+                {e.agent.toUpperCase()}
+              </span>
+              {push && <span style={{ fontSize: 9, letterSpacing: "0.1em", color: "var(--accent, #22d3ee)" }}>PUSHED</span>}
+              <span style={{ marginLeft: "auto", fontSize: 10, color: "var(--text-muted)" }}>{isoAge(e.created_at)}</span>
+            </div>
+            <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 3, fontWeight: push ? 600 : 400 }}>
+              {e.url ? (
+                <a href={e.url} style={{ color: "inherit", textDecoration: "none", borderBottom: "1px dotted var(--border)" }}>{e.title}</a>
+              ) : (
+                e.title
+              )}
+            </div>
+            {e.body && (
+              <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2, lineHeight: 1.45 }}>{e.body}</div>
+            )}
+          </div>
+        );
+      })}
+      {entries.length > 6 && (
+        <button onClick={() => setAll(!all)} style={{
+          background: "none", border: "none", color: "var(--accent, #22d3ee)",
+          cursor: "pointer", fontSize: 11, padding: 0,
+        }}>{all ? "collapse" : `view all (${entries.length})`}</button>
+      )}
+    </section>
   );
 }
 

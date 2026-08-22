@@ -10,10 +10,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   MissionData, Selection, Dot, Pill, MissionStyles, OpsMap, AgentTile,
   FeedTicker, ClientHealthStrip, MissionPanels, StatTiles, NextUpStrip,
-  WatchdogBanner,
+  WatchdogBanner, AgentFeed,
 } from "../components/MissionControlCore";
 import SfxMuteButton from "../components/SfxMuteButton";
 import PushToggle from "../components/PushToggle";
+import AlertsPanel from "../components/AlertsPanel";
 
 const STATUS_COLOR: Record<string, string> = {
   green: "var(--green)",
@@ -64,6 +65,8 @@ export default function MissionControl() {
           <WatchdogBanner watchdog={data.watchdog} onRechecked={load} />
         </div>
       )}
+      {/* Why the phone buzzed — open + recently recovered watchdog alerts */}
+      <AlertsPanel />
       <style>{`
         .mc-feed::-webkit-scrollbar { width: 6px; }
         .mc-feed::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
@@ -134,6 +137,9 @@ export default function MissionControl() {
                   {crew.map((a) => <AgentTile key={a.key} a={a} onSelect={setSelection} />)}
                 </div>
               </section>
+
+              {/* Agent feed — what the scheduled agents reported back */}
+              <AgentFeed entries={data.agentFeed ?? []} />
 
               {/* Current focus */}
               {data.focus && (

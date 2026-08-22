@@ -261,9 +261,13 @@ main > div:last-child > div > *:nth-child(6) { animation-delay: 0.27s; }
   /* things that must stay single column when they carry a min width */
   .app-view .mission-ops-grid { grid-template-columns: minmax(0, 1fr) !important; }
 
-  /* Standalone /mission page: safe-area padding + all grids to single column */
+  /* Standalone /mission page: safe-area padding + all grids to single column.
+     100dvh (not 100vh) so the scroll area tracks the real visible viewport,
+     and the bottom padding clears the home indicator. */
   .mission-page {
-    padding: calc(env(safe-area-inset-top, 0px) + 14px) 14px 40px !important;
+    height: 100dvh !important;
+    padding: calc(env(safe-area-inset-top, 0px) + 14px) 14px
+             calc(40px + env(safe-area-inset-bottom, 0px)) !important;
     overscroll-behavior-y: contain;
   }
   .mission-page [style*="grid-template-columns"] { grid-template-columns: minmax(0, 1fr) !important; }
@@ -398,6 +402,11 @@ main > div:last-child > div > *:nth-child(6) { animation-delay: 0.27s; }
     background: #f87171; color: #fff; font-size: 9px; font-weight: 700;
     border-radius: 20px; padding: 1px 4px; min-width: 14px; text-align: center; line-height: 14px;
   }
+
+  /* iOS Safari auto-zooms any focused field whose font-size is under 16px,
+     which knocks the whole PWA out of position. Force 16px on phone only —
+     desktop keeps its original sizes. */
+  input, textarea, select { font-size: 16px !important; }
 
   /* Bigger finger targets + readable minimums across the app */
   button, [role="button"], a, input, select, textarea { min-height: 40px; }

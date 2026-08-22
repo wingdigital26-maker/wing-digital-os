@@ -14,6 +14,18 @@ export default function BrainPage() {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const threadRef = useRef<HTMLDivElement>(null);
 
+  // Phone layout: the 260px sessions rail would leave a 130px chat column on a
+  // 390px phone, so on mobile the rail becomes a slide-in drawer behind a
+  // header toggle. Desktop (>768px) renders exactly as before.
+  const [isMobile, setIsMobile] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 768px)");
+    const on = () => setIsMobile(mq.matches);
+    on(); mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
+
   const loadSessions = useCallback(async () => {
     try {
       const r = await fetch("/api/brain/sessions");
@@ -34,6 +46,7 @@ export default function BrainPage() {
 
   async function openSession(id: string) {
     setActiveId(id);
+    setDrawerOpen(false);
     setLoadingHistory(true);
     setMessages([]);
     try {
@@ -52,6 +65,7 @@ export default function BrainPage() {
     setActiveId(null);
     setMessages([]);
     setInput("");
+    setDrawerOpen(false);
   }
 
   async function send() {
@@ -83,9 +97,36 @@ export default function BrainPage() {
   }
 
   return (
-    <div style={{ display: "flex", height: "100vh", background: "var(--bg-primary)", color: "var(--text-primary)" }}>
+    <div className="brain-shell" style={{ display: "flex", height: "100vh", background: "var(--bg-primary)", color: "var(--text-primary)" }}>
+      {/* Mobile-only styles: full-height dvh shell (keyboard-safe), sessions rail
+          becomes a slide-in drawer, safe-area padding top/bottom. Desktop >768px
+          is untouched. */}
+      <style>{`
+        @media (max-width: 768px) {
+          .brain-shell { height: 100dvh !important; }
+          .brain-aside {
+            position: fixed; left: 0; top: 0; bottom: 0; z-index: 60;
+            width: min(300px, 84vw) !important;
+            transform: translateX(${drawerOpen ? "0" : "-104%"});
+            transition: transform 0.24s cubic-bezier(0.22, 0.8, 0.36, 1);
+            box-shadow: ${drawerOpen ? "12px 0 40px rgba(0,0,0,0.55)" : "none"};
+            padding-top: env(safe-area-inset-top, 0px);
+          }
+          .brain-header { padding: calc(env(safe-area-inset-top, 0px) + 12px) 16px 12px !important; }
+          .brain-thread { padding: 16px 14px !important; }
+          .brain-inputbar {
+            padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px)) !important;
+          }
+          .brain-msg { max-width: 94% !important; }
+        }
+      `}</style>
+      {isMobile && drawerOpen && (
+        <div onClick={() => setDrawerOpen(false)} style={{
+          position: "fixed", inset: 0, zIndex: 55, background: "rgba(0,0,0,0.5)",
+        }} />
+      )}
       {/* Sessions sidebar */}
-      <aside style={{
+      <aside className="brain-aside" style={{
         width: 260, background: "var(--bg-secondary)", borderRight: "1px solid var(--border)",
         display: "flex", flexDirection: "column", flexShrink: 0,
       }}>
@@ -118,17 +159,30 @@ export default function BrainPage() {
 
       {/* Main thread */}
       <main style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        <header style={{
+        <header className="brain-header" style={{
           padding: "16px 24px", borderBottom: "1px solid var(--border)",
           background: "var(--bg-secondary)", flexShrink: 0,
+          display: "flex", alignItems: "center", gap: 12,
         }}>
-          <h1 style={{ fontSize: 16, fontWeight: 700 }}>Wing Digital OS Brain</h1>
-          <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
-            Chat grounded in your vault. History is saved.
-          </p>
+          {isMobile && (
+            <>
+              <a href="/" style={{ color: "var(--text-muted)", fontSize: 20, padding: "6px 4px" }}>←</a>
+              <button onClick={() => setDrawerOpen(true)} aria-label="Open chats" style={{
+                background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 10,
+                color: "var(--text-secondary)", fontSize: 13, fontWeight: 600,
+                padding: "8px 12px", minHeight: 40, cursor: "pointer", flexShrink: 0,
+              }}>☰ Chats</button>
+            </>
+          )}
+          <div style={{ minWidth: 0 }}>
+            <h1 style={{ fontSize: 16, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Wing Digital OS Brain</h1>
+            <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              Chat grounded in your vault. History is saved.
+            </p>
+          </div>
         </header>
 
-        <div ref={threadRef} style={{ flex: 1, overflow: "auto", padding: "24px" }}>
+        <div ref={threadRef} className="brain-thread" style={{ flex: 1, overflow: "auto", padding: "24px" }}>
           {messages.length === 0 && !loadingHistory && (
             <div style={{ maxWidth: 620, margin: "60px auto 0", textAlign: "center", color: "var(--text-muted)" }}>
               <p style={{ fontSize: 15, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 8 }}>
@@ -149,7 +203,7 @@ export default function BrainPage() {
                 <span style={{ fontSize: 10.5, color: "var(--text-muted)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>
                   {m.role === "user" ? "You" : "Brain"}
                 </span>
-                <div style={{
+                <div className="brain-msg" style={{
                   maxWidth: "88%", padding: "12px 16px", borderRadius: 14, fontSize: 13.5, lineHeight: 1.55,
                   background: m.role === "user" ? "var(--accent-glow)" : "var(--bg-card)",
                   border: `1px solid ${m.role === "user" ? "var(--accent)" : "var(--border)"}`,
@@ -168,7 +222,7 @@ export default function BrainPage() {
         </div>
 
         {/* Input */}
-        <div style={{ padding: "16px 24px", borderTop: "1px solid var(--border)", background: "var(--bg-secondary)", flexShrink: 0 }}>
+        <div className="brain-inputbar" style={{ padding: "16px 24px", borderTop: "1px solid var(--border)", background: "var(--bg-secondary)", flexShrink: 0 }}>
           <div style={{ maxWidth: 760, margin: "0 auto", display: "flex", gap: 10, alignItems: "flex-end" }}>
             <textarea
               value={input}

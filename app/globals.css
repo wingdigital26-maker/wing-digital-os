@@ -1,7 +1,27 @@
 @import "tailwindcss";
 
 :root {
-  /* Obsidian night — deep neutrals with electric cyan/violet duotone */
+  /* Daylight — warm-white paper, slate ink, the same cyan/violet duotone
+     pulled down to weights that hold contrast on a light ground. */
+  --bg-primary: #f6f7fb;
+  --bg-secondary: #eef1f7;
+  --bg-card: #ffffff;
+  --bg-hover: #e7ecf5;
+  --border: #d8dEE9;
+  --accent: #0e7490;
+  --accent-2: #6d4aff;
+  --accent-dim: #22d3ee;
+  --accent-glow: rgba(14, 116, 144, 0.10);
+  --text-primary: #10141f;
+  --text-secondary: #4a5673;
+  --text-muted: #7b87a3;
+  --green: #0f855c;
+  --orange: #b45309;
+  --red: #be123c;
+}
+
+:root[data-theme="dark"] {
+  /* Obsidian night — the original palette, kept intact. */
   --bg-primary: #07080f;
   --bg-secondary: #0b0d17;
   --bg-card: #10131f;
@@ -21,7 +41,8 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
-html { color-scheme: dark; }
+html { color-scheme: light; }
+html[data-theme="dark"] { color-scheme: dark; }
 
 body {
   background: var(--bg-primary);
@@ -55,10 +76,10 @@ body::before {
   z-index: 0;
   pointer-events: none;
   background:
-    radial-gradient(ellipse 55% 45% at 82% -8%, rgba(167, 139, 250, 0.10), transparent 60%),
-    radial-gradient(ellipse 50% 50% at 8% 108%, rgba(34, 211, 238, 0.08), transparent 60%),
-    linear-gradient(rgba(159, 170, 210, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(159, 170, 210, 0.025) 1px, transparent 1px);
+    radial-gradient(ellipse 55% 45% at 82% -8%, rgba(109, 74, 255, 0.055), transparent 60%),
+    radial-gradient(ellipse 50% 50% at 8% 108%, rgba(14, 116, 144, 0.05), transparent 60%),
+    linear-gradient(rgba(70, 90, 130, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(70, 90, 130, 0.045) 1px, transparent 1px);
   background-size: 100% 100%, 100% 100%, 44px 44px, 44px 44px;
 }
 
@@ -102,8 +123,8 @@ input:focus, textarea:focus, select:focus {
 /* Sidebar gets a glass treatment */
 aside {
   backdrop-filter: blur(14px);
-  background: linear-gradient(180deg, rgba(11, 13, 23, 0.92), rgba(9, 11, 20, 0.96)) !important;
-  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.03);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(238, 241, 247, 0.94)) !important;
+  box-shadow: inset -1px 0 0 rgba(16, 20, 31, 0.05);
 }
 
 /* Any card-styled element (inline style uses var(--bg-card)) picks up depth via border glow on hover.
@@ -149,7 +170,7 @@ main, section {
 
 /* ── Glassy top bar + animated accent hairline (signature touch) ─── */
 main > header {
-  background: rgba(11, 13, 23, 0.72) !important;
+  background: rgba(246, 247, 251, 0.78) !important;
   backdrop-filter: blur(16px);
   position: relative;
 }
@@ -379,7 +400,7 @@ main > div:last-child > div > *:nth-child(6) { animation-delay: 0.27s; }
   .mobile-nav {
     display: flex;
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 500;
-    background: rgba(9, 11, 20, 0.92);
+    background: rgba(255, 255, 255, 0.92);
     backdrop-filter: blur(18px);
     border-top: 1px solid var(--border);
     padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px));
@@ -472,3 +493,29 @@ main > div:last-child > div > *:nth-child(6) { animation-delay: 0.27s; }
 .markdown-body strong { color: var(--text-primary); font-weight: 600; }
 
 /* mobile-rev-2 */
+
+
+/* ── Dark-mode restoration ─────────────────────────────────────────────
+   A handful of rules baked near-black literals in before tokens existed.
+   They are correct in dark and wrong on paper, so they are re-applied only
+   under [data-theme="dark"] and given light equivalents by default. */
+:root[data-theme="dark"] body::before {
+  background:
+    radial-gradient(ellipse 55% 45% at 82% -8%, rgba(167, 139, 250, 0.10), transparent 60%),
+    radial-gradient(ellipse 50% 50% at 8% 108%, rgba(34, 211, 238, 0.08), transparent 60%),
+    linear-gradient(rgba(159, 170, 210, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(159, 170, 210, 0.025) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 44px 44px, 44px 44px;
+}
+
+/* Chrome surfaces: dark values restored for the dark theme. */
+:root[data-theme="dark"] aside {
+  background: linear-gradient(180deg, rgba(11, 13, 23, 0.92), rgba(9, 11, 20, 0.96)) !important;
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.03);
+}
+:root[data-theme="dark"] main > header {
+  background: rgba(11, 13, 23, 0.72) !important;
+}
+@media (max-width: 860px) {
+  :root[data-theme="dark"] .mobile-nav { background: rgba(9, 11, 20, 0.92); }
+}

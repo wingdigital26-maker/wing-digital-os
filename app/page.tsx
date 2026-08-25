@@ -17,6 +17,7 @@ const ActivityLog = dynamic(() => import("./components/ActivityLog"), { ssr: fal
 const WeekCalendar = dynamic(() => import("./components/WeekCalendar"), { ssr: false });
 const MissionOps = dynamic(() => import("./components/MissionOps"), { ssr: false });
 const ClientsBoard = dynamic(() => import("./components/ClientsBoard"), { ssr: false });
+const SonarBoard = dynamic(() => import("./components/SonarBoard"), { ssr: false });
 
 type NavGroup = {
   id: string; label: string; icon: IconType;
@@ -31,7 +32,13 @@ const NAV: NavGroup[] = [
       { id: "personal", label: "Personal" },
     ],
   },
-  { id: "clients", label: "Clients", icon: Users, subs: [{ id: "clients", label: "Clients" }] },
+  {
+    id: "clients", label: "Clients", icon: Users,
+    subs: [
+      { id: "clients", label: "Clients" },
+      { id: "sonar", label: "Sonar Leads" },
+    ],
+  },
   {
     id: "agent", label: "Agents", icon: Cpu,
     subs: [{ id: "agent", label: "Mission Control" }],
@@ -309,6 +316,7 @@ export default function Home() {
               active one is shown. Switching is instant, no reload/refetch. */}
           {visited.has("command") && <div className="app-view" style={{ display: active === "command" ? "block" : "none" }}><CommandCenter data={ghlData} loading={loading} onSendToAI={sendToAI} /></div>}
           {visited.has("clients") && <div className="app-view" style={{ display: active === "clients" ? "block" : "none" }}><ClientsBoard /></div>}
+          {visited.has("sonar") && <div className="app-view" style={{ display: active === "sonar" ? "block" : "none" }}><SonarBoard /></div>}
           {visited.has("competitors") && <div className="app-view" style={{ display: active === "competitors" ? "block" : "none" }}><CompetitorIntel onSendToAI={sendToAI} /></div>}
           {visited.has("knowledge") && <div className="app-view" style={{ display: active === "knowledge" ? "block" : "none" }}><KnowledgeBase initialPath={openNotePath} onSendToAI={sendToAI} /></div>}
           {visited.has("agent") && <div className="app-view" style={{ display: active === "agent" ? "block" : "none" }}><MissionOps /></div>}

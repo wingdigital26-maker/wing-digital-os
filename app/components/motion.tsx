@@ -6,15 +6,22 @@
 import type { Variants, Transition } from "motion/react";
 
 // Parent container that staggers its motion children in on mount.
+//
+// The stagger used to be 0.05s per child with a 12px opacity fade. On a dense
+// dashboard that meant a visible wave of half-transparent cards on every load
+// AND on every view switch, which read as the whole UI "fading" rather than as
+// polish. The entrance is now near-instant: a short slide with no opacity ramp,
+// so content is legible from the first frame.
 export const staggerContainer: Variants = {
   hidden: {},
-  show: { transition: { staggerChildren: 0.05, delayChildren: 0.02 } },
+  show: { transition: { staggerChildren: 0.012, delayChildren: 0 } },
 };
 
-// Child item: fade + rise into place with a soft spring.
+// Child item: a small rise into place. Deliberately NO opacity animation —
+// text should never be rendered semi-transparent on the way in.
 export const riseItem: Variants = {
-  hidden: { opacity: 0, y: 12 },
-  show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 260, damping: 26 } },
+  hidden: { y: 6 },
+  show: { y: 0, transition: { type: "spring", stiffness: 420, damping: 34, mass: 0.6 } },
 };
 
 // Spring used for interactive hover/tap feedback.

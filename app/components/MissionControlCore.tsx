@@ -244,6 +244,39 @@ export const STATUS_COLOR: Record<string, string> = {
   red: "var(--red)",
 };
 
+// ── Internal vs client-delivery boundary ───────────────────────────────────
+// The OS "Agents" tab shows ONLY Wing Digital's own internal agents — the ones
+// that run Jack's business. Anything whose job is producing/publishing work for
+// a paying client belongs in the CRM section instead, filed under that client.
+//
+// Add a key here to move an agent out of Agents and into client-delivery land.
+// Keys must match AgentCard.key (see SCHEDULED / CREW in app/api/mission/route.ts).
+export const CLIENT_DELIVERY_AGENTS = new Set<string>([
+  // Jackson Roofing weekly SEO blog + Google Business posts — client deliverable.
+  "content-engine-weekly",
+  // Renewal Health (Lynette Wing) weekly blogs/service pages — client deliverable.
+  "renewal-content-weekly",
+  // Hero's Junk Removal weekly content. Not currently emitted by /api/mission,
+  // listed defensively so it never leaks in if the roster gains it later.
+  "heros-content-weekly",
+  "heros-content-engine",
+  // Per-client blog/service publishing, if these keys ever appear.
+  "jackson-blog-publish",
+  "client-report-weekly",
+]);
+
+// KEPT as internal (deliberately NOT excluded):
+//  - sentinel-daily      : monitors client health but exists to protect Wing's
+//                          own delivery risk; report-only, no client output.
+//  - b2b-outreach-engine : Wing's OWN cold email, not per-client outreach.
+//  - b2b-prospector-daily: Wing's own lead pipeline.
+//  - chronicler-end-of-day, dispatch, reply-triage: pure internal ops.
+//  - builder             : client ONBOARDING runner — ambiguous, but it runs
+//                          Wing's internal setup SOP, so it stays here.
+export function isInternalAgent(a: { key: string }): boolean {
+  return !CLIENT_DELIVERY_AGENTS.has(a.key);
+}
+
 // ── selection model ────────────────────────────────────────────────────────
 export type Selection =
   | { type: "agent"; key: string }

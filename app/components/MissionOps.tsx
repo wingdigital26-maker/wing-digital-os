@@ -1,20 +1,141 @@
 "use client";
 
-// MISSION OPS — embedded mission-control view for the main OS Agents section.
-// Interactive: click any agent node/tile, system node, or feed line and a
-// slide-over panel shows everything going on with it. Shared pieces live in
-// MissionControlCore.tsx (also used by /mission). Reuses /api/mission.
+// MISSION OPS — the OS "Agents" view.
+//
+// Scope: Wing Digital's OWN internal agents only. Client-delivery work
+// (Renewal Health content, Hero's Junk content, Jackson blog publishing,
+// per-client outreach) lives in the CRM section instead — the boundary is the
+// CLIENT_DELIVERY_AGENTS set in MissionControlCore.tsx.
+//
+// Layout: the primary content is a scannable roster (status, last run, next
+// run, last result). The force-directed ops map is demoted behind a toggle at
+// the bottom. Shared pieces live in MissionControlCore.tsx (also used by
+// /mission, which still shows everything). Reuses /api/mission.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  MissionData, Selection, Dot, MissionStyles, OpsMap, AgentTile, FeedTicker,
-  MissionPanels, NextUpStrip, WatchdogBanner,
+  MissionData, Selection, Dot, MissionStyles, OpsMap, FeedTicker,
+  MissionPanels, NextUpStrip, WatchdogBanner, AgentCard,
+  isInternalAgent, fmtCountdown, fmtAge, shortDate, tightLine,
 } from "./MissionControlCore";
+
+const MONO = "'JetBrains Mono', monospace";
+
+/** Status is encoded as colour AND text — never colour alone. */
+type AgentStatus = { label: string; color: string; pulse: boolean; tone: "ok" | "warn" | "bad" | "idle" };
+
+function statusOf(a: AgentCard): AgentStatus {
+  if (!a.enabled && a.trial) return { label: "Trial", color: "var(--orange)", pulse: false, tone: "warn" };
+  if (!a.enabled) return { label: "Disabled", color: "var(--text-muted)", pulse: false, tone: "idle" };
+  if (a.watchdogState === "SILENT") return { label: "Silent", color: "var(--red)", pulse: true, tone: "bad" };
+  if (a.watchdogState === "LATE") return { label: "Late", color: "var(--orange)", pulse: true, tone: "warn" };
+  if (a.pcNeeded && a.kind === "scheduled") return { label: "PC needed", color: "var(--orange)", pulse: false, tone: "warn" };
+  if (a.kind === "crew") return { label: "On demand", color: "var(--accent-2)", pulse: false, tone: "idle" };
+  return { label: "Healthy", color: "var(--green)", pulse: true, tone: "ok" };
+}
+
+function StatusPill({ s }: { s: AgentStatus }) {
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", gap: 6,
+      fontSize: 11, fontWeight: 600, fontFamily: MONO, letterSpacing: "0.04em",
+      padding: "3px 10px 3px 8px", borderRadius: 99,
+      border: `1px solid ${s.color}`, color: s.color, whiteSpace: "nowrap",
+      background: "var(--bg-secondary)",
+    }}>
+      <Dot color={s.color} pulse={s.pulse} />
+      {s.label}
+    </span>
+  );
+}
+
+function Meta({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+  return (
+    <div style={{ minWidth: 0 }}>
+      <div style={{ fontSize: 9, letterSpacing: "0.14em", color: "var(--text-muted)", textTransform: "uppercase", marginBottom: 3 }}>
+        {label}
+      </div>
+      <div style={{
+        fontSize: 12, fontFamily: MONO, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+        color: accent ? "var(--accent)" : "var(--text-secondary)",
+      }}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function AgentRow({ a, onSelect }: { a: AgentCard; onSelect: (s: Selection) => void }) {
+  const s = statusOf(a);
+  const [hover, setHover] = useState(false);
+  const lastRun = a.lastRunAt
+    ? (fmtAge(a.lastRunAt.replace("T", " ").slice(0, 16)) ?? shortDate(a.lastRunAt))
+    : a.lastLogDate ? shortDate(a.lastLogDate) : "no record";
+  const nextRun = a.enabled && a.nextRunAt ? fmtCountdown(a.nextRunAt) : a.kind === "crew" ? "manual" : "not scheduled";
+
+  return (
+    <div
+      className="mo-click agents-row"
+      onClick={() => onSelect({ type: "agent", key: a.key })}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        display: "grid",
+        gridTemplateColumns: "minmax(200px, 1.5fr) 120px 110px 110px minmax(0, 1.4fr)",
+        gap: 18, alignItems: "center",
+        padding: "14px 18px",
+        borderTop: "1px solid var(--border)",
+        background: hover ? "var(--bg-hover)" : "transparent",
+        opacity: a.enabled || a.trial ? 1 : 0.55,
+        transition: "background 120ms ease",
+      }}
+    >
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 14, fontWeight: 650, color: "var(--text-primary)", letterSpacing: "-0.01em" }}>{a.name}</div>
+        <div style={{
+          fontSize: 12, color: "var(--text-muted)", marginTop: 2, lineHeight: 1.4,
+          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+        }}>{a.role}</div>
+      </div>
+      <div><StatusPill s={s} /></div>
+      <Meta label="Last run" value={lastRun} />
+      <Meta label="Next run" value={nextRun} accent={Boolean(a.enabled && a.nextRunAt)} />
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 9, letterSpacing: "0.14em", color: "var(--text-muted)", textTransform: "uppercase", marginBottom: 3 }}>
+          Last result
+        </div>
+        <div style={{ fontSize: 12, color: "var(--text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {a.lastLogLine ? tightLine(a.lastLogLine, 70) : <span style={{ color: "var(--text-muted)" }}>—</span>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Section({ title, count, note, children }: {
+  title: string; count: number; note: string; children: React.ReactNode;
+}) {
+  return (
+    <section style={{
+      background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 14, overflow: "hidden",
+    }}>
+      <header style={{ padding: "14px 18px", display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+        <h2 style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--text-primary)", margin: 0 }}>
+          {title}
+        </h2>
+        <span style={{ fontSize: 11, fontFamily: MONO, color: "var(--text-muted)" }}>{count}</span>
+        <span style={{ fontSize: 11, color: "var(--text-muted)", marginLeft: "auto" }}>{note}</span>
+      </header>
+      {children}
+    </section>
+  );
+}
 
 export default function MissionOps() {
   const [data, setData] = useState<MissionData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selection, setSelection] = useState<Selection>(null);
+  const [showMap, setShowMap] = useState(false);
 
   const aliveRef = useRef(true);
   const load = useCallback(async () => {
@@ -38,88 +159,143 @@ export default function MissionOps() {
     return () => { aliveRef.current = false; clearInterval(poll); window.removeEventListener("os:pull-refresh", onPull); };
   }, [load]);
 
-  const scheduled = useMemo(() => data?.agents.filter(a => a.kind === "scheduled") ?? [], [data]);
-  const crew = useMemo(() => data?.agents.filter(a => a.kind === "crew") ?? [], [data]);
+  // SCOPE GUARD: client-delivery agents are filtered out of the Agents tab.
+  const internal = useMemo(() => (data?.agents ?? []).filter(isInternalAgent), [data]);
+  const scheduled = useMemo(() => internal.filter(a => a.kind === "scheduled"), [internal]);
+  const crew = useMemo(() => internal.filter(a => a.kind === "crew"), [internal]);
+  const attention = useMemo(
+    () => internal.filter(a => { const t = statusOf(a).tone; return t === "bad" || t === "warn"; }).length,
+    [internal],
+  );
+
   const overallColor = data?.overall === "red" ? "var(--red)" : data?.overall === "yellow" ? "var(--orange)" : "var(--green)";
+  const overallText = data?.overall === "red" ? "Problems" : data?.overall === "yellow" ? "Degraded" : "All systems nominal";
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       <MissionStyles />
+      <style>{`
+        @media (max-width: 900px) {
+          .agents-row { grid-template-columns: minmax(0, 1fr) auto !important; row-gap: 10px !important; }
+          .agents-row > *:nth-child(n+3) { grid-column: span 2; }
+        }
+      `}</style>
 
       {/* Watchdog problems banner — always the very first thing on screen */}
       {data && <WatchdogBanner watchdog={data.watchdog} onRechecked={load} />}
 
-      {/* header row */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-        <Dot color={overallColor} pulse />
-        <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.12em", fontFamily: "'JetBrains Mono', monospace" }}>
-          AGENT MISSION CONTROL
-        </span>
-        {data?.cloud && (
-          <span style={{ fontSize: 10, color: "var(--accent-2)", border: "1px solid #a78bfa55", borderRadius: 99, padding: "2px 8px", fontFamily: "'JetBrains Mono', monospace" }}>
-            CLOUD MODE
+      {/* Page header */}
+      <header style={{ display: "flex", alignItems: "flex-start", gap: 14, flexWrap: "wrap" }}>
+        <div style={{ minWidth: 0 }}>
+          <h1 style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em", margin: 0, color: "var(--text-primary)" }}>
+            Agents
+          </h1>
+          <p style={{ fontSize: 13, color: "var(--text-muted)", margin: "5px 0 0", maxWidth: 620, lineHeight: 1.5 }}>
+            Wing Digital&apos;s own internal agents. Client-delivery work lives under CRM.
+          </p>
+        </div>
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 12, color: "var(--text-secondary)" }}>
+            <Dot color={overallColor} pulse />
+            {overallText}
+            {attention > 0 && (
+              <span style={{ color: "var(--orange)", fontFamily: MONO, fontSize: 11 }}>
+                · {attention} need{attention === 1 ? "s" : ""} attention
+              </span>
+            )}
           </span>
-        )}
-        {error && (
-          <span style={{ fontSize: 10, color: "var(--red)", border: "1px solid #f8717155", borderRadius: 99, padding: "2px 8px", fontFamily: "'JetBrains Mono', monospace" }}>
-            FEED ERROR {error}
-          </span>
-        )}
-        <a href="/mission" target="_blank" rel="noreferrer" style={{
-          marginLeft: "auto", fontSize: 11, color: "var(--accent, #22d3ee)", textDecoration: "none",
-          border: "1px solid var(--accent, #22d3ee)", borderRadius: 99, padding: "4px 12px", fontWeight: 600,
-        }}>
-          Open full Mission Control
-        </a>
-      </div>
+          {data?.cloud && (
+            <span style={{ fontSize: 10, color: "var(--accent-2)", border: "1px solid var(--accent-2)", borderRadius: 99, padding: "2px 9px", fontFamily: MONO }}>
+              CLOUD MODE
+            </span>
+          )}
+          {error && (
+            <span style={{ fontSize: 10, color: "var(--red)", border: "1px solid var(--red)", borderRadius: 99, padding: "2px 9px", fontFamily: MONO }}>
+              FEED ERROR {error}
+            </span>
+          )}
+          <a href="/mission" target="_blank" rel="noreferrer" style={{
+            fontSize: 12, color: "var(--accent)", textDecoration: "none",
+            border: "1px solid var(--accent)", borderRadius: 99, padding: "5px 13px", fontWeight: 600,
+          }}>
+            Full Mission Control
+          </a>
+        </div>
+      </header>
 
       {!data && !error && (
-        <div style={{ color: "var(--text-muted, #6b7280)", fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
-          Establishing uplink...
-        </div>
+        <div style={{ color: "var(--text-muted)", fontFamily: MONO, fontSize: 12 }}>Establishing uplink…</div>
       )}
 
       {data && (
         <>
-          {/* HERO: the ops map is the primary presented thing — full width and
-              tall, filling the viewport so the moving parts are legible. The
-              scheduled/on-demand lists, next-up strip, and activity live below. */}
-          <OpsMap agents={data.agents} volumes={data.volumes} watchdog={data.watchdog} onSelect={setSelection} hero />
+          {/* What fires in the next 24 hours, in order */}
+          <NextUpStrip agents={internal} onSelect={setSelection} />
 
-          {/* What fires in the next 24 hours, in order (secondary, below the map) */}
-          <NextUpStrip agents={data.agents} onSelect={setSelection} />
-
-          <div className="mission-ops-grid" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.6fr) minmax(280px, 1fr)", gap: 20, alignItems: "start" }}>
+          <div className="mission-ops-grid" style={{ display: "grid", gridTemplateColumns: "minmax(0, 2fr) minmax(280px, 1fr)", gap: 20, alignItems: "start" }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 20, minWidth: 0 }}>
-              <section>
-                <h2 style={{ fontSize: 11, letterSpacing: "0.14em", color: "var(--text-muted)", marginBottom: 8 }}>SCHEDULED AGENTS</h2>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 10 }}>
-                  {scheduled.map(a => <AgentTile key={a.key} a={a} onSelect={setSelection} />)}
-                </div>
-              </section>
-              <section>
-                <h2 style={{ fontSize: 11, letterSpacing: "0.14em", color: "var(--text-muted)", marginBottom: 8 }}>ON-DEMAND CREW</h2>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 10 }}>
-                  {crew.map(a => <AgentTile key={a.key} a={a} onSelect={setSelection} />)}
-                </div>
-              </section>
+              <Section title="Scheduled" count={scheduled.length} note="runs on a cron, unattended">
+                {scheduled.map(a => <AgentRow key={a.key} a={a} onSelect={setSelection} />)}
+                {scheduled.length === 0 && (
+                  <div style={{ padding: "18px", fontSize: 12, color: "var(--text-muted)", borderTop: "1px solid var(--border)" }}>
+                    No scheduled internal agents.
+                  </div>
+                )}
+              </Section>
+
+              <Section title="On demand" count={crew.length} note="you invoke these by name">
+                {crew.map(a => <AgentRow key={a.key} a={a} onSelect={setSelection} />)}
+                {crew.length === 0 && (
+                  <div style={{ padding: "18px", fontSize: 12, color: "var(--text-muted)", borderTop: "1px solid var(--border)" }}>
+                    No on-demand agents.
+                  </div>
+                )}
+              </Section>
             </div>
 
-            {/* Compact activity ticker; "view all" expands to the full feed */}
+            {/* Compact activity ticker */}
             <section style={{
-              background: "var(--bg-secondary, #0d1117)",
-              border: "1px solid var(--border, var(--border))",
-              borderRadius: 12, padding: "12px 14px",
+              background: "var(--bg-card)", border: "1px solid var(--border)",
+              borderRadius: 14, padding: "14px 16px",
             }}>
-              <h2 style={{ fontSize: 11, letterSpacing: "0.14em", color: "var(--text-muted)", marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>
-                <Dot color="var(--green)" pulse /> ACTIVITY
-                <span style={{ marginLeft: "auto", fontFamily: "'JetBrains Mono', monospace", fontSize: 10 }}>refresh 30s</span>
+              <h2 style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--text-primary)", margin: "0 0 12px", display: "flex", alignItems: "center", gap: 8 }}>
+                <Dot color="var(--green)" pulse /> Activity
+                <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 10, fontWeight: 400, color: "var(--text-muted)", letterSpacing: 0 }}>
+                  refresh 30s
+                </span>
               </h2>
-              <div style={{ maxHeight: 520, overflowY: "auto", paddingRight: 6 }}>
+              <div style={{ maxHeight: 560, overflowY: "auto", paddingRight: 6 }}>
                 <FeedTicker feed={data.feed} />
               </div>
             </section>
           </div>
+
+          {/* Ops map — demoted below the roster, collapsed by default. */}
+          <section style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 14, overflow: "hidden" }}>
+            <button
+              onClick={() => setShowMap(v => !v)}
+              style={{
+                width: "100%", display: "flex", alignItems: "center", gap: 10,
+                padding: "14px 18px", background: "transparent", border: "none", cursor: "pointer",
+                color: "var(--text-primary)", font: "inherit", textAlign: "left",
+              }}
+            >
+              <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase" }}>
+                Ops map
+              </span>
+              <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                live wiring between agents and systems
+              </span>
+              <span style={{ marginLeft: "auto", fontSize: 11, fontFamily: MONO, color: "var(--accent)" }}>
+                {showMap ? "Hide" : "Show"}
+              </span>
+            </button>
+            {showMap && (
+              <div style={{ borderTop: "1px solid var(--border)", padding: 12 }}>
+                <OpsMap agents={internal} volumes={data.volumes} watchdog={data.watchdog} onSelect={setSelection} />
+              </div>
+            )}
+          </section>
         </>
       )}
 

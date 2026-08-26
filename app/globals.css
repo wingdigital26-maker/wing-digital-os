@@ -133,12 +133,11 @@ aside {
 
 /* Content fade-in when switching views */
 main, section {
-  animation: viewIn 0.28s ease both;
+  /* Slide only, no opacity ramp: fading a whole view on every tab
+     switch made the dashboard read as permanently half-loaded. */
+  animation: viewIn 0.16s ease both;
 }
-@keyframes viewIn {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: none; }
-}
+@keyframes viewIn { from { transform: translateY(5px); } to { transform: none; } }
 
 /* Subtle pulse utility (used by status dots if any pick it up) */
 @keyframes pulseGlow {

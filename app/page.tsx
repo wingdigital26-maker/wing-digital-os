@@ -316,7 +316,7 @@ export default function Home() {
           </div>
           {/* CSS-only section transition: the new view mounts IMMEDIATELY
               (no JS-gated exit animation that can stall in background tabs). */}
-          <style>{`@keyframes viewIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }`}</style>
+          <style>{`@keyframes viewIn { from { transform: translateY(5px); } to { transform: none; } }`}</style>
           {/* Keep-alive views: each visited section stays mounted; only the
               active one is shown. Switching is instant, no reload/refetch. */}
           {visited.has("command") && <div className="app-view" style={{ display: active === "command" ? "block" : "none" }}><CommandCenter data={ghlData} loading={loading} onSendToAI={sendToAI} /></div>}

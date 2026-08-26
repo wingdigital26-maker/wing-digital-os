@@ -36,6 +36,174 @@ async function countWhere(filter: string): Promise<number> {
   return Number.isFinite(n) ? n : 0;
 }
 
+// ── Scraper health: did this client's watcher actually run, and do anything? ─
+// Two sources, both of which may not exist yet:
+//   crm_clients.last_scraped_at — when the watcher last touched this client
+//   watch_runs                  — per-run counters (queries/results/kept)
+// Neither is assumed. A missing column or a missing table is reported as
+// missing, never as a zero, because "ran and found nothing" and "we cannot
+// tell whether it ran" are completely different answers.
+export type WatchRun = {
+  client: string; queries: number | null; results: number | null;
+  kept: number | null; rejected: number | null; throttled: number | null;
+  ran_at: string | null;
+};
+export type WatchRuns = {
+  available: boolean;
+  reason: string | null;
+  byKey: Record<string, WatchRun>;
+};
+
+async function watchRuns(): Promise<WatchRuns> {
+  const none = (reason: string): WatchRuns => ({ available: false, reason, byKey: {} });
+  let res: Response;
+  try {
+    res = await sb("watch_runs?select=client,queries,results,kept,rejected,throttled,ran_at" +
+                   "&order=ran_at.desc&limit=500");
+  } catch (e) {
+    return none(`Could not reach the run log: ${e instanceof Error ? e.message : String(e)}`);
+  }
+  if (res.status === 404 || res.status === 400) {
+    const body = await res.text().catch(() => "");
+    if (body.includes("PGRST205") || body.includes("PGRST204") || res.status === 404) {
+      return none(
+        "The watch_runs table does not exist in the Sonar database yet, so per-run counters " +
+        "(queries issued, results returned, drafts kept) have never been recorded for anyone. " +
+        "This is a missing pipe, not a quiet week."
+      );
+    }
+    return none(`The run log returned HTTP ${res.status}: ${body.slice(0, 200)}`);
+  }
+  if (!res.ok) return none(`The run log returned HTTP ${res.status}.`);
+
+  const rows = (await res.json()) as WatchRun[];
+  // Newest run per client wins; the query already ordered newest-first.
+  const byKey: Record<string, WatchRun> = {};
+  for (const r of rows) {
+    const k = norm(String(r.client ?? ""));
+    if (k && !(k in byKey)) byKey[k] = r;
+  }
+  return {
+    available: true,
+    reason: rows.length ? null : "The watch_runs table exists but has no rows in it yet.",
+    byKey,
+  };
+}
+
+export type WatchState =
+  | "NOT_CONFIGURED" | "UNKNOWN" | "NEVER_RUN" | "RAN_FOUND_NOTHING" | "WORKING";
+
+export type Watch = {
+  state: WatchState;
+  /** Why this state, in Jack's words. Always populated. */
+  detail: string;
+  lastRanAt: string | null;
+  /** false when crm_clients has no last_scraped_at column at all. */
+  lastRanTracked: boolean;
+  run: WatchRun | null;
+  runsAvailable: boolean;
+  runsReason: string | null;
+  draftsWaiting: number | null;
+  draftsReason: string | null;
+};
+
+type Cfg = Record<string, unknown> & { slug?: string; name?: string; active?: boolean };
+
+// "Hero's Junk Removal's scraper" but "Northcomm Technologies' scraper".
+const poss = (n: string) => (n.endsWith("s") ? `${n}'` : `${n}'s`);
+
+function isConfigured(cfg: Cfg | null): boolean {
+  if (!cfg) return false;
+  const filled = (v: unknown) => typeof v === "string" && v.trim() !== "";
+  // A watcher needs something to hunt for and somewhere to hunt. Terms alone
+  // will not produce a query, and channels alone has nothing to search with.
+  return (filled(cfg.scrape_niche) || filled(cfg.scrape_terms)) && filled(cfg.scrape_cities);
+}
+
+function buildWatch(
+  cfg: Cfg | null, runs: WatchRuns, lastRanTracked: boolean,
+  drafts: number | null, draftsReason: string | null, name: string
+): Watch {
+  const key = norm(String(cfg?.name ?? name));
+  const bySlug = cfg?.slug ? runs.byKey[norm(String(cfg.slug))] : undefined;
+  const run = runs.byKey[key] ?? bySlug ?? null;
+  const lastRaw = lastRanTracked ? (cfg?.last_scraped_at as string | null | undefined) ?? null : null;
+  const lastRanAt = typeof lastRaw === "string" && lastRaw ? lastRaw : null;
+
+  const base = {
+    lastRanAt, lastRanTracked, run,
+    runsAvailable: runs.available, runsReason: runs.reason,
+    draftsWaiting: drafts, draftsReason,
+  };
+
+  if (!isConfigured(cfg)) {
+    return {
+      ...base, state: "NOT_CONFIGURED",
+      detail: !cfg
+        ? `${name} has no row in crm_clients, so no watcher is pointed at them at all. ` +
+          `Nothing has ever been searched for on their behalf.`
+        : `${poss(name)} scraper has no niche/keywords or no cities set, so every run it takes part in ` +
+          `is incapable of producing a single result. Fill the fields in below and the next run will hunt.`,
+    };
+  }
+
+  if (!lastRanTracked && !runs.available) {
+    return {
+      ...base, state: "UNKNOWN",
+      detail:
+        `Nothing in the Sonar database records when ${name}'s watcher last ran. crm_clients has no ` +
+        `last_scraped_at column and ${runs.reason ?? "there is no run log"} — so the OS genuinely ` +
+        `cannot tell you whether this scraper is working. Do not read the empty panel as healthy.`,
+    };
+  }
+
+  if (!lastRanAt && !run) {
+    return {
+      ...base, state: "NEVER_RUN",
+      detail:
+        `${name} is configured, but no run has ever been recorded against them. Either the watcher ` +
+        `has not executed since run tracking was installed, or it is skipping this client.`,
+    };
+  }
+
+  const results = run?.results ?? null;
+  const kept = run?.kept ?? null;
+  if (run && results === 0) {
+    // Zero results is two different stories. Zero QUERIES means the watcher
+    // never actually searched — it counted this client and moved on, which is
+    // a broken run, not a quiet one. Do not blur the two together.
+    const searched = run.queries == null || run.queries > 0;
+    return {
+      ...base, state: "RAN_FOUND_NOTHING",
+      detail: searched
+        ? `The watcher ran and searched for ${name}, but every query came back empty — ` +
+          `${run.queries ?? "an unrecorded number of"} queries, 0 results. The scraper executed; ` +
+          `it just found nobody. Repeated empty runs usually mean the search terms are too narrow ` +
+          `or the source is blocking us.`
+        : `The watcher ran and logged ${name}, but issued ZERO queries for them — so it never ` +
+          `actually searched. Finding nothing was guaranteed before it started. This is a broken ` +
+          `run, not a quiet one: check that the watcher is reading this client's cities and ` +
+          `keywords, and that it is not being skipped or rate-limited.`,
+    };
+  }
+  if (run && (results ?? 0) > 0) {
+    return {
+      ...base, state: "WORKING",
+      detail:
+        `${run.queries ?? "?"} queries returned ${results} result${results === 1 ? "" : "s"}, ` +
+        `${kept ?? "an unrecorded number"} kept as drafts.`,
+    };
+  }
+  // Timestamp exists but no counters for it.
+  return {
+    ...base, state: "RAN_FOUND_NOTHING",
+    detail:
+      `${poss(name)} last_scraped_at says a watcher touched them, but no run counters exist for that ` +
+      `run (${runs.reason ?? "no matching watch_runs row"}), so how many queries it issued and ` +
+      `what it returned is unknown. Nothing was kept.`,
+  };
+}
+
 // ── Client profile (MRR + status) ──────────────────────────────────────────
 // Same vault source /api/clients reads: wiki/clients/*.md frontmatter. Read
 // directly rather than over HTTP so this works in the same request.
@@ -202,27 +370,60 @@ export async function GET(req: Request) {
       if (r.channel) c.channels.add(r.channel);
     }
     // Per-client scraper config — the hunting instructions the watcher runs on.
-    const cfgRes = await sb("crm_clients?select=slug,name,channels,scrape_niche,scrape_cities,scrape_terms,active");
-    const cfgs = cfgRes.ok ? ((await cfgRes.json()) as {
-      slug: string; name: string; channels: string | null; scrape_niche: string | null;
-      scrape_cities: string | null; scrape_terms: string | null; active: boolean;
-    }[]) : [];
+    // select=* rather than a column list: a concurrent migration is adding
+    // last_scraped_at, and naming a column that does not exist yet would make
+    // PostgREST 400 the whole request. Read whatever is there and detect it.
+    const cfgRes = await sb("crm_clients?select=*");
+    const cfgs = cfgRes.ok ? ((await cfgRes.json()) as Cfg[]) : [];
+    // Only true if the column genuinely exists on the returned rows.
+    const lastRanTracked = cfgs.some((c) => "last_scraped_at" in c);
     // A configured client with no outbound yet still belongs on the board.
-    for (const cfg of cfgs) byClient[cfg.name] ||= blank(cfg.name);
-    const cfgByName = Object.fromEntries(cfgs.map((c) => [c.name, c]));
+    for (const cfg of cfgs) {
+      const n = String(cfg.name ?? "");
+      if (n) byClient[n] ||= blank(n);
+    }
+    const cfgByName: Record<string, Cfg> =
+      Object.fromEntries(cfgs.filter((c) => c.name).map((c) => [String(c.name), c]));
+
+    // Per-run counters for every client, from the run log (may not exist yet).
+    const runs = await watchRuns();
 
     // Key facts (MRR, status) come from the vault client pages, matched by name.
     const profiles = await clientProfiles();
     const profByName = new Map(profiles.map((p) => [norm(p.name), p]));
 
+    // The rollup is drawn from one capped page of `outbound`. If that cap was
+    // hit, the per-client draft counts are a floor, not a number, and the UI
+    // must be told so rather than printing a confident total.
+    const ROLLUP_CAP = 5000;
+    const truncated = all.length >= ROLLUP_CAP;
+    const draftsReason = truncated
+      ? `Counted from the newest ${ROLLUP_CAP} outbound rows, which is all this query reads — ` +
+        `older drafts for this client are not included.`
+      : null;
+
     const clients = Object.values(byClient)
-      .map((c) => ({
-        ...c,
-        channels: Array.from(c.channels).sort(),
-        byChannel: Object.values(c.byChannel).sort((a, b) => b.total - a.total),
-        scraper: cfgByName[c.client] ?? null,
-        profile: profByName.get(norm(c.client)) ?? null,
-      }))
+      .map((c) => {
+        const cfg = cfgByName[c.client] ?? null;
+        return {
+          ...c,
+          channels: Array.from(c.channels).sort(),
+          byChannel: Object.values(c.byChannel).sort((a, b) => b.total - a.total),
+          // Narrow projection: exactly the fields the scraper editor writes back.
+          scraper: cfg
+            ? {
+                slug: String(cfg.slug ?? ""), name: String(cfg.name ?? ""),
+                channels: (cfg.channels as string | null) ?? null,
+                scrape_niche: (cfg.scrape_niche as string | null) ?? null,
+                scrape_cities: (cfg.scrape_cities as string | null) ?? null,
+                scrape_terms: (cfg.scrape_terms as string | null) ?? null,
+                active: Boolean(cfg.active),
+              }
+            : null,
+          watch: buildWatch(cfg, runs, lastRanTracked, c.draft, draftsReason, c.client),
+          profile: profByName.get(norm(c.client)) ?? null,
+        };
+      })
       .sort((a, b) => b.total - a.total);
 
     // The item list, filtered to the current selection.
@@ -248,7 +449,7 @@ export async function GET(req: Request) {
     // Delivery-side activity for whichever client is open.
     const selected = client || clients[0]?.client || "";
     const content = selected
-      ? await contentFor(cfgByName[selected]?.slug ?? null, selected)
+      ? await contentFor((cfgByName[selected]?.slug as string | undefined) ?? null, selected)
       : { available: false, source: null, reason: "No client selected.", items: [] };
 
     return NextResponse.json({ configured: true, clients, items, totals, content });

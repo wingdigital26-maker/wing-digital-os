@@ -5,6 +5,7 @@ import CrmClientSummary, {
   CHANNEL_LABEL, type ChannelRoll, type ClientProfile, type Scraper,
 } from "./CrmClientSummary";
 import CrmContentFeed, { type ContentFeed } from "./CrmContentFeed";
+import CrmScraperHealth, { type Watch } from "./CrmScraperHealth";
 
 // CRM — everything happening for a client, compartmentalized by client.
 //
@@ -17,7 +18,17 @@ import CrmContentFeed, { type ContentFeed } from "./CrmContentFeed";
 type ClientRollup = {
   client: string; total: number; draft: number; approved: number; sent: number;
   channels: string[]; byChannel: ChannelRoll[]; scraper: Scraper | null;
-  profile: ClientProfile | null;
+  profile: ClientProfile | null; watch?: Watch;
+};
+
+// The left rail needs the health state at a glance too, so a client whose
+// scraper is dead is visible before you click into them.
+const RAIL: Record<string, { mark: string; color: string; text: string }> = {
+  WORKING:           { mark: "●", color: "var(--green)",      text: "scraper working" },
+  RAN_FOUND_NOTHING: { mark: "◐", color: "var(--orange)",     text: "ran, found nothing" },
+  NEVER_RUN:         { mark: "○", color: "var(--red)",        text: "never run" },
+  NOT_CONFIGURED:    { mark: "⊘", color: "var(--red)",        text: "not configured" },
+  UNKNOWN:           { mark: "?", color: "var(--text-muted)", text: "run state unknown" },
 };
 type Item = {
   id: number; client: string; channel: string; recipient: string | null;
@@ -226,6 +237,19 @@ export default function CrmBoard() {
                     ? c.channels.map((ch) => CHANNEL_LABEL[ch] || ch).join(" · ")
                     : "no messages yet"}
                 </div>
+                {(() => {
+                  if (!c.watch || !RAIL[c.watch.state]) return null;
+                  const zeroQ = c.watch.state === "RAN_FOUND_NOTHING" &&
+                                c.watch.run != null && c.watch.run.queries === 0;
+                  const r = zeroQ
+                    ? { mark: "◌", color: "var(--red)", text: "ran, searched nothing" }
+                    : RAIL[c.watch.state];
+                  return (
+                    <div style={{ fontSize: 10, marginTop: 4, fontWeight: 600, color: r.color }}>
+                      <span aria-hidden>{r.mark}</span> {r.text}
+                    </div>
+                  );
+                })()}
               </button>
             );
           })}
@@ -243,6 +267,11 @@ export default function CrmBoard() {
               byChannel={current.byChannel}
             />
           )}
+
+          {/* Is this client's scraper actually working? Sits directly above the
+              settings that control it, so a broken state and the knobs that fix
+              it are in the same glance. */}
+          {current?.watch && <CrmScraperHealth watch={current.watch} name={current.client} />}
 
           {/* This client's own scraper: what it hunts, where, on which
               platforms. The watcher reads exactly these fields on every run,

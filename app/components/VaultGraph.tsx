@@ -1,33 +1,42 @@
 "use client";
 // VAULT GRAPH — Jack's business brain, drawn as a living map of notes + threads.
 //
-// RELIABILITY FIRST. The DEFAULT view is a plain HTML canvas-2D render
-// (react-force-graph-2d) that has NO WebGL dependency, so it draws on virtually
-// every browser — including ones where WebGL is disabled, blocked by the GPU
-// driver, or silently rendering black (the exact reason Jack kept seeing a blank
-// void). Nodes are filled glowing circles colored by the 5 folder families,
-// sized by degree (hubs bigger), with low-opacity links, flowing particles,
-// hover/search highlight and a visible dim floor.
+// 3D ONLY. This used to ship two renderers (a canvas-2D fallback plus an opt-in
+// WebGL galaxy) with a toggle between them. Jack only wants the galaxy, so the
+// 2D path and its toggle are gone: this component is now the data + chrome
+// shell, and VaultGraph3D does all the drawing. If WebGL is genuinely
+// unavailable — or the scene throws — we show an honest message instead of a
+// blank void (there is no longer a second renderer to fall back to).
 //
-// The 3D WebGL galaxy (bloom/glow, auto-orbit) is an OPT-IN "3D" toggle for when
-// Jack wants the show. It is code-split (loaded only when toggled) and wrapped
-// in an error boundary + an up-front WebGL capability probe: if WebGL is
-// unavailable or the scene throws, we fall straight back to the reliable 2D
-// canvas. So: 2D is the always-visible default, 3D is the enhancement.
+// ── Why the scene stays DARK in a light app ──
+// The app is a light theme, but this panel is deliberately a dark inset, not an
+// oversight. The galaxy's whole visual language is additive: bloom, glowing
+// node cores, luminous link particles. Every one of those effects is light
+// EMITTED against darkness — on a white ground bloom does nothing, particles
+// disappear, and the "map of a mind at night" metaphor collapses into gray
+// spaghetti. So instead of half-converting it, we commit: the panel reads as an
+// intentional observatory window set into the light UI — framed with a proper
+// bezel, and with its floating chrome styled as dark glass so the controls
+// belong to the scene rather than looking like light-theme cards stranded on a
+// black rectangle.
 //
 // This component is only ever loaded client-side (page.tsx imports it via
 // next/dynamic { ssr:false }).
 import { useEffect, useMemo, useRef, useState, useCallback, Component } from "react";
 import type { ReactNode } from "react";
 import dynamic from "next/dynamic";
-import ForceGraph2D from "react-force-graph-2d";
 import { sfx } from "../lib/sounds";
 import type { GNode, GLink } from "./graphTypes";
 
-// The 3D galaxy (and all of three.js) is only pulled in when Jack opts into 3D.
+// three.js is heavy, so the scene is still code-split out of the main bundle.
 const VaultGraph3D = dynamic(() => import("./VaultGraph3D"), { ssr: false });
 
 const LS_DATA = "wingos-vault-graph-3d-v1"; // cached graph JSON for instant paint
+
+// The scene's own ground color. Kept here (not just in VaultGraph3D) so the
+// wrapper paints the identical value behind the canvas — otherwise there is a
+// pale flash before WebGL takes over.
+const SCENE_BG = "#05060d";
 
 // ── Warm the graph API as soon as this module loads ──
 if (typeof window !== "undefined") {
@@ -57,15 +66,21 @@ const GROUP_FAMILY: Record<string, string> = {
   wiki: "knowledge", concepts: "knowledge", syntheses: "knowledge", personas: "knowledge", inbox: "knowledge",
   root: "other",
 };
+// LITERAL HEX ONLY — these feed three.js materials and canvas label sprites,
+// neither of which can resolve CSS custom properties. The old table mixed in
+// values like "var(--green)", which THREE.Color cannot parse: those groups were
+// silently painting the wrong color. They are also tuned BRIGHT on purpose,
+// because they are emitted against the dark scene (see the header note) and
+// need to sit above the bloom threshold to actually glow.
 const GROUP_COLORS: Record<string, string> = {
-  campaigns: "#f59e0b", seo: "var(--orange)", outreach: "#d97706", business: "#fcd34d",
-  clients: "var(--green)", partners: "#2dd4bf",
-  automations: "var(--accent-2)", agents: "#8b5cf6", state: "#c4b5fd",
-  wiki: "#38bdf8", concepts: "#7dd3fc", syntheses: "var(--accent)", personas: "var(--accent)", inbox: "#93c5fd",
+  campaigns: "#fbbf24", seo: "#f59e0b", outreach: "#fb923c", business: "#fcd34d",
+  clients: "#34d399", partners: "#2dd4bf",
+  automations: "#a78bfa", agents: "#8b5cf6", state: "#c4b5fd",
+  wiki: "#38bdf8", concepts: "#7dd3fc", syntheses: "#22d3ee", personas: "#67e8f9", inbox: "#93c5fd",
   root: "#94a3b8",
 };
 const FAMILY_COLOR: Record<string, string> = {
-  business: "#f59e0b", clients: "var(--green)", automation: "var(--accent-2)", knowledge: "#38bdf8", other: "#94a3b8",
+  business: "#fbbf24", clients: "#34d399", automation: "#a78bfa", knowledge: "#38bdf8", other: "#94a3b8",
 };
 const fallbackCache = new Map<string, string>();
 function colorOf(g: string): string {
@@ -75,7 +90,7 @@ function colorOf(g: string): string {
   if (!c) {
     let h = 0;
     for (let i = 0; i < g.length; i++) h = (h * 31 + g.charCodeAt(i)) >>> 0;
-    c = hslToHex(210 + (h % 20), 22, 60 + (h % 4) * 6);
+    c = hslToHex(200 + (h % 24), 45, 62 + (h % 4) * 5);
     fallbackCache.set(g, c);
   }
   return c;
@@ -94,32 +109,6 @@ function hslToHex(h: number, s: number, l: number): string {
 }
 
 const HUB_DEG = 8; // degree at which a node reads as a hub (bigger, brighter)
-
-// ── Pre-rendered glow sprites ──
-// shadowBlur is one of the most expensive canvas ops; running it per-node
-// per-frame across 150+ nodes destroys pan/drag framerate. Instead we bake a
-// soft radial-gradient glow ONCE per color into a tiny offscreen canvas and
-// drawImage() it — effectively free in the hot path. Cached by color.
-const glowSpriteCache = new Map<string, HTMLCanvasElement>();
-function glowSprite(color: string): HTMLCanvasElement | null {
-  if (typeof document === "undefined") return null;
-  let c = glowSpriteCache.get(color);
-  if (!c) {
-    const S = 64; // sprite is drawn scaled to the node, so a small base is fine
-    c = document.createElement("canvas");
-    c.width = S; c.height = S;
-    const g = c.getContext("2d");
-    if (!g) return null;
-    const grad = g.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
-    grad.addColorStop(0, color);
-    grad.addColorStop(0.35, color);
-    grad.addColorStop(1, "rgba(0,0,0,0)");
-    g.fillStyle = grad;
-    g.fillRect(0, 0, S, S);
-    glowSpriteCache.set(color, c);
-  }
-  return c;
-}
 
 // Node size by degree, wide range so hubs are dramatically bigger.
 function nodeVal(deg: number): number {
@@ -183,9 +172,8 @@ function buildGraph(raw: RawGraph): { nodes: GNode[]; links: GLink[] } {
 }
 
 // ── Error boundary ──
-// If the opt-in 3D WebGL scene throws (a bad postprocessing pass, a shader
-// compile failure, a library/version mismatch), we catch it here and tell the
-// parent to drop back to the reliable 2D canvas render instead of a blank void.
+// With the 2D renderer gone there is nothing to fall back TO, so a throw inside
+// the WebGL scene must surface as an honest message rather than a silent void.
 class GraphErrorBoundary extends Component<
   { onError: () => void; children: ReactNode },
   { failed: boolean }
@@ -208,28 +196,25 @@ class GraphErrorBoundary extends Component<
 
 export default function VaultGraph({ onSelectNode, onToggleTree }: { onSelectNode: (path: string) => void; onToggleTree?: () => void }) {
   const wrapRef = useRef<HTMLDivElement>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const fg2dRef = useRef<any>(null);
   const [size, setSize] = useState({ w: 800, h: 600 });
   const [graph, setGraph] = useState<{ nodes: GNode[]; links: GLink[] }>({ nodes: [], links: [] });
   const [loading, setLoading] = useState(true);
   const [restored, setRestored] = useState(false);
   const [query, setQuery] = useState("");
-  const [flow, setFlow] = useState(false); // off by default: particles force constant redraw
-  // 2D canvas is the reliable DEFAULT. 3D is an opt-in enhancement.
-  const [is3D, setIs3D] = useState(true); // open in 3D; effectiveIs3D still gates on webglOK so it falls back to 2D safely
-  // Glow (bloom / depth-of-field) is a 3D-only, opt-in flourish.
+  // FLOW IS ON BY DEFAULT (Jack's ask): the galaxy should always look alive, not
+  // wait for a click. VaultGraph3D bounds the cost by sampling a subset of links
+  // for the ambient stream instead of animating all ~884 of them.
+  const [flow, setFlow] = useState(true);
+  // Bloom / depth-of-field. Opt-in: it is the prettiest but priciest pass.
   const [glow, setGlow] = useState(false);
-  // Set by the error boundary / WebGL probe: forces the reliable 2D render.
-  const [safeMode, setSafeMode] = useState(false);
+  // Set by the error boundary: the scene threw and cannot be shown.
+  const [sceneFailed, setSceneFailed] = useState(false);
   const [mobile] = useState<boolean>(detectMobile);
   // Mobile-only: the cluttered control row collapses into one compact bar.
-  // Search expands inline, and Flow/Glow/legend/stats live in a tap-to-open
-  // popover so they stay out of the way until Jack wants them.
   const [mSearchOpen, setMSearchOpen] = useState(false);
   const [mMenuOpen, setMMenuOpen] = useState(false);
-  // WebGL capability probe. If the browser cannot create a WebGL context, 3D is
-  // disabled entirely and we never leave the always-visible 2D canvas.
+  // WebGL capability probe. There is no 2D fallback any more, so this decides
+  // between "galaxy" and "explain why there is no galaxy".
   const [webglOK] = useState<boolean>(() => {
     if (typeof document === "undefined") return true;
     try {
@@ -239,32 +224,13 @@ export default function VaultGraph({ onSelectNode, onToggleTree }: { onSelectNod
       return false;
     }
   });
-  const effectiveIs3D = is3D && webglOK && !safeMode;
-  const effectiveGlow = glow && effectiveIs3D;
-
-  // ── 3D "did it actually paint?" watchdog ──
-  // Even with WebGL available, the 3D scene can occasionally mount but never
-  // frame the layout (a slow three.js init, a lost context, a fit that fired
-  // pre-layout) — leaving a black void. VaultGraph3D calls onFramed() the moment
-  // it successfully frames. If that has NOT happened ~1.5s after 3D mounts with
-  // real data, we fall back to the always-reliable 2D canvas so SOMETHING is
-  // always visible on every load.
-  const threeFramed = useRef(false);
-  const markThreeFramed = useCallback(() => { threeFramed.current = true; }, []);
-  useEffect(() => {
-    if (!effectiveIs3D || !graph.nodes.length) return;
-    threeFramed.current = false;
-    const t = window.setTimeout(() => {
-      if (!threeFramed.current) setSafeMode(true); // 3D produced nothing → 2D
-    }, 1800); // just past VaultGraph3D's own 1500ms reframe so real 3D isn't downgraded
-    return () => window.clearTimeout(t);
-  }, [effectiveIs3D, graph.nodes.length]);
+  const canRender3D = webglOK && !sceneFailed;
 
   const onSelectRef = useRef(onSelectNode);
   onSelectRef.current = onSelectNode;
 
-  // Highlight state kept in refs (read by the canvas painter); a tick forces
-  // React re-renders so the canvas repaints even when the sim is cooled.
+  // Highlight state kept in refs (read by the scene); a tick forces React
+  // re-renders so dependent visuals resync.
   const highlightNodes = useRef<Set<string>>(new Set());
   const highlightLinks = useRef<Set<GLink>>(new Set());
   const hoverId = useRef<string | null>(null);
@@ -274,32 +240,6 @@ export default function VaultGraph({ onSelectNode, onToggleTree }: { onSelectNod
   // Bumped by the explicit Recenter button; the ONLY sanctioned way to re-fit
   // after Jack has taken control of the view.
   const [recenterN, setRecenterN] = useState(0);
-
-  // ── Interaction flag ──
-  // While panning / zooming / dragging (or while the sim is still hot) we draw
-  // simplified nodes (plain discs, no glow sprite, no labels) and drop link
-  // particles, then restore the pretty render when idle. Kept in a ref so the
-  // canvas painter reads it without forcing a React re-render every frame.
-  const interacting = useRef(false);
-  const interactTimer = useRef<number | null>(null);
-  // Once Jack pans/zooms/drags, we NEVER auto-fit/auto-center again (that was the
-  // "zips back" bug: the fit-to-view kept re-firing and fought his navigation).
-  // Only an explicit mode-switch or Recenter button clears this.
-  const hasUserInteracted = useRef(false);
-  // zoomToFit() itself emits onZoom/onZoomEnd; while this is set we treat those
-  // as OUR framing, not a user pan, so auto-fit doesn't mark itself "interacted".
-  const suppressZoom = useRef(false);
-  const markInteracting = useCallback(() => {
-    if (suppressZoom.current) return; // ignore our own programmatic zoomToFit
-    interacting.current = true;
-    hasUserInteracted.current = true;
-    if (interactTimer.current) window.clearTimeout(interactTimer.current);
-    // settle back to the pretty render shortly after the last interaction event
-    interactTimer.current = window.setTimeout(() => {
-      interacting.current = false;
-      bump(); // repaint pretty once idle
-    }, 220);
-  }, [bump]);
 
   // adjacency for neighborhood highlighting
   const adj = useMemo(() => {
@@ -316,9 +256,6 @@ export default function VaultGraph({ onSelectNode, onToggleTree }: { onSelectNod
   const stats = { nodes: graph.nodes.length, links: graph.links.length };
 
   // ── Size tracking ──
-  // The canvas needs explicit pixel dimensions. If the wrapper ever measures 0
-  // (a collapsed flex/absolute parent), fall back to the real viewport so the
-  // graph is NEVER rendered into a zero-height (invisible) canvas.
   useEffect(() => {
     const wrap = wrapRef.current;
     if (!wrap) return;
@@ -337,11 +274,6 @@ export default function VaultGraph({ onSelectNode, onToggleTree }: { onSelectNod
   }, []);
 
   // ── Load: cache instantly, then reconcile with the API ──
-  // The blank-graph bug was partly an empty first paint: a cache miss plus a slow
-  // or momentarily-empty /api/vault/graph response left graph.nodes at [] and
-  // neither the 2D nor 3D branch (both gated on nodes.length > 0) ever mounted.
-  // We now keep the cache-first paint AND retry the fetch until it returns a
-  // non-empty graph, so nodes are reliably populated on every load.
   useEffect(() => {
     let cancelled = false;
     const cached = loadCache();
@@ -359,8 +291,7 @@ export default function VaultGraph({ onSelectNode, onToggleTree }: { onSelectNod
           const ok = g && Array.isArray(g.nodes) && g.nodes.length > 0;
           if (!ok) {
             // Empty/invalid payload: keep any cached paint and retry a few times
-            // with backoff before giving up (never leaves a blank void if the
-            // API is briefly warming up).
+            // with backoff before giving up.
             if (tries < 4) { window.setTimeout(() => attempt(tries + 1), 400 * (tries + 1)); return; }
             setLoading(false);
             return;
@@ -378,7 +309,6 @@ export default function VaultGraph({ onSelectNode, onToggleTree }: { onSelectNod
         })
         .catch(() => {
           if (cancelled) return;
-          // Network error: retry with backoff; fall back to cache paint if any.
           if (tries < 4) { window.setTimeout(() => attempt(tries + 1), 400 * (tries + 1)); return; }
           setLoading(false);
         });
@@ -393,57 +323,9 @@ export default function VaultGraph({ onSelectNode, onToggleTree }: { onSelectNod
     const degs = graph.nodes.map(n => n.deg ?? 0);
     (window as unknown as { __vaultGraphDebug?: unknown }).__vaultGraphDebug = {
       nodes: graph.nodes.length, links: graph.links.length,
-      degMax: Math.max(...degs, 0), mobile, is3D: effectiveIs3D, webglOK,
+      degMax: Math.max(...degs, 0), mobile, webglOK, sceneFailed, flow,
     };
-  }, [graph, mobile, effectiveIs3D, webglOK]);
-
-  // ── 2D force tuning: wide spacing, then settle FAST and stay static ──
-  // A faster alpha decay means the layout converges in far fewer ticks and then
-  // freezes, so panning/zooming after settle are cheap redraws (no re-sim). We
-  // only reheat once, when new graph data actually arrives — never on pan/zoom.
-  const lastHeatedFor = useRef<number>(-1);
-  useEffect(() => {
-    if (effectiveIs3D) return; // 3D tunes its own forces
-    const fg = fg2dRef.current;
-    if (!fg || !graph.nodes.length) return;
-    fg.d3Force("charge")?.strength(mobile ? -120 : -200).distanceMax(1000);
-    fg.d3Force("link")?.distance(mobile ? 50 : 80).strength(0.08);
-    if (fg.d3Force("center")) fg.d3Force("center").strength(0.04);
-    // Settle fast and freeze: higher decay = fewer ticks to cool, cheaper idle.
-    fg.d3AlphaDecay?.(0.045);
-    fg.d3VelocityDecay?.(0.4);
-    // Reheat ONCE per distinct dataset (restored cache is already settled), so a
-    // re-render from a pan/hover never re-runs the whole simulation.
-    if (lastHeatedFor.current !== graph.nodes.length && !restored) {
-      lastHeatedFor.current = graph.nodes.length;
-      fg.d3ReheatSimulation?.();
-    }
-  }, [graph, mobile, effectiveIs3D, restored]);
-
-  // ── Frame the whole layout in view (2D) ──
-  // Auto-fit runs ONLY before Jack has interacted. After any pan/zoom/drag the
-  // view stays exactly where he left it (see hasUserInteracted). A mode switch
-  // clears the flag so the fresh render gets framed once.
-  const didFit = useRef(false);
-  const fitToView2D = useCallback((force = false) => {
-    const fg = fg2dRef.current;
-    if (!fg || !graph.nodes.length) return;
-    if (!force && hasUserInteracted.current) return; // never fight manual nav
-    suppressZoom.current = true;
-    try { fg.zoomToFit(600, mobile ? 30 : 60); } catch { /* pre-layout: retry on engine stop */ }
-    // Release after the zoom animation (600ms) plus a margin so the trailing
-    // onZoomEnd from our own framing doesn't count as a user interaction.
-    window.setTimeout(() => { suppressZoom.current = false; }, 750);
-  }, [graph.nodes.length, mobile]);
-  useEffect(() => {
-    if (effectiveIs3D || !graph.nodes.length) return;
-    // Entering (or re-entering) 2D is a fresh view; allow one framing pass.
-    hasUserInteracted.current = false;
-    didFit.current = false;
-    const t1 = window.setTimeout(() => fitToView2D(), 400);
-    const t2 = window.setTimeout(() => fitToView2D(), 1500);
-    return () => { window.clearTimeout(t1); window.clearTimeout(t2); };
-  }, [graph.nodes.length, fitToView2D, effectiveIs3D]);
+  }, [graph, mobile, webglOK, sceneFailed, flow]);
 
   // ── Search highlight: matches drive the same dim/highlight machinery ──
   useEffect(() => {
@@ -484,7 +366,7 @@ export default function VaultGraph({ onSelectNode, onToggleTree }: { onSelectNod
     bump();
   }, [adj, graph, bump]);
 
-  // ── Shared handlers (used by both 2D and 3D) ──
+  // ── Shared handlers ──
   const onNodeHover = useCallback((node: GNode | null) => {
     if (mobile) return; // no hover on touch
     const id = node?.id ?? null;
@@ -506,82 +388,6 @@ export default function VaultGraph({ onSelectNode, onToggleTree }: { onSelectNod
     if (!query.trim()) setNeighborhood(null);
   }, [query, setNeighborhood]);
 
-  // ── 2D canvas painters ──
-  // Node: a filled glowing circle, hubs bigger + brighter, dimmed nodes kept
-  // visible (0.22 floor). Labels fade in once zoomed in enough to read them.
-  const anyHi = highlightNodes.current.size > 0;
-  // NOTE: no shadowBlur anywhere in this painter (the hot path). The glow look
-  // comes from a pre-baked radial-gradient sprite drawn with drawImage, and it
-  // is skipped entirely while interacting so pan/drag stay buttery.
-  const paintNode = useCallback((node: GNode, ctx: CanvasRenderingContext2D, scale: number) => {
-    const x = node.x ?? 0, y = node.y ?? 0;
-    const on = !anyHi || highlightNodes.current.has(node.id);
-    const r = Math.max(1.5, (node.val ?? 1.6));
-    const color = node.color ?? "#94a3b8";
-    const busy = interacting.current;
-    ctx.save();
-    ctx.globalAlpha = on ? 1 : 0.22;
-
-    // Soft glow via a pre-rendered sprite (cheap drawImage) — pretty render only.
-    if (!busy) {
-      const sprite = glowSprite(color);
-      if (sprite) {
-        const gr = r * (node.isHub ? 3.4 : 2.6);
-        ctx.globalAlpha = (on ? 1 : 0.22) * (node.isHub ? 0.5 : 0.35);
-        ctx.drawImage(sprite, x - gr, y - gr, gr * 2, gr * 2);
-        ctx.globalAlpha = on ? 1 : 0.22;
-      }
-    }
-
-    // Solid disc (always).
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, 2 * Math.PI);
-    ctx.fillStyle = color;
-    ctx.fill();
-
-    if (node.isHub) {
-      // bright ring so hubs read as hubs even before you zoom in
-      ctx.lineWidth = 0.6;
-      ctx.strokeStyle = "rgba(255,255,255,0.85)";
-      ctx.stroke();
-    }
-
-    // Labels.
-    //  · HUBS: always labeled at any zoom, and kept even during pan/drag (there
-    //    are only a handful, so it stays cheap). A dark halo keeps text legible
-    //    over nodes and links.
-    //  · Leaves: fade in only when zoomed in enough, and hidden while busy.
-    const hubLabel = on && node.isHub;
-    const leafLabel = !busy && on && !node.isHub && scale > 2.4;
-    if (hubLabel || leafLabel) {
-      const fontSize = node.isHub
-        ? Math.min(10, Math.max(4.5, 17 / scale)) // hubs bigger, readable when zoomed out
-        : Math.min(5, 11 / scale);
-      ctx.font = `${node.isHub ? "700 " : ""}${fontSize}px ui-sans-serif, system-ui, sans-serif`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "top";
-      // light halo/background so the label stays legible over nodes and links
-      // (canvas can't read CSS vars; hardcoded light-theme pair: pale halo + dark ink)
-      ctx.lineWidth = fontSize * (node.isHub ? 0.6 : 0.4);
-      ctx.strokeStyle = "rgba(255,255,255,0.9)";
-      ctx.lineJoin = "round";
-      ctx.strokeText(node.name, x, y + r + 1);
-      ctx.fillStyle = node.isHub ? "#10141f" : "rgba(23,29,45,0.92)";
-      ctx.fillText(node.name, x, y + r + 1);
-    }
-    ctx.restore();
-  }, [anyHi]);
-
-  // Pointer hitbox so hover/click land on the visible circle.
-  const paintPointer = useCallback((node: GNode, color: string, ctx: CanvasRenderingContext2D) => {
-    const x = node.x ?? 0, y = node.y ?? 0;
-    const r = Math.max(2.5, (node.val ?? 1.6) + 1.5);
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, 2 * Math.PI);
-    ctx.fillStyle = color;
-    ctx.fill();
-  }, []);
-
   // ── Legend: families present ──
   const legend = useMemo(() => {
     const byFamily = new Map<string, Map<string, number>>();
@@ -595,83 +401,44 @@ export default function VaultGraph({ onSelectNode, onToggleTree }: { onSelectNod
       family: FAMILY_LABEL[f] ?? f,
       color: FAMILY_COLOR[f] ?? "#94a3b8",
       groups: [...(byFamily.get(f) ?? new Map()).entries()]
-        .sort((a, b) => b[1] - a[1]).slice(0, 5)
+        // 3 per family, not 5: the legend is a key, not an index, and at 5 it
+        // grew into a 200px slab crowding the bottom-left of the panel.
+        .sort((a, b) => b[1] - a[1]).slice(0, 3)
         .map(([g]) => [g, colorOf(g)] as [string, string]),
     }));
   }, [graph]);
 
+  const recenter = useCallback(() => setRecenterN(n => n + 1), []);
+
   return (
-    <div ref={wrapRef} className="vault-graph" style={{ position: "relative", width: "100%", height: "100%", minHeight: "60vh", maxWidth: "100%", borderRadius: 16, overflow: "hidden", border: "1px solid var(--border)", background: "var(--bg-secondary)" }}>
+    <div
+      ref={wrapRef}
+      className="vault-graph"
+      style={{
+        position: "relative", width: "100%", height: "100%", minHeight: "60vh", maxWidth: "100%",
+        borderRadius: 16, overflow: "hidden",
+        // Deliberate dark inset in a light app: a real bezel (hairline + soft
+        // outer shadow) so it reads as a framed window, not an unstyled hole.
+        background: SCENE_BG,
+        border: "1px solid var(--border)",
+        boxShadow: "0 18px 44px rgba(15,23,42,0.16), inset 0 0 0 1px rgba(148,163,184,0.10)",
+      }}
+    >
       {loading && (
-        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 14, zIndex: 2 }}>
+        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(203,213,225,0.65)", fontSize: 14, zIndex: 2 }}>
           Charting the galaxy...
         </div>
       )}
 
-      {/* Reliable 2D canvas — the DEFAULT, always drawn unless 3D is active. */}
-      {!effectiveIs3D && graph.nodes.length > 0 && (
-        <ForceGraph2D
-          ref={fg2dRef}
-          width={size.w}
-          height={size.h}
-          graphData={graph as unknown as { nodes: GNode[]; links: GLink[] }}
-          backgroundColor="rgba(0,0,0,0)"
-          nodeRelSize={1}
-          nodeLabel={(n: GNode) => n.name}
-          nodeCanvasObject={paintNode}
-          nodePointerAreaPaint={paintPointer}
-          linkColor={(l: GLink) => {
-            const on = !anyHi || highlightLinks.current.has(l);
-            const src = typeof l.source === "object" ? (l.source as GNode) : graph.nodes.find(n => n.id === l.source);
-            const base = src?.color ?? "#7fa8d9";
-            return on ? base : "rgba(127,168,217,0.08)";
-          }}
-          linkWidth={(l: GLink) => (highlightLinks.current.has(l) ? 1.4 : 0.3)}
-          linkCurvature={0.12}
-          linkDirectionalParticles={(l: GLink) => {
-            // Particles animate every frame, forcing a full-canvas redraw for as
-            // long as ANY exist. So: NONE at idle (graph stays static and cheap),
-            // and only on the few highlighted links while hovering/searching.
-            if (!flow || interacting.current || !anyHi) return 0;
-            return highlightLinks.current.has(l) ? 2 : 0;
-          }}
-          linkDirectionalParticleSpeed={0.004}
-          linkDirectionalParticleWidth={1.4}
-          linkDirectionalParticleColor={(l: GLink) => {
-            const src = typeof l.source === "object" ? (l.source as GNode) : graph.nodes.find(n => n.id === lid(l.source));
-            return src?.color ?? "#7fa8d9";
-          }}
-          warmupTicks={restored ? 0 : (mobile ? 12 : 20)}
-          cooldownTicks={mobile ? 60 : 80}
-          cooldownTime={8000}
-          onNodeHover={onNodeHover}
-          onNodeClick={onNodeClick}
-          onNodeDrag={markInteracting}
-          onNodeDragEnd={markInteracting}
-          onZoom={markInteracting}
-          onZoomEnd={markInteracting}
-          onBackgroundClick={onBgClick}
-          onEngineStop={() => {
-            // Frame once when the layout first settles, but never after Jack has
-            // already moved the view (that re-fit was the "zips back" bug).
-            if (!didFit.current && !hasUserInteracted.current) {
-              didFit.current = true;
-              fitToView2D();
-            }
-            if (!restored) sfx.playWhenReady("graph-arrive");
-          }}
-        />
-      )}
-
-      {/* Opt-in 3D WebGL galaxy — code-split; error boundary falls back to 2D. */}
-      {effectiveIs3D && graph.nodes.length > 0 && (
-        <GraphErrorBoundary onError={() => { setSafeMode(true); setGlow(false); }}>
+      {/* The galaxy — the one and only renderer. */}
+      {canRender3D && graph.nodes.length > 0 && (
+        <GraphErrorBoundary onError={() => { setSceneFailed(true); setGlow(false); }}>
           <VaultGraph3D
             graph={graph}
             size={size}
             mobile={mobile}
             flow={flow}
-            glow={effectiveGlow}
+            glow={glow}
             restored={restored}
             highlightNodes={highlightNodes}
             highlightLinks={highlightLinks}
@@ -680,16 +447,30 @@ export default function VaultGraph({ onSelectNode, onToggleTree }: { onSelectNod
             onNodeHover={onNodeHover}
             onNodeClick={onNodeClick}
             onBackgroundClick={onBgClick}
-            onFramed={markThreeFramed}
           />
         </GraphErrorBoundary>
       )}
 
+      {/* No WebGL / the scene threw: say so plainly instead of showing a void. */}
+      {!canRender3D && !loading && (
+        <div style={{
+          position: "absolute", inset: 0, zIndex: 2, display: "flex",
+          flexDirection: "column", alignItems: "center", justifyContent: "center",
+          gap: 8, padding: 24, textAlign: "center",
+        }}>
+          <p style={{ color: "#e2e8f0", fontSize: 14, fontWeight: 600 }}>The vault map needs WebGL</p>
+          <p style={{ color: "rgba(148,163,184,0.85)", fontSize: 12, maxWidth: 340, lineHeight: 1.5 }}>
+            {sceneFailed
+              ? "The 3D scene failed to start in this browser. Reload, or enable hardware acceleration."
+              : "This browser has WebGL disabled or blocked. Enable hardware acceleration to see the graph."}
+          </p>
+          <p style={{ color: "rgba(148,163,184,0.6)", fontSize: 11 }}>
+            {stats.nodes} notes · {stats.links} threads are still indexed — use the contents list to browse them.
+          </p>
+        </div>
+      )}
+
       {/* ═══════════ MOBILE: one compact, unobtrusive control bar ═══════════ */}
-      {/* The graph is the hero. All chrome collapses into a single quiet row of
-          icon buttons floating over the graph: contents (tree) · search ·
-          recenter · 3D · more. Search expands inline; Flow/Glow/legend/stats
-          live in the "more" popover so they never take standing space. */}
       {mobile && (
         <>
           <div className="vg-mbar" style={{
@@ -705,21 +486,9 @@ export default function VaultGraph({ onSelectNode, onToggleTree }: { onSelectNod
               <IconSearch />
             </button>
             <div style={{ flex: 1 }} />
-            <button
-              onClick={() => {
-                hasUserInteracted.current = false;
-                if (effectiveIs3D) setRecenterN(n => n + 1);
-                else fitToView2D(true);
-              }}
-              aria-label="Recenter map" title="Recenter" style={mIconStyle(false)}
-            ><IconRecenter /></button>
-            <button
-              onClick={() => { setSafeMode(false); setIs3D(v => !v); }}
-              aria-pressed={effectiveIs3D}
-              disabled={!webglOK}
-              aria-label="Toggle 3D" title={webglOK ? "Toggle 3D" : "3D needs WebGL"}
-              style={{ ...mIconStyle(effectiveIs3D), opacity: webglOK ? 1 : 0.4 }}
-            ><span style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.02em" }}>{effectiveIs3D ? "3D" : "2D"}</span></button>
+            <button onClick={recenter} aria-label="Recenter map" title="Recenter" style={mIconStyle(false)}>
+              <IconRecenter />
+            </button>
             <button onClick={() => { setMMenuOpen(o => !o); setMSearchOpen(false); }} aria-pressed={mMenuOpen} aria-label="More controls" title="More" style={mIconStyle(mMenuOpen)}>
               <IconSliders />
             </button>
@@ -734,42 +503,29 @@ export default function VaultGraph({ onSelectNode, onToggleTree }: { onSelectNod
               onChange={e => setQuery(e.target.value)}
               placeholder="Search notes..."
               aria-label="Search graph nodes"
-              style={{
-                position: "absolute", top: 52, left: 10, right: 10, zIndex: 4,
-                background: "var(--bg-card)", backdropFilter: "blur(8px)",
-                border: "1px solid rgba(96,165,250,0.4)", borderRadius: 10,
-                padding: "9px 12px", color: "var(--text-primary)", fontSize: 13, outline: "none",
-              }}
+              style={{ ...glassPanel(), position: "absolute", top: 52, left: 10, right: 10, zIndex: 4, borderRadius: 10, padding: "9px 12px", color: "#e8edf7", fontSize: 13, outline: "none" }}
             />
           )}
 
           {/* "More" popover — secondary toggles + legend + stats, tucked away */}
           {mMenuOpen && (
             <div className="vg-mpop" style={{
-              position: "absolute", top: 52, right: 10, zIndex: 5, width: "min(72vw, 260px)",
-              background: "var(--bg-card)", backdropFilter: "blur(10px)",
-              border: "1px solid var(--border)", borderRadius: 14, padding: 12,
-              boxShadow: "0 12px 40px rgba(0,0,0,0.5)",
+              ...glassPanel(), position: "absolute", top: 52, right: 10, zIndex: 5, width: "min(72vw, 260px)",
+              borderRadius: 14, padding: 12,
               display: "flex", flexDirection: "column", gap: 12,
             }}>
               <div style={{ display: "flex", gap: 8 }}>
                 <button onClick={() => setFlow(f => !f)} aria-pressed={flow} style={{ ...toggleStyle(flow), flex: 1, textAlign: "center" }}>Flow</button>
-                <button
-                  onClick={() => setGlow(g => !g)}
-                  aria-pressed={effectiveGlow}
-                  disabled={!effectiveIs3D}
-                  title={effectiveIs3D ? "Bloom / depth-of-field glow" : "Glow is available in 3D"}
-                  style={{ ...toggleStyle(effectiveGlow), flex: 1, textAlign: "center", opacity: effectiveIs3D ? 1 : 0.4 }}
-                >Glow</button>
+                <button onClick={() => setGlow(g => !g)} aria-pressed={glow} title="Bloom / depth-of-field glow" style={{ ...toggleStyle(glow), flex: 1, textAlign: "center" }}>Glow</button>
               </div>
-              <div style={{ borderTop: "1px solid var(--border)", paddingTop: 10, display: "flex", flexDirection: "column", gap: 6, maxHeight: "34vh", overflow: "auto" }}>
-                <p style={{ fontSize: 9, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+              <div style={{ borderTop: "1px solid rgba(148,163,184,0.18)", paddingTop: 10, display: "flex", flexDirection: "column", gap: 6, maxHeight: "34vh", overflow: "auto" }}>
+                <p style={{ fontSize: 9, fontWeight: 700, color: "rgba(148,163,184,0.9)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
                   {stats.nodes} notes · {stats.links} threads
                 </p>
                 {legend.map(({ family, color }) => (
                   <div key={family} style={{ display: "flex", alignItems: "center", gap: 7 }}>
                     <span style={{ width: 8, height: 8, borderRadius: "50%", background: color, boxShadow: `0 0 8px ${color}`, flexShrink: 0 }} />
-                    <span style={{ fontSize: 10.5, color: "var(--text-secondary)", textTransform: "capitalize" }}>{family}</span>
+                    <span style={{ fontSize: 10.5, color: "#cbd5e1", textTransform: "capitalize" }}>{family}</span>
                   </div>
                 ))}
               </div>
@@ -788,79 +544,49 @@ export default function VaultGraph({ onSelectNode, onToggleTree }: { onSelectNod
         placeholder="Search notes..."
         aria-label="Search graph nodes"
         style={{
-          position: "absolute", top: 12, right: 12, zIndex: 3, width: 180, maxWidth: "40vw",
-          background: "var(--bg-card)", backdropFilter: "blur(6px)",
-          border: "1px solid var(--border)", borderRadius: 10,
-          padding: "7px 12px", color: "var(--text-primary)", fontSize: 12, outline: "none",
+          ...glassPanel(), position: "absolute", top: 12, right: 12, zIndex: 3, width: 180, maxWidth: "40vw",
+          borderRadius: 10, padding: "7px 12px", color: "#e8edf7", fontSize: 12, outline: "none",
         }}
       />
 
       {/* Stats chip */}
-      <div className="vg-stats" style={{
-        position: "absolute", top: 12, left: 12, zIndex: 3,
-        background: "var(--bg-card)", backdropFilter: "blur(6px)",
-        border: "1px solid var(--border)", borderRadius: 12, padding: "8px 12px",
-      }}>
-        <p style={{ fontSize: 9.5, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 3 }}>
+      <div className="vg-stats" style={{ ...glassPanel(), position: "absolute", top: 12, left: 12, zIndex: 3, borderRadius: 12, padding: "8px 12px" }}>
+        <p style={{ fontSize: 9.5, fontWeight: 700, color: "#e2e8f0", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 3 }}>
           Vault Map
         </p>
-        <p style={{ fontSize: 10.5, color: "var(--text-muted)" }}>
+        <p style={{ fontSize: 10.5, color: "rgba(148,163,184,0.95)" }}>
           {stats.nodes} notes · {stats.links} threads{restored ? " · restored" : ""}
         </p>
       </div>
 
-      {/* Toggles */}
+      {/* Toggles — the 2D/3D switch is gone; 3D is the only mode now. */}
       <div className="vg-toggles" style={{ position: "absolute", top: 54, right: 12, zIndex: 3, display: "flex", gap: 6 }}>
-        <button
-          onClick={() => {
-            // Explicit re-frame. Clears the "hands off" flag and fits once.
-            hasUserInteracted.current = false;
-            if (effectiveIs3D) setRecenterN(n => n + 1);
-            else fitToView2D(true);
-          }}
-          title="Re-frame the whole map"
-          style={toggleStyle(false)}
-        >Recenter</button>
-        <button
-          onClick={() => setFlow(f => !f)}
-          aria-pressed={flow}
-          style={toggleStyle(flow)}
-        >Flow</button>
-        {/* Glow is a 3D-only flourish; disabled in the reliable 2D view. */}
-        <button
-          onClick={() => setGlow(g => !g)}
-          aria-pressed={effectiveGlow}
-          disabled={!effectiveIs3D}
-          title={effectiveIs3D ? "Bloom / depth-of-field glow" : "Glow is available in 3D"}
-          style={{ ...toggleStyle(effectiveGlow), opacity: effectiveIs3D ? 1 : 0.4, cursor: effectiveIs3D ? "pointer" : "not-allowed" }}
-        >Glow</button>
-        <button
-          onClick={() => { setSafeMode(false); setIs3D(v => !v); }}
-          aria-pressed={effectiveIs3D}
-          disabled={!webglOK}
-          title={webglOK ? "Toggle the 3D galaxy" : "3D needs WebGL, which this browser has disabled"}
-          style={{ ...toggleStyle(effectiveIs3D), opacity: webglOK ? 1 : 0.4, cursor: webglOK ? "pointer" : "not-allowed" }}
-        >{effectiveIs3D ? "3D" : "2D"}</button>
+        <button onClick={recenter} title="Re-frame the whole map" style={toggleStyle(false)}>Recenter</button>
+        <button onClick={() => setFlow(f => !f)} aria-pressed={flow} title="Animated link particles" style={toggleStyle(flow)}>Flow</button>
+        <button onClick={() => setGlow(g => !g)} aria-pressed={glow} title="Bloom / depth-of-field glow" style={toggleStyle(glow)}>Glow</button>
       </div>
 
       {/* Legend */}
       <div className="vg-legend" style={{
-        position: "absolute", bottom: 12, left: 12, zIndex: 3,
-        background: "var(--bg-card)", backdropFilter: "blur(6px)",
-        border: "1px solid var(--border)", borderRadius: 12, padding: "8px 12px",
+        ...glassPanel(), position: "absolute", bottom: 12, left: 12, zIndex: 3,
+        borderRadius: 12, padding: "8px 12px",
         display: "flex", flexDirection: "column", gap: 4, maxWidth: 220,
+        // The legend grows with the number of folder families and was running
+        // off the bottom of the panel (last rows clipped). Cap it against the
+        // panel height and let it scroll instead.
+        maxHeight: "calc(100% - 140px)", overflowY: "auto",
       }}>
         {legend.map(({ family, color, groups }) => (
           <div key={family}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
               <span style={{ width: 8, height: 8, borderRadius: "50%", background: color, boxShadow: `0 0 8px ${color}` }} />
-              <p style={{ fontSize: 8.5, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em" }}>{family}</p>
+              <p style={{ fontSize: 8.5, color: "rgba(148,163,184,0.95)", textTransform: "uppercase", letterSpacing: "0.08em" }}>{family}</p>
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, paddingLeft: 14 }}>
               {groups.map(([name, c]) => (
                 <div key={name} style={{ display: "flex", alignItems: "center", gap: 4 }}>
                   <span style={{ width: 6, height: 6, borderRadius: "50%", background: c }} />
-                  <span style={{ fontSize: 9.5, color: "var(--text-secondary)", textTransform: "capitalize" }}>{name}</span>
+                  <span style={{ fontSize: 9.5, color: "#cbd5e1", textTransform: "capitalize" }}>{name}</span>
                 </div>
               ))}
             </div>
@@ -869,24 +595,40 @@ export default function VaultGraph({ onSelectNode, onToggleTree }: { onSelectNod
       </div>
 
       {/* Hint */}
-      <div style={{ position: "absolute", bottom: 12, right: 12, zIndex: 3, fontSize: 9.5, color: "rgba(157,180,204,0.5)" }}>
-        hover to light · click to open · scroll to zoom
+      <div style={{ position: "absolute", bottom: 12, right: 12, zIndex: 3, fontSize: 9.5, color: "rgba(148,163,184,0.55)" }}>
+        hover to light · click to open · scroll to zoom · drag to orbit
       </div>
       </>)}
     </div>
   );
 }
 
+// ── Chrome styling ──
+// These panels float ON the dark scene, not on the light app surface, so they
+// deliberately use dark-glass literals instead of the light theme's --bg-card /
+// --text-* tokens. Using the light tokens here produced white cards stamped on
+// a black rectangle — the exact "accidental" look the dark-inset decision is
+// meant to avoid.
+function glassPanel(): React.CSSProperties {
+  return {
+    background: "rgba(12,16,28,0.72)",
+    backdropFilter: "blur(10px)",
+    WebkitBackdropFilter: "blur(10px)",
+    border: "1px solid rgba(148,163,184,0.20)",
+    boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
+  };
+}
+
 // Compact, quiet icon button used only in the mobile control bar.
 function mIconStyle(active: boolean): React.CSSProperties {
   return {
+    ...glassPanel(),
     display: "inline-flex", alignItems: "center", justifyContent: "center",
     width: 34, height: 34, minHeight: 34, padding: 0, flexShrink: 0,
-    background: active ? "rgba(96,165,250,0.22)" : "var(--bg-card)",
-    backdropFilter: "blur(6px)",
-    border: `1px solid ${active ? "rgba(96,165,250,0.55)" : "rgba(255,255,255,0.12)"}`,
+    background: active ? "rgba(56,189,248,0.24)" : "rgba(12,16,28,0.72)",
+    border: `1px solid ${active ? "rgba(56,189,248,0.55)" : "rgba(148,163,184,0.20)"}`,
     borderRadius: 10,
-    color: active ? "#dbeafe" : "var(--text-muted)",
+    color: active ? "#e0f2fe" : "#cbd5e1",
     cursor: "pointer",
   };
 }
@@ -898,11 +640,11 @@ function IconSliders() { return <svg {...ICO}><path d="M4 21v-7M4 10V3M12 21v-9M
 
 function toggleStyle(active: boolean): React.CSSProperties {
   return {
-    background: active ? "rgba(96,165,250,0.22)" : "var(--bg-card)",
-    backdropFilter: "blur(6px)",
-    border: `1px solid ${active ? "rgba(96,165,250,0.55)" : "rgba(255,255,255,0.1)"}`,
+    ...glassPanel(),
+    background: active ? "rgba(56,189,248,0.24)" : "rgba(12,16,28,0.72)",
+    border: `1px solid ${active ? "rgba(56,189,248,0.55)" : "rgba(148,163,184,0.20)"}`,
     borderRadius: 10, padding: "6px 12px",
-    color: active ? "#dbeafe" : "var(--text-muted)",
+    color: active ? "#e0f2fe" : "#cbd5e1",
     fontSize: 11, fontWeight: 600, cursor: "pointer",
   };
 }

@@ -69,7 +69,7 @@ export default function AgentBoard() {
       {/* Needs Jack queue */}
       {queue.length > 0 && (
         <div style={{
-          background: "radial-gradient(ellipse 90% 60% at 50% -20%, rgba(251,191,36,0.12), transparent 60%), linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))",
+          background: "radial-gradient(ellipse 90% 60% at 50% -20%, rgba(251,191,36,0.12), transparent 60%), linear-gradient(180deg, var(--bg-card), var(--bg-card))",
           border: "1px solid rgba(251,191,36,0.4)", borderRadius: 16, padding: 18,
           boxShadow: "0 8px 24px var(--bg-hover), 0 0 24px rgba(251,191,36,0.06)",
         }}>
@@ -120,7 +120,7 @@ export default function AgentBoard() {
             const isOpen = expanded === agent.id;
             return (
               <div key={agent.id} onClick={() => setExpanded(isOpen ? null : agent.id)} style={{
-                background: `radial-gradient(ellipse 90% 70% at 50% -25%, ${color}10, transparent 60%), linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))`,
+                background: `radial-gradient(ellipse 90% 70% at 50% -25%, ${color}10, transparent 60%), linear-gradient(180deg, var(--bg-card), var(--bg-card))`,
                 border: "1px solid var(--border)", borderRadius: 14, padding: "14px 16px",
                 cursor: "pointer", boxShadow: "0 6px 20px rgba(0,0,0,0.2)",
               }}>

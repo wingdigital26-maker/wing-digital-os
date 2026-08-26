@@ -93,7 +93,7 @@ export function KpiCard({
       variants={{ hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 260, damping: 26 } } }}
       initial="hidden" animate="show"
       style={{
-      background: `radial-gradient(ellipse 90% 70% at 50% -20%, ${color}14, transparent 60%), linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))`,
+      background: `radial-gradient(ellipse 90% 70% at 50% -20%, ${color}14, transparent 60%), linear-gradient(180deg, var(--bg-card), var(--bg-card))`,
       border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px",
       boxShadow: "0 8px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.04)",
       display: "flex", flexDirection: "column", gap: 10, minWidth: 0,
@@ -267,7 +267,7 @@ export function ChartCard({
 }) {
   return (
     <div style={{
-      background: "linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))",
+      background: "linear-gradient(180deg, var(--bg-card), var(--bg-card))",
       border: "1px solid var(--border)", borderRadius: 16, padding: "16px 20px 14px",
       boxShadow: "0 8px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.04)",
       minWidth: 0,

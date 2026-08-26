@@ -23,7 +23,7 @@ export default function TrustPanel() {
 
   if (!data) return (
     <div style={{
-      background: "linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))",
+      background: "linear-gradient(180deg, var(--bg-card), var(--bg-card))",
       border: "1px solid var(--border)", borderRadius: 16, padding: 20, marginBottom: 18,
     }} aria-label="Loading trust data">
       <div className="skel" style={{ height: 12, width: 160, marginBottom: 16 }} />
@@ -40,7 +40,7 @@ export default function TrustPanel() {
 
   return (
     <div style={{
-      background: "linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))",
+      background: "linear-gradient(180deg, var(--bg-card), var(--bg-card))",
       border: "1px solid var(--border)", borderRadius: 16, padding: 20,
       boxShadow: "0 8px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.04)",
       marginBottom: 18,

@@ -65,7 +65,7 @@ export default function ClientsBoard() {
           { label: "In pipeline", v: pipeline.length, c: "var(--orange)" },
         ].map(s => (
           <div key={s.label} style={{
-            background: `radial-gradient(ellipse 90% 70% at 50% -20%, ${s.c}14, transparent 60%), linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))`,
+            background: `radial-gradient(ellipse 90% 70% at 50% -20%, ${s.c}14, transparent 60%), linear-gradient(180deg, var(--bg-card), var(--bg-card))`,
             border: "1px solid var(--border)", borderRadius: 14, padding: "14px 18px",
           }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
@@ -92,7 +92,7 @@ export default function ClientsBoard() {
               onClick={() => { sfx.play("blip"); setHealthClient(c.name); }}
               title="Click for client health"
               style={{
-                background: "radial-gradient(ellipse 90% 70% at 50% -20%, rgba(52,211,153,0.12), transparent 60%), linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))",
+                background: "radial-gradient(ellipse 90% 70% at 50% -20%, rgba(52,211,153,0.12), transparent 60%), linear-gradient(180deg, var(--bg-card), var(--bg-card))",
                 border: "1px solid rgba(52,211,153,0.35)",
                 borderRadius: 14, padding: "16px 18px", cursor: "pointer",
               }}>
@@ -173,7 +173,7 @@ export default function ClientsBoard() {
                     onClick={() => { sfx.play("blip"); setHealthClient(c.name); }}
                     title="Click for client health"
                     style={{
-                      background: "linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))",
+                      background: "linear-gradient(180deg, var(--bg-card), var(--bg-card))",
                       border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", cursor: "pointer",
                     }}>
                     <div style={{ display: "flex", gap: 9, alignItems: "center", minWidth: 0 }}>

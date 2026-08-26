@@ -223,7 +223,7 @@ export default function ColdCallBoard({ onSendToAI }: { onSendToAI: (ctx: string
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
         {STAT_CARDS.map(s => (
           <div key={s.label} style={{
-            background: `radial-gradient(ellipse 90% 80% at 50% -30%, ${s.color}14, transparent 60%), linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))`,
+            background: `radial-gradient(ellipse 90% 80% at 50% -30%, ${s.color}14, transparent 60%), linear-gradient(180deg, var(--bg-card), var(--bg-card))`,
             border: "1px solid var(--border)", borderRadius: 14, padding: "14px 18px",
             boxShadow: "0 8px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.04)",
           }}>
@@ -292,7 +292,7 @@ export default function ColdCallBoard({ onSendToAI }: { onSendToAI: (ctx: string
             const expanded = expandedId === p.id;
             return (
               <div key={p.id} style={{
-                background: "linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))",
+                background: "linear-gradient(180deg, var(--bg-card), var(--bg-card))",
                 border: "1px solid var(--border)",
                 borderLeft: `3px solid ${sc}`,
                 borderRadius: 12, padding: "12px 16px",

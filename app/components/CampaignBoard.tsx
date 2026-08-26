@@ -37,7 +37,7 @@ export default function CampaignBoard() {
           { label: "Queued to go out", v: t.remaining, c: "var(--accent)" },
         ].map(s => (
           <div key={s.label} style={{
-            background: `radial-gradient(ellipse 90% 70% at 50% -20%, ${s.c}14, transparent 60%), linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))`,
+            background: `radial-gradient(ellipse 90% 70% at 50% -20%, ${s.c}14, transparent 60%), linear-gradient(180deg, var(--bg-card), var(--bg-card))`,
             border: "1px solid var(--border)", borderRadius: 14, padding: "14px 18px",
           }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
@@ -50,7 +50,7 @@ export default function CampaignBoard() {
       </div>
 
       {/* Recent sends */}
-      <div style={{ background: "linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))", border: "1px solid var(--border)", borderRadius: 14, padding: 18 }}>
+      <div style={{ background: "linear-gradient(180deg, var(--bg-card), var(--bg-card))", border: "1px solid var(--border)", borderRadius: 14, padding: 18 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
           <p style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.07em" }}>
             {showQueued ? `Queued for wave 3 (${data.queued.length})` : `Latest sends (${data.contacts.length})`}

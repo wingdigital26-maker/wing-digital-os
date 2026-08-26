@@ -665,7 +665,7 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
       {loading && (
         <div style={{
           borderRadius: 20, border: "1px solid rgba(34,211,238,0.15)", padding: "24px 28px",
-          background: "linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))",
+          background: "linear-gradient(180deg, var(--bg-card), var(--bg-card))",
         }}>
           <div className="skel" style={{ height: 12, width: 220, marginBottom: 20 }} />
           <div style={{ display: "flex", gap: 40, flexWrap: "wrap" }}>
@@ -683,7 +683,7 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
       {!loading && (
         <motion.div className="briefing-hero" variants={riseItem} style={{
           position: "relative",
-          background: "linear-gradient(120deg, rgba(34,211,238,0.10), rgba(167,139,250,0.08) 55%, rgba(16,19,31,0.4))",
+          background: "linear-gradient(120deg, rgba(34,211,238,0.10), rgba(167,139,250,0.08) 55%, var(--bg-card))",
           border: "1px solid rgba(34,211,238,0.25)",
           borderRadius: 20, padding: "24px 28px",
           boxShadow: "0 16px 48px var(--bg-hover), inset 0 1px 0 rgba(255,255,255,0.06)",
@@ -793,7 +793,7 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
       {/* Dispatch agent briefing */}
       {brief && (
         <div style={{
-          background: "radial-gradient(ellipse 90% 60% at 50% -20%, rgba(167,139,250,0.10), transparent 60%), linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))",
+          background: "radial-gradient(ellipse 90% 60% at 50% -20%, rgba(167,139,250,0.10), transparent 60%), linear-gradient(180deg, var(--bg-card), var(--bg-card))",
           border: "1px solid rgba(167,139,250,0.3)", borderRadius: 16, padding: "16px 20px",
           boxShadow: "0 8px 24px var(--bg-hover)",
         }}>
@@ -869,7 +869,7 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
         }
         return (
           <motion.div variants={riseItem} style={{
-            background: "linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))",
+            background: "linear-gradient(180deg, var(--bg-card), var(--bg-card))",
             border: "1px solid var(--border)", borderRadius: 16, padding: "16px 20px",
             boxShadow: "0 8px 24px var(--bg-hover)",
           }}>
@@ -924,7 +924,7 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
           );
           const baseStyle: React.CSSProperties = {
             position: "relative",
-            background: `radial-gradient(ellipse 90% 70% at 50% -20%, ${stat.color}14, transparent 60%), linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))`,
+            background: `radial-gradient(ellipse 90% 70% at 50% -20%, ${stat.color}14, transparent 60%), linear-gradient(180deg, var(--bg-card), var(--bg-card))`,
             border: "1px solid var(--border)",
             borderRadius: 16, padding: "18px 20px",
             boxShadow: "0 8px 24px var(--bg-hover), inset 0 1px 0 rgba(255,255,255,0.04)",
@@ -970,7 +970,7 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
       <motion.div variants={riseItem}>
         {/* Active Clients */}
         <div style={{
-          background: "linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))",
+          background: "linear-gradient(180deg, var(--bg-card), var(--bg-card))",
           border: "1px solid var(--border)", borderRadius: 16, padding: 20,
           boxShadow: "0 8px 24px var(--bg-hover), inset 0 1px 0 rgba(255,255,255,0.04)",
         }}>
@@ -1178,7 +1178,7 @@ function CompetitorIntel({ onSendToAI }: { onSendToAI: (ctx: string) => void }) 
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {sections.map((section, i) => (
             <div key={i} style={{
-              background: `linear-gradient(90deg, ${INTEL_COLORS[i % INTEL_COLORS.length]}0a, transparent 30%), linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))`,
+              background: `linear-gradient(90deg, ${INTEL_COLORS[i % INTEL_COLORS.length]}0a, transparent 30%), linear-gradient(180deg, var(--bg-card), var(--bg-card))`,
               border: "1px solid var(--border)",
               borderRadius: 14, overflow: "hidden",
               borderLeft: `3px solid ${INTEL_COLORS[i % INTEL_COLORS.length]}`,
@@ -1225,7 +1225,7 @@ function CompetitorIntel({ onSendToAI }: { onSendToAI: (ctx: string) => void }) 
       {/* Wing Digital vs market summary card */}
       {rawContent && (
         <div style={{
-          background: "linear-gradient(120deg, rgba(34,211,238,0.08), rgba(167,139,250,0.07) 60%, rgba(16,19,31,0.4))",
+          background: "linear-gradient(120deg, rgba(34,211,238,0.08), rgba(167,139,250,0.07) 60%, var(--bg-card))",
           border: "1px solid rgba(34,211,238,0.25)", borderRadius: 18, padding: 22,
           boxShadow: "0 12px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)",
         }}>
@@ -1386,7 +1386,7 @@ function Clients({ data, loading }: { data: any; loading: boolean }) {
           { label: "Avg Deal", value: loading || !clients.length ? "..." : `$${Math.round(mrr / clients.length).toLocaleString()}`, color: "var(--accent)" },
         ].map(s => (
           <div key={s.label} style={{
-            background: `radial-gradient(ellipse 90% 80% at 50% -30%, ${s.color}14, transparent 60%), linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))`,
+            background: `radial-gradient(ellipse 90% 80% at 50% -30%, ${s.color}14, transparent 60%), linear-gradient(180deg, var(--bg-card), var(--bg-card))`,
             border: "1px solid var(--border)", borderRadius: 14, padding: "16px 22px",
             flex: 1, minWidth: 140,
             boxShadow: "0 8px 24px var(--bg-hover), inset 0 1px 0 rgba(255,255,255,0.04)",
@@ -1404,7 +1404,7 @@ function Clients({ data, loading }: { data: any; loading: boolean }) {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 14 }}>
           {clients.map((client: any) => (
             <div key={client.id} style={{
-              background: "radial-gradient(ellipse 90% 60% at 50% -20%, rgba(52,211,153,0.1), transparent 60%), linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))",
+              background: "radial-gradient(ellipse 90% 60% at 50% -20%, rgba(52,211,153,0.1), transparent 60%), linear-gradient(180deg, var(--bg-card), var(--bg-card))",
               border: "1px solid var(--border)",
               borderRadius: 16, padding: 20,
               boxShadow: "0 8px 24px var(--bg-hover), inset 0 1px 0 rgba(255,255,255,0.04)",
@@ -1892,7 +1892,7 @@ function PersonalSection({ data }: { data: any }) {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16 }}>
 
         {/* Daily Tasks */}
-        <div style={{ background: "linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))", border: "1px solid var(--border)", borderRadius: 16, padding: 20, boxShadow: "0 8px 24px var(--bg-hover), inset 0 1px 0 var(--border)" }}>
+        <div style={{ background: "linear-gradient(180deg, var(--bg-card), var(--bg-card))", border: "1px solid var(--border)", borderRadius: 16, padding: 20, boxShadow: "0 8px 24px var(--bg-hover), inset 0 1px 0 var(--border)" }}>
           <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 14 }}>📋 Today's Tasks</p>
           <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
             <input value={newTask} onChange={e => setNewTask(e.target.value)}
@@ -1919,7 +1919,7 @@ function PersonalSection({ data }: { data: any }) {
         </div>
 
         {/* Goals */}
-        <div style={{ background: "linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))", border: "1px solid var(--border)", borderRadius: 16, padding: 20, boxShadow: "0 8px 24px var(--bg-hover), inset 0 1px 0 var(--border)" }}>
+        <div style={{ background: "linear-gradient(180deg, var(--bg-card), var(--bg-card))", border: "1px solid var(--border)", borderRadius: 16, padding: 20, boxShadow: "0 8px 24px var(--bg-hover), inset 0 1px 0 var(--border)" }}>
           <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 14 }}>🎯 Goals</p>
           <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
             <input value={newGoal} onChange={e => setNewGoal(e.target.value)}
@@ -1940,7 +1940,7 @@ function PersonalSection({ data }: { data: any }) {
       </div>
 
       {/* CLEP Bio Tracker */}
-      <div style={{ background: "linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))", border: "1px solid var(--border)", borderRadius: 16, padding: 20, boxShadow: "0 8px 24px var(--bg-hover), inset 0 1px 0 var(--border)" }}>
+      <div style={{ background: "linear-gradient(180deg, var(--bg-card), var(--bg-card))", border: "1px solid var(--border)", borderRadius: 16, padding: 20, boxShadow: "0 8px 24px var(--bg-hover), inset 0 1px 0 var(--border)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <p style={{ fontSize: 13, fontWeight: 700 }}>📚 CLEP Bio Study Tracker</p>
           <span style={{ fontSize: 12, color: daysLeft < 14 ? "var(--red)" : "var(--text-muted)" }}>{daysLeft} days until exam</span>
@@ -1985,7 +1985,7 @@ function PersonalSection({ data }: { data: any }) {
       {/* Lead Follow-up Tracker */}
       {staleLeads.length > 0 && (
         <div style={{
-          background: "radial-gradient(ellipse 90% 60% at 50% -20%, rgba(251,113,133,0.1), transparent 60%), linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))",
+          background: "radial-gradient(ellipse 90% 60% at 50% -20%, rgba(251,113,133,0.1), transparent 60%), linear-gradient(180deg, var(--bg-card), var(--bg-card))",
           border: "1px solid rgba(251,113,133,0.35)", borderRadius: 16, padding: 20,
           boxShadow: "0 8px 24px var(--bg-hover), 0 0 24px rgba(251,113,133,0.06)",
         }}>

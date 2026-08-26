@@ -7,10 +7,11 @@
 // per-client outreach) lives in the CRM section instead — the boundary is the
 // CLIENT_DELIVERY_AGENTS set in MissionControlCore.tsx.
 //
-// Layout: the primary content is a scannable roster (status, last run, next
-// run, last result). The force-directed ops map is demoted behind a toggle at
-// the bottom. Shared pieces live in MissionControlCore.tsx (also used by
-// /mission, which still shows everything). Reuses /api/mission.
+// Layout, top to bottom: watchdog banner, header, next-up strip, the OPS MAP
+// as a contained first-class panel (fixed-ish height, its own heading and
+// legend), then the scannable roster beside the activity ticker. The map shows
+// the wiring at a glance; the roster carries the detail. Shared pieces live in
+// MissionControlCore.tsx (also used by /mission). Reuses /api/mission.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -131,11 +132,24 @@ function Section({ title, count, note, children }: {
   );
 }
 
+/** Legend for the ops map. Colour is never the only cue — each chip is named. */
+function LegendChip({ color, label, dashed }: { color: string; label: string; dashed?: boolean }) {
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
+      <span style={{
+        width: 10, height: 10, borderRadius: "50%",
+        border: `1.5px ${dashed ? "dashed" : "solid"} ${color}`,
+        background: "var(--bg-card)", flexShrink: 0,
+      }} />
+      {label}
+    </span>
+  );
+}
+
 export default function MissionOps() {
   const [data, setData] = useState<MissionData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selection, setSelection] = useState<Selection>(null);
-  const [showMap, setShowMap] = useState(false);
 
   const aliveRef = useRef(true);
   const load = useCallback(async () => {
@@ -232,6 +246,38 @@ export default function MissionOps() {
           {/* What fires in the next 24 hours, in order */}
           <NextUpStrip agents={internal} onSelect={setSelection} />
 
+          {/* Ops map — first-class, always visible, but contained: a card with
+              its own heading + legend and a bounded height so it never takes
+              over the page. Same Wing-only agent list as the roster below. */}
+          <section style={{
+            background: "var(--bg-card)", border: "1px solid var(--border)",
+            borderRadius: 14, overflow: "hidden",
+          }}>
+            <header style={{
+              padding: "14px 18px 12px", display: "flex", alignItems: "baseline",
+              gap: 10, flexWrap: "wrap",
+            }}>
+              <h2 style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--text-primary)", margin: 0 }}>
+                Ops map
+              </h2>
+              <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                how the internal agents wire into systems and the files they produce
+              </span>
+              <span style={{ display: "flex", alignItems: "center", gap: 14, marginLeft: "auto", flexWrap: "wrap" }}>
+                <LegendChip color="var(--accent)" label="Active" />
+                <LegendChip color="var(--map-idle)" label="Idle" />
+                <LegendChip color="var(--orange)" label="Trial" dashed />
+                <LegendChip color="var(--red)" label="Flagged" />
+              </span>
+            </header>
+            <div style={{ borderTop: "1px solid var(--border)", padding: 10 }}>
+              <OpsMap agents={internal} volumes={data.volumes} watchdog={data.watchdog} onSelect={setSelection} />
+            </div>
+            <div style={{ padding: "0 18px 13px", fontSize: 11, color: "var(--text-muted)" }}>
+              Hover a node to isolate its wiring · click anything to open its detail panel
+            </div>
+          </section>
+
           <div className="mission-ops-grid" style={{ display: "grid", gridTemplateColumns: "minmax(0, 2fr) minmax(280px, 1fr)", gap: 20, alignItems: "start" }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 20, minWidth: 0 }}>
               <Section title="Scheduled" count={scheduled.length} note="runs on a cron, unattended">
@@ -270,32 +316,6 @@ export default function MissionOps() {
             </section>
           </div>
 
-          {/* Ops map — demoted below the roster, collapsed by default. */}
-          <section style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 14, overflow: "hidden" }}>
-            <button
-              onClick={() => setShowMap(v => !v)}
-              style={{
-                width: "100%", display: "flex", alignItems: "center", gap: 10,
-                padding: "14px 18px", background: "transparent", border: "none", cursor: "pointer",
-                color: "var(--text-primary)", font: "inherit", textAlign: "left",
-              }}
-            >
-              <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase" }}>
-                Ops map
-              </span>
-              <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                live wiring between agents and systems
-              </span>
-              <span style={{ marginLeft: "auto", fontSize: 11, fontFamily: MONO, color: "var(--accent)" }}>
-                {showMap ? "Hide" : "Show"}
-              </span>
-            </button>
-            {showMap && (
-              <div style={{ borderTop: "1px solid var(--border)", padding: 12 }}>
-                <OpsMap agents={internal} volumes={data.volumes} watchdog={data.watchdog} onSelect={setSelection} />
-              </div>
-            )}
-          </section>
         </>
       )}
 

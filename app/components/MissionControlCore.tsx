@@ -371,11 +371,46 @@ export function MissionStyles() {
       .mo-flow { animation: moFlow 1.6s linear infinite; }
       @keyframes moFlow { from { stroke-dashoffset: 36; } to { stroke-dashoffset: 0; } }
       .mo-click { cursor: pointer; }
-      .mo-click:hover { filter: brightness(1.25); }
+      /* Light ground: "brighter on hover" washes out toward white, so the
+         light theme deepens instead. Dark theme keeps the original lift. */
+      .mo-click:hover { filter: brightness(0.93) saturate(1.12); }
+      :root[data-theme="dark"] .mo-click:hover { filter: brightness(1.25) saturate(1); }
+
+      /* ── Ops-map ink ramp ────────────────────────────────────────────
+         The map needs a three-step ink ramp (active / at-rest / tier label)
+         plus an "idle node" grey and a glow tint. SVG presentation
+         attributes read these fine via var(). Light values sit on bare :root
+         (bare :root is the light theme); the dark theme restores the original
+         near-black-ground values. Defined on :root, not .mo-map, so the map
+         legend outside the SVG can use the same ramp. */
+      :root {
+        --map-ink: var(--text-primary);
+        --map-ink-dim: var(--text-secondary);
+        --map-tier: var(--text-muted);
+        /* Mid-slate: reads clearly on white without competing with accents. */
+        --map-idle: #94a1bd;
+        --map-glow: rgba(14, 116, 144, 0.16);
+        /* Idle/active wire opacities — a hairline at 0.12 disappears on white,
+           but much above 0.2 the agent→system bundle becomes a hairball. */
+        --map-wire-idle: 0.18;
+        --map-wire-active: 0.5;
+        /* Halo painted behind map labels so wires crossing under them never
+           break the text. Matches the map's own ground, not the page's. */
+        --map-halo: var(--bg-secondary);
+      }
+      :root[data-theme="dark"] {
+        --map-idle: #4b5563;
+        --map-glow: rgba(34, 211, 238, 0.25);
+        --map-wire-idle: 0.12;
+        --map-wire-active: 0.45;
+        --map-halo: var(--bg-primary);
+      }
+      /* Applied to free-floating SVG labels (not the ones inside a filled node). */
+      .mo-map-label { paint-order: stroke fill; stroke: var(--map-halo); stroke-width: 3.5px; stroke-linejoin: round; }
       .mo-panel { animation: moSlideIn 0.22s ease-out; }
       @keyframes moSlideIn { from { transform: translateX(40px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
       .mo-feedline { cursor: pointer; border-radius: 6px; padding: 2px 4px; margin: 0 -4px; }
-      .mo-feedline:hover { background: rgba(255,255,255,0.05); }
+      .mo-feedline:hover { background: var(--bg-hover); }
     `}</style>
   );
 }
@@ -412,19 +447,24 @@ export function OpsMap({ agents, volumes, watchdog, onSelect, hero }: {
   hero?: boolean;
 }) {
   const [hover, setHover] = useState<Hover>(null);
-  const W = 960, H = 500;
-  // Extra headroom above the agents arc for the watchdog overseer node.
-  // Extra headroom for the oversized boss orb (1.5x the agent nodes).
-  const TOP = watchdog?.available ? 100 : 0;
+  // Geometry is deliberately WIDE and SHORT (≈2.3:1). The tiers used to be
+  // 500 units tall, which meant a full-width panel rendered the SVG at well
+  // under 1x and shrank every label below legibility. Compressing the tier
+  // gaps (they carried no information) lets the map render at ~1.15x inside a
+  // normal content column, so labels are readable at rest without hovering.
+  const W = 960;
+  const Y_AGENT = 62, Y_SYS = 186, Y_ART = 296, H = 330;
+  // Extra headroom above the agents arc for the oversized watchdog orb.
+  const TOP = watchdog?.available ? 92 : 0;
   // Enabled agents plus trial agents (disabled but intentional, shown amber).
   const shown = agents.filter(a => a.enabled || a.trial);
   const agentPos = shown.map((a, i) => {
     const x = (W / (shown.length + 1)) * (i + 1);
     // gentle arc: edges sit a bit lower than the middle
     const t = (i / Math.max(shown.length - 1, 1)) * 2 - 1;
-    return { a, x, y: 66 + t * t * 22 };
+    return { a, x, y: Y_AGENT + t * t * 14 };
   });
-  const sysPos = SYSTEMS.map((s, i) => ({ s, x: (W / (SYSTEMS.length + 1)) * (i + 1), y: 300 }));
+  const sysPos = SYSTEMS.map((s, i) => ({ s, x: (W / (SYSTEMS.length + 1)) * (i + 1), y: Y_SYS }));
   const sysMap = new Map(sysPos.map(p => [p.s.id, p]));
   // artifact satellites hang below their parent system; spread siblings apart
   const artPos = ARTIFACTS.map(art => {
@@ -433,7 +473,7 @@ export function OpsMap({ agents, volumes, watchdog, onSelect, hero }: {
     const sp = sysMap.get(art.system);
     if (!sp) return null;
     const off = (idx - (siblings.length - 1) / 2) * 74;
-    return { art, x: sp.x + off, y: 430, color: sp.s.color, si: idx, sn: siblings.length };
+    return { art, x: sp.x + off, y: Y_ART, color: sp.s.color, si: idx, sn: siblings.length };
   }).filter(Boolean) as { art: typeof ARTIFACTS[number]; x: number; y: number; color: string; si: number; sn: number }[];
 
   // hover relationships
@@ -469,31 +509,36 @@ export function OpsMap({ agents, volumes, watchdog, onSelect, hero }: {
   const hovering = hover !== null;
   const wdProblems = !!watchdog && (watchdog.overall === "problems" || Math.max(watchdog.problemCount, watchdog.problems.length) > 0);
   const wdColor = wdProblems ? "var(--red)" : BOSS_CLEAR;
-  const wdX = W / 2, wdY = -TOP + 44;
+  const wdX = W / 2, wdY = -TOP + 46;
   // Boss orb is 1.5x an agent node (agent r=21 -> 31.5), glow kept proportional.
   const wdR = 31.5;
 
   return (
     <div className={`mo-map${hero ? " mo-map-hero" : ""}`} style={{
-      background: "linear-gradient(180deg, var(--bg-card, #0d1117), var(--bg-secondary))",
-      border: "1px solid var(--border, var(--border))",
+      // The map's ground is one step DARKER than a card so the node fills
+      // (var(--bg-card) = pure white on light) read as objects on a surface
+      // instead of vanishing into it.
+      background: "linear-gradient(180deg, var(--bg-secondary), var(--bg-primary))",
+      border: "1px solid var(--border)",
       borderRadius: 14, padding: 8, overflowX: "auto", WebkitOverflowScrolling: "touch",
       ...(hero ? { height: "clamp(440px, 74vh, 900px)", display: "flex" } : {}),
     }}>
       <svg className="mo-map-svg" viewBox={`0 ${-TOP} ${W} ${H + TOP}`}
         preserveAspectRatio={hero ? "xMidYMid meet" : undefined}
-        style={{ width: "100%", minWidth: 680, display: "block", ...(hero ? { height: "100%" } : {}) }}>
+        // minWidth is the legibility floor: below ~860px the map scales the
+        // 9px labels under readable size, so it scrolls sideways instead.
+        style={{ width: "100%", minWidth: 860, display: "block", ...(hero ? { height: "100%" } : {}) }}>
         <defs>
           <radialGradient id="mo-glow" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="rgba(34,211,238,0.25)" />
-            <stop offset="100%" stopColor="rgba(34,211,238,0)" />
+            <stop offset="0%" stopColor="var(--map-glow)" />
+            <stop offset="100%" stopColor="transparent" />
           </radialGradient>
         </defs>
 
         {/* faint tier labels */}
-        <text x={14} y={40} fill="#374151" fontSize="9" fontFamily="'JetBrains Mono', monospace" letterSpacing="0.2em">AGENTS</text>
-        <text x={14} y={286} fill="#374151" fontSize="9" fontFamily="'JetBrains Mono', monospace" letterSpacing="0.2em">SYSTEMS</text>
-        <text x={14} y={470} fill="#374151" fontSize="9" fontFamily="'JetBrains Mono', monospace" letterSpacing="0.2em">ARTIFACTS</text>
+        <text x={10} y={Y_AGENT - 34} className="mo-map-label" fill="var(--map-tier)" fontSize="9" fontFamily="'JetBrains Mono', monospace" letterSpacing="0.2em">AGENTS</text>
+        <text x={10} y={Y_SYS - 30} className="mo-map-label" fill="var(--map-tier)" fontSize="9" fontFamily="'JetBrains Mono', monospace" letterSpacing="0.2em">SYSTEMS</text>
+        <text x={10} y={Y_ART - 24} className="mo-map-label" fill="var(--map-tier)" fontSize="9" fontFamily="'JetBrains Mono', monospace" letterSpacing="0.2em">ARTIFACTS</text>
 
         {/* agent → system wires */}
         {agentPos.map(({ a, x, y }) =>
@@ -509,7 +554,7 @@ export function OpsMap({ agents, volumes, watchdog, onSelect, hero }: {
             return (
               <g key={`${a.key}-${sysId}`} opacity={dimmed ? 0.1 : 1}>
                 <path d={d} fill="none" stroke={color}
-                  strokeOpacity={highlighted ? 0.9 : active ? 0.45 : 0.12}
+                  style={{ strokeOpacity: highlighted ? 0.9 : active ? "var(--map-wire-active)" : "var(--map-wire-idle)" }}
                   strokeWidth={highlighted ? 2.2 : active ? 1.5 : 1} />
                 {(active || highlighted) && (
                   <path d={d} fill="none" stroke={color} strokeWidth={2.2}
@@ -532,7 +577,7 @@ export function OpsMap({ agents, volumes, watchdog, onSelect, hero }: {
           return (
             <g key={`w-${art.id}`} opacity={dimmed ? 0.1 : 1}>
               <path d={d} fill="none" stroke={color}
-                strokeOpacity={highlighted ? 0.9 : active ? 0.4 : 0.14}
+                style={{ strokeOpacity: highlighted ? 0.9 : active ? "var(--map-wire-active)" : "var(--map-wire-idle)" }}
                 strokeWidth={highlighted ? 2 : 1} strokeDasharray="2 5" />
               {(active || highlighted) && (
                 <path d={d} fill="none" stroke={color} strokeWidth={1.8}
@@ -571,7 +616,8 @@ export function OpsMap({ agents, volumes, watchdog, onSelect, hero }: {
               fontFamily="'JetBrains Mono', monospace" letterSpacing="0.06em" fontWeight="700" style={{ pointerEvents: "none" }}>
               DA BOSS
             </text>
-            <text x={wdX} y={wdY + wdR + 14} textAnchor="middle" fill={wdProblems ? "var(--red)" : "#6b7280"} fontSize="8.5"
+            <text x={wdX} y={wdY + wdR + 14} textAnchor="middle" className="mo-map-label"
+              fill={wdProblems ? "var(--red)" : "var(--map-ink-dim)"} fontSize="9"
               fontFamily="'JetBrains Mono', monospace" style={{ pointerEvents: "none" }}>
               {wdProblems
                 ? `${Math.max(watchdog.problemCount, watchdog.problems.length)} problem${Math.max(watchdog.problemCount, watchdog.problems.length) === 1 ? "" : "s"}`
@@ -586,7 +632,7 @@ export function OpsMap({ agents, volumes, watchdog, onSelect, hero }: {
           const trial = !a.enabled && !!a.trial;
           const highlighted = hovering && hoverAgents.has(a.key);
           const dimmed = hovering && !highlighted;
-          const color = trial ? "var(--orange)" : highlighted || active ? "var(--accent)" : "#4b5563";
+          const color = trial ? "var(--orange)" : highlighted || active ? "var(--accent)" : "var(--map-idle)";
           return (
             <g key={a.key} className="mo-click" opacity={dimmed ? 0.3 : 1}
               onMouseEnter={() => { sfx.play("hover"); setHover({ kind: "agent", key: a.key }); }}
@@ -598,13 +644,16 @@ export function OpsMap({ agents, volumes, watchdog, onSelect, hero }: {
                 strokeDasharray={trial ? "3 3" : undefined}
                 className={active ? "mo-node-pulse" : undefined} />
               <circle cx={x} cy={y - 28} r={3.5}
-                fill={a.watchdogState === "SILENT" ? "var(--red)" : a.watchdogState === "LATE" ? "var(--orange)" : trial ? "var(--orange)" : active ? "var(--green)" : "#4b5563"}
+                fill={a.watchdogState === "SILENT" ? "var(--red)" : a.watchdogState === "LATE" ? "var(--orange)" : trial ? "var(--orange)" : active ? "var(--green)" : "var(--map-idle)"}
                 className={active || (a.watchdogState && a.watchdogState !== "OK") ? "mo-pulse" : undefined} />
-              <text x={x} y={y + 4} textAnchor="middle" fill={trial ? "var(--orange)" : active || highlighted ? "#e5e7eb" : "#9ca3af"}
-                fontSize="9.5" fontFamily="'JetBrains Mono', monospace" style={{ pointerEvents: "none" }}>
+              {/* Labels are legible AT REST: at-rest ink is --text-secondary,
+                  not a hover-only reveal. */}
+              <text x={x} y={y + 4} textAnchor="middle" fill={trial ? "var(--orange)" : active || highlighted ? "var(--map-ink)" : "var(--map-ink-dim)"}
+                fontSize="9.5" fontWeight="600" fontFamily="'JetBrains Mono', monospace" style={{ pointerEvents: "none" }}>
                 {a.name.split(" ")[0].slice(0, 9).toUpperCase()}
               </text>
-              <text x={x} y={y + 40} textAnchor="middle" fill={trial ? "var(--orange)" : "#6b7280"} fontSize="8.5"
+              <text x={x} y={y + 40} textAnchor="middle" className="mo-map-label"
+                fill={trial ? "var(--orange)" : "var(--map-ink-dim)"} fontSize="9"
                 fontFamily="'JetBrains Mono', monospace" style={{ pointerEvents: "none" }}>
                 {trial ? "TRIAL" : a.nextRunAt ? fmtCountdown(a.nextRunAt) : a.lastLogDate ?? ""}
               </text>
@@ -623,7 +672,7 @@ export function OpsMap({ agents, volumes, watchdog, onSelect, hero }: {
               onClick={() => { sfx.play("blip-system"); onSelect({ type: "system", id: s.id }); }}>
               <rect x={x - 54} y={y - 20} width={108} height={40} rx={10}
                 fill="var(--bg-card)" stroke={s.color}
-                strokeOpacity={highlighted ? 1 : 0.6} strokeWidth={highlighted ? 2 : 1.4} />
+                strokeOpacity={highlighted ? 1 : 0.75} strokeWidth={highlighted ? 2 : 1.4} />
               <circle cx={x - 42} cy={y} r={4} fill={s.color} className="mo-pulse" />
               <text x={x + 5} y={y + 4} textAnchor="middle" fill={s.color} fontSize="10"
                 fontFamily="'JetBrains Mono', monospace" letterSpacing="0.08em" style={{ pointerEvents: "none" }}>
@@ -644,10 +693,10 @@ export function OpsMap({ agents, volumes, watchdog, onSelect, hero }: {
               onClick={() => { sfx.play("blip-artifact"); onSelect({ type: "artifact", id: art.id }); }}>
               <rect x={x - 34} y={y - 13} width={68} height={26} rx={7}
                 fill="var(--bg-card)" stroke={color}
-                strokeOpacity={highlighted ? 0.95 : 0.45} strokeWidth={highlighted ? 1.6 : 1}
+                strokeOpacity={highlighted ? 0.95 : 0.6} strokeWidth={highlighted ? 1.6 : 1}
                 strokeDasharray={highlighted ? undefined : "3 3"} />
-              <text x={x} y={y + 3.5} textAnchor="middle" fill={highlighted ? "#e5e7eb" : "#9ca3af"}
-                fontSize="8" fontFamily="'JetBrains Mono', monospace" style={{ pointerEvents: "none" }}>
+              <text x={x} y={y + 3.5} textAnchor="middle" fill={highlighted ? "var(--map-ink)" : "var(--map-ink-dim)"}
+                fontSize="8.5" fontFamily="'JetBrains Mono', monospace" style={{ pointerEvents: "none" }}>
                 {art.label}
               </text>
             </g>

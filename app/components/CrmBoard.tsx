@@ -9,9 +9,13 @@ import { sfx } from "../lib/sounds";
 // body, and approve / skip / copy / mark-sent. Reads /api/crm (Sonar Supabase),
 // so it works PC-off. Nothing here transmits — it keeps outbound checked.
 
+type Scraper = {
+  slug: string; name: string; channels: string | null; scrape_niche: string | null;
+  scrape_cities: string | null; scrape_terms: string | null; active: boolean;
+};
 type ClientRollup = {
   client: string; total: number; draft: number; approved: number; sent: number;
-  channels: string[];
+  channels: string[]; scraper: Scraper | null;
 };
 type Item = {
   id: number; client: string; channel: string; recipient: string | null;
@@ -43,6 +47,8 @@ export default function CrmBoard() {
   const [status, setStatus] = useState<string>("draft");
   const [edits, setEdits] = useState<Record<number, string>>({});
   const [copied, setCopied] = useState<number | null>(null);
+  const [cfg, setCfg] = useState<Scraper | null>(null);
+  const [cfgSaved, setCfgSaved] = useState(false);
 
   const load = useCallback(() => {
     const qs = new URLSearchParams();
@@ -58,6 +64,21 @@ export default function CrmBoard() {
   }, [client, status]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const c = data?.clients.find((x) => x.client === client);
+    setCfg(c?.scraper ? { ...c.scraper } : null);
+  }, [client, data?.clients]);
+
+  async function saveCfg() {
+    if (!cfg) return;
+    await fetch("/api/crm", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "config", ...cfg }),
+    });
+    sfx.play("blip");
+    setCfgSaved(true);
+    setTimeout(() => setCfgSaved(false), 1600);
+  }
 
   async function act(it: Item, action: "approve" | "skip" | "sent") {
     if (edits[it.id] !== undefined && edits[it.id] !== it.body) {
@@ -161,6 +182,62 @@ export default function CrmBoard() {
 
         {/* Messages for the selected client */}
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+
+          {/* This client's own scraper: what it hunts, where, on which
+              platforms. The watcher reads exactly these fields on every run,
+              so editing here retargets the next run. */}
+          {cfg && (
+            <section style={{
+              border: "1px solid var(--border,#1f2437)", borderRadius: 14,
+              padding: "13px 16px", background: "var(--accent-glow,rgba(34,211,238,.08))",
+              display: "flex", flexDirection: "column", gap: 8,
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <span style={{
+                  fontSize: 10.5, textTransform: "uppercase", letterSpacing: ".1em",
+                  fontWeight: 700, color: "var(--accent)",
+                }}>◉ {cfg.name}&apos;s scraper</span>
+                <span style={{ fontSize: 11.5, color: "var(--text-secondary)" }}>
+                  hunts <b style={{ color: "var(--text-primary)" }}>{cfg.scrape_niche || "?"}</b> customers
+                  in <b style={{ color: "var(--text-primary)" }}>{cfg.scrape_cities || "?"}</b>
+                  {" "}· runs 3x daily, PC off
+                </span>
+                <span style={{ flex: 1 }} />
+                <label style={{ fontSize: 11.5, color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: 5 }}>
+                  <input type="checkbox" checked={cfg.active}
+                    onChange={(e) => setCfg({ ...cfg, active: e.target.checked })} />
+                  active
+                </label>
+              </div>
+              <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))" }}>
+                {([["what they sell", "scrape_niche", "roofing"],
+                   ["cities to watch", "scrape_cities", "Plano,Frisco"],
+                   ["extra keywords", "scrape_terms", "roof leak,hail damage"],
+                   ["platforms", "channels", "nextdoor,reddit"]] as
+                  [string, "scrape_niche" | "scrape_cities" | "scrape_terms" | "channels", string][]
+                ).map(([label, key, ph]) => (
+                  <label key={key} style={{ fontSize: 10.5, color: "var(--text-muted)", display: "flex", flexDirection: "column", gap: 3 }}>
+                    {label}
+                    <input value={cfg[key] ?? ""} placeholder={ph}
+                      onChange={(e) => setCfg({ ...cfg, [key]: e.target.value })}
+                      style={{
+                        fontSize: 12.5, padding: "6px 9px", borderRadius: 8,
+                        border: "1px solid var(--border)", background: "var(--bg-card)",
+                        color: "var(--text-primary)", fontFamily: "inherit",
+                      }} />
+                  </label>
+                ))}
+              </div>
+              <div>
+                <button onClick={saveCfg} style={{
+                  fontSize: 11.5, padding: "5px 14px", borderRadius: 8, cursor: "pointer",
+                  border: "1px solid var(--accent)", color: "var(--accent)",
+                  background: "transparent", fontWeight: 600,
+                }}>{cfgSaved ? "saved — next run uses this" : "save scraper settings"}</button>
+              </div>
+            </section>
+          )}
+
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {["draft", "approved", "sent", "skipped", ""].map((s) => (
               <button key={s || "all"} onClick={() => setStatus(s)} style={{

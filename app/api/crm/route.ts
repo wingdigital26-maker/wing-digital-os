@@ -65,8 +65,23 @@ export async function GET(req: Request) {
       else if (r.status === "sent") c.sent++;
       if (r.channel) c.channels.add(r.channel);
     }
+    // Per-client scraper config — the hunting instructions the watcher runs on.
+    const cfgRes = await sb("crm_clients?select=slug,name,channels,scrape_niche,scrape_cities,scrape_terms,active");
+    const cfgs = cfgRes.ok ? ((await cfgRes.json()) as {
+      slug: string; name: string; channels: string | null; scrape_niche: string | null;
+      scrape_cities: string | null; scrape_terms: string | null; active: boolean;
+    }[]) : [];
+    // A configured client with no outbound yet still belongs on the board.
+    for (const cfg of cfgs) {
+      byClient[cfg.name] ||= {
+        client: cfg.name, total: 0, draft: 0, approved: 0, sent: 0, channels: new Set(),
+      };
+    }
+    const cfgByName = Object.fromEntries(cfgs.map((c) => [c.name, c]));
+
     const clients = Object.values(byClient)
-      .map((c) => ({ ...c, channels: Array.from(c.channels).sort() }))
+      .map((c) => ({ ...c, channels: Array.from(c.channels).sort(),
+                     scraper: cfgByName[c.client] ?? null }))
       .sort((a, b) => b.total - a.total);
 
     // The item list, filtered to the current selection.
@@ -102,6 +117,23 @@ export async function POST(req: Request) {
   if (!url || !key) return NextResponse.json({ ok: false, error: "not configured" });
   const b = await req.json().catch(() => ({}));
   const { id, action, body } = b as { id?: number; action?: string; body?: string };
+
+  // Scraper config save — updates the hunting instructions the watcher reads.
+  if (action === "config") {
+    const { slug, scrape_niche, scrape_cities, scrape_terms, channels, active } = b as {
+      slug?: string; scrape_niche?: string; scrape_cities?: string;
+      scrape_terms?: string; channels?: string; active?: boolean;
+    };
+    if (!slug) return NextResponse.json({ ok: false, error: "missing slug" }, { status: 400 });
+    const res = await fetch(`${url}/rest/v1/crm_clients?slug=eq.${encodeURIComponent(slug)}`, {
+      method: "PATCH",
+      headers: { apikey: key, Authorization: `Bearer ${key}`,
+                 "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({ scrape_niche, scrape_cities, scrape_terms, channels, active }),
+    });
+    return NextResponse.json({ ok: res.ok });
+  }
+
   if (!id) return NextResponse.json({ ok: false, error: "bad request" }, { status: 400 });
 
   const now = new Date().toISOString();

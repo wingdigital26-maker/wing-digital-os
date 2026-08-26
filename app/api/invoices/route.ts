@@ -131,12 +131,26 @@ function advanceRecurring(from: string, recurring: Recurring, after: string): st
   return next;
 }
 
-function addDays(iso: string, days: number): string {
+/**
+ * The last day of the month `monthsAhead` calendar months after `iso`.
+ *
+ * This is the payment-calendar horizon, and it is deliberately month-aligned
+ * rather than "today + N days": the board draws whole month grids, so a horizon
+ * that stops mid-month would count payments in its header that have no cell to
+ * live in. Header and grid must describe the same window.
+ */
+function endOfMonthAhead(iso: string, monthsAhead: number): string {
   const p = parseISO(iso);
   if (!p) return iso;
-  const dt = new Date(Date.UTC(p[0], p[1] - 1, p[2] + days));
-  return dt.toISOString().slice(0, 10);
+  const total0 = p[0] * 12 + (p[1] - 1) + monthsAhead;
+  const y = Math.floor(total0 / 12);
+  const m1 = (total0 % 12) + 1;
+  return `${y}-${String(m1).padStart(2, "0")}-${String(daysInMonth(y, m1)).padStart(2, "0")}`;
 }
+
+// The board renders exactly this many month grids, starting with the current
+// month. The API horizon is derived from it so the two can never disagree.
+const CALENDAR_MONTHS = 3;
 
 // ── Invoice numbering ──────────────────────────────────────────────────────
 // WD-YYYY-NNN, sequential within the calendar year. We read the highest number
@@ -185,7 +199,7 @@ export async function GET(req: Request) {
 
     const today = todayISO();
     const monthStart = today.slice(0, 7) + "-01";
-    const horizon = addDays(today, 90);
+    const horizon = endOfMonthAhead(today, CALENDAR_MONTHS - 1);
 
     let outstanding_cents = 0;
     let paid_this_month_cents = 0;
@@ -207,7 +221,8 @@ export async function GET(req: Request) {
     }
 
     // Upcoming payments: every live recurring schedule whose next_due_on falls
-    // in the next 90 days. This is what the payment calendar draws.
+    // between today and the end of the last month the board draws. This is
+    // exactly what the payment calendar draws — no counted-but-uncelled money.
     const upcoming = all
       .filter(
         (r) =>
@@ -244,6 +259,10 @@ export async function GET(req: Request) {
       },
       upcoming,
       today,
+      // The window the `upcoming` list actually covers, so the board can label
+      // its header with the truth instead of a hardcoded "90 days".
+      horizon,
+      calendar_months: CALENDAR_MONTHS,
     });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -272,11 +291,21 @@ export async function POST(req: Request) {
   // ── create ───────────────────────────────────────────────────────────────
   if (action === "create") {
     const client = String(b.client || "").trim();
-    const amount_cents = Math.round(Number(b.amount_cents));
     if (!client) return NextResponse.json({ ok: false, error: "client required" }, { status: 400 });
-    if (!Number.isFinite(amount_cents) || amount_cents < 0) {
-      return NextResponse.json({ ok: false, error: "amount_cents must be a whole number of cents" }, { status: 400 });
+    // Validate the RAW value before touching it. Rounding first would make the
+    // whole-number guard unfireable and would silently bill a cent nobody
+    // quoted (1250.7 → 1251). Money is only ever whole cents.
+    const rawAmount = Number(b.amount_cents);
+    if (!Number.isInteger(rawAmount)) {
+      return NextResponse.json(
+        { ok: false, error: "amount_cents must be a whole number of cents (no fractions) — received " + String(b.amount_cents) },
+        { status: 400 }
+      );
     }
+    if (rawAmount < 0) {
+      return NextResponse.json({ ok: false, error: "amount_cents must not be negative" }, { status: 400 });
+    }
+    const amount_cents = rawAmount;
     const recurring = (["monthly", "quarterly", "annual"] as const).includes(b.recurring as Recurring)
       ? (b.recurring as Recurring)
       : null;
@@ -315,7 +344,13 @@ export async function POST(req: Request) {
       const text = await res.text();
       const isDup = res.status === 409 || text.includes("23505") || text.includes("duplicate key");
       if (!isDup || supplied || attempt === 1) {
-        return NextResponse.json({ ok: false, error: text || `create failed (${res.status})` }, { status: 400 });
+        // Never hand the raw Postgres body to the board — it renders whatever
+        // it gets, and "code 23505 / constraint invoices_invoice_no_key" means
+        // nothing to Jack. Name the actual conflict instead.
+        const error = isDup
+          ? `Invoice number ${invoice_no} already exists.`
+          : `Could not create the invoice (${res.status}). Please try again.`;
+        return NextResponse.json({ ok: false, error }, { status: isDup ? 409 : 400 });
       }
     }
     return NextResponse.json({ ok: false, error: "invoice_no collision" }, { status: 409 });
@@ -344,8 +379,27 @@ export async function POST(req: Request) {
   } else if (action === "void") {
     patch = { status: "void", next_due_on: null };
   } else if (action === "paid") {
+    // IDEMPOTENCY. Advancing the schedule is destructive: a second "paid" would
+    // hop next_due_on another whole interval and silently erase a month of
+    // expected revenue. The UI disables the button, but a retried or duplicated
+    // network request must be safe too. Already paid → succeed, change nothing.
+    if (cur.status === "paid") {
+      return NextResponse.json({ ok: true, invoice: cur, unchanged: true });
+    }
+    if (typeof b.paid_on === "string" && b.paid_on && !parseISO(b.paid_on)) {
+      return NextResponse.json({ ok: false, error: "paid_on must be a YYYY-MM-DD date" }, { status: 400 });
+    }
     const paid_on =
       typeof b.paid_on === "string" && parseISO(b.paid_on) ? b.paid_on.slice(0, 10) : today;
+    // A future paid_on is money that would be recorded and then displayed
+    // nowhere: "paid this month" only counts paid_on <= today. Refuse it rather
+    // than swallow it.
+    if (paid_on > today) {
+      return NextResponse.json(
+        { ok: false, error: `paid_on cannot be in the future (${paid_on} is after today, ${today}).` },
+        { status: 400 }
+      );
+    }
     patch = { status: "paid", paid_on };
     if (cur.recurring) {
       // THE CALENDAR DRIVER. Marking a recurring invoice paid rolls its

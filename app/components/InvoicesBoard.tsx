@@ -51,6 +51,11 @@ type Payload = {
   };
   upcoming: Upcoming[];
   today?: string;
+  // Last date the API's `upcoming` list covers, and how many month grids that
+  // window is worth. The board draws exactly this many months so the header
+  // count and the cells always describe the same window.
+  horizon?: string;
+  calendar_months?: number;
 };
 
 const STATUS_COLOR: Record<string, string> = {
@@ -187,15 +192,18 @@ export default function InvoicesBoard() {
     load();
   }
 
-  // ── 3-month payment calendar ─────────────────────────────────────────────
-  // Buckets every upcoming payment onto its due date, then lays out three real
-  // month grids starting with the current month.
+  // ── Payment calendar ─────────────────────────────────────────────────────
+  // Buckets every upcoming payment onto its due date, then lays out one real
+  // month grid per month in the API's window, starting with the current month.
+  // The month count comes from the API so the grid can never be shorter than
+  // the horizon the header is counting.
+  const calendarMonths = Math.max(1, data?.calendar_months ?? 3);
   const months = useMemo(() => {
     const byDate: Record<string, Upcoming[]> = {};
     for (const u of data?.upcoming || []) (byDate[u.due_on] ||= []).push(u);
 
     const [ty, tm] = [Number(today.slice(0, 4)), Number(today.slice(5, 7))];
-    return [0, 1, 2].map((offset) => {
+    return Array.from({ length: calendarMonths }, (_, offset) => {
       const total0 = ty * 12 + (tm - 1) + offset;
       const y = Math.floor(total0 / 12);
       const m1 = (total0 % 12) + 1;
@@ -213,7 +221,7 @@ export default function InvoicesBoard() {
       );
       return { y, m1, cells, monthTotal, current: offset === 0 };
     });
-  }, [data?.upcoming, today]);
+  }, [data?.upcoming, today, calendarMonths]);
 
   const grouped = useMemo(() => {
     const g: Record<string, Invoice[]> = {};
@@ -250,6 +258,11 @@ export default function InvoicesBoard() {
   const t = data.totals;
   const next = t.next_payment;
 
+  // Describe the window that is actually drawn below, so the "N expected" count
+  // beside it can never refer to money with no cell to land in.
+  const lastMonth = months[months.length - 1];
+  const windowLabel = `through ${MONTHS[lastMonth.m1 - 1]} ${lastMonth.y}`;
+
   return (
     <div style={{ display: "grid", gap: 16 }}>
       {err ? <p style={{ color: "var(--red)", fontSize: 13, margin: 0 }}>Invoices: {err}</p> : null}
@@ -285,7 +298,7 @@ export default function InvoicesBoard() {
             Payment calendar
           </h3>
           <span style={{ ...num, fontSize: 12, color: "var(--text-muted)" }}>
-            next 90 days · {data.upcoming.length} expected
+            {windowLabel} · {data.upcoming.length} expected
           </span>
         </header>
 

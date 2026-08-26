@@ -365,7 +365,7 @@ function VolPill({ x, y, text, color, live, stale }: { x: number; y: number; tex
   return (
     <g style={{ pointerEvents: "none" }} opacity={stale ? 0.7 : 1}>
       <rect x={x - w / 2} y={y - 9} width={w} height={18} rx={9}
-        fill="rgba(13,17,23,0.92)" stroke={stroke} strokeOpacity={stale ? 0.9 : 0.7}
+        fill="var(--bg-card)" stroke={stroke} strokeOpacity={stale ? 0.9 : 0.7}
         strokeWidth={1} strokeDasharray={stale ? "3 2" : undefined} />
       {live && <circle cx={x - w / 2 + 8} cy={y} r={2.6} fill="var(--green)" />}
       <text x={x + (live ? 4 : 0)} y={y + 3} textAnchor="middle" fill={fill} fontSize="9"
@@ -442,7 +442,7 @@ export function OpsMap({ agents, volumes, watchdog, onSelect, hero }: {
 
   return (
     <div className={`mo-map${hero ? " mo-map-hero" : ""}`} style={{
-      background: "linear-gradient(180deg, var(--bg-card, #0d1117), rgba(10,12,20,0.9))",
+      background: "linear-gradient(180deg, var(--bg-card, #0d1117), var(--bg-secondary))",
       border: "1px solid var(--border, var(--border))",
       borderRadius: 14, padding: 8, overflowX: "auto", WebkitOverflowScrolling: "touch",
       ...(hero ? { height: "clamp(440px, 74vh, 900px)", display: "flex" } : {}),
@@ -531,7 +531,7 @@ export function OpsMap({ agents, volumes, watchdog, onSelect, hero }: {
             onMouseLeave={() => setHover(h => (h?.kind === "watchdog" ? null : h))}
             onClick={() => { sfx.play("blip-watchdog"); onSelect({ type: "watchdog" }); }}>
             {wdProblems && <circle cx={wdX} cy={wdY} r={wdR * 1.9} fill="url(#mo-glow)" />}
-            <circle cx={wdX} cy={wdY} r={wdR} fill="rgba(13,17,23,0.95)" stroke={wdColor}
+            <circle cx={wdX} cy={wdY} r={wdR} fill="var(--bg-card)" stroke={wdColor}
               strokeWidth={3} className={wdProblems ? "mo-node-pulse" : undefined} />
             <circle cx={wdX} cy={wdY - wdR - 7} r={5} fill={wdColor} className={wdProblems ? "mo-pulse" : undefined} />
             <text x={wdX} y={wdY + 4} textAnchor="middle" fill={wdColor} fontSize="11"
@@ -560,7 +560,7 @@ export function OpsMap({ agents, volumes, watchdog, onSelect, hero }: {
               onMouseLeave={() => setHover(h => (h?.kind === "agent" && h.key === a.key ? null : h))}
               onClick={() => { sfx.play("blip"); onSelect({ type: "agent", key: a.key }); }}>
               {(active || highlighted) && <circle cx={x} cy={y} r={32} fill="url(#mo-glow)" />}
-              <circle cx={x} cy={y} r={21} fill="rgba(13,17,23,0.95)" stroke={color}
+              <circle cx={x} cy={y} r={21} fill="var(--bg-card)" stroke={color}
                 strokeWidth={highlighted ? 2.2 : 1.5}
                 strokeDasharray={trial ? "3 3" : undefined}
                 className={active ? "mo-node-pulse" : undefined} />
@@ -589,7 +589,7 @@ export function OpsMap({ agents, volumes, watchdog, onSelect, hero }: {
               onMouseLeave={() => setHover(h => (h?.kind === "system" && h.id === s.id ? null : h))}
               onClick={() => { sfx.play("blip-system"); onSelect({ type: "system", id: s.id }); }}>
               <rect x={x - 54} y={y - 20} width={108} height={40} rx={10}
-                fill="rgba(13,17,23,0.95)" stroke={s.color}
+                fill="var(--bg-card)" stroke={s.color}
                 strokeOpacity={highlighted ? 1 : 0.6} strokeWidth={highlighted ? 2 : 1.4} />
               <circle cx={x - 42} cy={y} r={4} fill={s.color} className="mo-pulse" />
               <text x={x + 5} y={y + 4} textAnchor="middle" fill={s.color} fontSize="10"
@@ -610,7 +610,7 @@ export function OpsMap({ agents, volumes, watchdog, onSelect, hero }: {
               onMouseLeave={() => setHover(h => (h?.kind === "artifact" && h.id === art.id ? null : h))}
               onClick={() => { sfx.play("blip-artifact"); onSelect({ type: "artifact", id: art.id }); }}>
               <rect x={x - 34} y={y - 13} width={68} height={26} rx={7}
-                fill="rgba(13,17,23,0.95)" stroke={color}
+                fill="var(--bg-card)" stroke={color}
                 strokeOpacity={highlighted ? 0.95 : 0.45} strokeWidth={highlighted ? 1.6 : 1}
                 strokeDasharray={highlighted ? undefined : "3 3"} />
               <text x={x} y={y + 3.5} textAnchor="middle" fill={highlighted ? "#e5e7eb" : "#9ca3af"}

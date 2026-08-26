@@ -560,12 +560,13 @@ export default function VaultGraph({ onSelectNode, onToggleTree }: { onSelectNod
       ctx.font = `${node.isHub ? "700 " : ""}${fontSize}px ui-sans-serif, system-ui, sans-serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "top";
-      // dark halo/background so the label stays legible over nodes and links
+      // light halo/background so the label stays legible over nodes and links
+      // (canvas can't read CSS vars; hardcoded light-theme pair: pale halo + dark ink)
       ctx.lineWidth = fontSize * (node.isHub ? 0.6 : 0.4);
-      ctx.strokeStyle = "rgba(3,4,8,0.92)";
+      ctx.strokeStyle = "rgba(255,255,255,0.9)";
       ctx.lineJoin = "round";
       ctx.strokeText(node.name, x, y + r + 1);
-      ctx.fillStyle = node.isHub ? "#ffffff" : "rgba(226,232,240,0.92)";
+      ctx.fillStyle = node.isHub ? "#10141f" : "rgba(23,29,45,0.92)";
       ctx.fillText(node.name, x, y + r + 1);
     }
     ctx.restore();
@@ -600,7 +601,7 @@ export default function VaultGraph({ onSelectNode, onToggleTree }: { onSelectNod
   }, [graph]);
 
   return (
-    <div ref={wrapRef} className="vault-graph" style={{ position: "relative", width: "100%", height: "100%", minHeight: "60vh", maxWidth: "100%", borderRadius: 16, overflow: "hidden", border: "1px solid var(--border)", background: "#04050a" }}>
+    <div ref={wrapRef} className="vault-graph" style={{ position: "relative", width: "100%", height: "100%", minHeight: "60vh", maxWidth: "100%", borderRadius: 16, overflow: "hidden", border: "1px solid var(--border)", background: "var(--bg-secondary)" }}>
       {loading && (
         <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 14, zIndex: 2 }}>
           Charting the galaxy...
@@ -614,7 +615,7 @@ export default function VaultGraph({ onSelectNode, onToggleTree }: { onSelectNod
           width={size.w}
           height={size.h}
           graphData={graph as unknown as { nodes: GNode[]; links: GLink[] }}
-          backgroundColor="#04050a"
+          backgroundColor="rgba(0,0,0,0)"
           nodeRelSize={1}
           nodeLabel={(n: GNode) => n.name}
           nodeCanvasObject={paintNode}
@@ -735,7 +736,7 @@ export default function VaultGraph({ onSelectNode, onToggleTree }: { onSelectNod
               aria-label="Search graph nodes"
               style={{
                 position: "absolute", top: 52, left: 10, right: 10, zIndex: 4,
-                background: "rgba(8,9,15,0.92)", backdropFilter: "blur(8px)",
+                background: "var(--bg-card)", backdropFilter: "blur(8px)",
                 border: "1px solid rgba(96,165,250,0.4)", borderRadius: 10,
                 padding: "9px 12px", color: "var(--text-primary)", fontSize: 13, outline: "none",
               }}
@@ -746,7 +747,7 @@ export default function VaultGraph({ onSelectNode, onToggleTree }: { onSelectNod
           {mMenuOpen && (
             <div className="vg-mpop" style={{
               position: "absolute", top: 52, right: 10, zIndex: 5, width: "min(72vw, 260px)",
-              background: "rgba(8,9,15,0.94)", backdropFilter: "blur(10px)",
+              background: "var(--bg-card)", backdropFilter: "blur(10px)",
               border: "1px solid var(--border)", borderRadius: 14, padding: 12,
               boxShadow: "0 12px 40px rgba(0,0,0,0.5)",
               display: "flex", flexDirection: "column", gap: 12,
@@ -788,7 +789,7 @@ export default function VaultGraph({ onSelectNode, onToggleTree }: { onSelectNod
         aria-label="Search graph nodes"
         style={{
           position: "absolute", top: 12, right: 12, zIndex: 3, width: 180, maxWidth: "40vw",
-          background: "rgba(8,9,15,0.72)", backdropFilter: "blur(6px)",
+          background: "var(--bg-card)", backdropFilter: "blur(6px)",
           border: "1px solid var(--border)", borderRadius: 10,
           padding: "7px 12px", color: "var(--text-primary)", fontSize: 12, outline: "none",
         }}
@@ -797,7 +798,7 @@ export default function VaultGraph({ onSelectNode, onToggleTree }: { onSelectNod
       {/* Stats chip */}
       <div className="vg-stats" style={{
         position: "absolute", top: 12, left: 12, zIndex: 3,
-        background: "rgba(8,9,15,0.7)", backdropFilter: "blur(6px)",
+        background: "var(--bg-card)", backdropFilter: "blur(6px)",
         border: "1px solid var(--border)", borderRadius: 12, padding: "8px 12px",
       }}>
         <p style={{ fontSize: 9.5, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 3 }}>
@@ -845,7 +846,7 @@ export default function VaultGraph({ onSelectNode, onToggleTree }: { onSelectNod
       {/* Legend */}
       <div className="vg-legend" style={{
         position: "absolute", bottom: 12, left: 12, zIndex: 3,
-        background: "rgba(8,9,15,0.7)", backdropFilter: "blur(6px)",
+        background: "var(--bg-card)", backdropFilter: "blur(6px)",
         border: "1px solid var(--border)", borderRadius: 12, padding: "8px 12px",
         display: "flex", flexDirection: "column", gap: 4, maxWidth: 220,
       }}>
@@ -881,7 +882,7 @@ function mIconStyle(active: boolean): React.CSSProperties {
   return {
     display: "inline-flex", alignItems: "center", justifyContent: "center",
     width: 34, height: 34, minHeight: 34, padding: 0, flexShrink: 0,
-    background: active ? "rgba(96,165,250,0.22)" : "rgba(8,9,15,0.72)",
+    background: active ? "rgba(96,165,250,0.22)" : "var(--bg-card)",
     backdropFilter: "blur(6px)",
     border: `1px solid ${active ? "rgba(96,165,250,0.55)" : "rgba(255,255,255,0.12)"}`,
     borderRadius: 10,
@@ -897,7 +898,7 @@ function IconSliders() { return <svg {...ICO}><path d="M4 21v-7M4 10V3M12 21v-9M
 
 function toggleStyle(active: boolean): React.CSSProperties {
   return {
-    background: active ? "rgba(96,165,250,0.22)" : "rgba(8,9,15,0.72)",
+    background: active ? "rgba(96,165,250,0.22)" : "var(--bg-card)",
     backdropFilter: "blur(6px)",
     border: `1px solid ${active ? "rgba(96,165,250,0.55)" : "rgba(255,255,255,0.1)"}`,
     borderRadius: 10, padding: "6px 12px",

@@ -114,7 +114,7 @@ export default async function PortalPage({ params }: { params: Promise<{ slug: s
   const health = healthRows[0];
 
   const card: React.CSSProperties = {
-    background: "linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))",
+    background: "linear-gradient(180deg, var(--bg-card), var(--bg-secondary))",
     border: "1px solid var(--border)", borderRadius: 16, padding: 20,
   };
   const sectionTitle: React.CSSProperties = {

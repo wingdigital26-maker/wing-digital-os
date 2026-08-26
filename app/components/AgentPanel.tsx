@@ -375,7 +375,7 @@ function ChatPanel({ agent, onCost, inject }: { agent: AgentConfig; onCost: (c: 
       {showPicker && <NotePicker onSelect={attachNote} onClose={() => setShowPicker(false)} />}
       <div style={{
         flex: 1, display: "flex", flexDirection: "column",
-        background: "linear-gradient(180deg, var(--bg-card), rgba(12, 15, 26, 0.9))",
+        background: "linear-gradient(180deg, var(--bg-card), var(--bg-secondary))",
         border: "1px solid var(--border)",
         borderRadius: 16, overflow: "hidden",
         boxShadow: `0 12px 40px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04), 0 -1px 0 0 ${agent.color}55 inset`,

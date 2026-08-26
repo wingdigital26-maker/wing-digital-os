@@ -1,16 +1,24 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import IntelProposalCard, {
+  PROPOSAL_STATUSES,
+  type Proposal,
+} from "./IntelProposalCard";
 
 // ───────────────────────────────────────────────────────────────────────────
-// Creator / competitor intel — what the AI builders Wing follows just shipped.
+// Creator intel — and, primarily, the improvements it proposes for Wing's own
+// systems.
 //
-// Fed by /api/intel (Supabase `intel_items`, filled from free YouTube RSS).
-// Every field on screen came off the creator's own feed: title, publish date,
-// their own description. Nothing is machine-summarized, so an empty summary
-// stays empty rather than being filled with a guess. The takeaway is Jack's to
-// write. Kept from the old panel: "Ask Claude to Analyze", which hands the
-// current list to the assistant instead of pretending to interpret it here.
+// The watcher follows AI-builder channels, and the analyzer turns relevant
+// videos into concrete proposals. This panel is the "ask me first" gate: every
+// proposal waits here for a human yes or no. Approving records a decision and
+// queues the change for Jack to apply by hand — this UI applies nothing, sends
+// nothing, and has no auto-apply path.
+//
+// Below the proposals sits the raw video feed, unchanged: titles, dates and
+// the creators' own descriptions straight off each public feed. Nothing on
+// screen is invented — an empty field stays empty.
 // ───────────────────────────────────────────────────────────────────────────
 
 type Item = {
@@ -37,6 +45,10 @@ type Source = {
 };
 
 type Totals = { total: number; new: number; reviewed: number; actioned: number; ignored: number };
+
+type ProposalTotals = {
+  total: number; proposed: number; approved: number; rejected: number; applied: number; failed: number;
+};
 
 const STATUSES = ["new", "reviewed", "actioned", "ignored"] as const;
 
@@ -70,6 +82,11 @@ export default function CompetitorIntel({ onSendToAI }: { onSendToAI?: (ctx: str
   const [error, setError] = useState("");
   const [busy, setBusy] = useState<number | null>(null);
   const [expanded, setExpanded] = useState<number | null>(null);
+  const [proposals, setProposals] = useState<Proposal[]>([]);
+  const [proposalTotals, setProposalTotals] = useState<ProposalTotals | null>(null);
+  const [proposalStatus, setProposalStatus] = useState<string>("proposed");
+  const [pBusy, setPBusy] = useState<number | null>(null);
+  const [showFeed, setShowFeed] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -77,6 +94,7 @@ export default function CompetitorIntel({ onSendToAI }: { onSendToAI?: (ctx: str
       const qs = new URLSearchParams();
       if (status) qs.set("status", status);
       if (source) qs.set("source", source);
+      if (proposalStatus) qs.set("proposalStatus", proposalStatus);
       const res = await fetch(`/api/intel?${qs.toString()}`);
       const data = await res.json();
       setConfigured(data.configured !== false);
@@ -84,14 +102,31 @@ export default function CompetitorIntel({ onSendToAI }: { onSendToAI?: (ctx: str
       setItems(data.items ?? []);
       setSources(data.sources ?? []);
       setTotals(data.totals ?? null);
+      setProposals(data.proposals ?? []);
+      setProposalTotals(data.proposalTotals ?? null);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
-  }, [status, source]);
+  }, [status, source, proposalStatus]);
 
   useEffect(() => { void load(); }, [load]);
+
+  // Records a human decision on a proposal. Never applies the change.
+  async function decide(id: number, action: "approve" | "reject" | "undo") {
+    setPBusy(id);
+    try {
+      await fetch("/api/intel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: "proposal", id, action }),
+      });
+      await load();
+    } finally {
+      setPBusy(null);
+    }
+  }
 
   async function mark(id: number, action: string) {
     setBusy(id);
@@ -153,8 +188,8 @@ export default function CompetitorIntel({ onSendToAI }: { onSendToAI?: (ctx: str
         <div>
           <h2 style={{ fontSize: 18, fontWeight: 700, color: "var(--text-primary)" }}>Creator Intel</h2>
           <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>
-            New videos from the AI builders Wing follows. Titles, dates and descriptions come
-            straight off each channel&apos;s public feed — no summary is written for you.
+            The watcher follows AI builders and proposes changes to Wing&apos;s own systems.
+            Every proposal waits for your decision here.
           </p>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
@@ -214,6 +249,72 @@ export default function CompetitorIntel({ onSendToAI }: { onSendToAI?: (ctx: str
         </div>
       )}
 
+      {/* ── Proposals: the primary content, and the ask-me-first gate. ─────── */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "baseline", justifyContent: "space-between", flexWrap: "wrap" }}>
+          <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--text-primary)" }}>
+            Proposed improvements
+          </h3>
+          <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
+            {proposalTotals ? `${proposalTotals.proposed} waiting on you · ${proposalTotals.total} total` : ""}
+          </span>
+        </div>
+
+        {/* Say the safety rule out loud, every time. */}
+        <div style={{
+          ...card,
+          background: "var(--bg-secondary)",
+          borderColor: "var(--accent)",
+          padding: "12px 14px",
+        }}>
+          <p style={{ fontSize: 13, color: "var(--text-primary)", lineHeight: 1.55 }}>
+            <strong>Nothing here is applied automatically.</strong> Approving a proposal only
+            records your decision and queues it for you to apply by hand. This screen cannot
+            change any system, send anything, or run anything — approve, reject, and undo are
+            the only things these buttons do.
+          </p>
+        </div>
+
+        {/* Proposal status filter. */}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <button onClick={() => setProposalStatus("")} style={chip(proposalStatus === "")}>
+            All{proposalTotals ? ` (${proposalTotals.total})` : ""}
+          </button>
+          {PROPOSAL_STATUSES.map((s) => (
+            <button key={s} onClick={() => setProposalStatus(s)} style={chip(proposalStatus === s)}>
+              {s === "proposed" ? "waiting on you" : s}
+              {proposalTotals ? ` (${proposalTotals[s]})` : ""}
+            </button>
+          ))}
+        </div>
+
+        {!loading && proposals.length === 0 && (
+          <div style={card}>
+            <p style={{ fontSize: 13, color: "var(--text-muted)", lineHeight: 1.55 }}>
+              {proposalTotals && proposalTotals.total > 0
+                ? `No proposals with status "${proposalStatus || "any"}". Nothing is being hidden — the other filters above hold the rest.`
+                : "No proposals yet. Nothing has been analyzed into a suggested change, so there is nothing to approve. Proposals appear here only once a watched video has actually been analyzed."}
+            </p>
+          </div>
+        )}
+
+        {proposals.map((p) => (
+          <IntelProposalCard key={p.id} p={p} busy={pBusy === p.id} onDecide={(id, a) => void decide(id, a)} />
+        ))}
+      </div>
+
+      {/* ── Secondary: the raw video feed the proposals came from. ─────────── */}
+      <div style={{ display: "flex", gap: 10, alignItems: "baseline", justifyContent: "space-between", flexWrap: "wrap", borderTop: "1px solid var(--border)", paddingTop: 16 }}>
+        <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--text-secondary)" }}>
+          Source videos{totals ? ` (${totals.total})` : ""}
+        </h3>
+        <button onClick={() => setShowFeed(!showFeed)} style={actionBtn}>
+          {showFeed ? "Hide the video feed" : "Show the video feed"}
+        </button>
+      </div>
+
+      {showFeed && (
+      <>
       {/* Status filter. */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
         <button onClick={() => setStatus("")} style={chip(status === "")}>
@@ -331,6 +432,8 @@ export default function CompetitorIntel({ onSendToAI }: { onSendToAI?: (ctx: str
           );
         })}
       </div>
+      </>
+      )}
     </div>
   );
 }

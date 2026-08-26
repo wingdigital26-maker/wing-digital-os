@@ -397,13 +397,45 @@ export default function VaultGraph3D(props: {
   // we pick a bounded, deterministic sample of links to carry the ambient
   // stream: the map reads as alive and circulating, at a fixed cost regardless
   // of how big the vault grows. Hover/search still lights the FULL neighborhood.
-  const AMBIENT_MAX = 150;
+  const AMBIENT_MAX = 190;
   const ambientFlow = useMemo(() => {
     const s = new Set<GLink>();
     const n = graph.links.length;
     if (!n) return s;
-    const stride = Math.max(1, Math.ceil(n / AMBIENT_MAX));
-    for (let i = 0; i < n; i += stride) s.add(graph.links[i]);
+
+    // Sampling every Nth link in ARRAY order picks by insertion sequence, which
+    // has nothing to do with the graph's shape — the hubs have so many links
+    // that they soak up most of the sample, and the outer nodes end up static.
+    // Weight the selection by how peripheral a link is instead, so the flow
+    // visibly reaches the edges of the map rather than churning in the middle.
+    const degree = new Map<string, number>();
+    const idOf = (e: unknown) =>
+      typeof e === "string" ? e : String((e as { id?: string })?.id ?? "");
+    for (const l of graph.links) {
+      const a = idOf(l.source), b = idOf(l.target);
+      degree.set(a, (degree.get(a) ?? 0) + 1);
+      degree.set(b, (degree.get(b) ?? 0) + 1);
+    }
+    // A link's "outerness" is driven by its least-connected end: a leaf hanging
+    // off the graph scores high, a hub-to-hub link scores low.
+    const scored = graph.links.map((l) => {
+      const a = degree.get(idOf(l.source)) ?? 1;
+      const b = degree.get(idOf(l.target)) ?? 1;
+      return { l, outer: 1 / Math.min(a, b) };
+    });
+    scored.sort((x, y) => y.outer - x.outer);
+
+    // Two thirds to the periphery so the rim is alive, one third spread evenly
+    // through the rest so the core still circulates and it does not read as a
+    // hollow ring.
+    const rim = Math.min(scored.length, Math.floor(AMBIENT_MAX * 0.66));
+    for (let i = 0; i < rim; i++) s.add(scored[i].l);
+    const rest = scored.slice(rim);
+    const want = AMBIENT_MAX - s.size;
+    if (want > 0 && rest.length) {
+      const stride = Math.max(1, Math.ceil(rest.length / want));
+      for (let i = 0; i < rest.length && s.size < AMBIENT_MAX; i += stride) s.add(rest[i].l);
+    }
     return s;
   }, [graph.links]);
 

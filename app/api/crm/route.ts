@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server";
+import fs from "node:fs/promises";
+import path from "node:path";
+import { listVaultFiles, readVaultFile } from "@/lib/vaultSource";
 
 // ───────────────────────────────────────────────────────────────────────────
 // CRM API — every outbound message, compartmentalized by the client it is FOR.
@@ -33,6 +36,134 @@ async function countWhere(filter: string): Promise<number> {
   return Number.isFinite(n) ? n : 0;
 }
 
+// ── Client profile (MRR + status) ──────────────────────────────────────────
+// Same vault source /api/clients reads: wiki/clients/*.md frontmatter. Read
+// directly rather than over HTTP so this works in the same request.
+export type ClientProfile = {
+  file: string; name: string; owner: string; industry: string;
+  status: string; mrr: number | null; updated: string;
+};
+const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+function frontmatter(text: string): Record<string, string> {
+  const m = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  if (!m) return {};
+  const out: Record<string, string> = {};
+  for (const line of m[1].split(/\r?\n/)) {
+    const kv = line.match(/^([A-Za-z_][A-Za-z0-9_]*):\s*(.*)$/);
+    if (kv) out[kv[1].toLowerCase()] = kv[2].trim().replace(/^["']|["']$/g, "");
+  }
+  return out;
+}
+
+async function clientProfiles(): Promise<ClientProfile[]> {
+  try {
+    const files = (await listVaultFiles()).filter(
+      (f) => f.startsWith("wiki/clients/") && f.endsWith(".md") &&
+             f.split("/").length === 3 && !f.includes("_TEMPLATE")
+    );
+    const out: ClientProfile[] = [];
+    for (const rel of files) {
+      const text = await readVaultFile(rel);
+      if (!text) continue;
+      const fm = frontmatter(text);
+      const slug = rel.split("/").pop()!.replace(/\.md$/, "");
+      const mrr = fm.mrr != null && fm.mrr !== "" ? Number(fm.mrr) : NaN;
+      out.push({
+        file: rel,
+        name: fm.client_name || slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+        owner: fm.owner || "",
+        industry: fm.industry || "",
+        status: (fm.status || "active").toLowerCase(),
+        mrr: Number.isFinite(mrr) ? mrr : null,
+        updated: fm.updated || fm.date || "",
+      });
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+// ── Content / posting activity ─────────────────────────────────────────────
+// The ONLY structured per-client publish record that exists today is the
+// content engine's state file on Jack's PC. Anything else gets an honest
+// empty state naming exactly what is missing — never invented posts.
+export type ContentItem = {
+  date: string; type: string; title: string; status: string; url: string | null;
+};
+export type ContentFeed = {
+  available: boolean; source: string | null; reason: string | null; items: ContentItem[];
+};
+
+const CONTENT_STATE_FILES: Record<string, string> = {
+  "jackson-roofing": "jackson-content-state.json",
+};
+
+function logDirs(): string[] {
+  return [
+    path.join("C:", "Users", "wjack", "ghl-cli", "outreach_logs"),
+    path.join(process.cwd(), "..", "ghl-cli", "outreach_logs"),
+  ];
+}
+
+async function contentFor(slug: string | null, name: string): Promise<ContentFeed> {
+  const none = (reason: string): ContentFeed =>
+    ({ available: false, source: null, reason, items: [] });
+  if (!slug) {
+    return none(
+      `${name} has no row in crm_clients, so there is no slug to look up a content record with. ` +
+      `Add the client to crm_clients to wire posting activity in.`
+    );
+  }
+  const fileName = CONTENT_STATE_FILES[slug] ?? `${slug}-content-state.json`;
+  let raw: string | null = null;
+  let found = "";
+  let dirSeen = false;
+  for (const dir of logDirs()) {
+    try { await fs.access(dir); dirSeen = true; } catch { continue; }
+    const p = path.join(dir, fileName);
+    try { raw = await fs.readFile(p, "utf8"); found = p; break; } catch { /* next */ }
+  }
+  if (raw == null) {
+    if (!dirSeen) {
+      return none(
+        `Publishing records live in ghl-cli/outreach_logs on Jack's PC, which this server cannot reach ` +
+        `right now. Nothing is being hidden — the source is offline.`
+      );
+    }
+    return none(
+      `No content engine has ever written a publish record for ${name}. Expected ` +
+      `outreach_logs/${fileName}; it does not exist. Only Jackson Roofing's content engine writes one today.`
+    );
+  }
+  let parsed: unknown;
+  try { parsed = JSON.parse(raw); } catch {
+    return none(`Found ${fileName} but it is not valid JSON, so nothing can be shown from it.`);
+  }
+  const items: ContentItem[] = [];
+  const byDate = (parsed ?? {}) as Record<string, unknown>;
+  for (const [date, rows] of Object.entries(byDate)) {
+    if (!Array.isArray(rows)) continue;
+    for (const r of rows as Record<string, unknown>[]) {
+      items.push({
+        date,
+        type: String(r.type ?? ""),
+        title: String(r.title ?? ""),
+        status: String(r.status ?? ""),
+        url: typeof r.url === "string" ? r.url : null,
+      });
+    }
+  }
+  items.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+  return {
+    available: true,
+    source: found.replace(/\\/g, "/").split("/").slice(-2).join("/"),
+    reason: items.length ? null : `${fileName} exists but records no posts yet.`,
+    items: items.slice(0, 60),
+  };
+}
+
 export async function GET(req: Request) {
   const { url, key } = creds();
   if (!url || !key) {
@@ -51,18 +182,23 @@ export async function GET(req: Request) {
     const all = clientsRes.ok ? ((await clientsRes.json()) as {
       client: string; status: string; channel: string;
     }[]) : [];
-    const byClient: Record<string, {
+    type ChannelRoll = { channel: string; total: number; draft: number; approved: number; sent: number };
+    type Roll = {
       client: string; total: number; draft: number; approved: number; sent: number;
-      channels: Set<string>;
-    }> = {};
+      channels: Set<string>; byChannel: Record<string, ChannelRoll>;
+    };
+    const blank = (client: string): Roll => ({
+      client, total: 0, draft: 0, approved: 0, sent: 0, channels: new Set(), byChannel: {},
+    });
+    const byClient: Record<string, Roll> = {};
     for (const r of all) {
-      const c = (byClient[r.client] ||= {
-        client: r.client, total: 0, draft: 0, approved: 0, sent: 0, channels: new Set(),
-      });
-      c.total++;
-      if (r.status === "draft") c.draft++;
-      else if (r.status === "approved") c.approved++;
-      else if (r.status === "sent") c.sent++;
+      const c = (byClient[r.client] ||= blank(r.client));
+      const ch = r.channel || "unknown";
+      const cc = (c.byChannel[ch] ||= { channel: ch, total: 0, draft: 0, approved: 0, sent: 0 });
+      c.total++; cc.total++;
+      if (r.status === "draft") { c.draft++; cc.draft++; }
+      else if (r.status === "approved") { c.approved++; cc.approved++; }
+      else if (r.status === "sent") { c.sent++; cc.sent++; }
       if (r.channel) c.channels.add(r.channel);
     }
     // Per-client scraper config — the hunting instructions the watcher runs on.
@@ -72,16 +208,21 @@ export async function GET(req: Request) {
       scrape_cities: string | null; scrape_terms: string | null; active: boolean;
     }[]) : [];
     // A configured client with no outbound yet still belongs on the board.
-    for (const cfg of cfgs) {
-      byClient[cfg.name] ||= {
-        client: cfg.name, total: 0, draft: 0, approved: 0, sent: 0, channels: new Set(),
-      };
-    }
+    for (const cfg of cfgs) byClient[cfg.name] ||= blank(cfg.name);
     const cfgByName = Object.fromEntries(cfgs.map((c) => [c.name, c]));
 
+    // Key facts (MRR, status) come from the vault client pages, matched by name.
+    const profiles = await clientProfiles();
+    const profByName = new Map(profiles.map((p) => [norm(p.name), p]));
+
     const clients = Object.values(byClient)
-      .map((c) => ({ ...c, channels: Array.from(c.channels).sort(),
-                     scraper: cfgByName[c.client] ?? null }))
+      .map((c) => ({
+        ...c,
+        channels: Array.from(c.channels).sort(),
+        byChannel: Object.values(c.byChannel).sort((a, b) => b.total - a.total),
+        scraper: cfgByName[c.client] ?? null,
+        profile: profByName.get(norm(c.client)) ?? null,
+      }))
       .sort((a, b) => b.total - a.total);
 
     // The item list, filtered to the current selection.
@@ -104,7 +245,13 @@ export async function GET(req: Request) {
       sent: await countWhere("status=eq.sent"),
     };
 
-    return NextResponse.json({ configured: true, clients, items, totals });
+    // Delivery-side activity for whichever client is open.
+    const selected = client || clients[0]?.client || "";
+    const content = selected
+      ? await contentFor(cfgByName[selected]?.slug ?? null, selected)
+      : { available: false, source: null, reason: "No client selected.", items: [] };
+
+    return NextResponse.json({ configured: true, clients, items, totals, content });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     return NextResponse.json({ configured: true, error: msg, clients: [], items: [] });

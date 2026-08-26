@@ -19,6 +19,8 @@ const MissionOps = dynamic(() => import("./components/MissionOps"), { ssr: false
 const ClientsBoard = dynamic(() => import("./components/ClientsBoard"), { ssr: false });
 const SonarBoard = dynamic(() => import("./components/SonarBoard"), { ssr: false });
 const CrmBoard = dynamic(() => import("./components/CrmBoard"), { ssr: false });
+const InvoicesBoard = dynamic(() => import("./components/InvoicesBoard"), { ssr: false });
+const CompetitorIntel = dynamic(() => import("./components/CompetitorIntel"), { ssr: false });
 
 type NavGroup = {
   id: string; label: string; icon: IconType;
@@ -43,6 +45,10 @@ const NAV: NavGroup[] = [
   {
     id: "crm", label: "CRM", icon: Note,
     subs: [{ id: "crm", label: "Outbound" }],
+  },
+  {
+    id: "money", label: "Money", icon: Calendar,
+    subs: [{ id: "invoices", label: "Invoices & Payments" }],
   },
   {
     id: "agent", label: "Agents", icon: Cpu,
@@ -323,6 +329,7 @@ export default function Home() {
           {visited.has("clients") && <div className="app-view" style={{ display: active === "clients" ? "block" : "none" }}><ClientsBoard /></div>}
           {visited.has("sonar") && <div className="app-view" style={{ display: active === "sonar" ? "block" : "none" }}><SonarBoard /></div>}
           {visited.has("crm") && <div className="app-view" style={{ display: active === "crm" ? "block" : "none" }}><CrmBoard /></div>}
+          {visited.has("invoices") && <div className="app-view" style={{ display: active === "invoices" ? "block" : "none" }}><InvoicesBoard /></div>}
           {visited.has("competitors") && <div className="app-view" style={{ display: active === "competitors" ? "block" : "none" }}><CompetitorIntel onSendToAI={sendToAI} /></div>}
           {visited.has("knowledge") && <div className="app-view" style={{ display: active === "knowledge" ? "block" : "none" }}><KnowledgeBase initialPath={openNotePath} onSendToAI={sendToAI} /></div>}
           {visited.has("agent") && <div className="app-view" style={{ display: active === "agent" ? "block" : "none" }}><MissionOps /></div>}
@@ -1016,267 +1023,6 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
   );
 }
 
-function CompetitorIntel({ onSendToAI }: { onSendToAI: (ctx: string) => void }) {
-  const [status, setStatus] = useState<"idle" | "running" | "done" | "error">("idle");
-  const [rawContent, setRawContent] = useState<string>("");
-  const [lastUpdated, setLastUpdated] = useState<string>("");
-  const [errorMsg, setErrorMsg] = useState("");
-  const [toast, setToast] = useState("");
-  const [activeCard, setActiveCard] = useState<number | null>(null);
-  const [usageStats, setUsageStats] = useState<{ spent: number; runs: number; budget: number; remaining: number } | null>(null);
-
-  function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(""), 3000); }
-
-  // Parse the markdown into sections for display
-  const sections = parseCompetitorSections(rawContent);
-
-  useEffect(() => {
-    loadContent();
-  }, []);
-
-  async function loadContent() {
-    try {
-      const res = await fetch("/api/agents/competitor-research");
-      const data = await res.json();
-      if (data.content) setRawContent(data.content);
-      if (data.usage) setUsageStats(data.usage);
-      const match = data.content?.match(/## Last Updated: (.+)/);
-      if (match) setLastUpdated(match[1]);
-    } catch { /* no file yet */ }
-  }
-
-  async function runResearch() {
-    setStatus("running");
-    setErrorMsg("");
-    try {
-      const res = await fetch("/api/agents/competitor-research", { method: "POST" });
-      const data = await res.json();
-      if (data.ok) {
-        setStatus("done");
-        showToast(`Intel updated · $${data.spent?.toFixed(3) ?? "?"} used this month`);
-        await loadContent();
-      } else {
-        setStatus("error");
-        setErrorMsg(data.error ?? "Unknown error");
-      }
-    } catch (e: any) {
-      setStatus("error");
-      setErrorMsg(e.message);
-    }
-  }
-
-  const analyzePrompt = rawContent
-    ? `Here is Wing Digital's current competitor intelligence:\n\n${rawContent}\n\nWing Digital: $1,000/month, done-for-you marketing automation for DFW home service businesses (roofing, HVAC, plumbing, electrical, pool service). We handle GHL CRM, lead gen (Apollo), AI receptionist, review automation, referral automation, and email sequences.\n\nBased on this competitor landscape:\n1. What are competitors NOT offering that we should highlight?\n2. What pricing gaps exist?\n3. What is our strongest differentiator to lead with in sales calls?\n4. Is there anything competitors are doing that we should add?`
-    : "";
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 960 }}>
-      {toast && <div style={{ position: "fixed", bottom: 24, right: 24, background: "var(--green)", color: "#07080f", padding: "10px 18px", borderRadius: 10, fontWeight: 700, fontSize: 13, zIndex: 200 }}>{toast}</div>}
-
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
-        <div>
-          <h2 style={{ fontSize: 18, fontWeight: 700 }}>Competitor Intelligence</h2>
-          <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>
-            DFW marketing automation agencies — what they offer, what they charge, where Wing Digital wins.
-          </p>
-          {lastUpdated && (
-            <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>
-              Last updated: {lastUpdated}
-            </p>
-          )}
-          {usageStats && (
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 6 }}>
-              <div style={{ width: 120, height: 5, background: "var(--bg-hover)", borderRadius: 10, overflow: "hidden" }}>
-                <div style={{
-                  height: "100%", borderRadius: 10,
-                  width: `${Math.min(100, (usageStats.spent / usageStats.budget) * 100)}%`,
-                  background: usageStats.remaining < 0.50 ? "var(--red)" : "var(--green)",
-                  transition: "width 0.4s",
-                }} />
-              </div>
-              <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                ${usageStats.spent.toFixed(3)} / ${usageStats.budget.toFixed(2)} this month · {usageStats.runs} runs
-              </span>
-            </div>
-          )}
-        </div>
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <button
-            onClick={runResearch}
-            disabled={status === "running"}
-            style={{
-              padding: "9px 20px", borderRadius: 10, fontSize: 13, cursor: status === "running" ? "not-allowed" : "pointer",
-              background: status === "running" ? "var(--bg-hover)" : "linear-gradient(135deg, #22d3ee, #0e7490)",
-              border: "none", color: "#fff", fontWeight: 700,
-              opacity: status === "running" ? 0.7 : 1,
-              display: "flex", alignItems: "center", gap: 8,
-            }}
-          >
-            {status === "running" ? (
-              <><span style={{ display: "inline-block", animation: "spin 1s linear infinite" }}>⟳</span> Researching...</>
-            ) : "⟳ Run Research Now"}
-          </button>
-          <button
-            onClick={() => onSendToAI(analyzePrompt)}
-            disabled={!rawContent}
-            style={{
-              padding: "9px 18px", borderRadius: 10, fontSize: 13,
-              cursor: rawContent ? "pointer" : "not-allowed",
-              background: "var(--accent-glow)", border: "1px solid var(--accent)",
-              color: "var(--accent)", fontWeight: 600, opacity: rawContent ? 1 : 0.4,
-            }}
-          >
-            Ask Claude to Analyze →
-          </button>
-        </div>
-      </div>
-
-      {/* Error banner */}
-      {errorMsg && (
-        <div style={{ background: "#f8717122", border: "1px solid #f87171", borderRadius: 10, padding: "14px 18px" }}>
-          <p style={{ fontSize: 13, fontWeight: 700, color: "var(--red)", marginBottom: 4 }}>Setup Required</p>
-          <p style={{ fontSize: 13, color: "var(--text-primary)" }}>{errorMsg}</p>
-          {errorMsg.includes("brave") || errorMsg.includes("BRAVE") ? (
-            <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 8 }}>
-              1. Go to brave.com/search/api and sign up for free (2,000 queries/month)<br />
-              2. Copy your API key<br />
-              3. Open <code style={{ background: "var(--bg-hover)", padding: "1px 6px", borderRadius: 4 }}>.env.local</code> and paste it next to <code style={{ background: "var(--bg-hover)", padding: "1px 6px", borderRadius: 4 }}>BRAVE_SEARCH_API_KEY=</code><br />
-              4. Restart the dev server, then click Run Research Now
-            </p>
-          ) : null}
-        </div>
-      )}
-
-      {/* No content yet */}
-      {!rawContent && status !== "running" && !errorMsg && (
-        <div style={{ padding: "60px 0", textAlign: "center", color: "var(--text-muted)", background: "var(--bg-card)", borderRadius: 14, border: "1px solid var(--border)" }}>
-          <p style={{ fontSize: 36, marginBottom: 12 }}>🔍</p>
-          <p style={{ fontSize: 16, fontWeight: 700, color: "var(--text-primary)", marginBottom: 8 }}>No intel yet</p>
-          <p style={{ fontSize: 13, marginBottom: 20 }}>Click "Run Research Now" to scan what DFW competitors are doing.</p>
-          <div style={{ maxWidth: 400, margin: "0 auto", background: "var(--bg-hover)", borderRadius: 10, padding: 16, textAlign: "left" }}>
-            <p style={{ fontSize: 12, fontWeight: 700, color: "var(--text-secondary)", marginBottom: 8 }}>What it researches:</p>
-            {["DFW marketing automation agencies", "Competitor pricing and packages", "GoHighLevel resellers in Texas", "Home service marketing positioning", "What they offer vs what Wing Digital offers"].map(item => (
-              <p key={item} style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 5 }}>→ {item}</p>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Running state */}
-      {status === "running" && (
-        <div style={{ padding: "40px 0", textAlign: "center", color: "var(--text-muted)", background: "var(--bg-card)", borderRadius: 14, border: "1px solid var(--border)" }}>
-          <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
-          <p style={{ fontSize: 32, marginBottom: 12, display: "inline-block", animation: "spin 1.2s linear infinite" }}>⟳</p>
-          <p style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)", marginBottom: 4 }}>Researching competitors...</p>
-          <p style={{ fontSize: 12 }}>Searching Brave · Analyzing with Groq · Writing to vault</p>
-        </div>
-      )}
-
-      {/* Content sections */}
-      {rawContent && status !== "running" && sections.length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {sections.map((section, i) => (
-            <div key={i} style={{
-              background: `linear-gradient(90deg, ${INTEL_COLORS[i % INTEL_COLORS.length]}0a, transparent 30%), linear-gradient(180deg, var(--bg-card), var(--bg-card))`,
-              border: "1px solid var(--border)",
-              borderRadius: 14, overflow: "hidden",
-              borderLeft: `3px solid ${INTEL_COLORS[i % INTEL_COLORS.length]}`,
-              boxShadow: "0 6px 20px rgba(0,0,0,0.2)",
-            }}>
-              <button
-                onClick={() => setActiveCard(activeCard === i ? null : i)}
-                style={{
-                  width: "100%", padding: "14px 18px", background: "transparent", border: "none",
-                  cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <span style={{ fontSize: 18 }}>{INTEL_ICONS[i % INTEL_ICONS.length]}</span>
-                  <span style={{ fontSize: 14, fontWeight: 700, color: "var(--text-primary)", textAlign: "left" }}>{section.title}</span>
-                </div>
-                <span style={{ fontSize: 14, color: "var(--text-muted)", flexShrink: 0 }}>{activeCard === i ? "▲" : "▼"}</span>
-              </button>
-              {activeCard === i && (
-                <div style={{ padding: "0 18px 16px", borderTop: "1px solid var(--border)" }}>
-                  <div style={{ paddingTop: 14, display: "flex", flexDirection: "column", gap: 6 }}>
-                    {section.bullets.map((bullet, bi) => (
-                      <div key={bi} style={{ display: "flex", gap: 10, padding: "6px 10px", background: "var(--bg-hover)", borderRadius: 8 }}>
-                        <span style={{ color: INTEL_COLORS[i % INTEL_COLORS.length], flexShrink: 0, fontWeight: 700, marginTop: 1 }}>→</span>
-                        <p style={{ fontSize: 13, color: "var(--text-primary)", lineHeight: 1.6 }}>{bullet}</p>
-                      </div>
-                    ))}
-                  </div>
-                  <CompetitorAskBtn section={section} onSendToAI={onSendToAI} />
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Raw view fallback if parsing returns nothing */}
-      {rawContent && status !== "running" && sections.length === 0 && (
-        <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 12, padding: 20 }}>
-          <pre style={{ fontSize: 12, color: "var(--text-primary)", whiteSpace: "pre-wrap", lineHeight: 1.7 }}>{rawContent}</pre>
-        </div>
-      )}
-
-      {/* Wing Digital vs market summary card */}
-      {rawContent && (
-        <div style={{
-          background: "linear-gradient(120deg, rgba(34,211,238,0.08), rgba(167,139,250,0.07) 60%, var(--bg-card))",
-          border: "1px solid rgba(34,211,238,0.25)", borderRadius: 18, padding: 22,
-          boxShadow: "0 12px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)",
-        }}>
-          <p style={{
-            fontSize: 12, fontWeight: 700, marginBottom: 14, textTransform: "uppercase", letterSpacing: "0.1em",
-            background: "linear-gradient(90deg, var(--accent), var(--accent-2))",
-            WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent",
-          }}>◈ Wing Digital Positioning</p>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
-            <div>
-              <p style={{ fontSize: 11, fontWeight: 700, color: "var(--green)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Our Advantages</p>
-              {["$1,000/mo flat — no hidden fees", "Done-for-you — zero client config", "Home service niche expertise", "Apollo + Claude + GHL pipeline built in", "60s missed-call text-back SLA"].map(item => (
-                <p key={item} style={{ fontSize: 12, color: "var(--text-primary)", marginBottom: 5 }}>✓ {item}</p>
-              ))}
-            </div>
-            <div>
-              <p style={{ fontSize: 11, fontWeight: 700, color: "var(--orange)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Watch For</p>
-              {["Competitors lowering prices", "New AI features being added", "GHL resellers undercutting", "Agencies targeting same niche", "Any DFW-specific marketing plays"].map(item => (
-                <p key={item} style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 5 }}>⚑ {item}</p>
-              ))}
-            </div>
-          </div>
-          <button
-            onClick={() => onSendToAI("Based on Wing Digital's competitor landscape, write me a 3-sentence elevator pitch that I can use on a cold call to a DFW roofing contractor. Make it specific, confident, and focused on what competitors aren't doing. No em dashes. Under 60 words.")}
-            style={{
-              marginTop: 16, padding: "9px 20px", borderRadius: 999, fontSize: 12, cursor: "pointer",
-              background: "linear-gradient(135deg, #22d3ee, #a78bfa)", border: "none", color: "#07080f", fontWeight: 700,
-              boxShadow: "0 4px 16px rgba(34,211,238,0.3)",
-            }}
-          >
-            ✦ Generate Sales Pitch from Intel
-          </button>
-        </div>
-      )}
-
-      {/* Auto-run schedule info */}
-      <div style={{
-        background: "rgba(255,255,255,0.025)", border: "1px solid var(--border)",
-        borderRadius: 14, padding: "14px 18px", display: "flex", alignItems: "center", gap: 14,
-      }}>
-        <span style={{ fontSize: 22 }}>⏰</span>
-        <div>
-          <p style={{ fontSize: 13, fontWeight: 600 }}>Scheduled: Every morning at 7:00 AM</p>
-          <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
-            Runs automatically via Windows Task Scheduler while the OS is open. Run <code style={{ background: "var(--bg-hover)", padding: "1px 6px", borderRadius: 4, fontSize: 11 }}>scripts/setup-competitor-cron.ps1</code> as Admin once to activate.
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function CompetitorAskBtn({ section, onSendToAI }: { section: { title: string; bullets: string[] }; onSendToAI: (s: string) => void }) {
   function ask() {

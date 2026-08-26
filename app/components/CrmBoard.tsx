@@ -1,21 +1,23 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { sfx } from "../lib/sounds";
+import CrmClientSummary, {
+  CHANNEL_LABEL, type ChannelRoll, type ClientProfile, type Scraper,
+} from "./CrmClientSummary";
+import CrmContentFeed, { type ContentFeed } from "./CrmContentFeed";
 
-// CRM — every outbound message, compartmentalized by the client it is for.
+// CRM — everything happening for a client, compartmentalized by client.
 //
-// Left rail lists each client with draft/approved/sent counts. Picking one shows
-// its messages, each with the real fact it was personalized on, an editable
-// body, and approve / skip / copy / mark-sent. Reads /api/crm (Sonar Supabase),
-// so it works PC-off. Nothing here transmits — it keeps outbound checked.
+// Left rail lists each client. Picking one shows a summary of their key facts,
+// their scraper's hunting instructions, lanes for each channel (email, social
+// replies, SMS), the messages in that lane, and the content Wing actually
+// published for them. Reads /api/crm (Sonar Supabase + the vault + the content
+// engine's state file). Nothing here transmits — it keeps the work checked.
 
-type Scraper = {
-  slug: string; name: string; channels: string | null; scrape_niche: string | null;
-  scrape_cities: string | null; scrape_terms: string | null; active: boolean;
-};
 type ClientRollup = {
   client: string; total: number; draft: number; approved: number; sent: number;
-  channels: string[]; scraper: Scraper | null;
+  channels: string[]; byChannel: ChannelRoll[]; scraper: Scraper | null;
+  profile: ClientProfile | null;
 };
 type Item = {
   id: number; client: string; channel: string; recipient: string | null;
@@ -27,24 +29,33 @@ type Payload = {
   configured: boolean; error?: string;
   clients: ClientRollup[]; items: Item[];
   totals?: { total: number; draft: number; approved: number; sent: number };
+  content?: ContentFeed;
 };
 
-const CHANNEL_LABEL: Record<string, string> = {
-  email: "Email", instagram: "Instagram", tiktok: "TikTok",
-  nextdoor: "Nextdoor", facebook: "Facebook", linkedin: "LinkedIn", reddit: "Reddit",
-};
 const STATUS_COLOR: Record<string, string> = {
-  draft: "var(--text-muted,#545d7d)",
-  approved: "var(--green,#34d399)",
-  sent: "var(--accent,#22d3ee)",
-  skipped: "var(--red,#fb7185)",
+  draft: "var(--text-muted)",
+  approved: "var(--green)",
+  sent: "var(--accent)",
+  skipped: "var(--red)",
 };
+
+// Which raw `channel` values belong to which lane.
+const SOCIAL = ["nextdoor", "reddit", "facebook", "instagram", "tiktok", "linkedin"];
+const SMS = ["sms", "text"];
+type Lane = "email" | "social" | "sms";
+const LANES: { id: Lane; label: string; match: (ch: string) => boolean }[] = [
+  { id: "email", label: "Email", match: (ch) => ch === "email" },
+  { id: "social", label: "Social replies", match: (ch) => SOCIAL.includes(ch) },
+  { id: "sms", label: "SMS / texting", match: (ch) => SMS.includes(ch) },
+];
 
 export default function CrmBoard() {
   const [data, setData] = useState<Payload | null>(null);
   const [err, setErr] = useState("");
   const [client, setClient] = useState<string>("");
   const [status, setStatus] = useState<string>("draft");
+  const [lane, setLane] = useState<Lane>("email");
+  const [lanePicked, setLanePicked] = useState(false);
   const [edits, setEdits] = useState<Record<number, string>>({});
   const [copied, setCopied] = useState<number | null>(null);
   const [cfg, setCfg] = useState<Scraper | null>(null);
@@ -64,10 +75,48 @@ export default function CrmBoard() {
   }, [client, status]);
 
   useEffect(() => { load(); }, [load]);
-  useEffect(() => {
-    const c = data?.clients.find((x) => x.client === client);
-    setCfg(c?.scraper ? { ...c.scraper } : null);
-  }, [client, data?.clients]);
+
+  const current = useMemo(
+    () => data?.clients.find((x) => x.client === client) ?? null,
+    [data?.clients, client]
+  );
+
+  // Reseed the editable scraper form when the compartment changes — done during
+  // render (React's sanctioned reset pattern) so in-progress edits survive a
+  // background refresh but never leak from one client onto another.
+  const [cfgFor, setCfgFor] = useState<string | null>(null);
+  if (current && cfgFor !== current.client) {
+    setCfgFor(current.client);
+    setCfg(current.scraper ? { ...current.scraper } : null);
+    setLanePicked(false);
+  }
+
+  // Counts per lane come from the client's full rollup, so a lane's tab is
+  // honest about having zero even when the current status filter hides it.
+  const laneCounts = useMemo(() => {
+    const out: Record<Lane, number> = { email: 0, social: 0, sms: 0 };
+    for (const c of current?.byChannel ?? []) {
+      const l = LANES.find((x) => x.match(c.channel));
+      if (l) out[l.id] += c.total;
+    }
+    return out;
+  }, [current]);
+
+  // Until Jack picks a lane, default to one that actually has something. Once
+  // he clicks, his choice sticks even if that lane is empty.
+  const active: Lane = lanePicked
+    ? lane
+    : (LANES.find((l) => laneCounts[l.id] > 0)?.id ?? lane);
+
+  const visible = useMemo(() => {
+    const m = LANES.find((l) => l.id === active)!.match;
+    return (data?.items ?? []).filter((i) => i.client === client && m(i.channel || ""));
+  }, [data?.items, client, active]);
+
+  const unlaned = useMemo(() => {
+    const known = (ch: string) => LANES.some((l) => l.match(ch));
+    return (current?.byChannel ?? []).filter((c) => !known(c.channel));
+  }, [current]);
 
   async function saveCfg() {
     if (!cfg) return;
@@ -117,9 +166,9 @@ export default function CrmBoard() {
   }
   if (!data.configured) {
     return (
-      <div style={{ padding: 18, border: "1px solid var(--border,#1f2437)", borderRadius: 14 }}>
+      <div style={{ padding: 18, border: "1px solid var(--border)", borderRadius: 14 }}>
         <h3 style={{ margin: "0 0 6px", fontSize: 15 }}>CRM not connected</h3>
-        <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary,#9aa3c0)" }}>
+        <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>
           Add <code>SONAR_SUPABASE_URL</code> and <code>SONAR_SUPABASE_SERVICE_KEY</code> to the environment.
         </p>
       </div>
@@ -132,22 +181,22 @@ export default function CrmBoard() {
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <header style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
         <h2 style={{ margin: 0, fontSize: 18, letterSpacing: "-0.01em" }}>CRM</h2>
-        <span style={{ fontSize: 12.5, color: "var(--text-secondary,#9aa3c0)" }}>
-          Every message going out, by client. Nothing sends from here — you keep it checked.
+        <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
+          Everything happening for each client. Nothing sends from here — you keep it checked.
         </span>
       </header>
 
       {t && (
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           {([["Total", t.total, null], ["Drafts", t.draft, null],
-             ["Approved", t.approved, "var(--green,#34d399)"], ["Sent", t.sent, "var(--accent,#22d3ee)"]] as
+             ["Approved", t.approved, "var(--green)"], ["Sent", t.sent, "var(--accent)"]] as
             [string, number, string | null][]).map(([label, val, color]) => (
             <div key={label} style={{
-              border: "1px solid var(--border,#1f2437)", borderRadius: 12, padding: "8px 14px",
-              background: "var(--bg-card,#10131f)", minWidth: 92,
+              border: "1px solid var(--border)", borderRadius: 12, padding: "8px 14px",
+              background: "var(--bg-card)", minWidth: 92,
             }}>
-              <div style={{ fontSize: 20, fontWeight: 700, color: color || "inherit", fontVariantNumeric: "tabular-nums" }}>{val}</div>
-              <div style={{ fontSize: 11, color: "var(--text-secondary,#9aa3c0)" }}>{label}</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: color || "var(--text-primary)", fontVariantNumeric: "tabular-nums" }}>{val}</div>
+              <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>{label}</div>
             </div>
           ))}
         </div>
@@ -157,39 +206,51 @@ export default function CrmBoard() {
         {/* Client compartments */}
         <nav style={{ display: "flex", flexDirection: "column", gap: 6 }} aria-label="Clients">
           {data.clients.length === 0 && (
-            <p style={{ fontSize: 12.5, color: "var(--text-secondary,#9aa3c0)" }}>No outbound yet.</p>
+            <p style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>No clients configured yet.</p>
           )}
           {data.clients.map((c) => {
             const on = c.client === client;
             return (
               <button key={c.client} onClick={() => setClient(c.client)} style={{
                 textAlign: "left", cursor: "pointer", borderRadius: 12, padding: "10px 12px",
-                border: `1px solid ${on ? "var(--accent,#22d3ee)" : "var(--border,#1f2437)"}`,
-                background: on ? "var(--accent-glow,rgba(34,211,238,.12))" : "var(--bg-card,#10131f)",
-                color: "inherit",
+                border: `1px solid ${on ? "var(--accent)" : "var(--border)"}`,
+                background: on ? "var(--accent-glow)" : "var(--bg-card)",
+                color: "var(--text-primary)",
               }}>
                 <div style={{ fontSize: 13.5, fontWeight: 600 }}>{c.client}</div>
-                <div style={{ fontSize: 11, color: "var(--text-secondary,#9aa3c0)", marginTop: 3 }}>
+                <div style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 3 }}>
                   {c.draft} draft · {c.approved} ok · {c.sent} sent
                 </div>
-                <div style={{ fontSize: 10, color: "var(--text-muted,#545d7d)", marginTop: 2 }}>
-                  {c.channels.map((ch) => CHANNEL_LABEL[ch] || ch).join(" · ")}
+                <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>
+                  {c.channels.length
+                    ? c.channels.map((ch) => CHANNEL_LABEL[ch] || ch).join(" · ")
+                    : "no messages yet"}
                 </div>
               </button>
             );
           })}
         </nav>
 
-        {/* Messages for the selected client */}
+        {/* Everything for the selected client */}
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+
+          {current && (
+            <CrmClientSummary
+              name={current.client}
+              profile={current.profile}
+              scraper={current.scraper}
+              counts={{ draft: current.draft, approved: current.approved, sent: current.sent, total: current.total }}
+              byChannel={current.byChannel}
+            />
+          )}
 
           {/* This client's own scraper: what it hunts, where, on which
               platforms. The watcher reads exactly these fields on every run,
               so editing here retargets the next run. */}
           {cfg && (
             <section style={{
-              border: "1px solid var(--border,#1f2437)", borderRadius: 14,
-              padding: "13px 16px", background: "var(--accent-glow,rgba(34,211,238,.08))",
+              border: "1px solid var(--border)", borderRadius: 14,
+              padding: "13px 16px", background: "var(--accent-glow)",
               display: "flex", flexDirection: "column", gap: 8,
             }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
@@ -238,37 +299,79 @@ export default function CrmBoard() {
             </section>
           )}
 
+          {/* Channel lanes */}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center",
+                        borderBottom: "1px solid var(--border)", paddingBottom: 9 }}>
+            {LANES.map((l) => {
+              const on = active === l.id;
+              return (
+                <button key={l.id} onClick={() => { setLane(l.id); setLanePicked(true); }} style={{
+                  fontSize: 12.5, padding: "5px 13px", borderRadius: 9, cursor: "pointer",
+                  fontWeight: on ? 650 : 500,
+                  border: `1px solid ${on ? "var(--accent)" : "var(--border)"}`,
+                  background: on ? "var(--accent-glow)" : "transparent",
+                  color: on ? "var(--accent)" : "var(--text-secondary)",
+                }}>
+                  {l.label}
+                  <span style={{ marginLeft: 7, color: "var(--text-muted)", fontVariantNumeric: "tabular-nums" }}>
+                    {laneCounts[l.id]}
+                  </span>
+                </button>
+              );
+            })}
+            {unlaned.length > 0 && (
+              <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                + {unlaned.map((c) => `${CHANNEL_LABEL[c.channel] || c.channel} (${c.total})`).join(", ")} on
+                {" "}channels with no lane
+              </span>
+            )}
+          </div>
+
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {["draft", "approved", "sent", "skipped", ""].map((s) => (
               <button key={s || "all"} onClick={() => setStatus(s)} style={{
                 fontSize: 12, padding: "4px 12px", borderRadius: 20, cursor: "pointer",
-                border: `1px solid ${status === s ? "var(--accent,#22d3ee)" : "var(--border,#1f2437)"}`,
-                background: status === s ? "var(--accent-glow,rgba(34,211,238,.12))" : "transparent",
-                color: "inherit",
+                border: `1px solid ${status === s ? "var(--accent)" : "var(--border)"}`,
+                background: status === s ? "var(--accent-glow)" : "transparent",
+                color: "var(--text-primary)",
               }}>{s || "all"}</button>
             ))}
           </div>
 
-          {data.items.length === 0 ? (
-            <p style={{ fontSize: 13, color: "var(--text-secondary,#9aa3c0)" }}>
-              Nothing {status || ""} for {client || "this client"}.
+          {active === "sms" && laneCounts.sms === 0 ? (
+            <div style={{
+              border: "1px dashed var(--border)", borderRadius: 12, padding: "13px 15px",
+            }}>
+              <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--orange)" }}>
+                No SMS lane wired yet
+              </div>
+              <p style={{ margin: "5px 0 0", fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.55 }}>
+                Nothing writes rows with <code>channel = &quot;sms&quot;</code> to the <code>outbound</code> table,
+                and Wing has no texting provider connected since GHL was retired. This lane will fill in on
+                its own once a sender starts drafting texts — nothing is being hidden.
+              </p>
+            </div>
+          ) : visible.length === 0 ? (
+            <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>
+              Nothing {status || ""} on {LANES.find((l) => l.id === active)!.label.toLowerCase()} for
+              {" "}{client || "this client"}.
             </p>
-          ) : data.items.map((it) => (
+          ) : visible.map((it) => (
             <article key={it.id} style={{
-              border: "1px solid var(--border,#1f2437)", borderRadius: 14, padding: "14px 16px",
-              background: "var(--bg-card,#10131f)", display: "flex", flexDirection: "column", gap: 9,
+              border: "1px solid var(--border)", borderRadius: 14, padding: "14px 16px",
+              background: "var(--bg-card)", display: "flex", flexDirection: "column", gap: 9,
             }}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
                 <div>
                   <span style={{
                     fontSize: 10.5, textTransform: "uppercase", letterSpacing: ".08em",
-                    color: "var(--accent,#22d3ee)", fontWeight: 700,
+                    color: "var(--accent)", fontWeight: 700,
                   }}>{CHANNEL_LABEL[it.channel] || it.channel}{it.tier ? ` · ${it.tier}` : ""}</span>
                   <div style={{ fontSize: 14.5, fontWeight: 650, marginTop: 3 }}>
                     {it.recipient || "(recipient)"}
                   </div>
                 </div>
-                <span style={{ fontSize: 11, fontWeight: 600, color: STATUS_COLOR[it.status] || "inherit" }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: STATUS_COLOR[it.status] || "var(--text-primary)" }}>
                   {it.status}
                 </span>
               </div>
@@ -281,8 +384,8 @@ export default function CrmBoard() {
                   it honest and non-generic. */}
               {it.personalization && (
                 <div style={{
-                  fontSize: 12, fontStyle: "italic", color: "var(--text-secondary,#9aa3c0)",
-                  borderLeft: "2px solid var(--accent-dim,#0e7490)", paddingLeft: 8,
+                  fontSize: 12, fontStyle: "italic", color: "var(--text-secondary)",
+                  borderLeft: "2px solid var(--accent-dim)", paddingLeft: 8,
                 }}>
                   {it.personalization}
                 </div>
@@ -294,24 +397,29 @@ export default function CrmBoard() {
                 style={{
                   width: "100%", minHeight: 120, resize: "vertical", borderRadius: 8, padding: 10,
                   fontSize: 12.5, lineHeight: 1.5, fontFamily: "inherit",
-                  background: "var(--bg-secondary,#0b0d17)", color: "inherit",
-                  border: "1px solid var(--border,#1f2437)", boxSizing: "border-box",
+                  background: "var(--bg-secondary)", color: "var(--text-primary)",
+                  border: "1px solid var(--border)", boxSizing: "border-box",
                 }}
               />
 
               <div style={{ display: "flex", gap: 7, flexWrap: "wrap", alignItems: "center" }}>
                 {(it.recipient_url || it.evidence_url) && (
                   <a href={it.evidence_url || it.recipient_url || "#"} target="_blank" rel="noopener"
-                    style={{ fontSize: 11.5, color: "var(--accent,#22d3ee)", textDecoration: "none" }}>open ↗</a>
+                    style={{ fontSize: 11.5, color: "var(--accent)", textDecoration: "none" }}>open ↗</a>
                 )}
                 <button onClick={() => copy(it)} style={btn}>{copied === it.id ? "copied" : "copy"}</button>
                 <span style={{ flex: 1 }} />
-                <button onClick={() => act(it, "approve")} style={{ ...btn, borderColor: "rgba(52,211,153,.45)", color: "var(--green,#34d399)" }}>approve</button>
-                <button onClick={() => act(it, "sent")} style={{ ...btn, borderColor: "rgba(34,211,238,.45)", color: "var(--accent,#22d3ee)" }}>mark sent</button>
+                <button onClick={() => act(it, "approve")} style={{ ...btn, borderColor: "var(--green)", color: "var(--green)" }}>approve</button>
+                <button onClick={() => act(it, "sent")} style={{ ...btn, borderColor: "var(--accent)", color: "var(--accent)" }}>mark sent</button>
                 <button onClick={() => act(it, "skip")} style={btn}>skip</button>
               </div>
             </article>
           ))}
+
+          {/* Delivery work: what Wing actually published for this client. */}
+          {client && data.content && (
+            <CrmContentFeed feed={data.content} client={client} />
+          )}
         </div>
       </div>
     </div>
@@ -320,5 +428,5 @@ export default function CrmBoard() {
 
 const btn: React.CSSProperties = {
   fontSize: 11.5, padding: "4px 11px", borderRadius: 8, cursor: "pointer",
-  border: "1px solid var(--border,#1f2437)", background: "transparent", color: "inherit",
+  border: "1px solid var(--border)", background: "transparent", color: "var(--text-primary)",
 };

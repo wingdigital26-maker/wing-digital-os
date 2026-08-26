@@ -40,7 +40,7 @@ export default function MissionOps() {
 
   const scheduled = useMemo(() => data?.agents.filter(a => a.kind === "scheduled") ?? [], [data]);
   const crew = useMemo(() => data?.agents.filter(a => a.kind === "crew") ?? [], [data]);
-  const overallColor = data?.overall === "red" ? "#f87171" : data?.overall === "yellow" ? "#fb923c" : "#34d399";
+  const overallColor = data?.overall === "red" ? "var(--red)" : data?.overall === "yellow" ? "var(--orange)" : "var(--green)";
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -56,12 +56,12 @@ export default function MissionOps() {
           AGENT MISSION CONTROL
         </span>
         {data?.cloud && (
-          <span style={{ fontSize: 10, color: "#a78bfa", border: "1px solid #a78bfa55", borderRadius: 99, padding: "2px 8px", fontFamily: "'JetBrains Mono', monospace" }}>
+          <span style={{ fontSize: 10, color: "var(--accent-2)", border: "1px solid #a78bfa55", borderRadius: 99, padding: "2px 8px", fontFamily: "'JetBrains Mono', monospace" }}>
             CLOUD MODE
           </span>
         )}
         {error && (
-          <span style={{ fontSize: 10, color: "#f87171", border: "1px solid #f8717155", borderRadius: 99, padding: "2px 8px", fontFamily: "'JetBrains Mono', monospace" }}>
+          <span style={{ fontSize: 10, color: "var(--red)", border: "1px solid #f8717155", borderRadius: 99, padding: "2px 8px", fontFamily: "'JetBrains Mono', monospace" }}>
             FEED ERROR {error}
           </span>
         )}
@@ -108,11 +108,11 @@ export default function MissionOps() {
             {/* Compact activity ticker; "view all" expands to the full feed */}
             <section style={{
               background: "var(--bg-secondary, #0d1117)",
-              border: "1px solid var(--border, rgba(255,255,255,0.06))",
+              border: "1px solid var(--border, var(--border))",
               borderRadius: 12, padding: "12px 14px",
             }}>
               <h2 style={{ fontSize: 11, letterSpacing: "0.14em", color: "var(--text-muted)", marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>
-                <Dot color="#34d399" pulse /> ACTIVITY
+                <Dot color="var(--green)" pulse /> ACTIVITY
                 <span style={{ marginLeft: "auto", fontFamily: "'JetBrains Mono', monospace", fontSize: 10 }}>refresh 30s</span>
               </h2>
               <div style={{ maxHeight: 520, overflowY: "auto", paddingRight: 6 }}>

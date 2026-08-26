@@ -58,14 +58,14 @@ const GROUP_FAMILY: Record<string, string> = {
   root: "other",
 };
 const GROUP_COLORS: Record<string, string> = {
-  campaigns: "#f59e0b", seo: "#fbbf24", outreach: "#d97706", business: "#fcd34d",
-  clients: "#34d399", partners: "#2dd4bf",
-  automations: "#a78bfa", agents: "#8b5cf6", state: "#c4b5fd",
-  wiki: "#38bdf8", concepts: "#7dd3fc", syntheses: "#22d3ee", personas: "#60a5fa", inbox: "#93c5fd",
+  campaigns: "#f59e0b", seo: "var(--orange)", outreach: "#d97706", business: "#fcd34d",
+  clients: "var(--green)", partners: "#2dd4bf",
+  automations: "var(--accent-2)", agents: "#8b5cf6", state: "#c4b5fd",
+  wiki: "#38bdf8", concepts: "#7dd3fc", syntheses: "var(--accent)", personas: "var(--accent)", inbox: "#93c5fd",
   root: "#94a3b8",
 };
 const FAMILY_COLOR: Record<string, string> = {
-  business: "#f59e0b", clients: "#34d399", automation: "#a78bfa", knowledge: "#38bdf8", other: "#94a3b8",
+  business: "#f59e0b", clients: "var(--green)", automation: "var(--accent-2)", knowledge: "#38bdf8", other: "#94a3b8",
 };
 const fallbackCache = new Map<string, string>();
 function colorOf(g: string): string {
@@ -600,7 +600,7 @@ export default function VaultGraph({ onSelectNode, onToggleTree }: { onSelectNod
   }, [graph]);
 
   return (
-    <div ref={wrapRef} className="vault-graph" style={{ position: "relative", width: "100%", height: "100%", minHeight: "60vh", maxWidth: "100%", borderRadius: 16, overflow: "hidden", border: "1px solid rgba(255,255,255,0.07)", background: "#04050a" }}>
+    <div ref={wrapRef} className="vault-graph" style={{ position: "relative", width: "100%", height: "100%", minHeight: "60vh", maxWidth: "100%", borderRadius: 16, overflow: "hidden", border: "1px solid var(--border)", background: "#04050a" }}>
       {loading && (
         <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 14, zIndex: 2 }}>
           Charting the galaxy...
@@ -747,7 +747,7 @@ export default function VaultGraph({ onSelectNode, onToggleTree }: { onSelectNod
             <div className="vg-mpop" style={{
               position: "absolute", top: 52, right: 10, zIndex: 5, width: "min(72vw, 260px)",
               background: "rgba(8,9,15,0.94)", backdropFilter: "blur(10px)",
-              border: "1px solid rgba(255,255,255,0.1)", borderRadius: 14, padding: 12,
+              border: "1px solid var(--border)", borderRadius: 14, padding: 12,
               boxShadow: "0 12px 40px rgba(0,0,0,0.5)",
               display: "flex", flexDirection: "column", gap: 12,
             }}>
@@ -761,7 +761,7 @@ export default function VaultGraph({ onSelectNode, onToggleTree }: { onSelectNod
                   style={{ ...toggleStyle(effectiveGlow), flex: 1, textAlign: "center", opacity: effectiveIs3D ? 1 : 0.4 }}
                 >Glow</button>
               </div>
-              <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 10, display: "flex", flexDirection: "column", gap: 6, maxHeight: "34vh", overflow: "auto" }}>
+              <div style={{ borderTop: "1px solid var(--border)", paddingTop: 10, display: "flex", flexDirection: "column", gap: 6, maxHeight: "34vh", overflow: "auto" }}>
                 <p style={{ fontSize: 9, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
                   {stats.nodes} notes · {stats.links} threads
                 </p>
@@ -789,7 +789,7 @@ export default function VaultGraph({ onSelectNode, onToggleTree }: { onSelectNod
         style={{
           position: "absolute", top: 12, right: 12, zIndex: 3, width: 180, maxWidth: "40vw",
           background: "rgba(8,9,15,0.72)", backdropFilter: "blur(6px)",
-          border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10,
+          border: "1px solid var(--border)", borderRadius: 10,
           padding: "7px 12px", color: "var(--text-primary)", fontSize: 12, outline: "none",
         }}
       />
@@ -798,7 +798,7 @@ export default function VaultGraph({ onSelectNode, onToggleTree }: { onSelectNod
       <div className="vg-stats" style={{
         position: "absolute", top: 12, left: 12, zIndex: 3,
         background: "rgba(8,9,15,0.7)", backdropFilter: "blur(6px)",
-        border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: "8px 12px",
+        border: "1px solid var(--border)", borderRadius: 12, padding: "8px 12px",
       }}>
         <p style={{ fontSize: 9.5, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 3 }}>
           Vault Map
@@ -846,7 +846,7 @@ export default function VaultGraph({ onSelectNode, onToggleTree }: { onSelectNod
       <div className="vg-legend" style={{
         position: "absolute", bottom: 12, left: 12, zIndex: 3,
         background: "rgba(8,9,15,0.7)", backdropFilter: "blur(6px)",
-        border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: "8px 12px",
+        border: "1px solid var(--border)", borderRadius: 12, padding: "8px 12px",
         display: "flex", flexDirection: "column", gap: 4, maxWidth: 220,
       }}>
         {legend.map(({ family, color, groups }) => (

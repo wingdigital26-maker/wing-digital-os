@@ -43,7 +43,7 @@ function ClaudeLogo() {
 function ClaudeCodeLogo() {
   return (
     <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-      <circle cx="16" cy="16" r="16" fill="#22d3ee" />
+      <circle cx="16" cy="16" r="16" fill="var(--accent)" />
       <path d="M13 11l-5 5 5 5" stroke="#07080f" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" fill="none" />
       <path d="M19 11l5 5-5 5" stroke="#07080f" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" fill="none" />
     </svg>
@@ -71,7 +71,7 @@ const AGENTS: AgentConfig[] = [
   {
     name: "Claude Code",
     endpoint: "/api/chat/claude-code",
-    color: "#22d3ee",
+    color: "var(--accent)",
     logo: <ClaudeCodeLogo />,
     tagline: "Full agent · Vault · GHL · Terminal",
   },
@@ -129,7 +129,7 @@ function CostWidget() {
       borderRadius: 8, padding: "5px 12px", fontSize: 12,
     }}>
       <span style={{ color: "var(--text-muted)" }}>This week:</span>
-      <span style={{ color: cost > 1 ? "#f87171" : "#4ade80", fontWeight: 700 }}>
+      <span style={{ color: cost > 1 ? "var(--red)" : "var(--green)", fontWeight: 700 }}>
         ${cost.toFixed(4)}
       </span>
       <span style={{ color: "var(--text-muted)", fontSize: 10 }}>Claude API</span>
@@ -384,7 +384,7 @@ function ChatPanel({ agent, onCost, inject }: { agent: AgentConfig; onCost: (c: 
         {/* Header */}
         <div style={{
           padding: "14px 18px",
-          borderBottom: "1px solid rgba(255,255,255,0.05)",
+          borderBottom: "1px solid var(--border)",
           background: `linear-gradient(135deg, ${agent.color}0d, transparent 55%)`,
           display: "flex", alignItems: "center", gap: 12, flexShrink: 0,
         }}>
@@ -393,7 +393,7 @@ function ChatPanel({ agent, onCost, inject }: { agent: AgentConfig; onCost: (c: 
             <div title="Online" style={{
               position: "absolute", bottom: -1, right: -1,
               width: 8, height: 8, borderRadius: "50%",
-              background: "#34d399", border: "2px solid var(--bg-card)",
+              background: "var(--green)", border: "2px solid var(--bg-card)",
             }} />
           </div>
           <div>
@@ -402,7 +402,7 @@ function ChatPanel({ agent, onCost, inject }: { agent: AgentConfig; onCost: (c: 
           </div>
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
             <button onClick={() => setShowPicker(true)} title="Attach a vault note as context" style={{
-              background: "transparent", border: "1px solid rgba(255,255,255,0.1)",
+              background: "transparent", border: "1px solid var(--border)",
               borderRadius: 999, padding: "5px 12px", fontSize: 11, color: "var(--text-secondary)",
               cursor: "pointer", display: "flex", alignItems: "center", gap: 5,
             }}>
@@ -421,7 +421,7 @@ function ChatPanel({ agent, onCost, inject }: { agent: AgentConfig; onCost: (c: 
                   {saving ? "Saving..." : saveMsg ? saveMsg : "Save"}
                 </button>
                 <button onClick={() => setMessages([])} title="Clear conversation" style={{
-                  background: "transparent", border: "1px solid rgba(255,255,255,0.1)",
+                  background: "transparent", border: "1px solid var(--border)",
                   borderRadius: 999, width: 26, height: 26, fontSize: 13, color: "var(--text-muted)",
                   cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
                   lineHeight: 1,
@@ -436,7 +436,7 @@ function ChatPanel({ agent, onCost, inject }: { agent: AgentConfig; onCost: (c: 
         {/* Context chips -- permanent + attached */}
         {(permanentCtx || attachedNotes.length > 0) && (
           <div style={{
-            padding: "8px 16px", borderBottom: "1px solid rgba(255,255,255,0.05)",
+            padding: "8px 16px", borderBottom: "1px solid var(--border)",
             display: "flex", flexWrap: "wrap", gap: 6, background: "rgba(255,255,255,0.02)", flexShrink: 0,
             alignItems: "center",
           }}>
@@ -450,7 +450,7 @@ function ChatPanel({ agent, onCost, inject }: { agent: AgentConfig; onCost: (c: 
                 borderRadius: 999, padding: "2px 10px", fontSize: 10,
               }}>
                 <span style={{ fontSize: 10 }}>🔒</span>
-                <span style={{ color: "#34d399", fontWeight: 600 }}>Vault context</span>
+                <span style={{ color: "var(--green)", fontWeight: 600 }}>Vault context</span>
               </div>
             )}
 
@@ -463,7 +463,7 @@ function ChatPanel({ agent, onCost, inject }: { agent: AgentConfig; onCost: (c: 
               }}>
                 <span>📄</span>
                 <span style={{ color: "var(--text-primary)", fontWeight: 600 }}>{note.name}</span>
-                {isClaude && <span style={{ color: "#fb923c", fontSize: 9, fontWeight: 700 }}>uses tokens</span>}
+                {isClaude && <span style={{ color: "var(--orange)", fontSize: 9, fontWeight: 700 }}>uses tokens</span>}
                 <button onClick={() => removeNote(note.path)} style={{
                   background: "none", border: "none", color: "var(--text-muted)",
                   cursor: "pointer", fontSize: 12, lineHeight: 1, padding: "0 0 0 2px",
@@ -510,14 +510,14 @@ function ChatPanel({ agent, onCost, inject }: { agent: AgentConfig; onCost: (c: 
                         color: "var(--text-muted)", alignSelf: "flex-start",
                       }}>
                         <span style={{ fontSize: 13 }}>🔧</span>
-                        <span style={{ color: "#22d3ee", fontWeight: 700 }}>{tc.tool}</span>
+                        <span style={{ color: "var(--accent)", fontWeight: 700 }}>{tc.tool}</span>
                         {tc.input && Object.keys(tc.input).length > 0 && (
                           <span style={{ color: "var(--text-muted)" }}>
                             {Object.values(tc.input).map(v => typeof v === "string" ? `"${v}"` : JSON.stringify(v)).join(", ")}
                           </span>
                         )}
                         <span style={{ color: "var(--text-muted)" }}>→</span>
-                        <span style={{ color: "#4ade80" }}>{resultPreview}</span>
+                        <span style={{ color: "var(--green)" }}>{resultPreview}</span>
                       </div>
                     );
                   })}
@@ -533,7 +533,7 @@ function ChatPanel({ agent, onCost, inject }: { agent: AgentConfig; onCost: (c: 
                     ? `linear-gradient(135deg, ${agent.color}, ${agent.color}cc)`
                     : "rgba(255,255,255,0.035)",
                   color: msg.role === "user" ? "#fff" : "var(--text-primary)",
-                  border: msg.role === "assistant" ? "1px solid rgba(255,255,255,0.06)" : "none",
+                  border: msg.role === "assistant" ? "1px solid var(--border)" : "none",
                   boxShadow: msg.role === "user" ? `0 4px 14px ${agent.color}33` : "none",
                   whiteSpace: "pre-wrap",
                 }}>
@@ -557,7 +557,7 @@ function ChatPanel({ agent, onCost, inject }: { agent: AgentConfig; onCost: (c: 
           <div style={{
             display: "flex", alignItems: "center", gap: 6,
             background: "rgba(255,255,255,0.04)",
-            border: `1px solid ${recording ? "#fb7185" : "rgba(255,255,255,0.08)"}`,
+            border: `1px solid ${recording ? "var(--red)" : "rgba(255,255,255,0.08)"}`,
             borderRadius: 999, padding: "5px 6px 5px 16px",
             boxShadow: recording ? "0 0 0 3px rgba(251,113,133,0.15)" : "inset 0 1px 2px rgba(0,0,0,0.25)",
             transition: "border-color 0.2s, box-shadow 0.2s",
@@ -581,7 +581,7 @@ function ChatPanel({ agent, onCost, inject }: { agent: AgentConfig; onCost: (c: 
             }}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 {recording ? (
-                  <rect x="6" y="6" width="12" height="12" rx="2" fill="#fb7185" />
+                  <rect x="6" y="6" width="12" height="12" rx="2" fill="var(--red)" />
                 ) : (
                   <>
                     <rect x="9" y="2" width="6" height="12" rx="3" fill="var(--text-muted)" />

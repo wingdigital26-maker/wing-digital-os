@@ -27,16 +27,16 @@ type Agent = {
 };
 
 const STATUS_PILL: Record<Agent["status"], { bg: string; fg: string; label: string }> = {
-  "ran today": { bg: "rgba(52,211,153,0.14)", fg: "#34d399", label: "Ran today" },
-  "ran this week": { bg: "rgba(96,165,250,0.14)", fg: "#60a5fa", label: "Ran this week" },
-  idle: { bg: "rgba(251,191,36,0.14)", fg: "#fbbf24", label: "Idle" },
+  "ran today": { bg: "rgba(52,211,153,0.14)", fg: "var(--green)", label: "Ran today" },
+  "ran this week": { bg: "rgba(96,165,250,0.14)", fg: "var(--accent)", label: "Ran this week" },
+  idle: { bg: "rgba(251,191,36,0.14)", fg: "var(--orange)", label: "Idle" },
   "never run": { bg: "rgba(107,114,128,0.16)", fg: "#9ca3af", label: "Never run" },
 };
 
 const DOT_COLOR: Record<RunDot["status"], string> = {
-  ok: "#34d399",
-  fail: "#f87171",
-  skipped: "#fbbf24",
+  ok: "var(--green)",
+  fail: "var(--red)",
+  skipped: "var(--orange)",
 };
 
 // agents that support a safe --dry-run
@@ -147,7 +147,7 @@ function AgentCard({ agent, onOpenRun, onRan }: { agent: Agent; onOpenRun: (r: R
   return (
     <div style={{
       background: `radial-gradient(ellipse 90% 60% at 50% -20%, ${ACCENT}0d, transparent 60%), linear-gradient(180deg, #0f1117, #0a0a0a)`,
-      border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: "16px 18px",
+      border: "1px solid var(--border)", borderRadius: 16, padding: "16px 18px",
       boxShadow: "0 8px 24px rgba(0,0,0,0.3)", display: "flex", flexDirection: "column", gap: 12,
     }}>
       {/* Header */}
@@ -202,11 +202,11 @@ function AgentCard({ agent, onOpenRun, onRan }: { agent: Agent; onOpenRun: (r: R
       {/* Run output inline */}
       {output && (
         <div style={{
-          background: "rgba(0,0,0,0.5)", border: `1px solid ${output.ok ? "rgba(52,211,153,0.3)" : "rgba(248,113,113,0.3)"}`,
+          background: "var(--bg-secondary)", border: `1px solid ${output.ok ? "rgba(52,211,153,0.3)" : "rgba(248,113,113,0.3)"}`,
           borderRadius: 10, padding: "10px 12px", fontSize: 11, fontFamily: "ui-monospace, monospace",
           color: "var(--text-secondary)", whiteSpace: "pre-wrap", maxHeight: 200, overflow: "auto",
         }}>
-          <p style={{ color: output.ok ? "#34d399" : "#f87171", fontWeight: 700, marginBottom: 6 }}>
+          <p style={{ color: output.ok ? "var(--green)" : "var(--red)", fontWeight: 700, marginBottom: 6 }}>
             {output.ok ? "✓ completed" : "✕ finished with errors"}
           </p>
           {output.text}
@@ -256,11 +256,11 @@ function RunModal({ agentName, run, onClose }: { agentName: string; run: RunDot;
       display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
     }}>
       <div onClick={(e) => e.stopPropagation()} style={{
-        background: "#0a0a0a", border: `1px solid ${ACCENT}55`, borderRadius: 16,
+        background: "var(--bg-card)", border: `1px solid ${ACCENT}55`, borderRadius: 16,
         width: 560, maxWidth: "100%", maxHeight: "80vh", display: "flex", flexDirection: "column",
         overflow: "hidden", boxShadow: `0 24px 64px rgba(0,0,0,0.6), 0 0 40px ${ACCENT}18`,
       }}>
-        <div style={{ padding: "16px 20px", borderBottom: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{ width: 9, height: 9, borderRadius: "50%", background: DOT_COLOR[run.status], boxShadow: `0 0 8px ${DOT_COLOR[run.status]}` }} />
             <div>
@@ -271,7 +271,7 @@ function RunModal({ agentName, run, onClose }: { agentName: string; run: RunDot;
             </div>
           </div>
           <button onClick={onClose} style={{
-            background: "transparent", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "50%",
+            background: "transparent", border: "1px solid var(--border)", borderRadius: "50%",
             width: 28, height: 28, color: "var(--text-muted)", cursor: "pointer", fontSize: 14, lineHeight: 1,
           }}>×</button>
         </div>

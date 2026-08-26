@@ -37,7 +37,7 @@ export default function ClientsBoard() {
     });
   }, [data]);
 
-  if (err) return <p style={{ color: "#fb7185", fontSize: 13 }}>Clients error: {err}</p>;
+  if (err) return <p style={{ color: "var(--red)", fontSize: 13 }}>Clients error: {err}</p>;
   if (!data) return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }} aria-label="Loading clients">
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
@@ -60,13 +60,13 @@ export default function ClientsBoard() {
       {/* Summary */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
         {[
-          { label: "Active clients", v: paying.length, c: "#34d399" },
-          { label: "Monthly recurring", v: `$${payingMrr.toLocaleString()}`, c: "#22d3ee" },
-          { label: "In pipeline", v: pipeline.length, c: "#fbbf24" },
+          { label: "Active clients", v: paying.length, c: "var(--green)" },
+          { label: "Monthly recurring", v: `$${payingMrr.toLocaleString()}`, c: "var(--accent)" },
+          { label: "In pipeline", v: pipeline.length, c: "var(--orange)" },
         ].map(s => (
           <div key={s.label} style={{
             background: `radial-gradient(ellipse 90% 70% at 50% -20%, ${s.c}14, transparent 60%), linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))`,
-            border: "1px solid rgba(255,255,255,0.07)", borderRadius: 14, padding: "14px 18px",
+            border: "1px solid var(--border)", borderRadius: 14, padding: "14px 18px",
           }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
               <span style={{ width: 6, height: 6, borderRadius: "50%", background: s.c, boxShadow: `0 0 8px ${s.c}` }} />
@@ -104,21 +104,21 @@ export default function ClientsBoard() {
                     <p style={{ fontSize: 11.5, color: "var(--text-muted)" }}>{c.owner || c.industry}</p>
                   </div>
                 </div>
-                <span style={{ fontSize: 15, fontWeight: 800, color: "#34d399", whiteSpace: "nowrap" }}>
+                <span style={{ fontSize: 15, fontWeight: 800, color: "var(--green)", whiteSpace: "nowrap" }}>
                   ${c.mrr.toLocaleString()}<span style={{ fontSize: 10, fontWeight: 500, opacity: 0.7 }}>/mo</span>
                 </span>
               </div>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
                 {c.industry && (
-                  <span style={{ fontSize: 10, fontWeight: 600, color: "#60a5fa", background: "rgba(96,165,250,0.1)", padding: "2px 9px", borderRadius: 999 }}>{c.industry}</span>
+                  <span style={{ fontSize: 10, fontWeight: 600, color: "var(--accent)", background: "rgba(96,165,250,0.1)", padding: "2px 9px", borderRadius: 999 }}>{c.industry}</span>
                 )}
                 {c.location && (
                   <span style={{ fontSize: 10, fontWeight: 600, color: "var(--text-muted)", background: "rgba(255,255,255,0.05)", padding: "2px 9px", borderRadius: 999 }}>{c.location}</span>
                 )}
-                <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 9px", borderRadius: 999, color: "#34d399", background: "rgba(52,211,153,0.1)" }}>active</span>
+                <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 9px", borderRadius: 999, color: "var(--green)", background: "rgba(52,211,153,0.1)" }}>active</span>
               </div>
               {ghlSnaps[c.file] && (
-                <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 12, paddingTop: 10, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--border)" }}>
                   {[
                     { l: "contacts", v: ghlSnaps[c.file].contacts },
                     { l: "open deals", v: ghlSnaps[c.file].openDeals },
@@ -126,15 +126,15 @@ export default function ClientsBoard() {
                     { l: "convos", v: ghlSnaps[c.file].conversations },
                   ].map(s => (
                     <div key={s.l}>
-                      <p style={{ fontSize: 16, fontWeight: 800, color: "#22d3ee", fontFamily: "'Space Grotesk', sans-serif", lineHeight: 1 }}>{s.v}</p>
+                      <p style={{ fontSize: 16, fontWeight: 800, color: "var(--accent)", fontFamily: "'Space Grotesk', sans-serif", lineHeight: 1 }}>{s.v}</p>
                       <p style={{ fontSize: 9.5, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 3 }}>{s.l}</p>
                     </div>
                   ))}
-                  <span style={{ marginLeft: "auto", alignSelf: "flex-start", fontSize: 9, fontWeight: 600, color: "#22d3ee", background: "rgba(34,211,238,0.1)", padding: "2px 8px", borderRadius: 999 }}>● live GHL</span>
+                  <span style={{ marginLeft: "auto", alignSelf: "flex-start", fontSize: 9, fontWeight: 600, color: "var(--accent)", background: "rgba(34,211,238,0.1)", padding: "2px 8px", borderRadius: 999 }}>● live GHL</span>
                 </div>
               )}
               {(c.email || c.phone || c.ghlLocationId) && (
-                <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", marginTop: 12, paddingTop: 10, display: "flex", flexDirection: "column", gap: 4 }}>
+                <div style={{ borderTop: "1px solid var(--border)", marginTop: 12, paddingTop: 10, display: "flex", flexDirection: "column", gap: 4 }}>
                   {c.email && <a href={`mailto:${c.email}`} onClick={(e) => e.stopPropagation()} style={{ fontSize: 11.5, color: "var(--text-secondary)", textDecoration: "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>✉ {c.email}</a>}
                   {c.phone && <a href={`tel:${c.phone.replace(/\D/g, "")}`} onClick={(e) => e.stopPropagation()} style={{ fontSize: 11.5, color: "var(--text-secondary)", textDecoration: "none" }}>☎ {c.phone}</a>}
                   {c.ghlLocationId && (
@@ -174,7 +174,7 @@ export default function ClientsBoard() {
                     title="Click for client health"
                     style={{
                       background: "linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))",
-                      border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "12px 14px", cursor: "pointer",
+                      border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", cursor: "pointer",
                     }}>
                     <div style={{ display: "flex", gap: 9, alignItems: "center", minWidth: 0 }}>
                       <span style={{ fontSize: 16 }}>{icon}</span>

@@ -13,7 +13,7 @@ export default function CampaignBoard() {
       .catch(e => setErr(String(e)));
   }, []);
 
-  if (err) return <p style={{ color: "#fb7185", fontSize: 13 }}>Campaign data error: {err}</p>;
+  if (err) return <p style={{ color: "var(--red)", fontSize: 13 }}>Campaign data error: {err}</p>;
   if (!data) return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }} aria-label="Loading campaign">
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
@@ -33,12 +33,12 @@ export default function CampaignBoard() {
       {/* Stat tiles */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
         {[
-          { label: "Emails sent", v: t.sent, c: "#34d399" },
-          { label: "Queued to go out", v: t.remaining, c: "#60a5fa" },
+          { label: "Emails sent", v: t.sent, c: "var(--green)" },
+          { label: "Queued to go out", v: t.remaining, c: "var(--accent)" },
         ].map(s => (
           <div key={s.label} style={{
             background: `radial-gradient(ellipse 90% 70% at 50% -20%, ${s.c}14, transparent 60%), linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))`,
-            border: "1px solid rgba(255,255,255,0.07)", borderRadius: 14, padding: "14px 18px",
+            border: "1px solid var(--border)", borderRadius: 14, padding: "14px 18px",
           }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
               <span style={{ width: 6, height: 6, borderRadius: "50%", background: s.c, boxShadow: `0 0 8px ${s.c}` }} />
@@ -50,7 +50,7 @@ export default function CampaignBoard() {
       </div>
 
       {/* Recent sends */}
-      <div style={{ background: "linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 14, padding: 18 }}>
+      <div style={{ background: "linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))", border: "1px solid var(--border)", borderRadius: 14, padding: 18 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
           <p style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.07em" }}>
             {showQueued ? `Queued for wave 3 (${data.queued.length})` : `Latest sends (${data.contacts.length})`}

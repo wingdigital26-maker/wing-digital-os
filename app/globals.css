@@ -471,7 +471,7 @@ main > div:last-child > div > *:nth-child(6) { animation-delay: 0.27s; }
   padding: 2px 6px; font-size: 0.85em; color: var(--accent);
 }
 .markdown-body pre {
-  background: linear-gradient(180deg, var(--bg-card), #0c0f1a);
+  background: var(--bg-secondary);
   border: 1px solid var(--border); border-radius: 10px; padding: 16px;
   overflow-x: auto; margin-bottom: 1em;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);

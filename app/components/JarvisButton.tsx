@@ -506,7 +506,7 @@ export default function JarvisButton() {
                 </button>
               )}
               {engine && (
-                <span style={{ color: engine === "limited" ? "#fb923c" : "#556", fontSize: 10, fontFamily: "Inter, sans-serif", border: `1px solid ${engine === "limited" ? "rgba(251,146,60,0.4)" : "rgba(16,192,240,0.2)"}`, borderRadius: 6, padding: "1px 6px" }}>
+                <span style={{ color: engine === "limited" ? "var(--orange)" : "#556", fontSize: 10, fontFamily: "Inter, sans-serif", border: `1px solid ${engine === "limited" ? "rgba(251,146,60,0.4)" : "rgba(16,192,240,0.2)"}`, borderRadius: 6, padding: "1px 6px" }}>
                   {engine === "claude-code" ? "via Claude Code" : engine === "limited" ? "limited mode" : "via API"}
                 </span>
               )}

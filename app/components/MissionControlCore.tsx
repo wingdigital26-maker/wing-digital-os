@@ -12,7 +12,7 @@ import { sfx } from "../lib/sounds";
 
 // Da Boss healthy / all-clear accent: a calm blue (not green). Red stays for
 // problems, amber for the stale/late state.
-const BOSS_CLEAR = "#60a5fa";
+const BOSS_CLEAR = "var(--accent)";
 const BOSS_CLEAR_RGB = "96, 165, 250";
 
 // ── types (mirror of /api/mission payload) ─────────────────────────────────
@@ -153,12 +153,12 @@ export interface ArtifactDetail {
 // ── shared metadata ────────────────────────────────────────────────────────
 // Systems split into precise pieces so the moving parts are visible.
 export const SYSTEMS = [
-  { id: "vault", label: "VAULT", color: "#a78bfa", blurb: "The Obsidian brain: log.md, hot.md, state snapshots, client pages. Most agents write their results here." },
-  { id: "ghl-clients", label: "GHL", color: "#fbbf24", blurb: "Client subaccounts in GoHighLevel (Jackson Roofing today, more as clients sign): contacts, pipelines, conversations, calendars." },
-  { id: "ghl-wing", label: "GHL WING", color: "#fb923c", blurb: "Wing Digital's own GoHighLevel account: the outreach CRM, reply inbox, and prospect pipeline." },
-  { id: "email", label: "EMAIL", color: "#22d3ee", blurb: "The cold-email path: the autonomous outreach sender and the inbox it feeds." },
-  { id: "clients", label: "CLIENTS", color: "#34d399", blurb: "Live client deliverables: Jackson Roofing, Renewal Health, and the health board that watches them." },
-  { id: "scheduler", label: "SCHEDULER", color: "#60a5fa", blurb: "The scheduled-tasks runner on Jack's PC that fires the daily and weekly agents." },
+  { id: "vault", label: "VAULT", color: "var(--accent-2)", blurb: "The Obsidian brain: log.md, hot.md, state snapshots, client pages. Most agents write their results here." },
+  { id: "ghl-clients", label: "GHL", color: "var(--orange)", blurb: "Client subaccounts in GoHighLevel (Jackson Roofing today, more as clients sign): contacts, pipelines, conversations, calendars." },
+  { id: "ghl-wing", label: "GHL WING", color: "var(--orange)", blurb: "Wing Digital's own GoHighLevel account: the outreach CRM, reply inbox, and prospect pipeline." },
+  { id: "email", label: "EMAIL", color: "var(--accent)", blurb: "The cold-email path: the autonomous outreach sender and the inbox it feeds." },
+  { id: "clients", label: "CLIENTS", color: "var(--green)", blurb: "Live client deliverables: Jackson Roofing, Renewal Health, and the health board that watches them." },
+  { id: "scheduler", label: "SCHEDULER", color: "var(--accent)", blurb: "The scheduled-tasks runner on Jack's PC that fires the daily and weekly agents." },
   { id: "website", label: "WEB/SEO", color: "#f472b6", blurb: "The published websites and SEO layer: blog posts, service pages, calendars, rankings." },
 ];
 
@@ -231,17 +231,17 @@ export const PILLAR_NAMES = [
 ];
 
 export const TYPE_COLOR: Record<string, string> = {
-  ingest: "#22d3ee",
-  query: "#a78bfa",
-  build: "#34d399",
-  security: "#f87171",
-  lint: "#fb923c",
+  ingest: "var(--accent)",
+  query: "var(--accent-2)",
+  build: "var(--green)",
+  security: "var(--red)",
+  lint: "var(--orange)",
 };
 
 export const STATUS_COLOR: Record<string, string> = {
-  green: "#34d399",
-  yellow: "#fb923c",
-  red: "#f87171",
+  green: "var(--green)",
+  yellow: "var(--orange)",
+  red: "var(--red)",
 };
 
 // ── selection model ────────────────────────────────────────────────────────
@@ -359,15 +359,15 @@ type Hover =
 function VolPill({ x, y, text, color, live, stale }: { x: number; y: number; text: string; color: string; live?: boolean; stale?: boolean }) {
   // Stale volumes turn amber and dim; live ones get a small green dot. A
   // confident stale number is never shown as if it were current.
-  const stroke = stale ? "#fb923c" : color;
-  const fill = stale ? "#fb923c" : color;
+  const stroke = stale ? "var(--orange)" : color;
+  const fill = stale ? "var(--orange)" : color;
   const w = text.length * 5.6 + 14 + (live ? 8 : 0);
   return (
     <g style={{ pointerEvents: "none" }} opacity={stale ? 0.7 : 1}>
       <rect x={x - w / 2} y={y - 9} width={w} height={18} rx={9}
         fill="rgba(13,17,23,0.92)" stroke={stroke} strokeOpacity={stale ? 0.9 : 0.7}
         strokeWidth={1} strokeDasharray={stale ? "3 2" : undefined} />
-      {live && <circle cx={x - w / 2 + 8} cy={y} r={2.6} fill="#34d399" />}
+      {live && <circle cx={x - w / 2 + 8} cy={y} r={2.6} fill="var(--green)" />}
       <text x={x + (live ? 4 : 0)} y={y + 3} textAnchor="middle" fill={fill} fontSize="9"
         fontFamily="'JetBrains Mono', monospace">{text}</text>
     </g>
@@ -435,7 +435,7 @@ export function OpsMap({ agents, volumes, watchdog, onSelect, hero }: {
   if (hover?.kind === "watchdog") for (const a of implicated) hoverAgents.add(a.key);
   const hovering = hover !== null;
   const wdProblems = !!watchdog && (watchdog.overall === "problems" || Math.max(watchdog.problemCount, watchdog.problems.length) > 0);
-  const wdColor = wdProblems ? "#f87171" : BOSS_CLEAR;
+  const wdColor = wdProblems ? "var(--red)" : BOSS_CLEAR;
   const wdX = W / 2, wdY = -TOP + 44;
   // Boss orb is 1.5x an agent node (agent r=21 -> 31.5), glow kept proportional.
   const wdR = 31.5;
@@ -443,7 +443,7 @@ export function OpsMap({ agents, volumes, watchdog, onSelect, hero }: {
   return (
     <div className={`mo-map${hero ? " mo-map-hero" : ""}`} style={{
       background: "linear-gradient(180deg, var(--bg-card, #0d1117), rgba(10,12,20,0.9))",
-      border: "1px solid var(--border, rgba(255,255,255,0.08))",
+      border: "1px solid var(--border, var(--border))",
       borderRadius: 14, padding: 8, overflowX: "auto", WebkitOverflowScrolling: "touch",
       ...(hero ? { height: "clamp(440px, 74vh, 900px)", display: "flex" } : {}),
     }}>
@@ -517,8 +517,8 @@ export function OpsMap({ agents, volumes, watchdog, onSelect, hero }: {
           const d = `M ${wdX} ${wdY + wdR} C ${wdX} ${midY}, ${p.x} ${midY}, ${p.x} ${p.y - 26}`;
           return (
             <g key={`wd-${a.key}`}>
-              <path d={d} fill="none" stroke="#f87171" strokeOpacity={0.5} strokeWidth={1.6} />
-              <path d={d} fill="none" stroke="#f87171" strokeWidth={2.4}
+              <path d={d} fill="none" stroke="var(--red)" strokeOpacity={0.5} strokeWidth={1.6} />
+              <path d={d} fill="none" stroke="var(--red)" strokeWidth={2.4}
                 strokeDasharray="4 14" strokeLinecap="round" className="mo-flow" />
             </g>
           );
@@ -538,7 +538,7 @@ export function OpsMap({ agents, volumes, watchdog, onSelect, hero }: {
               fontFamily="'JetBrains Mono', monospace" letterSpacing="0.06em" fontWeight="700" style={{ pointerEvents: "none" }}>
               DA BOSS
             </text>
-            <text x={wdX} y={wdY + wdR + 14} textAnchor="middle" fill={wdProblems ? "#f87171" : "#6b7280"} fontSize="8.5"
+            <text x={wdX} y={wdY + wdR + 14} textAnchor="middle" fill={wdProblems ? "var(--red)" : "#6b7280"} fontSize="8.5"
               fontFamily="'JetBrains Mono', monospace" style={{ pointerEvents: "none" }}>
               {wdProblems
                 ? `${Math.max(watchdog.problemCount, watchdog.problems.length)} problem${Math.max(watchdog.problemCount, watchdog.problems.length) === 1 ? "" : "s"}`
@@ -553,7 +553,7 @@ export function OpsMap({ agents, volumes, watchdog, onSelect, hero }: {
           const trial = !a.enabled && !!a.trial;
           const highlighted = hovering && hoverAgents.has(a.key);
           const dimmed = hovering && !highlighted;
-          const color = trial ? "#fb923c" : highlighted || active ? "#22d3ee" : "#4b5563";
+          const color = trial ? "var(--orange)" : highlighted || active ? "var(--accent)" : "#4b5563";
           return (
             <g key={a.key} className="mo-click" opacity={dimmed ? 0.3 : 1}
               onMouseEnter={() => { sfx.play("hover"); setHover({ kind: "agent", key: a.key }); }}
@@ -565,13 +565,13 @@ export function OpsMap({ agents, volumes, watchdog, onSelect, hero }: {
                 strokeDasharray={trial ? "3 3" : undefined}
                 className={active ? "mo-node-pulse" : undefined} />
               <circle cx={x} cy={y - 28} r={3.5}
-                fill={a.watchdogState === "SILENT" ? "#f87171" : a.watchdogState === "LATE" ? "#fb923c" : trial ? "#fb923c" : active ? "#34d399" : "#4b5563"}
+                fill={a.watchdogState === "SILENT" ? "var(--red)" : a.watchdogState === "LATE" ? "var(--orange)" : trial ? "var(--orange)" : active ? "var(--green)" : "#4b5563"}
                 className={active || (a.watchdogState && a.watchdogState !== "OK") ? "mo-pulse" : undefined} />
-              <text x={x} y={y + 4} textAnchor="middle" fill={trial ? "#fbbf24" : active || highlighted ? "#e5e7eb" : "#9ca3af"}
+              <text x={x} y={y + 4} textAnchor="middle" fill={trial ? "var(--orange)" : active || highlighted ? "#e5e7eb" : "#9ca3af"}
                 fontSize="9.5" fontFamily="'JetBrains Mono', monospace" style={{ pointerEvents: "none" }}>
                 {a.name.split(" ")[0].slice(0, 9).toUpperCase()}
               </text>
-              <text x={x} y={y + 40} textAnchor="middle" fill={trial ? "#fb923c" : "#6b7280"} fontSize="8.5"
+              <text x={x} y={y + 40} textAnchor="middle" fill={trial ? "var(--orange)" : "#6b7280"} fontSize="8.5"
                 fontFamily="'JetBrains Mono', monospace" style={{ pointerEvents: "none" }}>
                 {trial ? "TRIAL" : a.nextRunAt ? fmtCountdown(a.nextRunAt) : a.lastLogDate ?? ""}
               </text>
@@ -748,8 +748,8 @@ function WatchdogCopyButton({ watchdog, color }: { watchdog: WatchdogData; color
         }).catch(() => {});
       }}
       style={{
-        background: "none", border: `1px solid ${copied ? "#34d399" : color}55`,
-        color: copied ? "#34d399" : color, borderRadius: 6, padding: "2px 8px",
+        background: "none", border: `1px solid ${copied ? "var(--green)" : color}55`,
+        color: copied ? "var(--green)" : color, borderRadius: 6, padding: "2px 8px",
         cursor: "pointer", fontSize: 10, display: "inline-flex", alignItems: "center", gap: 5,
         fontFamily: "'JetBrains Mono', monospace", flexShrink: 0,
       }}>
@@ -790,11 +790,11 @@ const RECHECK_TARGETS: { id: string; label: string }[] = [
 ];
 
 const statusColor = (s: string): string =>
-  s === "resolved" || s === "ok" ? "#34d399" : s === "problem" ? "#f87171" : "#93a4b8";
+  s === "resolved" || s === "ok" ? "var(--green)" : s === "problem" ? "var(--red)" : "#93a4b8";
 
 function StatusMark({ status }: { status: string }) {
-  if (status === "resolved" || status === "ok") return <span style={{ color: "#34d399" }} aria-hidden>&#10003;</span>;
-  if (status === "problem") return <span style={{ color: "#f87171" }} aria-hidden>&#10007;</span>;
+  if (status === "resolved" || status === "ok") return <span style={{ color: "var(--green)" }} aria-hidden>&#10003;</span>;
+  if (status === "problem") return <span style={{ color: "var(--red)" }} aria-hidden>&#10007;</span>;
   return <Pill text="needs PC" color="#93a4b8" />;
 }
 
@@ -871,7 +871,7 @@ export function RecheckButton({ onRechecked, compact }: { onRechecked?: () => vo
       {open && (
         <div style={{
           position: "absolute", top: "100%", right: 0, marginTop: 4, zIndex: 30,
-          background: "var(--bg-card, #0d1117)", border: "1px solid var(--border, rgba(255,255,255,0.12))",
+          background: "var(--bg-card, #0d1117)", border: "1px solid var(--border, var(--border))",
           borderRadius: 8, padding: 4, minWidth: 190, boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
         }}>
           {RECHECK_TARGETS.map((t) => (
@@ -889,7 +889,7 @@ export function RecheckButton({ onRechecked, compact }: { onRechecked?: () => vo
         </div>
       )}
 
-      {err && <div style={{ fontSize: 10.5, color: "#f87171", fontFamily: mono }}>recheck failed: {err}</div>}
+      {err && <div style={{ fontSize: 10.5, color: "var(--red)", fontFamily: mono }}>recheck failed: {err}</div>}
 
       {result && !busy && (
         <div style={{
@@ -933,11 +933,11 @@ export function RecheckButton({ onRechecked, compact }: { onRechecked?: () => vo
             const persisted = !!result.persisted;
             const cloud = result.mode === "cloud-github";
             const n = result.resolvedCount ?? 0;
-            const col = persisted ? "#34d399" : "#93a4b8";
+            const col = persisted ? "var(--green)" : "#93a4b8";
             return (
               <div style={{
                 display: "flex", alignItems: "center", gap: 6, fontSize: 10, fontFamily: mono,
-                color: col, borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 6,
+                color: col, borderTop: "1px solid var(--border)", paddingTop: 6,
               }}>
                 {persisted ? (
                   // synced / cloud icon
@@ -1032,7 +1032,7 @@ export function RunDaBossButton({ onRechecked, block }: { onRechecked?: () => vo
       </button>
       <style>{`@keyframes recheckSpin { to { transform: rotate(360deg); } }`}</style>
 
-      {err && <div style={{ fontSize: 11, color: "#f87171", fontFamily: mono }}>Da Boss run failed: {err}</div>}
+      {err && <div style={{ fontSize: 11, color: "var(--red)", fontFamily: mono }}>Da Boss run failed: {err}</div>}
 
       {result && !busy && (
         <div style={{
@@ -1046,7 +1046,7 @@ export function RunDaBossButton({ onRechecked, block }: { onRechecked?: () => vo
               {(result.resolvedCount ?? 0) > 0 ? `, ${result.resolvedCount} resolved this run` : ""}
             </span>
           </div>
-          <div style={{ fontSize: 10.5, fontFamily: mono, color: persisted ? "#34d399" : "#93a4b8" }}>
+          <div style={{ fontSize: 10.5, fontFamily: mono, color: persisted ? "var(--green)" : "#93a4b8" }}>
             {persisted
               ? `Report updated${result.mode === "cloud-github" ? " (cloud)" : result.pushedToCloud ? " (synced)" : ""}`
               : "Live check only, report not updated - needs PC"}
@@ -1069,7 +1069,7 @@ export function WatchdogBanner({ watchdog, onRechecked }: { watchdog?: WatchdogD
   // Not reported yet (file missing): quiet neutral, never an error.
   if (!watchdog || !watchdog.available) {
     return (
-      <div style={{ ...base, border: "1px solid var(--border, rgba(255,255,255,0.08))", background: "var(--bg-card, #0d1117)" }}>
+      <div style={{ ...base, border: "1px solid var(--border, var(--border))", background: "var(--bg-card, #0d1117)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <Dot color="#6b7280" />
           <span style={{ fontSize: 11, letterSpacing: "0.1em", color: "var(--text-muted, #6b7280)" }}>
@@ -1110,7 +1110,7 @@ export function WatchdogBanner({ watchdog, onRechecked }: { watchdog?: WatchdogD
   }
 
   // Problems (red) and/or the watchdog itself late (amber).
-  const color = hasProblems ? "#f87171" : "#fb923c";
+  const color = hasProblems ? "var(--red)" : "var(--orange)";
   // Always start COLLAPSED. Only an explicit user tap expands it; every load and
   // every recheck/refresh must default to the tight banner, never auto-open.
   const isOpen = expanded ?? false;
@@ -1136,7 +1136,7 @@ export function WatchdogBanner({ watchdog, onRechecked }: { watchdog?: WatchdogD
         <Dot color={color} pulse />
         <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.1em", color }}>{headline}</span>
         {hasProblems && stale && (
-          <span style={{ fontSize: 10, color: "#fb923c", border: "1px solid #fb923c55", borderRadius: 99, padding: "1px 8px" }}>
+          <span style={{ fontSize: 10, color: "var(--orange)", border: "1px solid #fb923c55", borderRadius: 99, padding: "1px 8px" }}>
             report is also late ({relAge(ageMin)})
           </span>
         )}
@@ -1179,7 +1179,7 @@ export function WatchdogBanner({ watchdog, onRechecked }: { watchdog?: WatchdogD
             </div>
           )}
           {stale && hasProblems && (
-            <div style={{ fontSize: 10.5, color: "#fb923c" }}>
+            <div style={{ fontSize: 10.5, color: "var(--orange)" }}>
               Da Boss report itself is older than 3 hours - Da Boss being silent is also a problem.
             </div>
           )}
@@ -1198,13 +1198,13 @@ export function AgentTile({ a, onSelect }: { a: AgentCard; onSelect: (s: Selecti
   let pulse = false;
   let line = a.schedule;
   const trial = !a.enabled && !!a.trial;
-  if (trial) { color = "#fb923c"; line = "TRIAL"; }
+  if (trial) { color = "var(--orange)"; line = "TRIAL"; }
   else if (!a.enabled) { line = "disabled"; }
-  else if (a.watchdogState === "SILENT") { color = "#f87171"; pulse = true; line = "SILENT (Da Boss)"; }
-  else if (a.watchdogState === "LATE") { color = "#fb923c"; pulse = true; line = "LATE (Da Boss)"; }
-  else if (a.pcNeeded && a.kind === "scheduled") { color = "#fb923c"; line = "PC needed"; }
-  else if (a.nextRunAt) { color = "#22d3ee"; pulse = true; line = `next ${fmtCountdown(a.nextRunAt)}`; }
-  else if (a.lastLogDate) { color = "#34d399"; pulse = true; line = `last seen ${a.lastLogDate}`; }
+  else if (a.watchdogState === "SILENT") { color = "var(--red)"; pulse = true; line = "SILENT (Da Boss)"; }
+  else if (a.watchdogState === "LATE") { color = "var(--orange)"; pulse = true; line = "LATE (Da Boss)"; }
+  else if (a.pcNeeded && a.kind === "scheduled") { color = "var(--orange)"; line = "PC needed"; }
+  else if (a.nextRunAt) { color = "var(--accent)"; pulse = true; line = `next ${fmtCountdown(a.nextRunAt)}`; }
+  else if (a.lastLogDate) { color = "var(--green)"; pulse = true; line = `last seen ${a.lastLogDate}`; }
   else if (a.kind === "crew") { line = "on demand"; }
 
   return (
@@ -1213,7 +1213,7 @@ export function AgentTile({ a, onSelect }: { a: AgentCard; onSelect: (s: Selecti
       className="mo-click"
       style={{
         background: "var(--bg-card, #0d1117)",
-        border: "1px solid var(--border, rgba(255,255,255,0.06))",
+        border: "1px solid var(--border, var(--border))",
         borderRadius: 12, padding: "12px 16px",
         display: "flex", alignItems: "center", gap: 10,
         opacity: a.enabled || trial ? 1 : 0.5,
@@ -1223,7 +1223,7 @@ export function AgentTile({ a, onSelect }: { a: AgentCard; onSelect: (s: Selecti
       <Dot color={color} pulse={pulse} />
       <span style={{ fontWeight: 600, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.name}</span>
       {trial ? (
-        <span style={{ marginLeft: "auto" }}><Pill text="TRIAL" color="#fb923c" /></span>
+        <span style={{ marginLeft: "auto" }}><Pill text="TRIAL" color="var(--orange)" /></span>
       ) : (
         <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace", whiteSpace: "nowrap" }}>
           {line}
@@ -1242,13 +1242,13 @@ export function FreshnessMark({ source, updated, stale }: { source: MetricSource
   if (source === "live-db" || source === "live-ghl") {
     return (
       <span title={source === "live-db" ? "Live from prospects.db, just now" : "Live from the GHL API, just now"}
-        style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 9, color: "#34d399", fontFamily: mono }}>
-        <Dot color="#34d399" pulse /> live
+        style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 9, color: "var(--green)", fontFamily: mono }}>
+        <Dot color="var(--green)" pulse /> live
       </span>
     );
   }
   const age = fmtAge(updated);
-  const color = stale ? "#fb923c" : "var(--text-muted, #6b7280)";
+  const color = stale ? "var(--orange)" : "var(--text-muted, #6b7280)";
   return (
     <span title={stale ? "From a snapshot and past its freshness window — may be stale, needs PC or state-sync" : `From snapshot${age ? `, ${age}` : ""}`}
       style={{ fontSize: 9, color, fontFamily: mono }}>
@@ -1261,9 +1261,9 @@ export function FreshnessMark({ source, updated, stale }: { source: MetricSource
 export function FreshnessLegend() {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", fontSize: 10, color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace" }}>
-      <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Dot color="#34d399" /> live — queried from the source just now</span>
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Dot color="var(--green)" /> live — queried from the source just now</span>
       <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Dot color="#6b7280" /> snapshot — shows its real age</span>
-      <span style={{ display: "inline-flex", alignItems: "center", gap: 5, color: "#fb923c" }}><Dot color="#fb923c" /> stale — past its freshness window, needs PC</span>
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 5, color: "var(--orange)" }}><Dot color="var(--orange)" /> stale — past its freshness window, needs PC</span>
     </div>
   );
 }
@@ -1276,7 +1276,7 @@ export function StatTiles({ tiles, onSelect }: { tiles: StatTile[]; onSelect: (s
         {tiles.map((t) => {
           const live = t.source === "live-db" || t.source === "live-ghl";
           // Stale snapshot values render muted/amber, never as a bright stat.
-          const valueColor = t.stale ? "#fb923c" : live ? "var(--text-primary)" : "var(--text-secondary, #9ca3af)";
+          const valueColor = t.stale ? "var(--orange)" : live ? "var(--text-primary)" : "var(--text-secondary, #9ca3af)";
           return (
             <div key={t.label} className="mo-click" onClick={() => { sfx.play("ping"); onSelect({ type: "stat", key: t.key }); }}
               title={t.provenance || "Click for the breakdown"}
@@ -1316,12 +1316,12 @@ export function NextUpStrip({ agents, onSelect }: { agents: AgentCard[]; onSelec
     .sort((a, b) => new Date(a.nextRunAt as string).getTime() - new Date(b.nextRunAt as string).getTime());
   if (!upcoming.length) return null;
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", background: "var(--bg-card, #0d1117)", border: "1px solid var(--border, rgba(255,255,255,0.08))", borderRadius: 12, padding: "8px 14px" }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", background: "var(--bg-card, #0d1117)", border: "1px solid var(--border, var(--border))", borderRadius: 12, padding: "8px 14px" }}>
       <span style={{ fontSize: 10, letterSpacing: "0.12em", color: "var(--text-muted)" }}>NEXT 24H</span>
       {upcoming.map((a) => (
         <span key={a.key} className="mo-click" onClick={() => { sfx.play("blip"); onSelect({ type: "agent", key: a.key }); }}
-          style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", color: "var(--text-secondary)", border: "1px solid var(--border, rgba(255,255,255,0.1))", borderRadius: 99, padding: "3px 10px" }}>
-          <Dot color="#22d3ee" />
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", color: "var(--text-secondary)", border: "1px solid var(--border, var(--border))", borderRadius: 99, padding: "3px 10px" }}>
+          <Dot color="var(--accent)" />
           {a.name}
           <span style={{ color: "var(--accent, #22d3ee)" }}>{fmtCountdown(a.nextRunAt as string)}</span>
         </span>
@@ -1417,7 +1417,7 @@ export function AgentFeed({ entries }: { entries: AgentFeedEntry[] }) {
   const [all, setAll] = useState(false);
   const shown = all ? entries.slice(0, 25) : entries.slice(0, 6);
   return (
-    <section style={{ background: "var(--bg-card, #0d1117)", border: "1px solid var(--border, rgba(255,255,255,0.08))", borderRadius: 12, padding: 16 }}>
+    <section style={{ background: "var(--bg-card, #0d1117)", border: "1px solid var(--border, var(--border))", borderRadius: 12, padding: 16 }}>
       <h2 style={{ fontSize: 11, letterSpacing: "0.14em", color: "var(--text-muted)", marginBottom: 10 }}>AGENT FEED</h2>
       {entries.length === 0 && (
         <div style={{ fontSize: 12, color: "var(--text-muted)" }}>no agent reports yet</div>
@@ -1472,7 +1472,7 @@ export function ClientHealthStrip({
   onSelect: (s: Selection) => void;
 }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 14, background: "var(--bg-card, #0d1117)", border: "1px solid var(--border, rgba(255,255,255,0.08))", borderRadius: 12, padding: "10px 16px", flexWrap: "wrap" }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 14, background: "var(--bg-card, #0d1117)", border: "1px solid var(--border, var(--border))", borderRadius: 12, padding: "10px 16px", flexWrap: "wrap" }}>
       <span style={{ fontSize: 10, letterSpacing: "0.12em", color: "var(--text-muted)" }}>CLIENT HEALTH</span>
       {health.clients.length === 0 && (
         <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
@@ -1518,12 +1518,12 @@ function SlideOver({ title, accent, onClose, children }: {
         {/* tap-close handle target (styled as a grab handle on the phone bottom sheet) */}
         <div className="mo-panel-close" onClick={close} aria-label="Close panel" style={{
           display: "flex", alignItems: "center", gap: 10, padding: "14px 18px",
-          borderBottom: "1px solid var(--border, rgba(255,255,255,0.08))", cursor: "pointer",
+          borderBottom: "1px solid var(--border, var(--border))", cursor: "pointer",
         }}>
           <Dot color={accent} pulse />
           <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.1em", fontFamily: "'JetBrains Mono', monospace" }}>{title}</span>
           <button onClick={close} style={{
-            marginLeft: "auto", background: "none", border: "1px solid var(--border, rgba(255,255,255,0.15))",
+            marginLeft: "auto", background: "none", border: "1px solid var(--border, var(--border))",
             color: "var(--text-secondary, #9ca3af)", borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontSize: 12,
           }}>Close</button>
         </div>
@@ -1544,7 +1544,7 @@ function Section({ title, defaultOpen, children }: {
 }) {
   const [open, setOpen] = useState(!!defaultOpen);
   return (
-    <div style={{ borderTop: "1px solid var(--border, rgba(255,255,255,0.06))", marginTop: 12, paddingTop: 8 }}>
+    <div style={{ borderTop: "1px solid var(--border, var(--border))", marginTop: 12, paddingTop: 8 }}>
       <div className="mo-click" onClick={() => { sfx.play(open ? "toggle-off" : "toggle-on"); setOpen(o => !o); }}
         style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <span style={{ fontSize: 10, letterSpacing: "0.14em", color: "var(--text-muted)", textTransform: "uppercase" }}>{title}</span>
@@ -1581,7 +1581,7 @@ function DistilledExcerpt({ distilled, raw, accent }: { distilled: string[]; raw
       {showRaw && (
         <div style={{
           fontSize: 11, fontFamily: "'JetBrains Mono', monospace", color: "var(--text-secondary)",
-          background: "var(--bg-card, #0d1117)", border: "1px solid var(--border, rgba(255,255,255,0.08))",
+          background: "var(--bg-card, #0d1117)", border: "1px solid var(--border, var(--border))",
           borderRadius: 8, padding: "8px 10px", lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word", marginTop: 6,
         }}>
           {raw.join("\n")}
@@ -1620,7 +1620,7 @@ function CopyPath({ path }: { path: string }) {
             setTimeout(() => setCopied(false), 1500);
           }).catch(() => {});
         }}
-        style={{ background: "none", border: "1px solid var(--border, rgba(255,255,255,0.15))", color: copied ? "#34d399" : "var(--text-secondary, #9ca3af)", borderRadius: 6, padding: "2px 8px", cursor: "pointer", fontSize: 10, flexShrink: 0 }}>
+        style={{ background: "none", border: "1px solid var(--border, var(--border))", color: copied ? "var(--green)" : "var(--text-secondary, #9ca3af)", borderRadius: 6, padding: "2px 8px", cursor: "pointer", fontSize: 10, flexShrink: 0 }}>
         {copied ? "copied" : "copy vault path"}
       </button>
     </div>
@@ -1660,9 +1660,9 @@ function AgentPanel({ agentKey, onClose, onSelect }: {
   }, [agentKey]);
 
   const statusColor =
-    detail?.status === "active" ? "#34d399" :
-    detail?.status === "scheduled" ? "#22d3ee" :
-    detail?.status === "trial" ? "#fb923c" :
+    detail?.status === "active" ? "var(--green)" :
+    detail?.status === "scheduled" ? "var(--accent)" :
+    detail?.status === "trial" ? "var(--orange)" :
     detail?.status === "disabled" ? "#6b7280" : "#9ca3af";
 
   const producedArtifacts = ARTIFACTS.filter(a => a.producedBy === agentKey);
@@ -1672,16 +1672,16 @@ function AgentPanel({ agentKey, onClose, onSelect }: {
   return (
     <SlideOver title={detail ? detail.name.toUpperCase() : "AGENT"} accent={statusColor} onClose={onClose}>
       {!detail && !err && <div style={{ fontSize: 12, color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace" }}>Loading agent telemetry...</div>}
-      {err && <div style={{ fontSize: 12, color: "#f87171" }}>Could not load agent detail ({err})</div>}
+      {err && <div style={{ fontSize: 12, color: "var(--red)" }}>Could not load agent detail ({err})</div>}
       {detail && (
         <>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
             <Pill text={detail.status.toUpperCase()} color={statusColor} />
             <Pill text={detail.kind === "scheduled" ? "SCHEDULED" : "ON DEMAND"} color="var(--text-muted, #6b7280)" />
-            {detail.watchdogState === "SILENT" && <Pill text="SILENT (DA BOSS)" color="#f87171" />}
-            {detail.watchdogState === "LATE" && <Pill text="LATE (DA BOSS)" color="#fb923c" />}
+            {detail.watchdogState === "SILENT" && <Pill text="SILENT (DA BOSS)" color="var(--red)" />}
+            {detail.watchdogState === "LATE" && <Pill text="LATE (DA BOSS)" color="var(--orange)" />}
             {detail.watchdogState === "DISABLED" && <Pill text="DISABLED (DA BOSS)" color="#6b7280" />}
-            {detail.installed === false && <Pill text="NOT INSTALLED" color="#fb923c" />}
+            {detail.installed === false && <Pill text="NOT INSTALLED" color="var(--orange)" />}
           </div>
 
           {/* lead: what this is / what it did last / what happens next */}
@@ -1715,7 +1715,7 @@ function AgentPanel({ agentKey, onClose, onSelect }: {
               {!detail.nextRunAt && !detail.lastRunAt && "no recorded runs"}
             </div>
             {RUN_PHRASE[detail.key] && (
-              <div style={{ marginTop: 10, fontSize: 12, color: "var(--text-secondary)", background: "var(--bg-card, #0d1117)", border: "1px solid var(--border, rgba(255,255,255,0.08))", borderRadius: 8, padding: "8px 10px", lineHeight: 1.5 }}>
+              <div style={{ marginTop: 10, fontSize: 12, color: "var(--text-secondary)", background: "var(--bg-card, #0d1117)", border: "1px solid var(--border, var(--border))", borderRadius: 8, padding: "8px 10px", lineHeight: 1.5 }}>
                 Run it now: the OS is read-only, so tell Claude{" "}
                 <span style={{ fontFamily: "'JetBrains Mono', monospace", color: "var(--accent, #22d3ee)" }}>&quot;{RUN_PHRASE[detail.key]}&quot;</span>
               </div>
@@ -1780,12 +1780,12 @@ function ArtifactPanel({ artifactId, onClose, onSelect }: {
   }, [artifactId]);
 
   const sys = detail ? SYSTEMS.find(s => s.id === detail.system) : null;
-  const accent = sys?.color ?? "#22d3ee";
+  const accent = sys?.color ?? "var(--accent)";
 
   return (
     <SlideOver title={detail ? detail.label.toUpperCase() : "ARTIFACT"} accent={accent} onClose={onClose}>
       {!detail && !err && <div style={{ fontSize: 12, color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace" }}>Loading artifact...</div>}
-      {err && <div style={{ fontSize: 12, color: "#f87171" }}>Could not load artifact ({err})</div>}
+      {err && <div style={{ fontSize: 12, color: "var(--red)" }}>Could not load artifact ({err})</div>}
       {detail && (
         <>
           <SummaryBlock accent={accent} lines={[
@@ -1796,7 +1796,7 @@ function ArtifactPanel({ artifactId, onClose, onSelect }: {
 
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "10px 0" }}>
             <span className="mo-click" onClick={() => onSelect({ type: "agent", key: detail.producedBy })}>
-              <Pill text={detail.producedByName.toUpperCase()} color="#22d3ee" />
+              <Pill text={detail.producedByName.toUpperCase()} color="var(--accent)" />
             </span>
             {sys && (
               <span className="mo-click" onClick={() => onSelect({ type: "system", id: sys.id })}>
@@ -1834,12 +1834,12 @@ function StatPanel({ statKey, onClose, onSelect }: {
     return () => { alive = false; };
   }, [statKey]);
 
-  const accent = "#22d3ee";
+  const accent = "var(--accent)";
   const age = fmtAge(detail?.updated ?? null);
   return (
     <SlideOver title={detail ? detail.title.toUpperCase() : "STAT"} accent={accent} onClose={onClose}>
       {!detail && !err && <div style={{ fontSize: 12, color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace" }}>Loading breakdown...</div>}
-      {err && <div style={{ fontSize: 12, color: "#f87171" }}>Could not load breakdown ({err})</div>}
+      {err && <div style={{ fontSize: 12, color: "var(--red)" }}>Could not load breakdown ({err})</div>}
       {detail && (
         <>
           {/* Every panel states its source line at top: live vs snapshot age. */}
@@ -1849,18 +1849,18 @@ function StatPanel({ statKey, onClose, onSelect }: {
             background: detail.stale ? "rgba(251,146,60,0.06)" : "rgba(255,255,255,0.02)",
           }}>
             <FreshnessMark source={detail.source ?? "snapshot"} updated={detail.updated} stale={detail.stale} />
-            <span style={{ fontSize: 11, color: detail.stale ? "#fb923c" : "var(--text-secondary, #9ca3af)", fontFamily: "'JetBrains Mono', monospace" }}>
+            <span style={{ fontSize: 11, color: detail.stale ? "var(--orange)" : "var(--text-secondary, #9ca3af)", fontFamily: "'JetBrains Mono', monospace" }}>
               {detail.provenance ?? (age ? `From snapshot, ${age}` : "From snapshot")}
             </span>
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
-            {!detail.available && <Pill text="SNAPSHOT UNAVAILABLE" color="#fb923c" />}
+            {!detail.available && <Pill text="SNAPSHOT UNAVAILABLE" color="var(--orange)" />}
           </div>
           <SummaryBlock accent={accent} lines={detail.summary} />
           {detail.items.length > 0 && (
             <Section title={`Breakdown (${detail.items.length})`} defaultOpen>
               {detail.items.map((it, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "baseline", gap: 10, fontSize: 12.5, marginBottom: 7, borderBottom: "1px solid var(--border, rgba(255,255,255,0.05))", paddingBottom: 6 }}>
+                <div key={i} style={{ display: "flex", alignItems: "baseline", gap: 10, fontSize: 12.5, marginBottom: 7, borderBottom: "1px solid var(--border, var(--border))", paddingBottom: 6 }}>
                   <span style={{ color: "var(--text-secondary)", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.label}</span>
                   <span style={{ fontFamily: "'JetBrains Mono', monospace", color: "var(--text-primary)", flexShrink: 0 }}>{it.value}</span>
                   {it.note && <span style={{ color: "var(--text-muted)", fontSize: 11, flexShrink: 0 }}>{it.note}</span>}
@@ -1869,7 +1869,7 @@ function StatPanel({ statKey, onClose, onSelect }: {
             </Section>
           )}
           {detail.note && (
-            <div style={{ fontSize: 11, color: "var(--text-muted)", lineHeight: 1.5, marginTop: 12, borderLeft: "2px solid var(--border, rgba(255,255,255,0.15))", paddingLeft: 10 }}>
+            <div style={{ fontSize: 11, color: "var(--text-muted)", lineHeight: 1.5, marginTop: 12, borderLeft: "2px solid var(--border, var(--border))", paddingLeft: 10 }}>
               {detail.note}
             </div>
           )}
@@ -1914,18 +1914,18 @@ interface CalEntry {
 }
 const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
 const CAL_ENTRIES: CalEntry[] = [
-  { key: "b2b-prospector-daily", label: "Prospector", color: "#fbbf24", days: ALL_DAYS, time: "06:15" },
-  { key: "sentinel-daily", label: "Sentinel", color: "#34d399", days: ALL_DAYS, time: "07:00" },
+  { key: "b2b-prospector-daily", label: "Prospector", color: "var(--orange)", days: ALL_DAYS, time: "06:15" },
+  { key: "sentinel-daily", label: "Sentinel", color: "var(--green)", days: ALL_DAYS, time: "07:00" },
   { key: "content-engine-weekly", label: "Content Engine", color: "#f472b6", days: [0], time: "07:00" },
-  { key: "renewal-content-weekly", label: "Renewal Content", color: "#a78bfa", days: [0], time: "07:40" },
-  { key: "chronicler-end-of-day", label: "Chronicler", color: "#60a5fa", days: ALL_DAYS, time: "21:47" },
-  { key: "b2b-outreach-engine", label: "Outreach", color: "#22d3ee", days: ALL_DAYS, band: { start: "08:00", end: "20:00", every: "every 30 min", everyMin: 30 } },
-  { key: "watchdog", label: "Da Boss", color: "#f87171", days: ALL_DAYS, band: { start: "06:00", end: "22:00", every: "every 2h", everyMin: 120 } },
+  { key: "renewal-content-weekly", label: "Renewal Content", color: "var(--accent-2)", days: [0], time: "07:40" },
+  { key: "chronicler-end-of-day", label: "Chronicler", color: "var(--accent)", days: ALL_DAYS, time: "21:47" },
+  { key: "b2b-outreach-engine", label: "Outreach", color: "var(--accent)", days: ALL_DAYS, band: { start: "08:00", end: "20:00", every: "every 30 min", everyMin: 30 } },
+  { key: "watchdog", label: "Da Boss", color: "var(--red)", days: ALL_DAYS, band: { start: "06:00", end: "22:00", every: "every 2h", everyMin: 120 } },
 ];
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 // Green used across the calendar to mark an entry whose scheduled time is in the
 // past — i.e. it already ran this week. Upcoming entries stay neutral.
-const CAL_RAN_GREEN = "#4ade80";
+const CAL_RAN_GREEN = "var(--green)";
 
 function hm(t: string): number {
   const [h, m] = t.split(":").map(Number);
@@ -2025,7 +2025,7 @@ export function SchedulerCalendar({ agents, content = [], onSelect }: {
     <button className="mo-click" onClick={() => { sfx.play("nav"); setOffset(o => o + dir); setDetail(null); setPickedContent(null); }}
       aria-label={label}
       style={{
-        background: "var(--bg-card, rgba(255,255,255,0.02))", border: "1px solid var(--border, rgba(255,255,255,0.15))", color: "var(--text-secondary, #9ca3af)",
+        background: "var(--bg-card, rgba(255,255,255,0.02))", border: "1px solid var(--border, var(--border))", color: "var(--text-secondary, #9ca3af)",
         borderRadius: 8, padding: "3px 11px", cursor: "pointer", fontSize: 14, fontFamily: "'JetBrains Mono', monospace", lineHeight: 1.3,
       }}>{dir < 0 ? "‹" : "›"}</button>
   );
@@ -2050,7 +2050,7 @@ export function SchedulerCalendar({ agents, content = [], onSelect }: {
           display: "flex", alignItems: "center", gap: 7, fontSize: big ? 11.5 : 10.5, marginBottom: 4,
           padding: big ? "3px 8px" : "3px 7px", borderRadius: 6, minWidth: 0,
           background: "var(--bg-card, rgba(255,255,255,0.03))",
-          border: "1px solid var(--border, rgba(255,255,255,0.08))",
+          border: "1px solid var(--border, var(--border))",
           borderLeft: ran ? `2px solid ${CAL_RAN_GREEN}` : "1px solid var(--border, rgba(255,255,255,0.08))",
         }}>
         <span style={{ width: 6, height: 6, borderRadius: it.kind === "agent" ? "50%" : 2, background: dotColor, flexShrink: 0 }} />
@@ -2072,10 +2072,10 @@ export function SchedulerCalendar({ agents, content = [], onSelect }: {
         </div>
         {offset !== 0 && (
           <button className="mo-click" onClick={() => { sfx.play("nav"); setOffset(0); setDetail(null); }}
-            style={{ background: "none", border: "1px solid var(--border, rgba(255,255,255,0.15))", color: "var(--text-muted)", borderRadius: 8, padding: "3px 9px", cursor: "pointer", fontSize: 10, fontFamily: "'JetBrains Mono', monospace" }}>today</button>
+            style={{ background: "none", border: "1px solid var(--border, var(--border))", color: "var(--text-muted)", borderRadius: 8, padding: "3px 9px", cursor: "pointer", fontSize: 10, fontFamily: "'JetBrains Mono', monospace" }}>today</button>
         )}
         <div style={{ marginLeft: "auto", display: "inline-flex", gap: 8, alignItems: "center" }}>
-          <div style={{ display: "inline-flex", border: "1px solid var(--border, rgba(255,255,255,0.15))", borderRadius: 8, overflow: "hidden" }}>
+          <div style={{ display: "inline-flex", border: "1px solid var(--border, var(--border))", borderRadius: 8, overflow: "hidden" }}>
             {(["week", "month"] as const).map(v => (
               <button key={v} className="mo-click" onClick={() => switchView(v)}
                 style={{ background: view === v ? "var(--accent, #22d3ee)22" : "none", border: "none", color: view === v ? "var(--accent, #22d3ee)" : "var(--text-muted)", padding: big ? "5px 14px" : "4px 11px", cursor: "pointer", fontSize: 10.5, fontFamily: "'JetBrains Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em" }}>{v}</button>
@@ -2083,7 +2083,7 @@ export function SchedulerCalendar({ agents, content = [], onSelect }: {
           </div>
           <button className="mo-click" onClick={big ? closeFull : openFull} aria-label={big ? "exit full screen" : "full screen"}
             title={big ? "Exit full screen (Esc)" : "Full screen"}
-            style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: big ? 34 : 28, height: big ? 34 : 28, background: "var(--bg-card, rgba(255,255,255,0.02))", border: "1px solid var(--border, rgba(255,255,255,0.15))", color: "var(--text-secondary, #9ca3af)", borderRadius: 8, cursor: "pointer" }}>
+            style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: big ? 34 : 28, height: big ? 34 : 28, background: "var(--bg-card, rgba(255,255,255,0.02))", border: "1px solid var(--border, var(--border))", color: "var(--text-secondary, #9ca3af)", borderRadius: 8, cursor: "pointer" }}>
             {big ? (
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3v4a1 1 0 0 1-1 1H3M21 8h-4a1 1 0 0 1-1-1V3M16 21v-4a1 1 0 0 1 1-1h4M3 16h4a1 1 0 0 1 1 1v4" /></svg>
             ) : (
@@ -2115,7 +2115,7 @@ export function SchedulerCalendar({ agents, content = [], onSelect }: {
                 <div style={{
                   minHeight: big ? 260 : 124, borderRadius: 8, padding: 5,
                   background: "var(--bg-card, rgba(255,255,255,0.02))",
-                  border: "1px solid var(--border, rgba(255,255,255,0.06))",
+                  border: "1px solid var(--border, var(--border))",
                 }}>
                   {items.length === 0 && <div style={{ fontSize: 10, color: "var(--text-muted)", textAlign: "center", marginTop: 10, opacity: 0.5 }}>·</div>}
                   {items.map((it, i) => <ItemChip key={i} it={it} date={d} big={big} />)}
@@ -2133,7 +2133,7 @@ export function SchedulerCalendar({ agents, content = [], onSelect }: {
 
       {/* selected-day detail (month view) */}
       {view === "month" && detail && (
-        <div style={{ marginTop: 14, borderTop: "1px solid var(--border, rgba(255,255,255,0.08))", paddingTop: 12 }}>
+        <div style={{ marginTop: 14, borderTop: "1px solid var(--border, var(--border))", paddingTop: 12 }}>
           <div style={{ fontSize: 10, letterSpacing: "0.14em", color: "var(--text-muted)", textTransform: "uppercase", marginBottom: 8 }}>
             {DAY_LABELS[dayIdx(detail)]}, {MONTHS[detail.getMonth()]} {detail.getDate()}
           </div>
@@ -2160,7 +2160,7 @@ export function SchedulerCalendar({ agents, content = [], onSelect }: {
 
       {/* content-post detail popover */}
       {pickedContent && (
-        <div style={{ marginTop: 12, border: "1px solid var(--border, rgba(255,255,255,0.1))", borderRadius: 8, padding: "10px 12px", background: "var(--bg-card, rgba(255,255,255,0.02))" }}>
+        <div style={{ marginTop: 12, border: "1px solid var(--border, var(--border))", borderRadius: 8, padding: "10px 12px", background: "var(--bg-card, var(--border))" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
             <span style={{ width: 9, height: 9, borderRadius: 2, background: pickedContent.c.color }} />
             <span style={{ fontWeight: 700, fontSize: 13 }}>{pickedContent.c.platform} post</span>
@@ -2174,7 +2174,7 @@ export function SchedulerCalendar({ agents, content = [], onSelect }: {
       )}
 
       {/* legend */}
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 14, paddingTop: 10, borderTop: "1px solid var(--border, rgba(255,255,255,0.05))" }}>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 14, paddingTop: 10, borderTop: "1px solid var(--border, var(--border))" }}>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 10, color: "var(--text-secondary)", fontFamily: "'JetBrains Mono', monospace" }}>
           <span style={{ width: 8, height: 8, borderRadius: "50%", background: CAL_RAN_GREEN, flexShrink: 0 }} />
           ran
@@ -2205,14 +2205,14 @@ export function SchedulerCalendar({ agents, content = [], onSelect }: {
       }}>
         <div style={{
           margin: "auto", width: "100%", maxWidth: 1100, maxHeight: "100%",
-          background: "var(--bg-secondary, #0a0d14)", border: "1px solid var(--border, rgba(255,255,255,0.12))",
+          background: "var(--bg-secondary, #0a0d14)", border: "1px solid var(--border, var(--border))",
           borderRadius: 14, boxShadow: "0 24px 80px rgba(0,0,0,0.6)",
           display: "flex", flexDirection: "column", overflow: "hidden",
         }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "13px 18px", borderBottom: "1px solid var(--border, rgba(255,255,255,0.08))" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "13px 18px", borderBottom: "1px solid var(--border, var(--border))" }}>
             <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--accent, #22d3ee)", flexShrink: 0 }} />
             <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.1em", fontFamily: "'JetBrains Mono', monospace" }}>SCHEDULER</span>
-            <button className="mo-click" onClick={closeFull} aria-label="close" style={{ marginLeft: "auto", background: "none", border: "1px solid var(--border, rgba(255,255,255,0.15))", color: "var(--text-secondary, #9ca3af)", borderRadius: 8, padding: "7px 14px", cursor: "pointer", fontSize: 12 }}>Close</button>
+            <button className="mo-click" onClick={closeFull} aria-label="close" style={{ marginLeft: "auto", background: "none", border: "1px solid var(--border, var(--border))", color: "var(--text-secondary, #9ca3af)", borderRadius: 8, padding: "7px 14px", cursor: "pointer", fontSize: 12 }}>Close</button>
           </div>
           <div style={{ overflow: "auto", WebkitOverflowScrolling: "touch", padding: "18px 20px", flex: 1 }}>
             {body(true)}
@@ -2251,7 +2251,7 @@ function MonthGrid({ anchor, now, itemsOn, labelFor, colorFor, hasRun, onPick, o
     <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: big ? 5 : 3, minWidth: big ? 0 : 300 }}>
         {DAY_LABELS.map(dl => (
-          <div key={dl} style={{ fontSize: big ? 10 : 8.5, letterSpacing: "0.08em", textAlign: "center", color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace", marginBottom: 4, paddingBottom: 4, borderBottom: "1px solid var(--border, rgba(255,255,255,0.05))" }}>{dl.toUpperCase()}</div>
+          <div key={dl} style={{ fontSize: big ? 10 : 8.5, letterSpacing: "0.08em", textAlign: "center", color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace", marginBottom: 4, paddingBottom: 4, borderBottom: "1px solid var(--border, var(--border))" }}>{dl.toUpperCase()}</div>
         ))}
         {cells.map((d, i) => {
           const inMonth = d.getMonth() === anchor.getMonth();
@@ -2290,7 +2290,7 @@ function MonthGrid({ anchor, now, itemsOn, labelFor, colorFor, hasRun, onPick, o
                     const dotColor = ran ? CAL_RAN_GREEN : colorFor(it);
                     return (
                       <div key={k} className="mo-click mo-cal-chip" onClick={(ev) => { ev.stopPropagation(); onOpen(it, d); }} title={labelFor(it) + (ran ? " (ran)" : "")}
-                        style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10, padding: "2px 6px", borderRadius: 5, minWidth: 0, background: "var(--bg-card, rgba(255,255,255,0.03))", border: "1px solid var(--border, rgba(255,255,255,0.08))", borderLeft: ran ? `2px solid ${CAL_RAN_GREEN}` : "1px solid var(--border, rgba(255,255,255,0.08))" }}>
+                        style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10, padding: "2px 6px", borderRadius: 5, minWidth: 0, background: "var(--bg-card, rgba(255,255,255,0.03))", border: "1px solid var(--border, var(--border))", borderLeft: ran ? `2px solid ${CAL_RAN_GREEN}` : "1px solid var(--border, rgba(255,255,255,0.08))" }}>
                         <span style={{ width: 5, height: 5, borderRadius: it.kind === "agent" ? "50%" : 2, background: dotColor, flexShrink: 0 }} />
                         <span style={{ color: "var(--text-secondary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>{labelFor(it)}</span>
                       </div>
@@ -2417,9 +2417,9 @@ function SystemPanel({ systemId, data, onSelect, onClose }: {
         {touching.map(a => (
           <div key={a.key} className="mo-click" style={{
             display: "flex", alignItems: "center", gap: 8, fontSize: 12, marginBottom: 6,
-            border: "1px solid var(--border, rgba(255,255,255,0.08))", borderRadius: 8, padding: "6px 10px",
+            border: "1px solid var(--border, var(--border))", borderRadius: 8, padding: "6px 10px",
           }} onClick={() => onSelect({ type: "agent", key: a.key })}>
-            <Dot color={isRecentlyActive(a) ? "#34d399" : "#6b7280"} pulse={isRecentlyActive(a)} />
+            <Dot color={isRecentlyActive(a) ? "var(--green)" : "#6b7280"} pulse={isRecentlyActive(a)} />
             <span style={{ fontWeight: 600 }}>{a.name}</span>
             <span style={{ color: "var(--text-muted)", marginLeft: "auto", fontFamily: "'JetBrains Mono', monospace", fontSize: 10 }}>
               {a.enabled ? a.schedule : "disabled"}
@@ -2507,15 +2507,15 @@ export function ClientPanel({ name, data, onClose }: { name: string; data: Missi
       </Section>
 
       <Section title={`Flags (${c.redFlags.length})`} defaultOpen={c.redFlags.length > 0}>
-        {c.redFlags.length === 0 && <div style={{ fontSize: 12, color: "#34d399" }}>No open flags. All clear.</div>}
+        {c.redFlags.length === 0 && <div style={{ fontSize: 12, color: "var(--green)" }}>No open flags. All clear.</div>}
         {c.redFlags.map((f, i) => (
           <div key={i} style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 10, lineHeight: 1.5 }}>
-            <span style={{ color: "#f87171" }}>&#9873; </span>
+            <span style={{ color: "var(--red)" }}>&#9873; </span>
             {f.text}
             {f.link && (
               <>
                 {" "}
-                <a href={f.link} target="_blank" rel="noreferrer" style={{ color: "#22d3ee" }}>open &#8599;</a>
+                <a href={f.link} target="_blank" rel="noreferrer" style={{ color: "var(--accent)" }}>open &#8599;</a>
               </>
             )}
           </div>
@@ -2528,7 +2528,7 @@ export function ClientPanel({ name, data, onClose }: { name: string; data: Missi
 // ── Watchdog report panel (opened from the overseer node on the map) ───────
 function WatchdogPanel({ watchdog, onClose, onRechecked }: { watchdog?: WatchdogData | null; onClose: () => void; onRechecked?: () => void }) {
   const hasProblems = !!watchdog && (watchdog.overall === "problems" || Math.max(watchdog.problemCount, watchdog.problems.length) > 0);
-  const accent = hasProblems ? "#f87171" : BOSS_CLEAR;
+  const accent = hasProblems ? "var(--red)" : BOSS_CLEAR;
   const ageMin = watchdog ? watchdogAgeMin(watchdog.updated) : null;
   return (
     <SlideOver title="DA BOSS" accent={accent} onClose={onClose}>
@@ -2560,7 +2560,7 @@ function WatchdogPanel({ watchdog, onClose, onRechecked }: { watchdog?: Watchdog
           ]} />
 
           <Section title={`Problems (${watchdog.problems.length})`} defaultOpen={hasProblems}>
-            {watchdog.problems.length === 0 && <div style={{ fontSize: 12, color: "#34d399" }}>No problems listed.</div>}
+            {watchdog.problems.length === 0 && <div style={{ fontSize: 12, color: "var(--green)" }}>No problems listed.</div>}
             {watchdog.problems.map((p, i) => (
               <div key={i} style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 8, lineHeight: 1.5, borderLeft: `2px solid ${accent}55`, paddingLeft: 8 }}>
                 <ProblemLine p={p} color={accent} />
@@ -2579,7 +2579,7 @@ function WatchdogPanel({ watchdog, onClose, onRechecked }: { watchdog?: Watchdog
           <Section title={`Agent states (${Object.keys(watchdog.agents ?? {}).length})`} defaultOpen>
             {Object.entries(watchdog.agents ?? {}).map(([k, v]) => (
               <div key={k} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, marginBottom: 6 }}>
-                <Dot color={v === "SILENT" ? "#f87171" : v === "LATE" ? "#fb923c" : v === "DISABLED" ? "#6b7280" : "#34d399"} />
+                <Dot color={v === "SILENT" ? "var(--red)" : v === "LATE" ? "var(--orange)" : v === "DISABLED" ? "#6b7280" : "var(--green)"} />
                 <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>{k}</span>
                 <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace" }}>{v}</span>
               </div>
@@ -2621,11 +2621,11 @@ export function ClientHealthSlideOver({ clientName, onClose }: { clientName: str
   if (data && match) return <ClientPanel name={match.client} data={data} onClose={onClose} />;
 
   return (
-    <SlideOver title={clientName.toUpperCase()} accent="#22d3ee" onClose={onClose}>
+    <SlideOver title={clientName.toUpperCase()} accent="var(--accent)" onClose={onClose}>
       {!data && !err && (
         <div style={{ fontSize: 12, color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace" }}>Loading client health...</div>
       )}
-      {err && <div style={{ fontSize: 12, color: "#f87171" }}>Could not load client health ({err})</div>}
+      {err && <div style={{ fontSize: 12, color: "var(--red)" }}>Could not load client health ({err})</div>}
       {data && !match && (
         <div style={{ fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.6 }}>
           No health-board entry for this client yet. Sentinel adds one on its next run

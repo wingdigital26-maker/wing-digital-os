@@ -233,7 +233,7 @@ export default function JacksonDashboard() {
                   style={{
                     position: "relative",
                     background: `radial-gradient(ellipse 90% 70% at 50% -20%, ${stat.color}18, transparent 60%), linear-gradient(180deg, #10131f, rgba(12,15,26,0.85))`,
-                    border: "1px solid rgba(255,255,255,0.07)",
+                    border: "1px solid var(--border)",
                     borderRadius: 16,
                     padding: "18px 20px",
                     boxShadow: "0 8px 24px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04)",
@@ -378,7 +378,7 @@ export default function JacksonDashboard() {
                           gap: 12,
                           padding: "11px 14px",
                           background: "rgba(255,255,255,0.03)",
-                          border: "1px solid rgba(255,255,255,0.06)",
+                          border: "1px solid var(--border)",
                           borderLeft: "3px solid #60a5fa",
                           borderRadius: 11,
                         }}
@@ -421,7 +421,7 @@ export default function JacksonDashboard() {
                           alignItems: "center",
                           gap: 10,
                           padding: "10px 4px",
-                          borderBottom: "1px solid rgba(255,255,255,0.05)",
+                          borderBottom: "1px solid var(--border)",
                         }}
                       >
                         <div style={{ minWidth: 0 }}>
@@ -472,7 +472,7 @@ export default function JacksonDashboard() {
                           alignItems: "flex-start",
                           gap: 12,
                           padding: "10px 4px",
-                          borderBottom: "1px solid rgba(255,255,255,0.05)",
+                          borderBottom: "1px solid var(--border)",
                         }}
                       >
                         <span
@@ -539,7 +539,7 @@ function Card({ children }: { children: React.ReactNode }) {
     <div
       style={{
         background: "linear-gradient(180deg, #10131f, rgba(12,15,26,0.85))",
-        border: "1px solid rgba(255,255,255,0.07)",
+        border: "1px solid var(--border)",
         borderRadius: 18,
         padding: "20px 22px",
         boxShadow: "0 8px 24px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)",

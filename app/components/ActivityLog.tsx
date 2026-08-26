@@ -10,13 +10,13 @@ interface LogEvent {
 }
 
 const TYPE_META: Record<LogEvent["type"], { icon: string; color: string; label: string }> = {
-  lead:        { icon: "👤", color: "#4ade80", label: "New Lead" },
-  appointment: { icon: "📅", color: "#60a5fa", label: "Appointment" },
+  lead:        { icon: "👤", color: "var(--green)", label: "New Lead" },
+  appointment: { icon: "📅", color: "var(--accent)", label: "Appointment" },
   ai_claude:   { icon: "🟠", color: "#E8692A", label: "Claude" },
   ai_hermes:   { icon: "⚙️", color: "#6b7280", label: "Groq" },
-  vault:       { icon: "📄", color: "#22d3ee", label: "Vault" },
-  pipeline:    { icon: "🎯", color: "#fb923c", label: "Pipeline" },
-  coldcall:    { icon: "📞", color: "#a78bfa", label: "Cold Call" },
+  vault:       { icon: "📄", color: "var(--accent)", label: "Vault" },
+  pipeline:    { icon: "🎯", color: "var(--orange)", label: "Pipeline" },
+  coldcall:    { icon: "📞", color: "var(--accent-2)", label: "Cold Call" },
 };
 
 function relativeTime(date: Date): string {
@@ -206,7 +206,7 @@ export default function ActivityLog() {
         {/* Type chips */}
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {FILTER_OPTIONS.map(f => {
-            const c = TYPE_META[f as LogEvent["type"]]?.color ?? "#22d3ee";
+            const c = TYPE_META[f as LogEvent["type"]]?.color ?? "var(--accent)";
             const on = filter === f;
             return (
               <button key={f} onClick={() => setFilter(prev => prev === f ? null : f as LogEvent["type"])} style={{
@@ -230,7 +230,7 @@ export default function ActivityLog() {
               padding: "4px 12px", borderRadius: 999, fontSize: 11, cursor: "pointer",
               border: `1px solid ${dateRange === r ? "rgba(96,165,250,0.5)" : "rgba(255,255,255,0.09)"}`,
               background: dateRange === r ? "rgba(96,165,250,0.12)" : "rgba(255,255,255,0.03)",
-              color: dateRange === r ? "#60a5fa" : "var(--text-muted)",
+              color: dateRange === r ? "var(--accent)" : "var(--text-muted)",
               fontWeight: dateRange === r ? 700 : 500,
             }}>
               {dateRangeLabel(r)}
@@ -262,7 +262,7 @@ export default function ActivityLog() {
                   display: "flex", alignItems: "flex-start", gap: 12,
                   padding: "11px 15px", borderRadius: 12,
                   background: `linear-gradient(90deg, ${meta.color}08, transparent 25%), rgba(255,255,255,0.03)`,
-                  border: "1px solid rgba(255,255,255,0.06)",
+                  border: "1px solid var(--border)",
                   borderLeft: `3px solid ${meta.color}`,
                 }}>
                   <span style={{

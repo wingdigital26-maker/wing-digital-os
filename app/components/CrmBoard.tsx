@@ -83,7 +83,7 @@ export default function CrmBoard() {
     setTimeout(() => setCopied((c) => (c === it.id ? null : c)), 1500);
   }
 
-  if (err && !data?.items?.length) return <p style={{ color: "#fb7185", fontSize: 13 }}>CRM: {err}</p>;
+  if (err && !data?.items?.length) return <p style={{ color: "var(--red)", fontSize: 13 }}>CRM: {err}</p>;
   if (!data) {
     return (
       <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 16 }} aria-label="Loading CRM">

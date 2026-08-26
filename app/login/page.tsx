@@ -27,8 +27,8 @@ export default function Login() {
     }}>
       <div style={{
         width: "min(380px, 90vw)",
-        background: "linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))",
-        border: "1px solid rgba(255,255,255,0.08)", borderRadius: 20, padding: 32,
+        background: "var(--bg-card)",
+        border: "1px solid var(--border)", borderRadius: 20, padding: 32,
         boxShadow: "0 24px 60px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05)",
         display: "flex", flexDirection: "column", gap: 18, textAlign: "center",
       }}>
@@ -48,7 +48,7 @@ export default function Login() {
           onKeyDown={e => e.key === "Enter" && submit()}
           placeholder="Email (leave blank for password-only)"
           style={{
-            background: "var(--bg-hover)", border: `1px solid ${error ? "#f87171" : "var(--border)"}`,
+            background: "var(--bg-hover)", border: `1px solid ${error ? "var(--red)" : "var(--border)"}`,
             borderRadius: 10, padding: "12px 14px", color: "var(--text-primary)",
             fontSize: 14, outline: "none", textAlign: "center",
           }}
@@ -59,12 +59,12 @@ export default function Login() {
           onKeyDown={e => e.key === "Enter" && submit()}
           placeholder="Password"
           style={{
-            background: "var(--bg-hover)", border: `1px solid ${error ? "#f87171" : "var(--border)"}`,
+            background: "var(--bg-hover)", border: `1px solid ${error ? "var(--red)" : "var(--border)"}`,
             borderRadius: 10, padding: "12px 14px", color: "var(--text-primary)",
             fontSize: 14, outline: "none", textAlign: "center",
           }}
         />
-        {error && <p style={{ fontSize: 12, color: "#f87171" }}>Wrong email or password</p>}
+        {error && <p style={{ fontSize: 12, color: "var(--red)" }}>Wrong email or password</p>}
         <button onClick={submit} disabled={loading || !pw} style={{
           padding: "12px 0", borderRadius: 10, border: "none", cursor: "pointer",
           background: "linear-gradient(135deg, #22d3ee, #0e7490)", color: "#fff",

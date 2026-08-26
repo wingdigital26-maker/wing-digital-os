@@ -2,9 +2,9 @@
 import { useEffect, useState } from "react";
 
 const STATE_STYLE: Record<string, { c: string; label: string }> = {
-  autonomous: { c: "#34d399", label: "AUTONOMOUS" },
-  supervised: { c: "#fbbf24", label: "SUPERVISED" },
-  suspended: { c: "#fb7185", label: "SUSPENDED" },
+  autonomous: { c: "var(--green)", label: "AUTONOMOUS" },
+  supervised: { c: "var(--orange)", label: "SUPERVISED" },
+  suspended: { c: "var(--red)", label: "SUSPENDED" },
 };
 
 export default function TrustPanel() {
@@ -24,7 +24,7 @@ export default function TrustPanel() {
   if (!data) return (
     <div style={{
       background: "linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))",
-      border: "1px solid rgba(255,255,255,0.07)", borderRadius: 16, padding: 20, marginBottom: 18,
+      border: "1px solid var(--border)", borderRadius: 16, padding: 20, marginBottom: 18,
     }} aria-label="Loading trust data">
       <div className="skel" style={{ height: 12, width: 160, marginBottom: 16 }} />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14, marginBottom: 16 }}>
@@ -41,13 +41,13 @@ export default function TrustPanel() {
   return (
     <div style={{
       background: "linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))",
-      border: "1px solid rgba(255,255,255,0.07)", borderRadius: 16, padding: 20,
+      border: "1px solid var(--border)", borderRadius: 16, padding: 20,
       boxShadow: "0 8px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.04)",
       marginBottom: 18,
     }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 14 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#a78bfa", boxShadow: "0 0 8px #a78bfa" }} />
+          <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--accent-2)", boxShadow: "0 0 8px #a78bfa" }} />
           <p style={{ fontSize: 12, fontWeight: 700, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.07em" }}>
             Trust &amp; Budget
           </p>
@@ -68,7 +68,7 @@ export default function TrustPanel() {
             <div style={{ height: 7, borderRadius: 99, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
               <div style={{
                 width: `${b.pct}%`, height: "100%", borderRadius: 99,
-                background: b.pct > 85 ? "#fb7185" : b.pct > 60 ? "#fbbf24" : "#34d399",
+                background: b.pct > 85 ? "var(--red)" : b.pct > 60 ? "var(--orange)" : "var(--green)",
                 transition: "width .3s",
               }} />
             </div>
@@ -77,7 +77,7 @@ export default function TrustPanel() {
       </div>
 
       {budget.denials.length > 0 && (
-        <p style={{ fontSize: 11.5, color: "#fb7185", fontWeight: 600, marginBottom: 12 }}>
+        <p style={{ fontSize: 11.5, color: "var(--red)", fontWeight: 600, marginBottom: 12 }}>
           ⚠ {budget.denials.length} budget denial{budget.denials.length > 1 ? "s" : ""} today — last: {budget.denials[budget.denials.length - 1].why}
         </p>
       )}
@@ -103,7 +103,7 @@ export default function TrustPanel() {
                   {t.runs} runs · {Math.round(t.passRate * 100)}% last {t.windowSize}
                 </span>
                 {t.consecFails > 0 && (
-                  <span style={{ fontSize: 11, color: "#fb7185", fontWeight: 700 }}>{t.consecFails}✗</span>
+                  <span style={{ fontSize: 11, color: "var(--red)", fontWeight: 700 }}>{t.consecFails}✗</span>
                 )}
                 <span style={{
                   fontSize: 10, fontWeight: 800, letterSpacing: "0.05em", padding: "3px 10px",

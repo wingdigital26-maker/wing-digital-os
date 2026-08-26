@@ -4,12 +4,12 @@ import { useState, useEffect, useCallback } from "react";
 const STATUSES = ["no-answer", "voicemail", "callback", "booked", "emailed", "not-interested", "closed"];
 
 const STATUS_COLORS: Record<string, string> = {
-  "new": "#60a5fa",
-  "no-answer": "#fbbf24",
-  "voicemail": "#fb923c",
-  "callback": "#a78bfa",
-  "emailed": "#22d3ee",
-  "booked": "#34d399",
+  "new": "var(--accent)",
+  "no-answer": "var(--orange)",
+  "voicemail": "var(--orange)",
+  "callback": "var(--accent-2)",
+  "emailed": "var(--accent)",
+  "booked": "var(--green)",
   "not-interested": "#6b7280",
   "closed": "#6b7280",
 };
@@ -69,11 +69,11 @@ export default function ColdCallBoard({ onSendToAI }: { onSendToAI: (ctx: string
   const dialed = prospects.length - fresh - (counts["closed"] ?? 0);
 
   const STAT_CARDS = [
-    { label: "Active Leads", value: active.length, color: "#60a5fa" },
-    { label: "Not Yet Called", value: fresh, color: "#22d3ee" },
-    { label: "Follow-Up Queue", value: followup, color: "#fbbf24" },
-    { label: "Booked", value: booked, color: "#34d399" },
-    { label: "Dialed", value: dialed, color: "#a78bfa" },
+    { label: "Active Leads", value: active.length, color: "var(--accent)" },
+    { label: "Not Yet Called", value: fresh, color: "var(--accent)" },
+    { label: "Follow-Up Queue", value: followup, color: "var(--orange)" },
+    { label: "Booked", value: booked, color: "var(--green)" },
+    { label: "Dialed", value: dialed, color: "var(--accent-2)" },
   ];
 
   const filtered = active.filter(p => {
@@ -117,11 +117,11 @@ export default function ColdCallBoard({ onSendToAI }: { onSendToAI: (ctx: string
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-      {toast && <div style={{ position: "fixed", bottom: 24, right: 24, background: "#4ade80", color: "#07080f", padding: "10px 18px", borderRadius: 10, fontWeight: 700, fontSize: 13, zIndex: 200 }}>{toast}</div>}
+      {toast && <div style={{ position: "fixed", bottom: 24, right: 24, background: "var(--green)", color: "#07080f", padding: "10px 18px", borderRadius: 10, fontWeight: 700, fontSize: 13, zIndex: 200 }}>{toast}</div>}
 
       {/* Call Session Mode — full screen */}
       {session && current && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(7,8,15,0.97)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24 }}>
+        <div style={{ position: "fixed", inset: 0, zIndex: 300, background: "var(--bg-primary)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24 }}>
           <div style={{ position: "absolute", top: 20, left: 24, right: 24, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <span style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 600 }}>
               Call {sessionIdx + 1} of {sessionQueue.length} · {sessionStats.dials} logged · {sessionStats.booked} booked
@@ -133,7 +133,7 @@ export default function ColdCallBoard({ onSendToAI }: { onSendToAI: (ctx: string
 
           <div style={{ maxWidth: 640, width: "100%", display: "flex", flexDirection: "column", gap: 20, textAlign: "center" }}>
             <div>
-              <p style={{ fontSize: 12, color: current.status === "callback" ? "#a78bfa" : "var(--text-muted)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
+              <p style={{ fontSize: 12, color: current.status === "callback" ? "var(--accent-2)" : "var(--text-muted)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
                 {current.status === "callback" ? "⏰ Scheduled callback" : `Tier ${current.tier} · ${current.google_reviews ?? "~"} reviews${current.google_rating ? ` · ${current.google_rating}★` : ""}`}
               </p>
               <h1 style={{ fontSize: 34, fontWeight: 800, fontFamily: "'Space Grotesk', sans-serif", lineHeight: 1.15 }}>{current.name}</h1>
@@ -141,7 +141,7 @@ export default function ColdCallBoard({ onSendToAI }: { onSendToAI: (ctx: string
                 {current.city}{current.owner_name ? ` · Ask for ${current.owner_name}` : ""}
               </p>
               {current.phone && (
-                <a href={`tel:${current.phone}`} style={{ display: "inline-block", marginTop: 14, fontSize: 28, fontWeight: 800, color: "#60a5fa", textDecoration: "none", fontFamily: "'Space Grotesk', sans-serif", textShadow: "0 0 24px rgba(96,165,250,0.4)" }}>
+                <a href={`tel:${current.phone}`} style={{ display: "inline-block", marginTop: 14, fontSize: 28, fontWeight: 800, color: "var(--accent)", textDecoration: "none", fontFamily: "'Space Grotesk', sans-serif", textShadow: "0 0 24px rgba(96,165,250,0.4)" }}>
                   {current.phone}
                 </a>
               )}
@@ -150,7 +150,7 @@ export default function ColdCallBoard({ onSendToAI }: { onSendToAI: (ctx: string
                   style={{
                     display: "inline-block", padding: "8px 22px", borderRadius: 999, fontSize: 12.5, fontWeight: 700,
                     background: "rgba(34,211,238,0.08)", border: "1px solid rgba(34,211,238,0.4)",
-                    color: "#22d3ee", textDecoration: "none",
+                    color: "var(--accent)", textDecoration: "none",
                   }}>
                   📄 View Audit PDF
                 </a>
@@ -163,7 +163,7 @@ export default function ColdCallBoard({ onSendToAI }: { onSendToAI: (ctx: string
                 border: "1px solid rgba(34,211,238,0.25)", borderRadius: 16, padding: "20px 24px",
                 fontSize: 16, lineHeight: 1.7, color: "var(--text-primary)", textAlign: "left",
               }}>
-                <span style={{ color: "#22d3ee", fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em", display: "block", marginBottom: 8 }}>The hook</span>
+                <span style={{ color: "var(--accent)", fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em", display: "block", marginBottom: 8 }}>The hook</span>
                 {current.call_hook}
               </div>
             )}
@@ -173,10 +173,10 @@ export default function ColdCallBoard({ onSendToAI }: { onSendToAI: (ctx: string
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginTop: 6 }}>
               {[
-                { s: "no-answer", label: "No Answer", c: "#fbbf24" },
-                { s: "voicemail", label: "Voicemail", c: "#fb923c" },
-                { s: "callback", label: "Callback", c: "#a78bfa" },
-                { s: "booked", label: "Booked 🎯", c: "#34d399" },
+                { s: "no-answer", label: "No Answer", c: "var(--orange)" },
+                { s: "voicemail", label: "Voicemail", c: "var(--orange)" },
+                { s: "callback", label: "Callback", c: "var(--accent-2)" },
+                { s: "booked", label: "Booked 🎯", c: "var(--green)" },
                 { s: "not-interested", label: "Not Interested", c: "#6b7280" },
               ].map(b => (
                 <button key={b.s} onClick={() => sessionLog(b.s)} disabled={logging !== null} style={{
@@ -224,7 +224,7 @@ export default function ColdCallBoard({ onSendToAI }: { onSendToAI: (ctx: string
         {STAT_CARDS.map(s => (
           <div key={s.label} style={{
             background: `radial-gradient(ellipse 90% 80% at 50% -30%, ${s.color}14, transparent 60%), linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))`,
-            border: "1px solid rgba(255,255,255,0.07)", borderRadius: 14, padding: "14px 18px",
+            border: "1px solid var(--border)", borderRadius: 14, padding: "14px 18px",
             boxShadow: "0 8px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.04)",
           }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
@@ -243,10 +243,10 @@ export default function ColdCallBoard({ onSendToAI }: { onSendToAI: (ctx: string
           border: "1px solid rgba(52,211,153,0.25)", borderRadius: 14, padding: "13px 18px",
           fontSize: 12.5, color: "var(--text-secondary)", display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center",
         }}>
-          <span style={{ fontWeight: 700, color: "#34d399" }}>The math:</span>
-          <span>{active.length} leads × 3% close = <b style={{ color: "#34d399" }}>${projected3.toLocaleString()}/mo recurring</b></span>
+          <span style={{ fontWeight: 700, color: "var(--green)" }}>The math:</span>
+          <span>{active.length} leads × 3% close = <b style={{ color: "var(--green)" }}>${projected3.toLocaleString()}/mo recurring</b></span>
           <span style={{ opacity: 0.6 }}>·</span>
-          <span>at 5% it&apos;s <b style={{ color: "#34d399" }}>${projected5.toLocaleString()}/mo</b></span>
+          <span>at 5% it&apos;s <b style={{ color: "var(--green)" }}>${projected5.toLocaleString()}/mo</b></span>
           <button onClick={() => onSendToAI(`My roofing cold call campaign: ${active.length} active leads, ${fresh} not yet called, ${followup} in follow-up, ${booked} booked. Price point $2,000/mo. What should I focus on in today's call session?`)}
             style={{ marginLeft: "auto", fontSize: 11.5, fontWeight: 600, color: "#E8692A", background: "transparent", border: "none", cursor: "pointer" }}>
             ✦ Ask Claude →
@@ -293,7 +293,7 @@ export default function ColdCallBoard({ onSendToAI }: { onSendToAI: (ctx: string
             return (
               <div key={p.id} style={{
                 background: "linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))",
-                border: "1px solid rgba(255,255,255,0.06)",
+                border: "1px solid var(--border)",
                 borderLeft: `3px solid ${sc}`,
                 borderRadius: 12, padding: "12px 16px",
                 opacity: logging === p.id ? 0.4 : 1, transition: "opacity 0.15s",
@@ -308,22 +308,22 @@ export default function ColdCallBoard({ onSendToAI }: { onSendToAI: (ctx: string
                     </p>
                   </div>
                   {p.phone && (
-                    <a href={`tel:${p.phone}`} style={{ fontSize: 12.5, color: "#60a5fa", fontWeight: 700, textDecoration: "none", whiteSpace: "nowrap" }}>{p.phone}</a>
+                    <a href={`tel:${p.phone}`} style={{ fontSize: 12.5, color: "var(--accent)", fontWeight: 700, textDecoration: "none", whiteSpace: "nowrap" }}>{p.phone}</a>
                   )}
                   <span style={{ background: sc + "1e", color: sc, fontSize: 10.5, fontWeight: 700, padding: "3px 10px", borderRadius: 999, border: `1px solid ${sc}44`, whiteSpace: "nowrap" }}>
                     {p.status || "new"}
                   </span>
                   <select value="" onChange={e => { if (e.target.value) logCall(p.id, e.target.value); }}
-                    style={{ background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: "5px 8px", color: "var(--text-secondary)", fontSize: 11, cursor: "pointer" }}>
+                    style={{ background: "rgba(0,0,0,0.3)", border: "1px solid var(--border)", borderRadius: 8, padding: "5px 8px", color: "var(--text-secondary)", fontSize: 11, cursor: "pointer" }}>
                     <option value="">Log call...</option>
                     {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
                 {expanded && (
-                  <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+                  <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--border)" }}>
                     {p.call_hook && (
                       <p style={{ fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.6, marginBottom: 8 }}>
-                        <span style={{ color: "#22d3ee", fontWeight: 700 }}>Hook: </span>{p.call_hook}
+                        <span style={{ color: "var(--accent)", fontWeight: 700 }}>Hook: </span>{p.call_hook}
                       </p>
                     )}
                     {p.bbb_rating && (
@@ -340,7 +340,7 @@ export default function ColdCallBoard({ onSendToAI }: { onSendToAI: (ctx: string
                         ✦ Ask Claude to coach this call →
                       </button>
                       <a href={`/api/audit?name=${encodeURIComponent(p.name)}`} target="_blank" rel="noreferrer"
-                        style={{ fontSize: 11, color: "#22d3ee", textDecoration: "none", fontWeight: 600 }}>
+                        style={{ fontSize: 11, color: "var(--accent)", textDecoration: "none", fontWeight: 600 }}>
                         📄 View audit PDF →
                       </a>
                     </div>

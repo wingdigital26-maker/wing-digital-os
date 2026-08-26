@@ -27,7 +27,7 @@ export default function SfxMuteButton() {
         width: 30,
         height: 30,
         borderRadius: 8,
-        border: "1px solid var(--border, rgba(255,255,255,0.15))",
+        border: "1px solid var(--border, var(--border))",
         background: "transparent",
         color: muted ? "var(--text-muted, #6b7280)" : "var(--accent, #22d3ee)",
         cursor: "pointer",

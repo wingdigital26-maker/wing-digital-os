@@ -102,7 +102,7 @@ export default function SonarBoard() {
   }
 
   if (err && !data?.leads?.length) {
-    return <p style={{ color: "#fb7185", fontSize: 13 }}>Sonar: {err}</p>;
+    return <p style={{ color: "var(--red)", fontSize: 13 }}>Sonar: {err}</p>;
   }
   if (!data) {
     return (

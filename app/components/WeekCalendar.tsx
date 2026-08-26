@@ -14,10 +14,10 @@ interface Appointment {
 const HOURS = Array.from({ length: 13 }, (_, i) => i + 7); // 7am - 7pm
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const STATUS_COLOR: Record<string, string> = {
-  confirmed: "#4ade80",
-  booked: "#22d3ee",
-  showed: "#60a5fa",
-  noshow: "#f87171",
+  confirmed: "var(--green)",
+  booked: "var(--accent)",
+  showed: "var(--accent)",
+  noshow: "var(--red)",
   cancelled: "#6b7280",
 };
 
@@ -135,7 +135,7 @@ export default function WeekCalendar({ appointments, locationId }: { appointment
             }}>
               {/* Hour lines */}
               {HOURS.map(h => (
-                <div key={h} style={{ height: 40, borderBottom: "1px solid rgba(255,255,255,0.04)", flexShrink: 0 }} />
+                <div key={h} style={{ height: 40, borderBottom: "1px solid var(--border)", flexShrink: 0 }} />
               ))}
               {/* Appointments */}
               {dayAppts.map(a => {
@@ -143,7 +143,7 @@ export default function WeekCalendar({ appointments, locationId }: { appointment
                 const end = a.endTime ? new Date(a.endTime) : new Date(start.getTime() + 60 * 60 * 1000);
                 const top = topPct(start);
                 const height = heightPct(start, end);
-                const color = STATUS_COLOR[a.status?.toLowerCase()] ?? "#22d3ee";
+                const color = STATUS_COLOR[a.status?.toLowerCase()] ?? "var(--accent)";
                 return (
                   <div key={a.id} onClick={() => setSelected(a)} style={{
                     position: "absolute",
@@ -175,7 +175,7 @@ export default function WeekCalendar({ appointments, locationId }: { appointment
               {selected.contactName} · {selected.startTime ? fmt12(new Date(selected.startTime)) : "—"}
               {selected.endTime ? ` – ${fmt12(new Date(selected.endTime))}` : ""}
             </p>
-            <span style={{ fontSize: 10, color: STATUS_COLOR[selected.status?.toLowerCase()] ?? "#22d3ee", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+            <span style={{ fontSize: 10, color: STATUS_COLOR[selected.status?.toLowerCase()] ?? "var(--accent)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>
               {selected.status ?? "Booked"}
             </span>
           </div>

@@ -220,7 +220,7 @@ export default function Home() {
                   {hasBadge && (
                     <span style={{
                       position: "absolute", top: -4, right: -6,
-                      background: "#f87171", color: "#fff",
+                      background: "var(--red)", color: "#fff",
                       fontSize: 9, fontWeight: 700, borderRadius: 20,
                       padding: "1px 4px", minWidth: 14, textAlign: "center",
                       lineHeight: "14px",
@@ -421,7 +421,7 @@ function GlobalDaBoss() {
     stale = ageMin > 180;
   }
   const state = hasProblems ? "red" : stale ? "amber" : "blue";
-  const color = state === "red" ? "#f87171" : state === "amber" ? "#fb923c" : "#60a5fa";
+  const color = state === "red" ? "var(--red)" : state === "amber" ? "var(--orange)" : "var(--accent)";
   const label = state === "red" ? `${count} problem${count === 1 ? "" : "s"}` : state === "amber" ? "late" : "all clear";
 
   // Only surface the floating chip when there is something to act on: a real
@@ -443,7 +443,7 @@ function GlobalDaBoss() {
           position: "fixed", zIndex: 9997,
           display: "inline-flex", alignItems: "center", gap: 7,
           padding: "8px 12px", minHeight: 40, borderRadius: 999,
-          border: `1px solid ${color}`, background: "rgba(9,11,20,0.82)",
+          border: `1px solid ${color}`, background: "var(--bg-card)",
           backdropFilter: "blur(10px)", color, cursor: "pointer",
           fontSize: 12, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace",
           boxShadow: `0 4px 18px ${color}33`,
@@ -588,9 +588,9 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
 
   const ghlBase = `https://app.gohighlevel.com/v2/location/${locationId}`;
   const STATS = [
-    { label: "Opened Emails", value: loading ? "..." : (stats?.openedEmails ?? 0), color: "#4ade80", href: `${ghlBase}/conversations` },
-    { label: "MRR", value: loading ? "..." : `$${(stats?.mrr ?? 0).toLocaleString()}`, color: "#fb923c" },
-    { label: "Appts This Week", value: loading ? "..." : (stats?.apptsThisWeek ?? 0), color: "#60a5fa", onClick: () => setShowCalendar(c => !c) },
+    { label: "Opened Emails", value: loading ? "..." : (stats?.openedEmails ?? 0), color: "var(--green)", href: `${ghlBase}/conversations` },
+    { label: "MRR", value: loading ? "..." : `$${(stats?.mrr ?? 0).toLocaleString()}`, color: "var(--orange)" },
+    { label: "Appts This Week", value: loading ? "..." : (stats?.apptsThisWeek ?? 0), color: "var(--accent)", onClick: () => setShowCalendar(c => !c) },
   ];
 
   function showToast(msg: string) {
@@ -656,7 +656,7 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
 
       {/* Toast */}
       {toast && (
-        <div style={{ position: "fixed", bottom: 24, right: 24, background: "#4ade80", color: "#07080f", padding: "10px 18px", borderRadius: 10, fontWeight: 700, fontSize: 13, zIndex: 200 }}>
+        <div style={{ position: "fixed", bottom: 24, right: 24, background: "var(--green)", color: "#07080f", padding: "10px 18px", borderRadius: 10, fontWeight: 700, fontSize: 13, zIndex: 200 }}>
           {toast}
         </div>
       )}
@@ -686,7 +686,7 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
           background: "linear-gradient(120deg, rgba(34,211,238,0.10), rgba(167,139,250,0.08) 55%, rgba(16,19,31,0.4))",
           border: "1px solid rgba(34,211,238,0.25)",
           borderRadius: 20, padding: "24px 28px",
-          boxShadow: "0 16px 48px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06)",
+          boxShadow: "0 16px 48px var(--bg-hover), inset 0 1px 0 rgba(255,255,255,0.06)",
           overflow: "hidden",
         }}>
           <div style={{
@@ -704,14 +704,14 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
           <div className="briefing-metrics" style={{ display: "flex", gap: 32, flexWrap: "wrap", alignItems: "flex-end" }}>
             <div>
               <div style={{ display: "flex", alignItems: "flex-end", gap: 10 }}>
-                <p style={{ fontSize: 36, fontWeight: 800, color: "#22d3ee", lineHeight: 1, textShadow: "0 0 24px rgba(34,211,238,0.35)", fontFamily: "'Space Grotesk', sans-serif" }}><CountUp value={sentToday ?? camp?.by_day?.[new Date().toLocaleDateString("en-CA")] ?? 0} /></p>
+                <p style={{ fontSize: 36, fontWeight: 800, color: "var(--accent)", lineHeight: 1, textShadow: "0 0 24px rgba(34,211,238,0.35)", fontFamily: "'Space Grotesk', sans-serif" }}><CountUp value={sentToday ?? camp?.by_day?.[new Date().toLocaleDateString("en-CA")] ?? 0} /></p>
                 {camp?.by_day && (() => {
                   const s = buildDailySeries(camp.by_day, 10).map(d => d.value);
                   const today = sentToday ?? s[s.length - 1] ?? 0;
                   if (today !== s[s.length - 1]) s[s.length - 1] = today;
                   return (
                     <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-start" }}>
-                      <Sparkline data={s} color="#22d3ee" width={84} height={24} />
+                      <Sparkline data={s} color="var(--accent)" width={84} height={24} />
                       <Delta value={today - (s[s.length - 2] ?? 0)} label="vs yday" />
                     </div>
                   );
@@ -720,15 +720,15 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
               <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>emails sent today</p>
             </div>
             <div>
-              <p style={{ fontSize: 36, fontWeight: 800, color: "#4ade80", lineHeight: 1, textShadow: "0 0 24px rgba(74,222,128,0.35)", fontFamily: "'Space Grotesk', sans-serif" }}><CountUp prefix="$" value={stats?.mrr ?? 0} /></p>
+              <p style={{ fontSize: 36, fontWeight: 800, color: "var(--green)", lineHeight: 1, textShadow: "0 0 24px rgba(74,222,128,0.35)", fontFamily: "'Space Grotesk', sans-serif" }}><CountUp prefix="$" value={stats?.mrr ?? 0} /></p>
               <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>MRR · {data?.activeClients?.length ?? 0} active client{(data?.activeClients?.length ?? 0) === 1 ? "" : "s"}</p>
             </div>
             <div>
-              <p style={{ fontSize: 36, fontWeight: 800, color: "#34d399", lineHeight: 1, textShadow: "0 0 24px rgba(52,211,153,0.35)", fontFamily: "'Space Grotesk', sans-serif" }}><CountUp value={stats?.responded ?? 0} /></p>
+              <p style={{ fontSize: 36, fontWeight: 800, color: "var(--green)", lineHeight: 1, textShadow: "0 0 24px rgba(52,211,153,0.35)", fontFamily: "'Space Grotesk', sans-serif" }}><CountUp value={stats?.responded ?? 0} /></p>
               <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>responded to me</p>
             </div>
             <div style={{ cursor: "pointer" }} onClick={() => setShowCalendar(c => !c)}>
-              <p style={{ fontSize: 36, fontWeight: 800, color: "#60a5fa", lineHeight: 1, textShadow: "0 0 24px rgba(96,165,250,0.35)", fontFamily: "'Space Grotesk', sans-serif" }}><CountUp value={todayAppts.length} /></p>
+              <p style={{ fontSize: 36, fontWeight: 800, color: "var(--accent)", lineHeight: 1, textShadow: "0 0 24px rgba(96,165,250,0.35)", fontFamily: "'Space Grotesk', sans-serif" }}><CountUp value={todayAppts.length} /></p>
               <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>appointments {showCalendar ? "▲" : "▼"}</p>
             </div>
             <button onClick={() => onSendToAI(`Today's Wing Digital briefing:\n- Emails sent today: ${sentToday ?? camp?.by_day?.[new Date().toLocaleDateString("en-CA")] ?? 0}\n- MRR: $${stats?.mrr ?? 0}\n- Responded: ${stats?.responded ?? 0}\n- Appointments today: ${todayAppts.length}\n\nWhat should I prioritize today to grow Wing Digital?`)}
@@ -753,8 +753,8 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
               : d.toLocaleDateString("en-US", { weekday: "short" }) + " " + d.toLocaleTimeString("en-US", { hour: "numeric" });
             return (
               <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 14, display: "flex", alignItems: "center", gap: 7 }}>
-                <span className="live-dot" style={{ width: 6, height: 6, borderRadius: "50%", background: "#a78bfa", boxShadow: "0 0 8px #a78bfa", display: "inline-block" }} />
-                next agent run: <span style={{ color: "#a78bfa", fontWeight: 700, textTransform: "capitalize" }}>{upcoming.name}</span> · {when}
+                <span className="live-dot" style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--accent-2)", boxShadow: "0 0 8px #a78bfa", display: "inline-block" }} />
+                next agent run: <span style={{ color: "var(--accent-2)", fontWeight: 700, textTransform: "capitalize" }}>{upcoming.name}</span> · {when}
               </p>
             );
           })()}
@@ -763,12 +763,12 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
               {todayAppts.slice(0, 3).map((a: any) => (
                 <div key={a.id} style={{
                   display: "flex", justifyContent: "space-between", alignItems: "center",
-                  padding: "8px 14px", background: "rgba(0,0,0,0.25)", borderRadius: 10,
-                  border: "1px solid rgba(255,255,255,0.05)",
+                  padding: "8px 14px", background: "var(--bg-hover)", borderRadius: 10,
+                  border: "1px solid var(--border)",
                 }}>
                   <span style={{ fontSize: 13, fontWeight: 600 }}>{a.contactName || a.title}</span>
                   <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                    <span style={{ fontSize: 12, color: "#60a5fa", fontWeight: 600 }}>{a.startTime ? new Date(a.startTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : ""}</span>
+                    <span style={{ fontSize: 12, color: "var(--accent)", fontWeight: 600 }}>{a.startTime ? new Date(a.startTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : ""}</span>
                     {a.contactId && locationId && (
                       <a href={`https://app.gohighlevel.com/v2/location/${locationId}/contacts/detail/${a.contactId}`} target="_blank" rel="noreferrer"
                         style={{ fontSize: 11, color: "var(--accent)", textDecoration: "none", fontWeight: 600 }}>GHL →</a>
@@ -795,19 +795,19 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
         <div style={{
           background: "radial-gradient(ellipse 90% 60% at 50% -20%, rgba(167,139,250,0.10), transparent 60%), linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))",
           border: "1px solid rgba(167,139,250,0.3)", borderRadius: 16, padding: "16px 20px",
-          boxShadow: "0 8px 24px rgba(0,0,0,0.25)",
+          boxShadow: "0 8px 24px var(--bg-hover)",
         }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", flexWrap: "wrap", gap: 8 }}
             onClick={() => setShowBriefing(b => !b)}>
-            <p style={{ fontSize: 12.5, fontWeight: 700, color: "#a78bfa" }}>
+            <p style={{ fontSize: 12.5, fontWeight: 700, color: "var(--accent-2)" }}>
               🌅 Dispatch Briefing · <span style={{ color: "var(--text-muted)", fontWeight: 600 }}>{brief.date_label}</span>
             </p>
             <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
               {[
-                { l: "live", v: brief.stats.live, c: "#60a5fa" },
-                { l: "callbacks", v: brief.stats.callbacks, c: "#a78bfa" },
-                { l: "redials", v: brief.stats.followup, c: "#fbbf24" },
-                { l: "booked", v: brief.stats.booked, c: "#34d399" },
+                { l: "live", v: brief.stats.live, c: "var(--accent)" },
+                { l: "callbacks", v: brief.stats.callbacks, c: "var(--accent-2)" },
+                { l: "redials", v: brief.stats.followup, c: "var(--orange)" },
+                { l: "booked", v: brief.stats.booked, c: "var(--green)" },
                 { l: "staged", v: brief.stats.staged, c: "#6b7280" },
               ].map(s => (
                 <span key={s.l} style={{ fontSize: 10.5, fontWeight: 700, color: s.c, background: `${s.c}14`, border: `1px solid ${s.c}33`, padding: "3px 10px", borderRadius: 999 }}>
@@ -828,16 +828,16 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
                     display: "flex", alignItems: "center", gap: 12, padding: "7px 10px",
                     borderRadius: 8, background: d.n % 2 ? "rgba(255,255,255,0.025)" : "transparent",
                   }}>
-                    <span style={{ fontSize: 11, fontWeight: 800, color: d.why.includes("callback") ? "#a78bfa" : d.why === "redial" ? "#fbbf24" : "var(--text-muted)", width: 20, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif" }}>{d.n}</span>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: d.why.includes("callback") ? "var(--accent-2)" : d.why === "redial" ? "var(--orange)" : "var(--text-muted)", width: 20, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif" }}>{d.n}</span>
                     <span style={{ fontSize: 13, fontWeight: 700, flex: 1, minWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.name}</span>
                     <span style={{ fontSize: 11.5, color: "var(--text-muted)", width: 110, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.city}</span>
                     <span style={{
                       fontSize: 10, fontWeight: 700, padding: "2px 9px", borderRadius: 999, whiteSpace: "nowrap",
-                      color: d.why.includes("callback") ? "#a78bfa" : d.why === "redial" ? "#fbbf24" : "#22d3ee",
+                      color: d.why.includes("callback") ? "var(--accent-2)" : d.why === "redial" ? "var(--orange)" : "var(--accent)",
                       background: d.why.includes("callback") ? "rgba(167,139,250,0.12)" : d.why === "redial" ? "rgba(251,191,36,0.10)" : "rgba(34,211,238,0.08)",
                     }}>{d.why}</span>
                     <a href={`tel:${d.phone}`} onClick={e => e.stopPropagation()}
-                      style={{ fontSize: 12, fontWeight: 700, color: "#60a5fa", textDecoration: "none", whiteSpace: "nowrap", width: 130, textAlign: "right" }}>
+                      style={{ fontSize: 12, fontWeight: 700, color: "var(--accent)", textDecoration: "none", whiteSpace: "nowrap", width: 130, textAlign: "right" }}>
                       {d.phone}
                     </a>
                   </div>
@@ -853,12 +853,12 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
 
       {/* Agent Workforce health strip */}
       {agentHealth.length > 0 && (() => {
-        const HC: Record<string, string> = { ok: "#34d399", crashed: "#f87171", idle: "#fbbf24", running: "#60a5fa" };
+        const HC: Record<string, string> = { ok: "var(--green)", crashed: "var(--red)", idle: "var(--orange)", running: "var(--accent)" };
         const crashed = agentHealth.filter(a => a.health === "crashed").length;
         const running = agentHealth.filter(a => a.state === "Running").length;
         const onBattery = agentHealth.some(a => a.onBatteryBlocked);
         const summary = crashed > 0 ? `${crashed} need attention` : onBattery ? "battery-blocked" : running > 0 ? `${running} running now` : "all healthy";
-        const summaryColor = crashed > 0 ? "#f87171" : onBattery ? "#fbbf24" : "#34d399";
+        const summaryColor = crashed > 0 ? "var(--red)" : onBattery ? "var(--orange)" : "var(--green)";
         function fmtNext(s: string) {
           if (!s) return "—";
           const d = new Date(s), now = new Date();
@@ -870,8 +870,8 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
         return (
           <motion.div variants={riseItem} style={{
             background: "linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))",
-            border: "1px solid rgba(255,255,255,0.07)", borderRadius: 16, padding: "16px 20px",
-            boxShadow: "0 8px 24px rgba(0,0,0,0.25)",
+            border: "1px solid var(--border)", borderRadius: 16, padding: "16px 20px",
+            boxShadow: "0 8px 24px var(--bg-hover)",
           }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
               <p style={{ fontSize: 12.5, fontWeight: 700, color: "var(--text)" }}>
@@ -887,7 +887,7 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
                 return (
                   <div key={a.name} style={{
                     display: "flex", alignItems: "center", gap: 10, padding: "9px 12px",
-                    background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 10,
+                    background: "rgba(255,255,255,0.025)", border: "1px solid var(--border)", borderRadius: 10,
                   }}>
                     <span className="live-dot" style={{ width: 8, height: 8, borderRadius: "50%", background: c, boxShadow: `0 0 8px ${c}`, flexShrink: 0 }} />
                     <div style={{ minWidth: 0, flex: 1 }}>
@@ -901,7 +901,7 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
               })}
             </div>
             {onBattery && (
-              <p style={{ fontSize: 10.5, color: "#fbbf24", marginTop: 12 }}>
+              <p style={{ fontSize: 10.5, color: "var(--orange)", marginTop: 12 }}>
                 ⚠ Some agents are blocked from running on battery — they will queue until plugged in.
               </p>
             )}
@@ -925,9 +925,9 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
           const baseStyle: React.CSSProperties = {
             position: "relative",
             background: `radial-gradient(ellipse 90% 70% at 50% -20%, ${stat.color}14, transparent 60%), linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))`,
-            border: "1px solid rgba(255,255,255,0.07)",
+            border: "1px solid var(--border)",
             borderRadius: 16, padding: "18px 20px",
-            boxShadow: "0 8px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.04)",
+            boxShadow: "0 8px 24px var(--bg-hover), inset 0 1px 0 rgba(255,255,255,0.04)",
             cursor: stat.onClick || stat.href ? "pointer" : "default",
             textDecoration: "none", display: "block", overflow: "hidden",
           };
@@ -952,9 +952,9 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
         <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", marginRight: 4 }}>Quick</span>
         {[
-          { icon: Plus, label: "Add Lead", action: () => setShowAddLead(true), c: "#34d399" },
-          { icon: Calendar, label: "Calendar", action: () => setShowCalendar(c => !c), c: "#60a5fa" },
-          { icon: Note, label: "New Note", action: () => setShowNewNote(true), c: "#a78bfa" },
+          { icon: Plus, label: "Add Lead", action: () => setShowAddLead(true), c: "var(--green)" },
+          { icon: Calendar, label: "Calendar", action: () => setShowCalendar(c => !c), c: "var(--accent)" },
+          { icon: Note, label: "New Note", action: () => setShowNewNote(true), c: "var(--accent-2)" },
           { icon: Sparkles, label: "Ask Claude", action: () => onSendToAI("What should I focus on today for Wing Digital?"), c: "#E8692A" },
         ].map(btn => (
           <motion.button key={btn.label} onClick={() => { sfx.play("blip"); btn.action(); }}
@@ -971,11 +971,11 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
         {/* Active Clients */}
         <div style={{
           background: "linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))",
-          border: "1px solid rgba(255,255,255,0.07)", borderRadius: 16, padding: 20,
-          boxShadow: "0 8px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.04)",
+          border: "1px solid var(--border)", borderRadius: 16, padding: 20,
+          boxShadow: "0 8px 24px var(--bg-hover), inset 0 1px 0 rgba(255,255,255,0.04)",
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-            <span className="live-dot" style={{ width: 6, height: 6, borderRadius: "50%", background: "#22d3ee", boxShadow: "0 0 8px #22d3ee" }} />
+            <span className="live-dot" style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--accent)", boxShadow: "0 0 8px #22d3ee" }} />
             <p style={{ fontSize: 12, fontWeight: 700, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.07em" }}>Active Clients</p>
           </div>
           {loading ? <Spinner /> : (data?.activeClients?.length ? (
@@ -984,7 +984,7 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
               {data.activeClients.slice(0, 50).map((client: any) => (
                 <motion.div key={client.id} variants={riseItem} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
                   <p style={{ fontSize: 13, fontWeight: 600 }}>{client.name}</p>
-                  <span style={{ fontSize: 13, color: "#4ade80", fontWeight: 600 }}>${client.value.toLocaleString()}/mo</span>
+                  <span style={{ fontSize: 13, color: "var(--green)", fontWeight: 600 }}>${client.value.toLocaleString()}/mo</span>
                 </motion.div>
               ))}
             </motion.div>
@@ -1071,7 +1071,7 @@ function CompetitorIntel({ onSendToAI }: { onSendToAI: (ctx: string) => void }) 
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 960 }}>
-      {toast && <div style={{ position: "fixed", bottom: 24, right: 24, background: "#4ade80", color: "#07080f", padding: "10px 18px", borderRadius: 10, fontWeight: 700, fontSize: 13, zIndex: 200 }}>{toast}</div>}
+      {toast && <div style={{ position: "fixed", bottom: 24, right: 24, background: "var(--green)", color: "#07080f", padding: "10px 18px", borderRadius: 10, fontWeight: 700, fontSize: 13, zIndex: 200 }}>{toast}</div>}
 
       {/* Header */}
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
@@ -1091,7 +1091,7 @@ function CompetitorIntel({ onSendToAI }: { onSendToAI: (ctx: string) => void }) 
                 <div style={{
                   height: "100%", borderRadius: 10,
                   width: `${Math.min(100, (usageStats.spent / usageStats.budget) * 100)}%`,
-                  background: usageStats.remaining < 0.50 ? "#f87171" : "#4ade80",
+                  background: usageStats.remaining < 0.50 ? "var(--red)" : "var(--green)",
                   transition: "width 0.4s",
                 }} />
               </div>
@@ -1135,7 +1135,7 @@ function CompetitorIntel({ onSendToAI }: { onSendToAI: (ctx: string) => void }) 
       {/* Error banner */}
       {errorMsg && (
         <div style={{ background: "#f8717122", border: "1px solid #f87171", borderRadius: 10, padding: "14px 18px" }}>
-          <p style={{ fontSize: 13, fontWeight: 700, color: "#f87171", marginBottom: 4 }}>Setup Required</p>
+          <p style={{ fontSize: 13, fontWeight: 700, color: "var(--red)", marginBottom: 4 }}>Setup Required</p>
           <p style={{ fontSize: 13, color: "var(--text-primary)" }}>{errorMsg}</p>
           {errorMsg.includes("brave") || errorMsg.includes("BRAVE") ? (
             <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 8 }}>
@@ -1179,7 +1179,7 @@ function CompetitorIntel({ onSendToAI }: { onSendToAI: (ctx: string) => void }) 
           {sections.map((section, i) => (
             <div key={i} style={{
               background: `linear-gradient(90deg, ${INTEL_COLORS[i % INTEL_COLORS.length]}0a, transparent 30%), linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))`,
-              border: "1px solid rgba(255,255,255,0.07)",
+              border: "1px solid var(--border)",
               borderRadius: 14, overflow: "hidden",
               borderLeft: `3px solid ${INTEL_COLORS[i % INTEL_COLORS.length]}`,
               boxShadow: "0 6px 20px rgba(0,0,0,0.2)",
@@ -1236,13 +1236,13 @@ function CompetitorIntel({ onSendToAI }: { onSendToAI: (ctx: string) => void }) 
           }}>◈ Wing Digital Positioning</p>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
             <div>
-              <p style={{ fontSize: 11, fontWeight: 700, color: "#4ade80", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Our Advantages</p>
+              <p style={{ fontSize: 11, fontWeight: 700, color: "var(--green)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Our Advantages</p>
               {["$1,000/mo flat — no hidden fees", "Done-for-you — zero client config", "Home service niche expertise", "Apollo + Claude + GHL pipeline built in", "60s missed-call text-back SLA"].map(item => (
                 <p key={item} style={{ fontSize: 12, color: "var(--text-primary)", marginBottom: 5 }}>✓ {item}</p>
               ))}
             </div>
             <div>
-              <p style={{ fontSize: 11, fontWeight: 700, color: "#fb923c", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Watch For</p>
+              <p style={{ fontSize: 11, fontWeight: 700, color: "var(--orange)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Watch For</p>
               {["Competitors lowering prices", "New AI features being added", "GHL resellers undercutting", "Agencies targeting same niche", "Any DFW-specific marketing plays"].map(item => (
                 <p key={item} style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 5 }}>⚑ {item}</p>
               ))}
@@ -1263,7 +1263,7 @@ function CompetitorIntel({ onSendToAI }: { onSendToAI: (ctx: string) => void }) 
 
       {/* Auto-run schedule info */}
       <div style={{
-        background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.06)",
+        background: "rgba(255,255,255,0.025)", border: "1px solid var(--border)",
         borderRadius: 14, padding: "14px 18px", display: "flex", alignItems: "center", gap: 14,
       }}>
         <span style={{ fontSize: 22 }}>⏰</span>
@@ -1293,7 +1293,7 @@ function CompetitorAskBtn({ section, onSendToAI }: { section: { title: string; b
   );
 }
 
-const INTEL_COLORS = ["#60a5fa", "#fb923c", "#22d3ee", "#4ade80", "#f472b6", "#34d399", "#facc15", "#38bdf8"];
+const INTEL_COLORS = ["var(--accent)", "var(--orange)", "var(--accent)", "var(--green)", "#f472b6", "var(--green)", "#facc15", "#38bdf8"];
 const INTEL_ICONS = ["🏢", "💰", "📦", "📣", "🎯", "⚡", "🔧", "📊"];
 
 function parseCompetitorSections(content: string): { title: string; bullets: string[] }[] {
@@ -1372,7 +1372,7 @@ function Clients({ data, loading }: { data: any; loading: boolean }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-      {toast && <div style={{ position: "fixed", bottom: 24, right: 24, background: "#4ade80", color: "#07080f", padding: "10px 18px", borderRadius: 10, fontWeight: 700, fontSize: 13, zIndex: 200 }}>{toast}</div>}
+      {toast && <div style={{ position: "fixed", bottom: 24, right: 24, background: "var(--green)", color: "#07080f", padding: "10px 18px", borderRadius: 10, fontWeight: 700, fontSize: 13, zIndex: 200 }}>{toast}</div>}
       {noteClient && <Modal title={`Note for ${noteClient}`} onClose={() => setNoteClient(null)}>
         <textarea value={noteContent} onChange={e => setNoteContent(e.target.value)} rows={6} placeholder="Write your note..."
           style={{ background: "var(--bg-hover)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 12px", color: "var(--text-primary)", fontSize: 13, resize: "vertical", outline: "none", width: "100%" }} />
@@ -1381,15 +1381,15 @@ function Clients({ data, loading }: { data: any; loading: boolean }) {
       {/* MRR summary */}
       <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
         {[
-          { label: "Total Clients", value: loading ? "..." : clients.length, color: "#22d3ee" },
-          { label: "MRR", value: loading ? "..." : `$${mrr.toLocaleString()}`, color: "#4ade80" },
-          { label: "Avg Deal", value: loading || !clients.length ? "..." : `$${Math.round(mrr / clients.length).toLocaleString()}`, color: "#60a5fa" },
+          { label: "Total Clients", value: loading ? "..." : clients.length, color: "var(--accent)" },
+          { label: "MRR", value: loading ? "..." : `$${mrr.toLocaleString()}`, color: "var(--green)" },
+          { label: "Avg Deal", value: loading || !clients.length ? "..." : `$${Math.round(mrr / clients.length).toLocaleString()}`, color: "var(--accent)" },
         ].map(s => (
           <div key={s.label} style={{
             background: `radial-gradient(ellipse 90% 80% at 50% -30%, ${s.color}14, transparent 60%), linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))`,
-            border: "1px solid rgba(255,255,255,0.07)", borderRadius: 14, padding: "16px 22px",
+            border: "1px solid var(--border)", borderRadius: 14, padding: "16px 22px",
             flex: 1, minWidth: 140,
-            boxShadow: "0 8px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.04)",
+            boxShadow: "0 8px 24px var(--bg-hover), inset 0 1px 0 rgba(255,255,255,0.04)",
           }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
               <span style={{ width: 5, height: 5, borderRadius: "50%", background: s.color, boxShadow: `0 0 7px ${s.color}` }} />
@@ -1405,9 +1405,9 @@ function Clients({ data, loading }: { data: any; loading: boolean }) {
           {clients.map((client: any) => (
             <div key={client.id} style={{
               background: "radial-gradient(ellipse 90% 60% at 50% -20%, rgba(52,211,153,0.1), transparent 60%), linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))",
-              border: "1px solid rgba(255,255,255,0.07)",
+              border: "1px solid var(--border)",
               borderRadius: 16, padding: 20,
-              boxShadow: "0 8px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.04)",
+              boxShadow: "0 8px 24px var(--bg-hover), inset 0 1px 0 rgba(255,255,255,0.04)",
               display: "flex", flexDirection: "column", gap: 12,
             }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
@@ -1417,7 +1417,7 @@ function Clients({ data, loading }: { data: any; loading: boolean }) {
                     background: "linear-gradient(135deg, rgba(52,211,153,0.25), rgba(34,211,238,0.12))",
                     border: "1px solid rgba(52,211,153,0.35)",
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 14, fontWeight: 800, color: "#34d399",
+                    fontSize: 14, fontWeight: 800, color: "var(--green)",
                     fontFamily: "'Space Grotesk', sans-serif",
                   }}>{(client.name || "?").charAt(0).toUpperCase()}</div>
                   <div>
@@ -1426,7 +1426,7 @@ function Clients({ data, loading }: { data: any; loading: boolean }) {
                   </div>
                 </div>
                 <div style={{ textAlign: "right" }}>
-                  <p style={{ fontSize: 18, fontWeight: 800, color: "#34d399", fontFamily: "'Space Grotesk', sans-serif", textShadow: "0 0 16px rgba(52,211,153,0.35)" }}>${client.value.toLocaleString()}</p>
+                  <p style={{ fontSize: 18, fontWeight: 800, color: "var(--green)", fontFamily: "'Space Grotesk', sans-serif", textShadow: "0 0 16px rgba(52,211,153,0.35)" }}>${client.value.toLocaleString()}</p>
                   <p style={{ fontSize: 10, color: "var(--text-muted)" }}>deal value</p>
                 </div>
               </div>
@@ -1436,7 +1436,7 @@ function Clients({ data, loading }: { data: any; loading: boolean }) {
                 <p style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>Services</p>
                 <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                   {(client.tags?.length ? client.tags : ["Active"]).slice(0, 4).map((t: string) => (
-                    <span key={t} style={{ fontSize: 10, background: "rgba(52,211,153,0.1)", color: "#34d399", padding: "2px 10px", borderRadius: 999, border: "1px solid rgba(52,211,153,0.3)", fontWeight: 600 }}>{t}</span>
+                    <span key={t} style={{ fontSize: 10, background: "rgba(52,211,153,0.1)", color: "var(--green)", padding: "2px 10px", borderRadius: 999, border: "1px solid rgba(52,211,153,0.3)", fontWeight: 600 }}>{t}</span>
                   ))}
                 </div>
               </div>
@@ -1446,14 +1446,14 @@ function Clients({ data, loading }: { data: any; loading: boolean }) {
                   <a href={`https://app.gohighlevel.com/v2/location/${locationId}/contacts/detail/${client.contactId}`}
                     target="_blank" rel="noreferrer" style={{
                       flex: 1, padding: "7px 0", borderRadius: 999, fontSize: 12, cursor: "pointer",
-                      background: "transparent", border: "1px solid rgba(255,255,255,0.1)", color: "var(--text-secondary)",
+                      background: "transparent", border: "1px solid var(--border)", color: "var(--text-secondary)",
                       textDecoration: "none", textAlign: "center", fontWeight: 500,
                     }}>View in GHL →</a>
                 ) : (
                   <a href={`https://app.gohighlevel.com/v2/location/${locationId}/opportunities/list`}
                     target="_blank" rel="noreferrer" style={{
                       flex: 1, padding: "7px 0", borderRadius: 999, fontSize: 12,
-                      background: "transparent", border: "1px solid rgba(255,255,255,0.1)", color: "var(--text-secondary)",
+                      background: "transparent", border: "1px solid var(--border)", color: "var(--text-secondary)",
                       textDecoration: "none", textAlign: "center", fontWeight: 500,
                     }}>View in GHL →</a>
                 )}
@@ -1518,7 +1518,7 @@ function renderMarkdown(md: string): React.ReactNode {
       const buf: string[] = []; i++;
       while (i < lines.length && !/^```/.test(lines[i])) { buf.push(lines[i]); i++; }
       i++;
-      blocks.push(<pre key={key++} style={{ background: "rgba(0,0,0,0.35)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: 12, overflowX: "auto", fontSize: 12.5, lineHeight: 1.6 }}>{buf.join("\n")}</pre>);
+      blocks.push(<pre key={key++} style={{ background: "var(--bg-hover)", border: "1px solid var(--border)", borderRadius: 8, padding: 12, overflowX: "auto", fontSize: 12.5, lineHeight: 1.6 }}>{buf.join("\n")}</pre>);
       continue;
     }
     const h = line.match(/^(#{1,6})\s+(.*)$/);
@@ -1712,13 +1712,13 @@ function KnowledgeBase({ initialPath, onSendToAI }: { initialPath?: string; onSe
         width: "82vw", maxWidth: 300,
         transform: treeOpen ? "translateX(0)" : "translateX(-102%)",
         transition: "none",
-        borderRight: "1px solid rgba(255,255,255,0.06)",
-        overflow: "hidden", background: "rgba(9,11,20,0.96)", backdropFilter: "blur(12px)",
+        borderRight: "1px solid var(--border)",
+        overflow: "hidden", background: "var(--bg-secondary)", backdropFilter: "blur(12px)",
         boxShadow: treeOpen ? "8px 0 30px rgba(0,0,0,0.5)" : "none",
       } : {
         width: treeOpen ? 230 : 0, flexShrink: 0,
         borderRight: treeOpen ? "1px solid rgba(255,255,255,0.05)" : "none",
-        overflow: "hidden", background: "rgba(11,13,23,0.6)", backdropFilter: "blur(10px)",
+        overflow: "hidden", background: "var(--bg-secondary)", backdropFilter: "blur(10px)",
         transition: "width 0.25s ease",
       }}>
         <div style={{ width: 230, height: "100%", overflow: "auto", padding: "16px 0" }}>
@@ -1769,17 +1769,17 @@ function KnowledgeBase({ initialPath, onSendToAI }: { initialPath?: string; onSe
             style={isPhone ? {
               position: "absolute", left: 0, right: 0, bottom: 0, zIndex: 46,
               height: "72%", borderTopLeftRadius: 18, borderTopRightRadius: 18,
-              background: "rgba(9,11,20,0.98)", backdropFilter: "blur(14px)",
-              borderTop: "1px solid rgba(255,255,255,0.1)", boxShadow: "0 -12px 40px rgba(0,0,0,0.6)",
+              background: "var(--bg-card)", backdropFilter: "blur(14px)",
+              borderTop: "1px solid var(--border)", boxShadow: "0 -12px 40px rgba(0,0,0,0.6)",
               display: "flex", flexDirection: "column",
             } : {
               width: 460, flexShrink: 0, height: "100%",
-              borderLeft: "1px solid rgba(255,255,255,0.07)",
-              background: "rgba(9,11,20,0.72)", backdropFilter: "blur(10px)",
+              borderLeft: "1px solid var(--border)",
+              background: "var(--bg-card)", backdropFilter: "blur(10px)",
               display: "flex", flexDirection: "column",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 16px", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 16px", borderBottom: "1px solid var(--border)" }}>
               {isPhone && <span style={{ position: "absolute", top: 6, left: "50%", transform: "translateX(-50%)", width: 36, height: 4, borderRadius: 2, background: "rgba(255,255,255,0.25)" }} />}
               <span style={{ flex: 1, fontSize: 13, fontWeight: 700, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {selectedFile.split("/").pop()}
@@ -1817,7 +1817,7 @@ function KnowledgeBase({ initialPath, onSendToAI }: { initialPath?: string; onSe
 
       {/* Toast */}
       {toast && (
-        <div style={{ position: "fixed", bottom: 24, right: 24, background: "#4ade80", color: "#07080f", padding: "10px 18px", borderRadius: 10, fontWeight: 700, fontSize: 13, zIndex: 200 }}>
+        <div style={{ position: "fixed", bottom: 24, right: 24, background: "var(--green)", color: "#07080f", padding: "10px 18px", borderRadius: 10, fontWeight: 700, fontSize: 13, zIndex: 200 }}>
           {toast}
         </div>
       )}
@@ -1892,7 +1892,7 @@ function PersonalSection({ data }: { data: any }) {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16 }}>
 
         {/* Daily Tasks */}
-        <div style={{ background: "linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 16, padding: 20, boxShadow: "0 8px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.04)" }}>
+        <div style={{ background: "linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))", border: "1px solid var(--border)", borderRadius: 16, padding: 20, boxShadow: "0 8px 24px var(--bg-hover), inset 0 1px 0 var(--border)" }}>
           <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 14 }}>📋 Today's Tasks</p>
           <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
             <input value={newTask} onChange={e => setNewTask(e.target.value)}
@@ -1919,7 +1919,7 @@ function PersonalSection({ data }: { data: any }) {
         </div>
 
         {/* Goals */}
-        <div style={{ background: "linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 16, padding: 20, boxShadow: "0 8px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.04)" }}>
+        <div style={{ background: "linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))", border: "1px solid var(--border)", borderRadius: 16, padding: 20, boxShadow: "0 8px 24px var(--bg-hover), inset 0 1px 0 var(--border)" }}>
           <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 14 }}>🎯 Goals</p>
           <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
             <input value={newGoal} onChange={e => setNewGoal(e.target.value)}
@@ -1931,7 +1931,7 @@ function PersonalSection({ data }: { data: any }) {
             {goals.length === 0 && <p style={{ color: "var(--text-muted)", fontSize: 13 }}>No goals yet. Add one above.</p>}
             {goals.map(g => (
               <div key={g.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", background: "var(--bg-hover)", borderRadius: 8 }}>
-                <input type="checkbox" checked={g.done} onChange={() => toggleGoal(g.id)} style={{ cursor: "pointer", width: 16, height: 16, accentColor: "#4ade80" }} />
+                <input type="checkbox" checked={g.done} onChange={() => toggleGoal(g.id)} style={{ cursor: "pointer", width: 16, height: 16, accentColor: "var(--green)" }} />
                 <span style={{ flex: 1, fontSize: 13, color: g.done ? "var(--text-muted)" : "var(--text-primary)", textDecoration: g.done ? "line-through" : "none" }}>{g.text}</span>
               </div>
             ))}
@@ -1940,10 +1940,10 @@ function PersonalSection({ data }: { data: any }) {
       </div>
 
       {/* CLEP Bio Tracker */}
-      <div style={{ background: "linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 16, padding: 20, boxShadow: "0 8px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.04)" }}>
+      <div style={{ background: "linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))", border: "1px solid var(--border)", borderRadius: 16, padding: 20, boxShadow: "0 8px 24px var(--bg-hover), inset 0 1px 0 var(--border)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <p style={{ fontSize: 13, fontWeight: 700 }}>📚 CLEP Bio Study Tracker</p>
-          <span style={{ fontSize: 12, color: daysLeft < 14 ? "#f87171" : "var(--text-muted)" }}>{daysLeft} days until exam</span>
+          <span style={{ fontSize: 12, color: daysLeft < 14 ? "var(--red)" : "var(--text-muted)" }}>{daysLeft} days until exam</span>
         </div>
         <div style={{ display: "flex", gap: 16, marginBottom: 16, flexWrap: "wrap" }}>
           <div style={{ flex: 1, minWidth: 140 }}>
@@ -1963,7 +1963,7 @@ function PersonalSection({ data }: { data: any }) {
           </div>
         </div>
         {/* Progress bar */}
-        <div style={{ background: "rgba(0,0,0,0.35)", borderRadius: 20, height: 12, overflow: "hidden", border: "1px solid rgba(255,255,255,0.05)" }}>
+        <div style={{ background: "var(--bg-hover)", borderRadius: 20, height: 12, overflow: "hidden", border: "1px solid var(--border)" }}>
           <div style={{
             height: "100%", width: `${clepPct}%`,
             background: clepPct >= 100 ? "linear-gradient(90deg, #34d399, #22d3ee)" : "linear-gradient(90deg, #22d3ee, #a78bfa)",
@@ -1973,7 +1973,7 @@ function PersonalSection({ data }: { data: any }) {
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6 }}>
           <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{clep.studied}h / {clep.target}h</span>
-          <span style={{ fontSize: 11, fontWeight: 700, color: clepPct >= 100 ? "#4ade80" : "var(--accent)" }}>{clepPct}% complete</span>
+          <span style={{ fontSize: 11, fontWeight: 700, color: clepPct >= 100 ? "var(--green)" : "var(--accent)" }}>{clepPct}% complete</span>
         </div>
         {daysLeft > 0 && clep.studied < clep.target && (
           <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 8 }}>
@@ -1987,7 +1987,7 @@ function PersonalSection({ data }: { data: any }) {
         <div style={{
           background: "radial-gradient(ellipse 90% 60% at 50% -20%, rgba(251,113,133,0.1), transparent 60%), linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))",
           border: "1px solid rgba(251,113,133,0.35)", borderRadius: 16, padding: 20,
-          boxShadow: "0 8px 24px rgba(0,0,0,0.25), 0 0 24px rgba(251,113,133,0.06)",
+          boxShadow: "0 8px 24px var(--bg-hover), 0 0 24px rgba(251,113,133,0.06)",
         }}>
           <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>⚠️ Follow-up Needed</p>
           <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 14 }}>These leads haven't been touched in 3+ days</p>
@@ -2001,7 +2001,7 @@ function PersonalSection({ data }: { data: any }) {
                     <p style={{ fontSize: 11, color: "var(--text-muted)" }}>{lead.email} {lead.tags?.slice(0, 1).map((t: string) => `· ${t}`).join("")}</p>
                   </div>
                   <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                    <span style={{ fontSize: 11, color: "#f87171", fontWeight: 700 }}>{days}d ago</span>
+                    <span style={{ fontSize: 11, color: "var(--red)", fontWeight: 700 }}>{days}d ago</span>
                     {data?.locationId && lead.id && (
                       <a href={`https://app.gohighlevel.com/v2/location/${data.locationId}/contacts/detail/${lead.id}`}
                         target="_blank" rel="noreferrer"

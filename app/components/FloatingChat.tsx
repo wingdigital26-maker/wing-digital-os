@@ -16,7 +16,7 @@ function MicIcon({ active }: { active: boolean }) {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
       {active ? (
-        <rect x="6" y="6" width="12" height="12" rx="2" fill="#f87171" />
+        <rect x="6" y="6" width="12" height="12" rx="2" fill="var(--red)" />
       ) : (
         <>
           <rect x="9" y="2" width="6" height="12" rx="3" fill="currentColor" />
@@ -170,7 +170,7 @@ export default function FloatingChat() {
                     ? `linear-gradient(135deg, ${agent.color}, ${agent.color}cc)`
                     : "rgba(255,255,255,0.035)",
                   color: msg.role === "user" ? "#fff" : "var(--text-primary)",
-                  border: msg.role === "assistant" ? "1px solid rgba(255,255,255,0.06)" : "none",
+                  border: msg.role === "assistant" ? "1px solid var(--border)" : "none",
                   boxShadow: msg.role === "user" ? `0 3px 10px ${agent.color}33` : "none",
                   whiteSpace: "pre-wrap",
                 }}>
@@ -198,7 +198,7 @@ export default function FloatingChat() {
             <div style={{
               display: "flex", alignItems: "center", gap: 4,
               background: "rgba(255,255,255,0.04)",
-              border: `1px solid ${recording ? "#fb7185" : "rgba(255,255,255,0.08)"}`,
+              border: `1px solid ${recording ? "var(--red)" : "rgba(255,255,255,0.08)"}`,
               borderRadius: 999, padding: "4px 5px 4px 14px",
               boxShadow: recording ? "0 0 0 3px rgba(251,113,133,0.15)" : "inset 0 1px 2px rgba(0,0,0,0.25)",
               transition: "border-color 0.2s, box-shadow 0.2s",
@@ -218,7 +218,7 @@ export default function FloatingChat() {
                 background: recording ? "rgba(251,113,133,0.15)" : "transparent",
                 border: "none", borderRadius: "50%", width: 28, height: 28,
                 cursor: "pointer", flexShrink: 0,
-                color: recording ? "#fb7185" : "var(--text-muted)",
+                color: recording ? "var(--red)" : "var(--text-muted)",
                 display: "flex", alignItems: "center", justifyContent: "center",
               }}>
                 <MicIcon active={recording} />

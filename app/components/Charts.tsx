@@ -11,7 +11,7 @@ const GROTESK = "'Space Grotesk', sans-serif";
 // ── Sparkline ────────────────────────────────────────────────────────────────
 export function Sparkline({
   data,
-  color = "#22d3ee",
+  color = "var(--accent)",
   width = 110,
   height = 34,
 }: {
@@ -56,7 +56,7 @@ export function Delta({ value, label }: { value: number | null; label?: string }
   if (value === null || !Number.isFinite(value)) return null;
   const up = value > 0;
   const flat = value === 0;
-  const c = flat ? "#6b7280" : up ? "#34d399" : "#fb7185";
+  const c = flat ? "#6b7280" : up ? "var(--green)" : "var(--red)";
   return (
     <span style={{
       display: "inline-flex", alignItems: "center", gap: 4,
@@ -74,7 +74,7 @@ export function Delta({ value, label }: { value: number | null; label?: string }
 export function KpiCard({
   label,
   value,
-  color = "#22d3ee",
+  color = "var(--accent)",
   delta = null,
   deltaLabel,
   spark,
@@ -94,7 +94,7 @@ export function KpiCard({
       initial="hidden" animate="show"
       style={{
       background: `radial-gradient(ellipse 90% 70% at 50% -20%, ${color}14, transparent 60%), linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))`,
-      border: "1px solid rgba(255,255,255,0.07)", borderRadius: 14, padding: "16px 18px",
+      border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px",
       boxShadow: "0 8px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.04)",
       display: "flex", flexDirection: "column", gap: 10, minWidth: 0,
     }}>
@@ -117,7 +117,7 @@ export function KpiCard({
 // ── Bar chart (daily series) ────────────────────────────────────────────────
 export function BarChart({
   data,
-  color = "#22d3ee",
+  color = "var(--accent)",
   height = 130,
   showEvery = 1,
 }: {
@@ -257,7 +257,7 @@ export function DonutChart({
 export function ChartCard({
   title,
   badge,
-  badgeColor = "#22d3ee",
+  badgeColor = "var(--accent)",
   children,
 }: {
   title: string;
@@ -268,7 +268,7 @@ export function ChartCard({
   return (
     <div style={{
       background: "linear-gradient(180deg, var(--bg-card), rgba(12,15,26,0.85))",
-      border: "1px solid rgba(255,255,255,0.07)", borderRadius: 16, padding: "16px 20px 14px",
+      border: "1px solid var(--border)", borderRadius: 16, padding: "16px 20px 14px",
       boxShadow: "0 8px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.04)",
       minWidth: 0,
     }}>

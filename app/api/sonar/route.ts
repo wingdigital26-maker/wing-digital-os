@@ -85,15 +85,25 @@ export async function GET(req: Request) {
 
   const { searchParams } = new URL(req.url);
   const limit = Math.min(Number(searchParams.get("limit") || 40), 200);
+  // Default to showing ONLY identity-verified businesses. A fact-check of the
+  // raw table found 63% junk — wrong-state companies, lead-gen doorway shells,
+  // and LinkedIn person profiles. identity_gate.py classifies every row; a
+  // call list must never default to the unfiltered pile.
+  const identity = searchParams.get("identity") ?? "verified";
   const minNeed = searchParams.get("minNeed") || "0.6";
   const city = searchParams.get("city") || "";
 
   try {
-    const [total, awaiting, highNeed, unaudited, withPhone, approved] =
+    const [total, awaiting, highNeed, verified, unresolved, outOfRegion,
+           notABusiness, unaudited, withPhone, approved] =
       await Promise.all([
         countWhere("id=gt.0"),
         countWhere("status=eq.new"),
         countWhere("need_score=gte.0.7"),
+        countWhere("identity=eq.verified"),
+        countWhere("identity=eq.unresolved"),
+        countWhere("identity=eq.out_of_region"),
+        countWhere("identity=eq.not_a_business"),
         countWhere("audited_at=is.null"),
         countWhere("phone=not.is.null"),
         countWhere("status=eq.approved"),
@@ -103,6 +113,7 @@ export async function GET(req: Request) {
     // (LinkedIn profiles) carry a null need_score by design and are excluded.
     const filters = [
       "status=eq.new",
+      identity === "all" ? "" : `identity=eq.${encodeURIComponent(identity)}`,
       `need_score=gte.${encodeURIComponent(minNeed)}`,
       city ? `place_name=eq.${encodeURIComponent(city)}` : "",
       "order=need_score.desc.nullslast",
@@ -130,7 +141,9 @@ export async function GET(req: Request) {
 
     return NextResponse.json({
       configured: true,
-      totals: { total, awaiting, highNeed, unaudited, withPhone, approved },
+      totals: { total, awaiting, highNeed, unaudited, withPhone, approved,
+                verified, unresolved, outOfRegion, notABusiness },
+      identityFilter: identity,
       cities,
       leads,
       fetchedAt: new Date().toISOString(),

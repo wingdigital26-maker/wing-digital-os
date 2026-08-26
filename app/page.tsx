@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
 import { motion, MotionConfig } from "motion/react";
 import { Bolt, Users, Cpu, Bulb, Plus, Calendar, Note, Sparkles } from "reicon-react";
-import { staggerContainer, riseItem, hoverSpring, cardHover, cardTap } from "./components/motion";
+import { staggerContainer, riseItem, hoverSpring, cardHover, cardHoverPassive, cardTap } from "./components/motion";
 import { Sparkline, Delta, buildDailySeries } from "./components/Charts";
 import { StatTiles, MissionPanels, MissionStyles, Selection, StatTile, WatchdogBanner, WatchdogData, MissionData } from "./components/MissionControlCore";
 import { sfx } from "./lib/sounds";
@@ -939,7 +939,8 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
             textDecoration: "none", display: "block", overflow: "hidden",
           };
           const interactive = Boolean(stat.onClick || stat.href);
-          const hover = interactive ? cardHover : undefined;
+          // Every tile responds; interactive ones respond more.
+          const hover = interactive ? cardHover : cardHoverPassive;
           const tap = interactive ? cardTap : undefined;
           if (stat.href) return (
             <motion.a key={stat.label} href={stat.href} target="_blank" rel="noreferrer" style={baseStyle}

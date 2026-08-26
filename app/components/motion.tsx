@@ -30,3 +30,10 @@ export const hoverSpring: Transition = { type: "spring", stiffness: 400, damping
 // Subtle lift on hover for clickable cards / pills.
 export const cardHover = { scale: 1.02, y: -2 };
 export const cardTap = { scale: 0.98 };
+
+// Cards that are NOT clickable still need to feel alive. Previously only tiles
+// with an onClick or href moved, so in a row of identical-looking stat tiles
+// "Opened emails" lifted and "MRR" sat dead — the row read as half-broken.
+// This is a smaller lift with no scale, so a real affordance still reads as
+// stronger than a passive one and hover never promises a click that is not there.
+export const cardHoverPassive = { y: -1 };

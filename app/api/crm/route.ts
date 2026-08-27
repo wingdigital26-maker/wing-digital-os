@@ -117,29 +117,29 @@ function filledVal(v: unknown): boolean {
 // Flattening them into a coloured dot is how a same-day job ends up sorted
 // below a marketing row.
 const TIER_MEANING: Record<string, { label: string; meaning: string; rank: number }> = {
-  hire:   { label: "HIRE — someone is trying to pay for this work right now",
+  hire:   { label: "HIRE, someone is trying to pay for this work right now",
             meaning: "A live posting from a person asking to hire. Highest value, and it expires. Same-day.",
             rank: 1 },
-  event:  { label: "EVENT — a dated cleanout with a deadline",
+  event:  { label: "EVENT, a dated cleanout with a deadline",
             meaning: "A dated event whose leftovers have to leave when it ends. Call before the end date.",
             rank: 2 },
-  signal: { label: "SIGNAL — a marketing-list row, not a job",
+  signal: { label: "SIGNAL, a marketing-list row, not a job",
             meaning: "Someone giving away something bulky. Nobody is hiring here. Do not work it like a job.",
             rank: 4 },
-  A:      { label: "A — strongest pain evidence",
+  A:      { label: "A, strongest pain evidence",
             meaning: "The prospect publicly exhibits the pain this client removes, scored 55+.",
             rank: 1 },
-  B:      { label: "B — real pain evidence, weaker",
+  B:      { label: "B, real pain evidence, weaker",
             meaning: "Pain evidence exists and is quoted, but scored below the A threshold.",
             rank: 2 },
-  C:      { label: "C — a single weak signal",
+  C:      { label: "C, a single weak signal",
             meaning: "One low-weight signal (often a funding/launch item). Fit, barely pain.",
             rank: 3 },
-  tier1:  { label: "Tier 1 — direct demand",
+  tier1:  { label: "Tier 1, direct demand",
             meaning: "Someone asking for this service in public.", rank: 1 },
-  tier2:  { label: "Tier 2 — indirect signal",
+  tier2:  { label: "Tier 2, indirect signal",
             meaning: "A signal that demand exists, not a request for it.", rank: 3 },
-  reply:  { label: "Reply — a response to an existing thread",
+  reply:  { label: "Reply, a response to an existing thread",
             meaning: "A drafted reply into a conversation already underway, not a cold first touch.",
             rank: 2 },
 };
@@ -176,7 +176,7 @@ function outboundEvidence(r: OutRow): OutboundEvidence {
       label: "No personalization recorded",
       detail:
         "This draft carries no record of what it was personalized on, so there is " +
-        "nothing to check it against. Read the body before approving — an " +
+        "nothing to check it against. Read the body before approving, an " +
         "unevidenced claim about a stranger's business is the one thing that must " +
         "never go out.",
     };
@@ -187,7 +187,7 @@ function outboundEvidence(r: OutRow): OutboundEvidence {
   if (/NEEDS LOCATION CHECK|NEEDS VERIFICATION|unverified/i.test(p)) {
     return {
       quote: null, sourceUrl, sourceKind, strength: "flagged_unverified",
-      label: "FLAGGED by the drafter — verify before approving",
+      label: "FLAGGED by the drafter, verify before approving",
       detail:
         `The drafter itself flagged this row as unverified: "${p.slice(0, 240)}". ` +
         `It is not asking for a rubber stamp. Confirm the flagged point by hand ` +
@@ -219,7 +219,7 @@ function outboundEvidence(r: OutRow): OutboundEvidence {
           `on the board.`
         : `The message quotes the prospect's own words (read from ${where}), but no ` +
           `evidence_url was saved, so the quote cannot be checked before sending. ` +
-          `Verify it or cut it — an unverifiable quote is worse than no quote.`,
+          `Verify it or cut it, an unverifiable quote is worse than no quote.`,
     };
   }
   // e.g. "category: balm, no complaint quoted" — the drafter is telling you it
@@ -229,7 +229,7 @@ function outboundEvidence(r: OutRow): OutboundEvidence {
     quote: null, sourceUrl, sourceKind,
     strength: "stated_no_quote",
     label: admitsNothing
-      ? "Generic — the drafter found nothing specific to say"
+      ? "Generic, the drafter found nothing specific to say"
       : "Personalized on a stated fact, not a direct quote",
     detail: admitsNothing
       ? `The drafter recorded: "${p.slice(0, 200)}". It had no quoted fact to ` +
@@ -274,7 +274,7 @@ function shapeOutbound(r: OutRow) {
     evidence: outboundEvidence(r),
     bodyState: s(r.body)
       ? "written"
-      : "MISSING — this row has no message body at all, so there is nothing to " +
+      : "MISSING, this row has no message body at all, so there is nothing to " +
         "approve. The drafter created the row and never filled it in.",
     // A draft that has never been looked at, and one that was reviewed and left
     // alone, are different situations that must not render the same.
@@ -426,7 +426,7 @@ function buildWatch(
       ...base, state: "UNKNOWN",
       detail:
         `Nothing in the Sonar database records when ${name}'s watcher last ran. crm_clients has no ` +
-        `last_scraped_at column and ${runs.reason ?? "there is no run log"} — so the OS genuinely ` +
+        `last_scraped_at column and ${runs.reason ?? "there is no run log"}, so the OS genuinely ` +
         `cannot tell you whether this scraper is working. Do not read the empty panel as healthy.`,
     };
   }
@@ -450,11 +450,11 @@ function buildWatch(
     return {
       ...base, state: "RAN_FOUND_NOTHING",
       detail: searched
-        ? `The watcher ran and searched for ${name}, but every query came back empty — ` +
+        ? `The watcher ran and searched for ${name}, but every query came back empty, ` +
           `${run.queries ?? "an unrecorded number of"} queries, 0 results. The scraper executed; ` +
           `it just found nobody. Repeated empty runs usually mean the search terms are too narrow ` +
           `or the source is blocking us.`
-        : `The watcher ran and logged ${name}, but issued ZERO queries for them — so it never ` +
+        : `The watcher ran and logged ${name}, but issued ZERO queries for them, so it never ` +
           `actually searched. Finding nothing was guaranteed before it started. This is a broken ` +
           `run, not a quiet one: check that the watcher is reading this client's cities and ` +
           `keywords, and that it is not being skipped or rate-limited.`,
@@ -599,7 +599,7 @@ async function contentFor(slug: string | null, name: string): Promise<ContentFee
     if (!dirSeen) {
       return none(
         `Publishing records live in ghl-cli/outreach_logs on Jack's PC, which this server cannot reach ` +
-        `right now. Nothing is being hidden — the source is offline.`
+        `right now. Nothing is being hidden, the source is offline.`
       );
     }
     return none(
@@ -928,7 +928,7 @@ export async function GET(req: Request) {
         `no personalization at all. ` +
         (missingBody
           ? `${missingBody} row${missingBody === 1 ? " has" : "s have"} no message body at ` +
-            `all — the drafter created the row and never wrote the message, so there is ` +
+            `all, the drafter created the row and never wrote the message, so there is ` +
             `nothing there to approve.`
           : `Every row has a message body.`) +
         (scanned.meta.complete ? "" : ` NOTE: ${scanned.meta.note}`),

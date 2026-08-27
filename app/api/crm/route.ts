@@ -838,7 +838,14 @@ export async function POST(req: Request) {
                  "Content-Type": "application/json", Prefer: "return=minimal" },
       body: JSON.stringify({ scrape_niche, scrape_cities, scrape_terms, channels, active }),
     });
-    return NextResponse.json({ ok: res.ok });
+    if (!res.ok) {
+      const detail = await res.text().catch(() => "");
+      return NextResponse.json(
+        { ok: false, error: detail || `save failed (${res.status})` },
+        { status: 502 }
+      );
+    }
+    return NextResponse.json({ ok: true });
   }
 
   if (!id) return NextResponse.json({ ok: false, error: "bad request" }, { status: 400 });
@@ -861,5 +868,14 @@ export async function POST(req: Request) {
     },
     body: JSON.stringify(patch),
   });
-  return NextResponse.json({ ok: res.ok });
+  // A rejected write must not look like a successful one. Returning 200 with
+  // ok:false made a failed approve indistinguishable from a real one in the UI.
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    return NextResponse.json(
+      { ok: false, error: detail || `${action} failed (${res.status})` },
+      { status: 502 }
+    );
+  }
+  return NextResponse.json({ ok: true, status: patch.status ?? null });
 }

@@ -167,8 +167,12 @@ export default function CrmBoard() {
   const [lanePicked, setLanePicked] = useState(false);
   const [edits, setEdits] = useState<Record<number, string>>({});
   const [copied, setCopied] = useState<number | null>(null);
+  // Per-row failure text. A row that could not be approved stays on the board
+  // carrying the reason, instead of vanishing as though it succeeded.
+  const [actErr, setActErr] = useState<Record<number, string>>({});
   const [cfg, setCfg] = useState<Scraper | null>(null);
   const [cfgSaved, setCfgSaved] = useState(false);
+  const [cfgErr, setCfgErr] = useState("");
 
   // Deliberately unfiltered: a CRM has to show the whole history for a client,
   // not just one status. The status chips filter these rows in the browser, so
@@ -261,26 +265,52 @@ export default function CrmBoard() {
 
   async function saveCfg() {
     if (!cfg) return;
-    await fetch("/api/crm", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "config", ...cfg }),
-    });
+    const err = await post({ action: "config", ...cfg });
+    if (err) {
+      // "saved" is a claim. Do not make it when the write was refused.
+      setCfgErr(err);
+      return;
+    }
+    setCfgErr("");
     sfx.play("blip");
     setCfgSaved(true);
     setTimeout(() => setCfgSaved(false), 1600);
   }
 
-  async function act(it: Item, action: "approve" | "skip" | "sent") {
-    if (edits[it.id] !== undefined && edits[it.id] !== it.body) {
-      await fetch("/api/crm", {
+  // Removing the row is how this board says "done". That is only truthful if the
+  // write actually landed, so nothing is removed until the server confirms it.
+  // The previous version dropped the row and played the success sound no matter
+  // what came back, which made a failed approve look exactly like a real one.
+  async function post(payload: Record<string, unknown>): Promise<string | null> {
+    try {
+      const r = await fetch("/api/crm", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: it.id, action: "save", body: edits[it.id] }),
+        body: JSON.stringify(payload),
       });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || j?.ok === false) return String(j?.error || `failed (${r.status})`);
+      return null;
+    } catch (e) {
+      return String(e);
     }
-    await fetch("/api/crm", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: it.id, action }),
-    });
+  }
+
+  async function act(it: Item, action: "approve" | "skip" | "sent") {
+    setActErr((m) => ({ ...m, [it.id]: "" }));
+    if (edits[it.id] !== undefined && edits[it.id] !== it.body) {
+      const saveErr = await post({ id: it.id, action: "save", body: edits[it.id] });
+      // The edit is the thing being approved. If it did not persist, stop here
+      // rather than approving the older body behind Jack's back.
+      if (saveErr) {
+        setActErr((m) => ({ ...m, [it.id]: `Edit did not save: ${saveErr}` }));
+        return;
+      }
+    }
+    const err = await post({ id: it.id, action });
+    if (err) {
+      setActErr((m) => ({ ...m, [it.id]: `Could not ${action}: ${err}` }));
+      return;
+    }
     sfx.play("blip");
     setData((d) => (d ? { ...d, items: d.items.filter((x) => x.id !== it.id) } : d));
   }
@@ -482,6 +512,11 @@ export default function CrmBoard() {
                   border: "1px solid var(--accent)", color: "var(--accent)",
                   background: "transparent", fontWeight: 600,
                 }}>{cfgSaved ? "saved — next run uses this" : "save scraper settings"}</button>
+                {cfgErr && (
+                  <p role="alert" style={{ color: "var(--red)", fontSize: 12, margin: "6px 0 0" }}>
+                    Not saved: {cfgErr}. The next run still uses the old settings.
+                  </p>
+                )}
               </div>
             </section>
           )}
@@ -679,6 +714,11 @@ export default function CrmBoard() {
                   {park ? "not our area — skip" : "skip"}
                 </button>
               </div>
+              {actErr[it.id] && (
+                <p role="alert" style={{ color: "var(--red)", fontSize: 12, margin: "6px 0 0" }}>
+                  {actErr[it.id]}. Nothing changed, the row is still here.
+                </p>
+              )}
             </article>
           );})}
 

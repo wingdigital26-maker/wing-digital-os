@@ -5,7 +5,15 @@
 // never stops working.
 import { SignJWT, jwtVerify } from "jose";
 
-export type Session = { sub: string; email: string; role: string };
+// `portal` is the client slug a client-role user belongs to (optional; set at
+// login from the client_users mapping) so middleware can send them home
+// without a DB lookup on every request.
+export type Session = {
+  sub: string;
+  email: string;
+  role: string;
+  portal?: string;
+};
 
 function secretKey(): Uint8Array | null {
   const s = process.env.AUTH_SESSION_SECRET;
@@ -16,7 +24,11 @@ function secretKey(): Uint8Array | null {
 export async function signSession(s: Session): Promise<string> {
   const key = secretKey();
   if (!key) throw new Error("AUTH_SESSION_SECRET not set");
-  return await new SignJWT({ email: s.email, role: s.role })
+  return await new SignJWT({
+    email: s.email,
+    role: s.role,
+    ...(s.portal ? { portal: s.portal } : {}),
+  })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(s.sub)
     .setIssuedAt()
@@ -38,6 +50,7 @@ export async function verifySession(
       sub: String(payload.sub ?? ""),
       email: String(payload.email ?? ""),
       role: String(payload.role ?? "client"),
+      portal: typeof payload.portal === "string" ? payload.portal : undefined,
     };
   } catch {
     return null;

@@ -70,12 +70,39 @@ export async function POST(req: Request) {
           }
         }
         if (uid) {
+          // For client-role users, resolve their portal slug (client_users ->
+          // clients) so middleware can redirect them home without a DB call.
+          // Server-side lookups only -- nothing here trusts client input.
+          let portal: string | undefined;
+          const isStaffRole =
+            role === "admin" || role === "owner" || role === "staff";
+          if (!isStaffRole && svc) {
+            try {
+              const mp = await fetch(
+                `${sbUrl}/rest/v1/client_users?user_id=eq.${uid}&select=client_id&limit=1`,
+                { headers: { apikey: svc, Authorization: `Bearer ${svc}` } }
+              );
+              const maps = mp.ok ? await mp.json() : [];
+              const clientId = maps?.[0]?.client_id;
+              if (clientId) {
+                const cr = await fetch(
+                  `${sbUrl}/rest/v1/clients?id=eq.${clientId}&select=slug&limit=1`,
+                  { headers: { apikey: svc, Authorization: `Bearer ${svc}` } }
+                );
+                const rows = cr.ok ? await cr.json() : [];
+                if (rows?.[0]?.slug) portal = String(rows[0].slug);
+              }
+            } catch {
+              // Portal lookup is best-effort; the session still works without it.
+            }
+          }
           store.delete(ip);
-          const res = NextResponse.json({ ok: true, role });
-          const token = await signSession({ sub: uid, email, role });
+          const res = NextResponse.json({ ok: true, role, portal });
+          const token = await signSession({ sub: uid, email, role, portal });
           res.cookies.set("wingos_session", token, {
             httpOnly: true,
             sameSite: "lax",
+            secure: process.env.NODE_ENV === "production",
             maxAge: WEEK,
             path: "/",
           });
@@ -96,9 +123,10 @@ export async function POST(req: Request) {
 
   store.delete(ip); // success clears the counter
   const res = NextResponse.json({ ok: true });
-  res.cookies.set("wingos_auth", authToken(), {
+  res.cookies.set("wingos_auth", await authToken(), {
     httpOnly: true,
     sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
     maxAge: WEEK,
     path: "/",
   });

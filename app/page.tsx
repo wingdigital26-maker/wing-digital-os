@@ -621,11 +621,11 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
     });
     setSaving(false);
     if (res.ok) {
-      showToast("Lead added to GHL!");
+      showToast("Lead added.");
       setShowAddLead(false);
       setLeadForm({ firstName: "", lastName: "", email: "", phone: "", tag: "" });
     } else {
-      showToast("Error adding lead. Check GHL API.");
+      showToast("No CRM connected. GHL retired, replacement pending.");
     }
   }
 
@@ -668,7 +668,18 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
         </div>
       )}
 
-      {/* Morning Briefing — skeleton while GHL loads so it never looks blank */}
+      {/* CRM amputated: /api/ghl now answers 410 with an error since GHL was
+          retired 2026-08-22. Say so instead of rendering zeroed tiles as fact. */}
+      {!loading && data?.error && (
+        <div style={{
+          border: "1px solid var(--border)", borderRadius: 12, padding: "12px 16px",
+          background: "var(--bg-card)", fontSize: 12.5, color: "var(--text-muted)",
+        }}>
+          No CRM data source connected. GHL retired 2026-08-22, replacement pending. Lead, pipeline, and appointment data is unavailable until a new CRM is wired in.
+        </div>
+      )}
+
+      {/* Morning Briefing — skeleton while the dashboard loads so it never looks blank */}
       {loading && (
         <div style={{
           borderRadius: 20, border: "1px solid rgba(34,211,238,0.15)", padding: "24px 28px",
@@ -729,6 +740,20 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
             <div>
               <p style={{ fontSize: 36, fontWeight: 800, color: "var(--green)", lineHeight: 1, textShadow: "0 0 24px rgba(74,222,128,0.35)", fontFamily: "'Space Grotesk', sans-serif" }}><CountUp prefix="$" value={stats?.mrr ?? 0} /></p>
               <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>MRR · {data?.activeClients?.length ?? 0} active client{(data?.activeClients?.length ?? 0) === 1 ? "" : "s"}</p>
+              {/* A fixed-term deal reads as durable unless the headline says
+                  otherwise. Warn while there is still time to renew. */}
+              {data?.revenue?.nextExpiry && (
+                <p style={{ fontSize: 11, color: "var(--orange)", marginTop: 4 }}>
+                  ${data.revenue.nextExpiry.amount.toLocaleString()}/mo of this ends {data.revenue.nextExpiry.end}
+                  {" "}({data.revenue.nextExpiry.monthsRemaining} mo left) unless renewed
+                </p>
+              )}
+              {(data?.revenue?.pipelineTotal ?? 0) > 0 && (
+                // Pipeline sits beside the earned number, never inside it.
+                <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
+                  + ${data.revenue.pipelineTotal.toLocaleString()} pipeline — not earned, not in MRR
+                </p>
+              )}
             </div>
             <div>
               <p style={{ fontSize: 36, fontWeight: 800, color: "var(--green)", lineHeight: 1, textShadow: "0 0 24px rgba(52,211,153,0.35)", fontFamily: "'Space Grotesk', sans-serif" }}><CountUp value={stats?.responded ?? 0} /></p>
@@ -992,11 +1017,32 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
               {data.activeClients.slice(0, 50).map((client: any) => (
                 <motion.div key={client.id} variants={riseItem} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
                   <p style={{ fontSize: 13, fontWeight: 600 }}>{client.name}</p>
-                  <span style={{ fontSize: 13, color: "var(--green)", fontWeight: 600 }}>${client.value.toLocaleString()}/mo</span>
+                  {/* Every row states its basis. This used to print
+                      "${value}/mo" in green for EVERY client, so an expected
+                      (not-yet-earned) figure and an unverified one both rendered
+                      exactly like collected recurring revenue — and a client with
+                      no figure crashed on null. Green is reserved for money that
+                      actually counts toward MRR; everything else is muted and
+                      labelled with what it really is. */}
+                  <span style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                    <span style={{
+                      fontSize: 13, fontWeight: 600,
+                      color: client.countsTowardMrr ? "var(--green)" : "var(--text-muted)",
+                    }}>
+                      {client.value == null
+                        ? "not recorded"
+                        : `$${client.value.toLocaleString()}${client.countsTowardMrr ? "/mo" : ""}`}
+                    </span>
+                    {!client.countsTowardMrr && (
+                      <span style={{ fontSize: 10, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                        {client.value == null ? "unknown" : client.basisLabel}
+                      </span>
+                    )}
+                  </span>
                 </motion.div>
               ))}
             </motion.div>
-          ) : <p style={{ color: "var(--text-muted)", fontSize: 13 }}>No won opportunities yet</p>)}
+          ) : <p style={{ color: "var(--text-muted)", fontSize: 13 }}>No active clients on the roster</p>)}
         </div>
       </motion.div>
 
@@ -1095,6 +1141,9 @@ function parseCompetitorSections(content: string): { title: string; bullets: str
 function Clients({ data, loading }: { data: any; loading: boolean }) {
   const clients = data?.activeClients ?? [];
   const mrr = data?.stats?.mrr ?? 0;
+  // Only the clients whose money actually makes up `mrr`. Every row carries the
+  // flag from the single source of truth, so this never re-derives the figure.
+  const payingCount = clients.filter((c: any) => c.countsTowardMrr).length;
   const locationId = data?.locationId ?? "";
   const [noteClient, setNoteClient] = useState<string | null>(null);
   const [noteContent, setNoteContent] = useState("");
@@ -1130,7 +1179,20 @@ function Clients({ data, loading }: { data: any; loading: boolean }) {
         {[
           { label: "Total Clients", value: loading ? "..." : clients.length, color: "var(--accent)" },
           { label: "MRR", value: loading ? "..." : `$${mrr.toLocaleString()}`, color: "var(--green)" },
-          { label: "Avg Deal", value: loading || !clients.length ? "..." : `$${Math.round(mrr / clients.length).toLocaleString()}`, color: "var(--accent)" },
+          // "Avg Deal" used to be mrr / clients.length, which divided the earned
+          // MRR by EVERY active client including the ones contributing nothing to
+          // it — an average over a denominator the numerator does not cover. It
+          // read as "our typical client pays $312" when one client pays $1,250
+          // and the rest are unrecorded. Averaged over the contributors only.
+          {
+            label: "Avg MRR / paying client",
+            value: loading
+              ? "..."
+              : payingCount
+                ? `$${Math.round(mrr / payingCount).toLocaleString()}`
+                : "no data",
+            color: "var(--accent)",
+          },
         ].map(s => (
           <div key={s.label} style={{
             background: `radial-gradient(ellipse 90% 80% at 50% -30%, ${s.color}14, transparent 60%), linear-gradient(180deg, var(--bg-card), var(--bg-card))`,

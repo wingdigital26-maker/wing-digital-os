@@ -12,7 +12,6 @@ export default function ClientsBoard() {
   const [data, setData] = useState<any>(null);
   const [err, setErr] = useState("");
   const [showPipeline, setShowPipeline] = useState(false);
-  const [ghlSnaps, setGhlSnaps] = useState<Record<string, any>>({});
   // Clicking a client card opens the same health slide-over used in Mission
   // Control (overall status, 5 pillars, flags, live site). The card content
   // (GHL stats, contact links) stays visible behind the panel.
@@ -25,17 +24,9 @@ export default function ClientsBoard() {
       .catch(e => setErr(String(e)));
   }, []);
 
-  // Live GHL snapshot per paying client that has a linked sub-account
-  useEffect(() => {
-    const payers = (data?.clients ?? []).filter((c: any) => c.mrr && c.ghlLocationId);
-    payers.forEach((c: any) => {
-      const slug = c.file.replace(/\.md$/, "");
-      fetch(`/api/clients/ghl?slug=${encodeURIComponent(slug)}&loc=${encodeURIComponent(c.ghlLocationId)}`)
-        .then(r => r.json())
-        .then(snap => { if (snap.available) setGhlSnaps(prev => ({ ...prev, [c.file]: snap })); })
-        .catch(() => {});
-    });
-  }, [data]);
+  // Per-client GHL snapshots are gone: GHL was retired 2026-08-22 and no
+  // replacement CRM is connected, so cards show an honest "no data source"
+  // line instead of live contact/deal counts.
 
   if (err) return <p style={{ color: "var(--red)", fontSize: 13 }}>Clients error: {err}</p>;
   if (!data) return (
@@ -50,19 +41,33 @@ export default function ClientsBoard() {
   );
 
   const all = [...data.clients].sort((a: any, b: any) => (b.mrr ?? 0) - (a.mrr ?? 0));
-  // Active = actually paying. Everyone else is pipeline / onboarding, not an active client.
-  const paying = all.filter((c: any) => c.mrr && c.mrr > 0);
-  const pipeline = all.filter((c: any) => !c.mrr || c.mrr <= 0);
-  const payingMrr = paying.reduce((s: number, c: any) => s + (c.mrr ?? 0), 0);
+  const paying = all.filter((c: any) => c.revenue?.countsTowardMrr);
+  // Roster clients only. `all` is every markdown page in wiki/clients/, most of
+  // which are prospects, reports and playbooks — listing those here rendered
+  // "37", the exact number that used to make the OS claim 37 clients when there
+  // were 4. A page the roster does not recognise is not shown as a client at all.
+  const notPaying = all.filter(
+    (c: any) => c.isClient !== false && !c.revenue?.countsTowardMrr
+  );
+  // MRR and the client count come straight from the API, which gets them from
+  // lib/revenue.ts. This component used to re-sum the rows itself, which is how
+  // a screen ends up quietly disagreeing with the tile next to it — so there is
+  // deliberately no arithmetic here any more.
+  const payingMrr = data.mrr ?? 0;
+  const activeCount = data.activeClients ?? paying.length;
+  const pipelineTotal = data.pipelineTotal ?? 0;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
       {/* Summary */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
         {[
-          { label: "Active clients", v: paying.length, c: "var(--green)" },
-          { label: "Monthly recurring", v: `$${payingMrr.toLocaleString()}`, c: "var(--accent)" },
-          { label: "In pipeline", v: pipeline.length, c: "var(--orange)" },
+          // Active clients is the ROSTER count, not "clients who happen to have
+          // a figure on file" — those are different questions and were being
+          // answered with the same number.
+          { label: "Active clients", v: activeCount, c: "var(--green)" },
+          { label: "MRR", v: `$${payingMrr.toLocaleString()}`, c: "var(--accent)" },
+          { label: "Pipeline (not revenue)", v: `$${pipelineTotal.toLocaleString()}`, c: "var(--orange)" },
         ].map(s => (
           <div key={s.label} style={{
             background: `radial-gradient(ellipse 90% 70% at 50% -20%, ${s.c}14, transparent 60%), linear-gradient(180deg, var(--bg-card), var(--bg-card))`,
@@ -104,8 +109,17 @@ export default function ClientsBoard() {
                     <p style={{ fontSize: 11.5, color: "var(--text-muted)" }}>{c.owner || c.industry}</p>
                   </div>
                 </div>
-                <span style={{ fontSize: 15, fontWeight: 800, color: "var(--green)", whiteSpace: "nowrap" }}>
-                  ${c.mrr.toLocaleString()}<span style={{ fontSize: 10, fontWeight: 500, opacity: 0.7 }}>/mo</span>
+                <span style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                  <span style={{ fontSize: 15, fontWeight: 800, color: "var(--green)" }}>
+                    ${c.mrr.toLocaleString()}<span style={{ fontSize: 10, fontWeight: 500, opacity: 0.7 }}>/mo</span>
+                  </span>
+                  {/* A fixed-term retainer looks identical to an open-ended one
+                      unless the card says when it stops. */}
+                  {c.revenue?.term && (
+                    <span style={{ display: "block", fontSize: 10, color: "var(--orange)", fontWeight: 600, marginTop: 2 }}>
+                      {c.revenue.term.monthsRemaining} mo left · ends {c.revenue.term.end}
+                    </span>
+                  )}
                 </span>
               </div>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
@@ -117,37 +131,15 @@ export default function ClientsBoard() {
                 )}
                 <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 9px", borderRadius: 999, color: "var(--green)", background: "rgba(52,211,153,0.1)" }}>active</span>
               </div>
-              {ghlSnaps[c.file] && (
-                <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--border)" }}>
-                  {[
-                    { l: "contacts", v: ghlSnaps[c.file].contacts },
-                    { l: "open deals", v: ghlSnaps[c.file].openDeals },
-                    { l: "appts 30d", v: ghlSnaps[c.file].upcomingAppts },
-                    { l: "convos", v: ghlSnaps[c.file].conversations },
-                  ].map(s => (
-                    <div key={s.l}>
-                      <p style={{ fontSize: 16, fontWeight: 800, color: "var(--accent)", fontFamily: "'Space Grotesk', sans-serif", lineHeight: 1 }}>{s.v}</p>
-                      <p style={{ fontSize: 9.5, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 3 }}>{s.l}</p>
-                    </div>
-                  ))}
-                  <span style={{ marginLeft: "auto", alignSelf: "flex-start", fontSize: 9, fontWeight: 600, color: "var(--accent)", background: "rgba(34,211,238,0.1)", padding: "2px 8px", borderRadius: 999 }}>● live GHL</span>
-                </div>
-              )}
-              {(c.email || c.phone || c.ghlLocationId) && (
+              <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--border)" }}>
+                <p style={{ fontSize: 10.5, color: "var(--text-muted)" }}>
+                  No CRM data source connected (GHL retired, replacement pending)
+                </p>
+              </div>
+              {(c.email || c.phone) && (
                 <div style={{ borderTop: "1px solid var(--border)", marginTop: 12, paddingTop: 10, display: "flex", flexDirection: "column", gap: 4 }}>
                   {c.email && <a href={`mailto:${c.email}`} onClick={(e) => e.stopPropagation()} style={{ fontSize: 11.5, color: "var(--text-secondary)", textDecoration: "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>✉ {c.email}</a>}
                   {c.phone && <a href={`tel:${c.phone.replace(/\D/g, "")}`} onClick={(e) => e.stopPropagation()} style={{ fontSize: 11.5, color: "var(--text-secondary)", textDecoration: "none" }}>☎ {c.phone}</a>}
-                  {c.ghlLocationId && (
-                    <a href={`https://app.gohighlevel.com/v2/location/${c.ghlLocationId}/`} target="_blank" rel="noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      style={{
-                        marginTop: 6, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6,
-                        fontSize: 11.5, fontWeight: 700, color: "#07080f", textDecoration: "none",
-                        background: "linear-gradient(135deg, #34d399, #22d3ee)", padding: "8px 14px", borderRadius: 8,
-                      }}>
-                      Open GHL account →
-                    </a>
-                  )}
                 </div>
               )}
             </div>
@@ -156,17 +148,17 @@ export default function ClientsBoard() {
       </div>
 
       {/* Pipeline (not yet paying) — collapsed by default */}
-      {pipeline.length > 0 && (
+      {notPaying.length > 0 && (
         <div>
           <button onClick={() => setShowPipeline(v => !v)} style={{
             display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", cursor: "pointer",
             fontSize: 11, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", padding: 0,
           }}>
-            Pipeline · not yet paying ({pipeline.length}) <span>{showPipeline ? "▲" : "▼"}</span>
+            Not counted in MRR ({notPaying.length}) <span>{showPipeline ? "▲" : "▼"}</span>
           </button>
           {showPipeline && (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10, marginTop: 12, opacity: 0.75 }}>
-              {pipeline.map((c: any) => {
+              {notPaying.map((c: any) => {
                 const icon = INDUSTRY_ICON[(c.industry || "").toLowerCase()] ?? "🏢";
                 return (
                   <div key={c.file}

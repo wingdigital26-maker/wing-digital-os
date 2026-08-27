@@ -65,7 +65,25 @@ export async function middleware(req: NextRequest) {
   // null if the cookie is absent/invalid or AUTH_SESSION_SECRET is unset, in
   // which case we fall through to the legacy OS_PASSWORD gate below.
   const session = await verifySession(req.cookies.get("wingos_session")?.value);
-  if (session) return NextResponse.next();
+  if (session) {
+    const isStaff =
+      session.role === "admin" ||
+      session.role === "owner" ||
+      session.role === "staff";
+    if (isStaff) return NextResponse.next();
+
+    // Client-role sessions only ever reach their client portal. Everything
+    // else -- admin pages AND admin API routes -- is blocked.
+    if (pathname === "/portal" || pathname.startsWith("/portal/")) {
+      return NextResponse.next();
+    }
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    }
+    const url = req.nextUrl.clone();
+    url.pathname = session.portal ? `/portal/${session.portal}` : "/login";
+    return NextResponse.redirect(url);
+  }
 
   const password = process.env.OS_PASSWORD;
   if (!password) {
@@ -84,7 +102,7 @@ export async function middleware(req: NextRequest) {
   }
 
   const cookie = req.cookies.get("wingos_auth")?.value;
-  if (cookie === authToken()) return NextResponse.next();
+  if (cookie && cookie === (await authToken())) return NextResponse.next();
 
   if (pathname.startsWith("/api/")) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });

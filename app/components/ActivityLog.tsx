@@ -64,7 +64,9 @@ export function logVaultEvent(action: string, path: string) {
   localStorage.setItem("wingos_activity", JSON.stringify(events.slice(0, 50)));
 }
 
-const FILTER_OPTIONS = ["lead", "appointment", "ai_claude", "ai_hermes", "vault", "pipeline", "coldcall"] as const;
+// lead / appointment / pipeline chips removed: those events came from GHL,
+// which was retired 2026-08-22 with no replacement CRM connected yet.
+const FILTER_OPTIONS = ["ai_claude", "ai_hermes", "vault", "coldcall"] as const;
 const DATE_RANGES = ["today", "week", "month", "all_time"] as const;
 type DateRange = typeof DATE_RANGES[number];
 
@@ -86,51 +88,19 @@ function inRange(date: Date, range: DateRange): boolean {
 }
 
 export default function ActivityLog() {
-  const [ghlEvents, setGhlEvents] = useState<LogEvent[]>([]);
+  const [sourceEvents, setSourceEvents] = useState<LogEvent[]>([]);
   const [aiEvents, setAiEvents] = useState<LogEvent[]>([]);
   const [filter, setFilter] = useState<LogEvent["type"] | null>(null);
   const [dateRange, setDateRange] = useState<DateRange>("week");
   const [refreshing, setRefreshing] = useState(false);
 
-  async function fetchGhl() {
+  // No CRM event source: GHL was retired 2026-08-22 (this used to fetch
+  // /api/ghl for leads, appointments, and pipeline moves) and no replacement
+  // is connected yet. Cold call activity still comes from prospects.db.
+  async function fetchEvents() {
     setRefreshing(true);
     try {
-      const res = await fetch("/api/ghl");
-      const data = await res.json();
       const events: LogEvent[] = [];
-
-      (data.recentLeads ?? []).slice(0, 10).forEach((c: any) => {
-        events.push({
-          id: `lead-${c.id}`,
-          type: "lead",
-          title: c.name || c.email || "New Contact",
-          detail: `${c.email ?? ""} ${c.phone ? "· " + c.phone : ""}`.trim(),
-          time: new Date(c.dateAdded ?? Date.now()),
-        });
-      });
-
-      (data.appointments ?? []).slice(0, 10).forEach((a: any) => {
-        events.push({
-          id: `appt-${a.id}`,
-          type: "appointment",
-          title: a.title ?? "Appointment",
-          detail: a.startTime ? new Date(a.startTime).toLocaleString() : "",
-          time: new Date(a.startTime ?? a.dateAdded ?? Date.now()),
-        });
-      });
-
-      // Pull pipeline stage changes from opportunities
-      (data.pipelines ?? []).forEach((p: any) => {
-        (p.opportunities ?? []).slice(0, 5).forEach((o: any) => {
-          events.push({
-            id: `opp-${o.id}`,
-            type: "pipeline",
-            title: o.name ?? "Deal",
-            detail: `${p.name} › ${o.pipelineStage?.name ?? o.status}`,
-            time: new Date(o.lastStageChangeAt ?? o.dateAdded ?? Date.now()),
-          });
-        });
-      });
 
       // Cold call activity from prospects.db
       try {
@@ -151,19 +121,19 @@ export default function ActivityLog() {
           });
       } catch { }
 
-      setGhlEvents(events);
+      setSourceEvents(events);
     } catch { }
     setRefreshing(false);
   }
 
   useEffect(() => {
-    fetchGhl();
+    fetchEvents();
     setAiEvents(loadAiEvents());
     const id = setInterval(() => setAiEvents(loadAiEvents()), 5000);
     return () => clearInterval(id);
   }, []);
 
-  const all: LogEvent[] = [...ghlEvents, ...aiEvents]
+  const all: LogEvent[] = [...sourceEvents, ...aiEvents]
     .sort((a, b) => b.time.getTime() - a.time.getTime());
 
   const filtered = all
@@ -189,10 +159,10 @@ export default function ActivityLog() {
         <div>
           <h2 style={{ fontSize: 16, fontWeight: 700 }}>Activity Log</h2>
           <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
-            {all.length} events across GHL, AI agents, and vault
+            {all.length} events across AI agents, vault, and cold calls. No CRM event source connected (GHL retired, replacement pending).
           </p>
         </div>
-        <button onClick={fetchGhl} disabled={refreshing} style={{
+        <button onClick={fetchEvents} disabled={refreshing} style={{
           background: "var(--bg-card)", border: "1px solid var(--border)",
           borderRadius: 8, padding: "7px 14px", fontSize: 12, color: "var(--text-muted)", cursor: "pointer",
           opacity: refreshing ? 0.5 : 1,
@@ -243,7 +213,7 @@ export default function ActivityLog() {
       {grouped.length === 0 ? (
         <div style={{ padding: "48px 0", textAlign: "center", color: "var(--text-muted)" }}>
           <p style={{ fontSize: 32, marginBottom: 8 }}>📋</p>
-          <p>No activity yet. GHL leads and AI chats will appear here.</p>
+          <p>No CRM event source connected. GHL retired, replacement pending. AI chats, vault edits, and cold call activity will appear here.</p>
         </div>
       ) : grouped.map(group => (
         <div key={group.label}>

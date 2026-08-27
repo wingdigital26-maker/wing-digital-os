@@ -4,6 +4,7 @@ import path from "path";
 import { execFileSync, spawn } from "child_process";
 import { isCloud } from "@/lib/runtime";
 import { VAULT_PATH, listVaultFiles, readVaultFile } from "@/lib/vaultSource";
+import { getRevenueTruth, BASIS_LABEL } from "@/lib/revenue";
 
 export const runtime = "nodejs";
 
@@ -223,94 +224,54 @@ async function toolSearchVault(input: { keyword?: string }): Promise<string> {
 }
 
 async function toolQueryGhl(): Promise<string> {
-  const GHL_API_KEY = process.env.GHL_API_KEY;
-  const GHL_LOCATION_ID = process.env.GHL_LOCATION_ID;
-  if (!GHL_API_KEY || !GHL_LOCATION_ID) {
-    return "ERROR: GHL credentials not configured on the server.";
-  }
-  const headers = {
-    Authorization: `Bearer ${GHL_API_KEY}`,
-    Version: "2021-07-28",
-    "Content-Type": "application/json",
-  };
-  async function ghlFetch(p: string) {
-    try {
-      const res = await fetch(`https://services.leadconnectorhq.com${p}`, { headers, cache: "no-store" });
-      if (!res.ok) return null;
-      return await res.json();
-    } catch {
-      return null;
-    }
-  }
+  // GHL retired 2026-08-22 — every GHL API call 401s forever and no
+  // replacement CRM is connected. This tool now reports only the local
+  // revenue truth; contact/pipeline/appointment counts have NO data source
+  // and are reported as such rather than as zeroes.
 
-  // Active clients + MRR come from the client-notes roster (same source /api/ghl uses),
-  // NOT from GHL opp values which are one-time deal values.
-  const CLIENTS_DIR = path.join(VAULT_WIKI, "clients");
-  let mrr = 0;
-  let activeClients = 0;
-  const clientNames: string[] = [];
-  try {
-    const files = fs.readdirSync(CLIENTS_DIR).filter((f) => f.endsWith(".md"));
-    for (const f of files) {
-      const text = fs.readFileSync(path.join(CLIENTS_DIR, f), "utf-8");
-      const fm = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
-      const kv: Record<string, string> = {};
-      if (fm) {
-        for (const line of fm[1].split(/\r?\n/)) {
-          const m = line.match(/^(\w[\w_-]*):\s*(.+)$/);
-          if (m) kv[m[1].toLowerCase()] = m[2].trim();
-        }
-      }
-      const status = (kv["status"] || "active").toLowerCase();
-      const clientMrr = kv["mrr"] ? Number(kv["mrr"]) : 0;
-      if (status === "active" && clientMrr > 0) {
-        mrr += clientMrr;
-        activeClients++;
-        clientNames.push(`${kv["client_name"] || f.replace(/\.md$/, "")} ($${clientMrr}/mo)`);
-      }
-    }
-  } catch {
-    mrr = 700;
-    activeClients = 1;
-    clientNames.push("Jackson Roofing ($700/mo)");
-  }
-
-  const [contacts, opportunities] = await Promise.all([
-    ghlFetch(`/contacts/?locationId=${GHL_LOCATION_ID}&limit=100`),
-    ghlFetch(`/opportunities/search?location_id=${GHL_LOCATION_ID}&limit=100`),
-  ]);
-
-  const totalContacts = contacts?.meta?.total ?? (contacts?.contacts?.length ?? 0);
-  const allOpps = opportunities?.opportunities ?? [];
-  const openOpps = allOpps.filter((o: any) => o.status === "open");
-  const pipelineValue = openOpps.reduce((s: number, o: any) => s + (o.monetaryValue ?? 0), 0);
-
-  // Appointments this week (per-calendar, like /api/ghl).
-  const now = new Date();
-  const weekStart = new Date(now);
-  weekStart.setDate(now.getDate() - now.getDay());
-  const weekEnd = new Date(weekStart);
-  weekEnd.setDate(weekStart.getDate() + 7);
-  const calList = await ghlFetch(`/calendars/?locationId=${GHL_LOCATION_ID}`);
-  const calendars = calList?.calendars ?? [];
-  const eventBatches = await Promise.all(
-    calendars.map((cal: any) =>
-      ghlFetch(
-        `/calendars/events?locationId=${GHL_LOCATION_ID}&calendarId=${cal.id}&startTime=${weekStart.getTime()}&endTime=${weekEnd.getTime()}`
-      )
-    )
+  // Revenue + client count come from lib/revenue.ts, the single source of truth.
+  //
+  // This block previously re-implemented the sum over wiki/clients/*.md AND, in its
+  // catch, assigned `mrr = 700; activeClients = 1;` with a literal "Jackson Roofing
+  // ($700/mo)" string. That meant that whenever the vault read failed, the assistant
+  // stated a specific client and a specific dollar figure as fact with no data
+  // behind either. An assistant inventing revenue is worse than one saying it does
+  // not know, so there is no fallback constant now — an unreachable source yields
+  // an explicit unknown.
+  const truth = await getRevenueTruth();
+  const mrr = truth.mrr;
+  const activeClients = truth.activeClients;
+  // Every active client is listed with its real basis, so the assistant can never
+  // describe a one-time or expected figure as monthly recurring revenue.
+  const clientNames: string[] = truth.clients.map((c) =>
+    c.amount == null
+      ? `${c.name} (amount unknown — not recorded, not $0)`
+      : `${c.name} ($${c.amount.toLocaleString()} ${BASIS_LABEL[c.basis]})`
   );
-  const apptsThisWeek = eventBatches.flatMap((b: any) => b?.events ?? []).length;
 
   return JSON.stringify(
     {
-      totalContacts,
+      crmStatus:
+        "No CRM connected. GHL retired 2026-08-22, replacement pending. Contact counts, pipeline opportunities, and appointments have no data source.",
       activeClients,
       activeClientList: clientNames,
-      mrr: `$${mrr}/mo`,
-      appointmentsThisWeek: apptsThisWeek,
-      openPipelineOpportunities: openOpps.length,
-      openPipelineValue: `$${pipelineValue}`,
+      // Confirmed recurring retainers ONLY. One-time, expected and
+      // unconfirmed-recurrence amounts are reported separately below and must
+      // never be described as MRR.
+      mrr: `$${mrr.toLocaleString()}/mo`,
+      mrrBasis: truth.mrrBasisLine,
+      oneTimeCollected: truth.oneTimeTotal
+        ? `$${truth.oneTimeTotal.toLocaleString()} (one-time, NOT recurring)`
+        : "none recorded",
+      expectedNotYetEarned: truth.expectedTotal
+        ? `$${truth.expectedTotal.toLocaleString()} (pipeline — agreed or likely, not earned, never counted as revenue)`
+        : "none recorded",
+      amountsWithUnconfirmedBasis: truth.unconfirmedTotal
+        ? `$${truth.unconfirmedTotal.toLocaleString()} (held OUT of MRR until Jack confirms it recurs)`
+        : "none",
+      clientsWithNoFigureOnFile: truth.unknown.map((c) => c.name),
+      openQuestionsForJack: truth.questions,
+      rosterSource: truth.rosterSource,
     },
     null,
     2
@@ -491,32 +452,9 @@ async function toolRunAgent(input: { agent?: string; dryRun?: boolean }): Promis
 }
 
 async function toolGhlUpdate(input: { method?: string; path?: string; body?: unknown }): Promise<string> {
-  const method = String(input.method ?? "GET").toUpperCase();
-  if (!["GET", "POST", "PUT"].includes(method)) {
-    return `ERROR: method '${method}' not allowed. Only GET, POST, PUT (DELETE is blocked).`;
-  }
-  const apiPath = String(input.path ?? "");
-  if (!apiPath.startsWith("/")) return "ERROR: path must start with '/'.";
-  const GHL_API_KEY = process.env.GHL_API_KEY;
-  if (!GHL_API_KEY) return "ERROR: GHL_API_KEY not configured on the server.";
-  try {
-    const res = await fetch(`https://services.leadconnectorhq.com${apiPath}`, {
-      method,
-      headers: {
-        Authorization: `Bearer ${GHL_API_KEY}`,
-        Version: "2021-07-28",
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: method === "GET" ? undefined : JSON.stringify(input.body ?? {}),
-      cache: "no-store",
-    });
-    let text = await res.text();
-    if (text.length > 12000) text = text.slice(0, 12000) + "\n...[truncated]";
-    return `HTTP ${res.status} ${method} ${apiPath}\n${text}`;
-  } catch (e: any) {
-    return "ERROR: GHL request failed. " + (e?.message ?? "unknown");
-  }
+  // GHL retired 2026-08-22. Never call the dead API.
+  void input;
+  return "ERROR: GHL retired 2026-08-22, no replacement CRM connected. This tool has no backend.";
 }
 
 function stripHtml(html: string): string {

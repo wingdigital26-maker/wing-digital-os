@@ -32,7 +32,7 @@ type ClientEntry = {
   client: string;
   waiting: number;
   counts: { draft: number; approved: number; skipped: number; sent: number; other: number };
-  sendPolicy: { available: boolean; mayySend: boolean | null; scopeNote: string | null };
+  sendPolicy: { available: boolean; maySend: boolean | null; scopeNote: string | null };
   lastScrapedAt: string | null;
   lastScrapedTracked: boolean;
   queue: InboxItem[];
@@ -212,9 +212,9 @@ export default function ClientInbox() {
                 )}
               </div>
               <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
-                {c.sendPolicy.mayySend === false
+                {c.sendPolicy.maySend === false
                   ? "cannot send"
-                  : c.sendPolicy.mayySend === true
+                  : c.sendPolicy.maySend === true
                   ? "can send"
                   : "send status unknown"}
                 {" · scraper "}{ago(c.lastScrapedTracked ? c.lastScrapedAt : null)}
@@ -250,8 +250,8 @@ function ClientPane({
   rowErr: Record<number, string>;
 }) {
   const pol = client.sendPolicy;
-  const cannotSend = pol.mayySend === false;
-  const unknownSend = pol.mayySend === null;
+  const cannotSend = pol.maySend === false;
+  const unknownSend = pol.maySend === null;
 
   return (
     <div style={{ paddingTop: 16, paddingBottom: 32 }}>

@@ -110,7 +110,7 @@ export type ClientInboxEntry = {
   client: string;
   waiting: number;
   counts: { draft: number; approved: number; skipped: number; sent: number; other: number };
-  sendPolicy: { available: boolean; mayySend: boolean | null; scopeNote: string | null };
+  sendPolicy: { available: boolean; maySend: boolean | null; scopeNote: string | null };
   lastScrapedAt: string | null;
   lastScrapedTracked: boolean;
   queue: ReturnType<typeof shapeItem>[];
@@ -188,7 +188,7 @@ export async function GET(req: Request) {
           counts: { draft: b.draft.length, approved: b.approved, skipped: b.skipped, sent: b.sent, other: b.other },
           sendPolicy: {
             available: policyAvailable,
-            mayySend: policyAvailable ? (pol ? pol.may_send === true : false) : null,
+            maySend: policyAvailable ? (pol ? pol.may_send === true : false) : null,
             scopeNote: pol?.scope_note ?? (policyAvailable
               ? "No send-policy row on file for this client, which defaults to deny."
               : null),

@@ -25,14 +25,24 @@ export async function GET(req: Request) {
     try {
       const text = fs.readFileSync(p, "utf-8");
       const state = JSON.parse(text);
+      // updatedAt is when content_engine.py last WROTE this state, not when we
+      // read it. Reading a three-week-old file must not report "just now".
+      const writtenAt = fs.statSync(p).mtime.toISOString();
       return NextResponse.json(
-        { updatedAt: new Date().toISOString(), state },
+        { updatedAt: writtenAt, state, source: "local-state-file" },
         { headers: { "Cache-Control": "no-store" } }
       );
     } catch {
       /* try next candidate path */
     }
   }
-  // No file yet -- empty state, dashboard falls back to the weekday rule.
-  return NextResponse.json({ updatedAt: new Date().toISOString(), state: {} });
+  // No state file reachable -- either it has never been written, or we are in the
+  // cloud and the PC that writes it is off. Either way we know NOTHING about when
+  // this content was last touched, so updatedAt must be null. Stamping a fresh
+  // timestamp here would tell the dashboard the data is current when it is absent.
+  return NextResponse.json({
+    updatedAt: null,
+    state: {},
+    source: "state-file-unavailable",
+  });
 }

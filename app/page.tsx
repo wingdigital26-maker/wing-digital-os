@@ -19,6 +19,7 @@ const MissionOps = dynamic(() => import("./components/MissionOps"), { ssr: false
 const ClientsBoard = dynamic(() => import("./components/ClientsBoard"), { ssr: false });
 const SonarBoard = dynamic(() => import("./components/SonarBoard"), { ssr: false });
 const CrmBoard = dynamic(() => import("./components/CrmBoard"), { ssr: false });
+const ClientInbox = dynamic(() => import("./components/ClientInbox"), { ssr: false });
 const PipelineBoard = dynamic(() => import("./components/PipelineBoard"), { ssr: false });
 const InvoicesBoard = dynamic(() => import("./components/InvoicesBoard"), { ssr: false });
 const CompetitorIntel = dynamic(() => import("./components/CompetitorIntel"), { ssr: false });
@@ -48,6 +49,10 @@ const NAV: NavGroup[] = [
     // business (contacts and deals), the GoHighLevel replacement.
     id: "crm", label: "CRM", icon: Note,
     subs: [
+      // Inbox is first because it is the one that asks for a decision. Outbound
+      // is for browsing everything ever drafted; Inbox is the queue of what is
+      // still waiting on Jack, per client.
+      { id: "inbox", label: "Inbox" },
       { id: "pipeline", label: "Pipeline" },
       { id: "crm", label: "Outbound" },
     ],
@@ -349,6 +354,7 @@ export default function Home() {
           {visited.has("clients") && <div className="app-view" style={{ display: active === "clients" ? "block" : "none" }}><ClientsBoard /></div>}
           {visited.has("sonar") && <div className="app-view" style={{ display: active === "sonar" ? "block" : "none" }}><SonarBoard /></div>}
           {visited.has("pipeline") && <div className="app-view" style={{ display: active === "pipeline" ? "block" : "none" }}><PipelineBoard /></div>}
+          {visited.has("inbox") && <div className="app-view" style={{ display: active === "inbox" ? "block" : "none" }}><ClientInbox /></div>}
           {visited.has("crm") && <div className="app-view" style={{ display: active === "crm" ? "block" : "none" }}><CrmBoard /></div>}
           {visited.has("invoices") && <div className="app-view" style={{ display: active === "invoices" ? "block" : "none" }}><InvoicesBoard /></div>}
           {visited.has("competitors") && <div className="app-view" style={{ display: active === "competitors" ? "block" : "none" }}><CompetitorIntel onSendToAI={sendToAI} /></div>}

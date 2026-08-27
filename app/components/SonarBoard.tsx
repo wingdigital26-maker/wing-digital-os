@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { sfx } from "../lib/sounds";
+import { copyText } from "../lib/copyText";
 
 // SONAR — the free social + web lead engine, surfaced in the OS.
 //
@@ -62,6 +63,7 @@ export default function SonarBoard() {
   const [minNeed, setMinNeed] = useState("0.6");
   const [busy, setBusy] = useState<number | null>(null);
   const [copied, setCopied] = useState<number | null>(null);
+  const [copyFailed, setCopyFailed] = useState<number | null>(null);
 
   const load = useCallback(() => {
     const qs = new URLSearchParams({ minNeed, limit: "60" });
@@ -95,8 +97,15 @@ export default function SonarBoard() {
     }
   }
 
-  function copyDraft(l: Lead) {
-    navigator.clipboard?.writeText(l.draft_reply || "");
+  async function copyDraft(l: Lead) {
+    // This used to set "copied" unconditionally without awaiting, so the UI
+    // confirmed a copy that may never have happened.
+    const ok = await copyText(l.draft_reply || "");
+    if (!ok) {
+      setCopyFailed(l.id);
+      setTimeout(() => setCopyFailed((c) => (c === l.id ? null : c)), 2500);
+      return;
+    }
     setCopied(l.id);
     setTimeout(() => setCopied((c) => (c === l.id ? null : c)), 1500);
   }
@@ -257,7 +266,7 @@ export default function SonarBoard() {
                   )}
                   {l.draft_reply && (
                     <button onClick={() => copyDraft(l)} style={btn}>
-                      {copied === l.id ? "copied" : "copy draft"}
+                      {copyFailed === l.id ? "copy blocked" : copied === l.id ? "copied" : "copy draft"}
                     </button>
                   )}
                   <button disabled={busy === l.id} onClick={() => act(l.id, "approve")}

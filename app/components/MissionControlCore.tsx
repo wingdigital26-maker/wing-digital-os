@@ -9,6 +9,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { sfx } from "../lib/sounds";
+import { copyText } from "../lib/copyText";
 
 // Da Boss healthy / all-clear accent: a calm blue (not green). Red stays for
 // problems, amber for the stale/late state.
@@ -817,25 +818,35 @@ function watchdogReportText(w: WatchdogData): string {
 // Small copy-icon button that copies the full watchdog report as plain text.
 function WatchdogCopyButton({ watchdog, color }: { watchdog: WatchdogData; color: string }) {
   const [copied, setCopied] = useState(false);
+  const [failed, setFailed] = useState(false);
   return (
     <button
       title="Copy the full report from Da Boss"
       aria-label="Copy report from Da Boss"
-      onClick={(e) => {
+      onClick={async (e) => {
         e.stopPropagation();
-        navigator.clipboard?.writeText(watchdogReportText(watchdog)).then(() => {
+        const ok = await copyText(watchdogReportText(watchdog));
+        if (ok) {
           sfx.play("send");
           setCopied(true);
           setTimeout(() => setCopied(false), 1500);
-        }).catch(() => {});
+        } else {
+          // A copy that quietly does nothing is worse than one that admits it.
+          setFailed(true);
+          setTimeout(() => setFailed(false), 2500);
+        }
       }}
       style={{
-        background: "none", border: `1px solid ${copied ? "var(--green)" : color}55`,
-        color: copied ? "var(--green)" : color, borderRadius: 6, padding: "2px 8px",
+        background: "none",
+        border: `1px solid ${failed ? "var(--red)" : copied ? "var(--green)" : color}55`,
+        color: failed ? "var(--red)" : copied ? "var(--green)" : color,
+        borderRadius: 6, padding: "2px 8px",
         cursor: "pointer", fontSize: 10, display: "inline-flex", alignItems: "center", gap: 5,
         fontFamily: "'JetBrains Mono', monospace", flexShrink: 0,
       }}>
-      {copied ? (
+      {failed ? (
+        "Copy blocked"
+      ) : copied ? (
         "Copied"
       ) : (
         <>
@@ -1692,18 +1703,19 @@ function LinkRow({ links, accent }: { links: RealLink[]; accent: string }) {
 // honest affordance is copy-the-path).
 function CopyPath({ path }: { path: string }) {
   const [copied, setCopied] = useState(false);
+  const [failed, setFailed] = useState(false);
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
       <span style={{ fontSize: 10, color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace", wordBreak: "break-all" }}>{path}</span>
       <button
-        onClick={() => {
-          navigator.clipboard?.writeText(path).then(() => {
-            setCopied(true);
-            setTimeout(() => setCopied(false), 1500);
-          }).catch(() => {});
+        onClick={async () => {
+          const ok = await copyText(path);
+          if (!ok) { setFailed(true); setTimeout(() => setFailed(false), 2500); return; }
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
         }}
-        style={{ background: "none", border: "1px solid var(--border, var(--border))", color: copied ? "var(--green)" : "var(--text-secondary, #9ca3af)", borderRadius: 6, padding: "2px 8px", cursor: "pointer", fontSize: 10, flexShrink: 0 }}>
-        {copied ? "copied" : "copy vault path"}
+        style={{ background: "none", border: "1px solid var(--border, var(--border))", color: failed ? "var(--red)" : copied ? "var(--green)" : "var(--text-secondary, #9ca3af)", borderRadius: 6, padding: "2px 8px", cursor: "pointer", fontSize: 10, flexShrink: 0 }}>
+        {failed ? "copy blocked" : copied ? "copied" : "copy vault path"}
       </button>
     </div>
   );

@@ -6,6 +6,7 @@ import CrmClientSummary, {
 } from "./CrmClientSummary";
 import CrmContentFeed, { type ContentFeed, type ContentItem } from "./CrmContentFeed";
 import CrmScraperHealth, { ago, healthLook, isOffByChoice, type Watch } from "./CrmScraperHealth";
+import CrmRowDetail, { type DetailItem, type Evidence, type Review, type TierInfo } from "./CrmRowDetail";
 
 // CRM — everything happening for a client, compartmentalized by client.
 //
@@ -34,6 +35,17 @@ type Item = {
   // null = not knowable right now (policy/queue read failed), never a guess.
   sendable: boolean | null;
   notSendableReason: string | null;
+  // Rich per-row data the API computes: tier meaning, evidence quote +
+  // source distinction, review state. Optional because older payloads may
+  // not carry every field, but the live shape always does.
+  recipientHandle?: string | null;
+  reviewedAt?: string | null;
+  sentAt?: string | null;
+  direction?: string | null;
+  tierInfo?: TierInfo;
+  evidence?: Evidence;
+  review?: Review;
+  bodyState?: string;
 };
 type Payload = {
   configured: boolean; error?: string;
@@ -180,6 +192,8 @@ export default function CrmBoard() {
   // Per-row failure text. A row that could not be approved stays on the board
   // carrying the reason, instead of vanishing as though it succeeded.
   const [actErr, setActErr] = useState<Record<number, string>>({});
+  // Which row's full-detail panel is open. One at a time, per board.
+  const [openId, setOpenId] = useState<number | null>(null);
   const [cfg, setCfg] = useState<Scraper | null>(null);
   const [cfgSaved, setCfgSaved] = useState(false);
   const [cfgErr, setCfgErr] = useState("");
@@ -723,6 +737,19 @@ export default function CrmBoard() {
                   <span style={{ fontSize: 11, fontWeight: 600, color: STATUS_COLOR[it.status] || "var(--text-primary)" }}>
                     {it.status}
                   </span>
+                  <button
+                    type="button"
+                    aria-expanded={openId === it.id}
+                    onClick={(e) => { e.stopPropagation(); setOpenId((cur) => (cur === it.id ? null : it.id)); }}
+                    style={{
+                      fontSize: 11, padding: "3px 10px", borderRadius: 20, cursor: "pointer",
+                      border: `1px solid ${openId === it.id ? "var(--accent)" : "var(--border)"}`,
+                      background: openId === it.id ? "var(--accent-glow)" : "transparent",
+                      color: openId === it.id ? "var(--accent)" : "var(--text-secondary)", fontWeight: 600,
+                    }}
+                  >
+                    {openId === it.id ? "hide details" : "details"}
+                  </button>
                 </div>
               </div>
 
@@ -804,6 +831,9 @@ export default function CrmBoard() {
                 <p role="alert" style={{ color: "var(--red)", fontSize: 12, margin: "6px 0 0" }}>
                   {actErr[it.id]}. Nothing changed, the row is still here.
                 </p>
+              )}
+              {openId === it.id && (
+                <CrmRowDetail it={it as DetailItem} onClose={() => setOpenId(null)} />
               )}
             </article>
           );})}

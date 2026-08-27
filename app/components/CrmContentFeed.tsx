@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 
 // Delivery-side activity for a client: the blog posts, city pages, Google
 // Business posts and review pushes the content engine actually recorded.
@@ -23,9 +24,13 @@ function statusColor(s: string) {
 }
 
 export default function CrmContentFeed({ feed, client }: { feed: ContentFeed; client: string }) {
-  const items = feed.items;
-  const published = items.filter((i) => i.status === "published").length;
-  const planned = items.filter((i) => i.status !== "published").length;
+  const all = feed.items;
+  const [only, setOnly] = useState<string>("");
+  const counts: Record<string, number> = {};
+  for (const i of all) counts[i.status || "unknown"] = (counts[i.status || "unknown"] || 0) + 1;
+  const items = only ? all.filter((i) => (i.status || "unknown") === only) : all;
+  const published = counts.published ?? 0;
+  const planned = all.length - published;
 
   return (
     <section style={{
@@ -48,7 +53,29 @@ export default function CrmContentFeed({ feed, client }: { feed: ContentFeed; cl
         )}
       </div>
 
-      {!feed.available || items.length === 0 ? (
+      {feed.available && all.length > 0 && (
+        <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
+          {[["", "all", all.length] as const,
+            ...Object.entries(counts).map(([s, n]) => [s, s, n] as const)]
+            .map(([id, label, n]) => {
+              const on = only === id;
+              return (
+                <button key={id || "all"} onClick={() => setOnly(id)} style={{
+                  fontSize: 11.5, padding: "3px 11px", borderRadius: 20, cursor: "pointer",
+                  fontWeight: on ? 650 : 500,
+                  border: `1px solid ${on ? statusColor(String(id)) : "var(--border)"}`,
+                  background: on ? "var(--accent-glow)" : "transparent",
+                  color: on ? "var(--text-primary)" : "var(--text-secondary)",
+                }}>
+                  {label}
+                  <b style={{ marginLeft: 6, fontVariantNumeric: "tabular-nums", color: statusColor(String(id)) }}>{n}</b>
+                </button>
+              );
+            })}
+        </div>
+      )}
+
+      {!feed.available || all.length === 0 ? (
         <div style={{
           border: "1px dashed var(--border)", borderRadius: 10, padding: "12px 14px",
         }}>

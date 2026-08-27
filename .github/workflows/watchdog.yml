@@ -38,6 +38,69 @@ jobs:
             -H "x-heartbeat-key: ${{ secrets.HEARTBEAT_KEY }}" \
             -H "Content-Type: application/json" -d "$body"
 
+      # The cloud lane has been watching the LOCAL fleet (via agent_heartbeats)
+      # while nothing watched the cloud lane itself. A GitHub Actions job that
+      # starts failing only sends Jack an email, and a job that silently stops
+      # being scheduled sends nothing at all -- which is the failure mode that
+      # let a backup report success for 11 days. These two steps make the cloud
+      # lane report on itself through the same heartbeat -> phone-push path.
+      - name: Cloud job self-check (recent failures + backup freshness)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -u
+          problems=""
+          runs_url="https://github.com/$REPO/actions"
+
+          # `gh api` prints its error BODY to stdout on a 404 and still exits
+          # non-zero, so `cmd || echo QUERY_FAILED` yields the JSON error glued
+          # to the sentinel and every downstream test misreads it. Every value
+          # below is therefore shape-checked, and anything that is not the shape
+          # we asked for is CANTCHECK -- never silently treated as healthy.
+
+          # 1) Any workflow run that concluded in failure in the last 24h.
+          since=$(date -u -d '24 hours ago' +%Y-%m-%dT%H:%M:%SZ)
+          failed=$(gh api "repos/$REPO/actions/runs?status=failure&per_page=30" \
+            --jq "[.workflow_runs[] | select(.created_at > \"$since\") | .name] | unique | join(\",\")" \
+            2>/dev/null) || failed="__ERR__"
+          case "$failed" in
+            "") echo "no failed runs in 24h" ;;
+            *'"status"'*|__ERR__) problems="$problems CANTCHECK(Actions run list unreadable);" ;;
+            *) problems="$problems failed-in-24h[$failed];" ;;
+          esac
+
+          # 2) The backup must have SUCCEEDED recently. A missing workflow, a
+          #    workflow GitHub auto-disabled after 60 days of repo inactivity,
+          #    and a workflow failing every night all look identical from the
+          #    dashboard: nothing happens. All three are alerted here.
+          last_ok=$(gh api "repos/$REPO/actions/workflows/backup.yml/runs?status=success&per_page=1" \
+            --jq '.workflow_runs[0].created_at // "NONE"' 2>/dev/null) || last_ok="__ERR__"
+          case "$last_ok" in
+            NONE) problems="$problems os-backup has NEVER completed successfully;" ;;
+            20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]T*)
+              age_h=$(( ( $(date -u +%s) - $(date -u -d "$last_ok" +%s) ) / 3600 ))
+              echo "last successful os-backup: $last_ok (${age_h}h ago)"
+              [ "$age_h" -le 30 ] || problems="$problems os-backup last succeeded ${age_h}h ago (daily job);"
+              ;;
+            *) problems="$problems CANTCHECK(backup.yml run history unreadable - is the workflow present and enabled?);" ;;
+          esac
+
+          if [ -n "$problems" ]; then
+            status=error
+            msg="cloud jobs: $problems open $runs_url"
+          else
+            status=ok
+            msg="cloud jobs healthy; backup succeeded within 30h"
+          fi
+          echo "$status: $msg"
+          curl -s -X POST https://wing-digital-os.vercel.app/api/heartbeat \
+            -H "x-heartbeat-key: ${{ secrets.HEARTBEAT_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d "$(printf '{"agent":"cloud-jobs","status":"%s","message":%s}' \
+                  "$status" "$(printf '%s' "$msg" | python3 -c 'import json,sys;print(json.dumps(sys.stdin.read()))')")"
+          echo
+
       - name: Ping cloud watchdog
         run: |
           code=$(curl -s -o /tmp/out -w '%{http_code}' \

@@ -31,15 +31,47 @@ export type Watch = {
 
 // Colour and shape carry the state as well as the words, so the panel reads at
 // a glance without being read. Solid border = we know; dashed = we do not.
-const LOOK: Record<WatchState, {
+export type Look = {
   label: string; color: string; dashed: boolean; mark: string; tint: boolean;
-}> = {
-  WORKING:           { label: "Working",             color: "var(--green)",     dashed: false, mark: "●", tint: true },
-  RAN_FOUND_NOTHING: { label: "Ran, found nothing",  color: "var(--orange)",    dashed: false, mark: "◐", tint: false },
-  NEVER_RUN:         { label: "Never run",           color: "var(--red)",       dashed: true,  mark: "○", tint: false },
-  NOT_CONFIGURED:    { label: "Not configured",      color: "var(--red)",       dashed: true,  mark: "⊘", tint: false },
-  UNKNOWN:           { label: "Can't tell",          color: "var(--text-muted)",dashed: true,  mark: "?", tint: false },
+  /** bad = fix it, warn = watch it, ok = fine, idle = deliberately not running. */
+  severity: "ok" | "warn" | "bad" | "idle";
 };
+
+const LOOK: Record<WatchState, Look> = {
+  WORKING:           { label: "Working",            color: "var(--green)",      dashed: false, mark: "●", tint: true,  severity: "ok" },
+  RAN_FOUND_NOTHING: { label: "Ran, found nothing", color: "var(--orange)",     dashed: false, mark: "◐", tint: false, severity: "warn" },
+  NEVER_RUN:         { label: "Never run",          color: "var(--red)",        dashed: true,  mark: "○", tint: false, severity: "bad" },
+  NOT_CONFIGURED:    { label: "Not configured",     color: "var(--red)",        dashed: true,  mark: "⊘", tint: false, severity: "bad" },
+  UNKNOWN:           { label: "Can't tell",         color: "var(--text-muted)", dashed: true,  mark: "?", tint: false, severity: "warn" },
+};
+
+const SEARCHED_NOTHING: Look = {
+  label: "Ran, searched nothing", color: "var(--red)", dashed: false, mark: "◌", tint: false, severity: "bad",
+};
+const OFF_BY_CHOICE: Look = {
+  label: "Off by choice", color: "var(--text-secondary)", dashed: false, mark: "⏻", tint: false, severity: "idle",
+};
+
+// A client whose `channels` is literally "none" has had scraping switched OFF
+// deliberately. The config-shaped check the API runs ("no niche, no cities")
+// cannot tell that apart from a client someone forgot to fill in, so it reports
+// NOT_CONFIGURED — which reads as a defect. It is not one. Deciding not to
+// scrape is a setting, and the UI has to say so, or the board cries wolf every
+// day about a client that is working exactly as intended.
+export function isOffByChoice(channels: string | null | undefined): boolean {
+  const v = (channels ?? "").trim().toLowerCase();
+  return v === "none" || v === "off" || v === "disabled";
+}
+
+/** The single source of truth for how a watch state looks, everywhere. */
+export function healthLook(watch: Watch, channels?: string | null): Look {
+  if (isOffByChoice(channels)) return OFF_BY_CHOICE;
+  // Zero queries means it never actually searched: a failure, not a quiet week.
+  if (watch.state === "RAN_FOUND_NOTHING" && watch.run != null && watch.run.queries === 0) {
+    return SEARCHED_NOTHING;
+  }
+  return LOOK[watch.state] ?? LOOK.UNKNOWN;
+}
 
 // Plain words, not a timestamp Jack has to do arithmetic on.
 export function ago(iso: string, now = Date.now()): string {
@@ -79,16 +111,22 @@ function Metric({ value, label, color }: { value: number | null; label: string; 
   );
 }
 
-export default function CrmScraperHealth({ watch, name }: { watch: Watch; name: string }) {
+export default function CrmScraperHealth({ watch, name, channels }: {
+  watch: Watch; name: string; channels?: string | null;
+}) {
   const run = watch.run;
-  // A run that issued zero queries never searched at all. It shares a state
-  // with "found nothing", but it is a failure, not a quiet week — so it gets
-  // its own badge rather than hiding behind the amber one.
-  const searchedNothing =
-    watch.state === "RAN_FOUND_NOTHING" && run != null && run.queries === 0;
-  const look = searchedNothing
-    ? { label: "Ran, searched nothing", color: "var(--red)", dashed: false, mark: "◌", tint: false }
-    : LOOK[watch.state];
+  const off = isOffByChoice(channels);
+  const look = healthLook(watch, channels);
+
+  // When scraping is off on purpose, the API's NOT_CONFIGURED sentence ("fill
+  // the fields in and the next run will hunt") is actively wrong advice, so it
+  // gets replaced rather than decorated.
+  const detail = off
+    ? `Scraping is switched off for ${name} on purpose — their platforms field is set to ` +
+      `"none", so no watcher searches on their behalf and no drafts are expected to appear. ` +
+      `Nothing here is broken and nothing is missing; this is a setting. Set platforms to a ` +
+      `real channel list if you ever want the watcher to start hunting for them.`
+    : watch.detail;
 
   // The "when" line. Three genuinely different sentences for three genuinely
   // different situations — no source, a source that says never, and a real time.
@@ -134,22 +172,31 @@ export default function CrmScraperHealth({ watch, name }: { watch: Watch; name: 
       </div>
 
       <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.6, color: "var(--text-secondary)" }}>
-        {watch.detail}
+        {detail}
       </p>
 
       {/* What the last run did FOR THIS CLIENT. Shown only when a run log row
           exists; otherwise the reason the numbers are absent is shown instead,
           because four zeros would be a lie. */}
       {run ? (
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
           <Metric value={run.queries} label="queries"
-                  color={run.queries === 0 ? "var(--red)" : undefined} />
+                  color={off ? "var(--text-muted)" : run.queries === 0 ? "var(--red)" : undefined} />
           <Metric value={run.results} label="results"
-                  color={(run.results ?? 0) > 0 ? "var(--green)" : "var(--orange)"} />
+                  color={off ? "var(--text-muted)"
+                       : (run.results ?? 0) > 0 ? "var(--green)" : "var(--orange)"} />
           <Metric value={run.kept} label="drafts kept"
-                  color={(run.kept ?? 0) > 0 ? "var(--green)" : undefined} />
+                  color={off ? "var(--text-muted)" : (run.kept ?? 0) > 0 ? "var(--green)" : undefined} />
+          <Metric value={run.rejected} label="filtered out"
+                  color={off ? "var(--text-muted)" : undefined} />
           {run.throttled != null && run.throttled > 0 && (
             <Metric value={run.throttled} label="throttled" color="var(--orange)" />
+          )}
+          {off && (
+            <span style={{ fontSize: 11.5, color: "var(--text-secondary)", maxWidth: 340, lineHeight: 1.5 }}>
+              The run log counted {name} and moved on without searching. With scraping off, zeroes
+              here are the correct result, not a failure.
+            </span>
           )}
         </div>
       ) : (
@@ -172,8 +219,23 @@ export default function CrmScraperHealth({ watch, name }: { watch: Watch; name: 
                 color={(watch.draftsWaiting ?? 0) > 0 ? "var(--accent)" : "var(--text-muted)"} />
         {watch.draftsWaiting === 0 && (
           <span style={{ fontSize: 11.5, color: "var(--text-secondary)", maxWidth: 380, lineHeight: 1.5 }}>
-            Nothing is queued for you to review. That is a real count of the outbound table,
-            not a missing value.
+            {off
+              ? `Zero drafts is the expected state for ${name} — nothing drafts for a client whose ` +
+                `scraping is off. This is a real count of the outbound table, not a missing value.`
+              : "Nothing is queued for you to review. That is a real count of the outbound table, " +
+                "not a missing value."}
+          </span>
+        )}
+        {/* The run log and the outbound table disagreeing is a real fault that
+            neither number reveals on its own, so it is called out by name. */}
+        {!off && run != null && (run.kept ?? 0) > 0 && watch.draftsWaiting === 0 && (
+          <span style={{
+            fontSize: 11.5, color: "var(--orange)", maxWidth: 420, lineHeight: 1.5,
+            borderLeft: "2px solid var(--orange)", paddingLeft: 8,
+          }}>
+            These two numbers disagree: the last run reports {run.kept} kept as drafts, but the
+            outbound table holds 0 drafts for {name}. Either those drafts were written under a
+            different client name or they were never written at all.
           </span>
         )}
         {watch.draftsReason && (

@@ -14,6 +14,7 @@ import {
   type LiveOutreach,
   type MetricSource,
 } from "../../../lib/liveTruth";
+import { getRevenueTruth, BASIS_LABEL as BASIS_LABEL_MISSION, type RevenueTruth } from "../../../lib/revenue";
 
 // ───────────────────────────────────────────────────────────────────────────
 // Mission Control API (READ-ONLY)
@@ -547,6 +548,7 @@ function buildStats(
   biz: string | null,
   outreach: string | null,
   live: LiveOutreach | null,
+  revenue: RevenueTruth | null,
 ): { tiles: StatTile[]; updated: string | null } {
   const tiles: StatTile[] = [];
   let updated: string | null = null;
@@ -554,14 +556,56 @@ function buildStats(
   const outUpdated = parseSnapshotAsOf(outreach);
   const nowIso = new Date().toISOString();
 
-  // MRR / active clients: snapshot only (48h threshold).
-  if (biz) {
+  // MRR / active clients.
+  //
+  // These used to be regexed out of wiki/state/business-snapshot.md — a file a
+  // python script rewrites on a schedule. So this tile showed whatever was true
+  // the last time state-sync ran, while the client screen recomputed live from
+  // the vault, and the two silently drifted apart. Now both come from
+  // lib/revenue.ts, computed live, so every surface prints the same number.
+  if (revenue) {
+    const prov = `Live from the client roster (${revenue.rosterSource}) + vault revenue fields, just now`;
+    const base = { key: "clients" as const, updated: revenue.asOf, source: "live-db" as MetricSource, stale: false, provenance: prov };
+    tiles.push({
+      ...base,
+      label: "MRR",
+      value: "$" + revenue.mrr.toLocaleString() + "/mo",
+      // The sub-line makes the measure honest at a glance: it names what is
+      // deliberately NOT in this number rather than letting the tile imply
+      // it is everything Wing Digital earns.
+      sub: revenue.mrrClients.length
+        ? `confirmed recurring · ${revenue.mrrClients.map((c) => c.name).join(", ")}`
+        : "no confirmed recurring retainer on file",
+    });
+    tiles.push({ ...base, label: "Active Clients", value: String(revenue.activeClients), sub: `roster: ${revenue.rosterSource}` });
+    // A fixed-term deal expiring is a thing Jack needs to see coming rather than
+    // discover when the money stops.
+    if (revenue.nextExpiry) {
+      const e = revenue.nextExpiry;
+      tiles.push({
+        ...base,
+        label: "MRR expiring",
+        value: "$" + e.amount.toLocaleString() + "/mo",
+        sub: `${e.name} — ${e.monthsRemaining} month${e.monthsRemaining === 1 ? "" : "s"} left, ends ${e.end} unless renewed`,
+      });
+    }
+    if (revenue.unconfirmedTotal > 0) {
+      tiles.push({ ...base, label: "Basis unconfirmed", value: "$" + revenue.unconfirmedTotal.toLocaleString(), sub: "no invoice evidence — held out of MRR until confirmed" });
+    }
+    // Pipeline sits beside the earned number, never inside it.
+    if (revenue.pipelineTotal > 0) {
+      tiles.push({ ...base, label: "Pipeline", value: "$" + revenue.pipelineTotal.toLocaleString(), sub: "NOT earned — expected/probable only, never added to MRR" });
+    }
+    updated = revenue.asOf;
+  } else if (biz) {
+    // Revenue truth unavailable. Fall back to the snapshot, but label it as the
+    // stale snapshot it is — never as a live figure.
     const mrr = biz.match(/\*\*MRR:\*\*\s*\$?([\d,]+)/);
     const active = biz.match(/\*\*Active clients:\*\*\s*(\d+)/);
     const bizStale = isStale(bizUpdated, STALE_HOURS.clients);
     const prov = provenanceLine({ source: "snapshot", asOf: bizUpdated, stale: bizStale });
-    if (mrr) tiles.push({ key: "clients", label: "MRR", value: "$" + mrr[1] + "/mo", sub: null, updated: bizUpdated, source: "snapshot", stale: bizStale, provenance: prov });
-    if (active) tiles.push({ key: "clients", label: "Active Clients", value: active[1], sub: null, updated: bizUpdated, source: "snapshot", stale: bizStale, provenance: prov });
+    if (mrr) tiles.push({ key: "clients", label: "MRR", value: "$" + mrr[1] + "/mo", sub: "from snapshot — live roster unreachable", updated: bizUpdated, source: "snapshot", stale: bizStale, provenance: prov });
+    if (active) tiles.push({ key: "clients", label: "Active Clients", value: active[1], sub: "from snapshot — live roster unreachable", updated: bizUpdated, source: "snapshot", stale: bizStale, provenance: prov });
     updated = bizUpdated;
   }
 
@@ -607,10 +651,11 @@ function parseEmailedRows(outreach: string): { company: string; city: string; wh
 }
 
 async function statDetail(id: string) {
-  const [biz, outreach, live] = await Promise.all([
+  const [biz, outreach, live, rev] = await Promise.all([
     readVaultFile("wiki/state/business-snapshot.md"),
     readVaultFile("wiki/state/outreach-snapshot.md"),
     readOutreachLive(),
+    getRevenueTruth().catch(() => null),
   ]);
   const outUpdated = parseSnapshotAsOf(outreach);
   const bizUpdated = parseSnapshotAsOf(biz);
@@ -687,7 +732,31 @@ async function statDetail(id: string) {
 
   if (id === "clients") {
     const items: { label: string; value: string; note: string | null }[] = [];
-    if (biz) {
+    if (rev) {
+      // Live per-client rows. Every figure states its basis, so a one-time or
+      // expected amount can never be mistaken for a monthly retainer, and an
+      // unknown renders as "not recorded" rather than as $0.
+      for (const c of rev.clients) {
+        items.push({
+          label: redact(c.name),
+          value: c.amount == null ? "not recorded" : "$" + c.amount.toLocaleString() + (c.basis === "monthly" || c.basis === "term" ? "/mo" : ""),
+          note:
+            c.amount == null
+              ? "no figure on file — unknown, not zero"
+              : c.term
+                ? `fixed term, ${c.term.monthsRemaining} mo left, ends ${c.term.end}`
+                : BASIS_LABEL_MISSION[c.basis] ?? c.basis,
+        });
+      }
+      // Pipeline deals listed after the clients, explicitly marked not-revenue.
+      for (const d of rev.pipelineDeals) {
+        items.push({
+          label: redact(d.name),
+          value: d.amount == null ? "amount unknown" : "$" + d.amount.toLocaleString(),
+          note: `PIPELINE — ${d.stage}, not earned${d.expectedClose ? `, expected ${d.expectedClose}` : ""}`,
+        });
+      }
+    } else if (biz) {
       for (const line of biz.split(/\r?\n/)) {
         const m = line.match(/^\|\s*([^|*]+?)\s*\|\s*\$?([\d,]+)\s*\|\s*([^|]+?)\s*\|/);
         if (m && !/^Client$/i.test(m[1]) && !/^-+$/.test(m[1])) {
@@ -697,11 +766,22 @@ async function statDetail(id: string) {
     }
     const bizStale = isStale(bizUpdated, STALE_HOURS.clients);
     return NextResponse.json({
-      id, title: "Active clients", updated: bizUpdated, available: !!biz,
-      source: "snapshot" as MetricSource, stale: bizStale,
-      provenance: provenanceLine({ source: "snapshot", asOf: bizUpdated, stale: bizStale }, "business snapshot"),
+      id, title: "Active clients",
+      updated: rev ? rev.asOf : bizUpdated,
+      available: rev ? true : !!biz,
+      source: (rev ? "live-db" : "snapshot") as MetricSource,
+      stale: rev ? false : bizStale,
+      provenance: rev
+        ? `Live from the client roster (${rev.rosterSource}) + vault revenue fields, just now`
+        : provenanceLine({ source: "snapshot", asOf: bizUpdated, stale: bizStale }, "business snapshot"),
+      // Everything only Jack can settle, surfaced where he is looking at the money.
+      questions: rev ? rev.questions : [],
       summary: [
-        `${num(biz, /\*\*Active clients:\*\*\s*(\d+)/) ?? items.length} active client${items.length === 1 ? "" : "s"}, $${num(biz, /\*\*MRR:\*\*\s*\$?([\d,]+)/) ?? "?"}/mo MRR.`,
+        // Derived from the live revenue truth, not regexed out of the snapshot,
+        // so this line always agrees with the MRR tile above it.
+        rev
+          ? `${rev.activeClients} active client${rev.activeClients === 1 ? "" : "s"}. ${rev.mrrBasisLine}`
+          : `${num(biz, /\*\*Active clients:\*\*\s*(\d+)/) ?? items.length} active client${items.length === 1 ? "" : "s"}, $${num(biz, /\*\*MRR:\*\*\s*\$?([\d,]+)/) ?? "?"}/mo MRR (from snapshot — live roster unreachable).`,
         "Full client detail lives in the Clients section of the OS.",
       ],
       items,
@@ -1288,7 +1368,10 @@ export async function GET(req: NextRequest) {
   const publishes = parsePublishes(feed, healthRaw);
 
   // Stats
-  const stats = buildStats(bizRaw, outreachRaw, live);
+  // Revenue truth is computed live; if it fails, buildStats degrades to the
+  // labelled snapshot rather than showing nothing or a fabricated figure.
+  const revenueTruth = await getRevenueTruth().catch(() => null);
+  const stats = buildStats(bizRaw, outreachRaw, live, revenueTruth);
 
   // Volume badges for the ops map. Every badge carries the same provenance as
   // the tiles: source + asOf + stale, so no confident stale number ever shows.

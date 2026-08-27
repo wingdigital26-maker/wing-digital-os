@@ -1,7 +1,21 @@
 import { NextResponse } from "next/server";
 import { listVaultFiles, readVaultFile } from "@/lib/vaultSource";
+import { getRevenueTruth, BASIS_LABEL } from "@/lib/revenue";
 
 export const runtime = "nodejs";
+
+// The client roster + revenue view.
+//
+// This route no longer computes revenue or decides who counts as a client. Both
+// answers come from lib/revenue.ts, the single source of truth, so the numbers
+// here are byte-identical to /api/crm, /api/ghl, /api/mission and /api/jarvis.
+//
+// Two things it used to get wrong, both fixed at the source:
+//   * It summed `mrr:` across EVERY row including the ones it had just flagged
+//     as not-clients, producing a total that disagreed with the count beside it.
+//   * It blended measures: a one-time payment and a monthly retainer were added
+//     into one "totalMrr". Amounts are now bucketed by declared basis and only
+//     confirmed monthly retainers sum into MRR.
 
 function parseFrontmatter(text: string): Record<string, string> {
   const m = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
@@ -9,127 +23,135 @@ function parseFrontmatter(text: string): Record<string, string> {
   if (!m) return out;
   for (const line of m[1].split(/\r?\n/)) {
     const kv = line.match(/^(\w[\w_-]*):\s*(.+)$/);
-    if (kv) out[kv[1].toLowerCase()] = kv[2].trim();
+    if (kv) out[kv[1].toLowerCase()] = kv[2].trim().replace(/^["']|["']$/g, "");
   }
   return out;
 }
 
-const norm = (s: string) => (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-
 export async function GET() {
   try {
-    const files = (await listVaultFiles()).filter(
-      (rel) => rel.startsWith("wiki/clients/") && !rel.slice("wiki/clients/".length).includes("/")
-    );
-    const clients = await Promise.all(files.map(async rel => {
-      const f = rel.split("/").pop()!;
-      const text = (await readVaultFile(rel)) ?? "";
-      const fm = parseFrontmatter(text);
-      // pull contact info from the body (first email/phone found)
-      const email = text.match(/[\w.+-]+@[\w-]+\.[\w.]+/)?.[0] ?? "";
-      const phone = text.match(/\(?\d{3}\)?[ -.]?\d{3}[-.]?\d{4}/)?.[0] ?? "";
-      // GHL sub-account link: frontmatter ghl_location_id, else "Location ID: `...`" in the body
-      const ghlLocationId =
-        fm["ghl_location_id"] ||
-        text.match(/Location ID:\**\s*`?([A-Za-z0-9]{15,})`?/)?.[1] ||
-        "";
-      const pretty = f.replace(".md", "").split("-")
-        .map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
-      return {
-        file: f,
-        name: fm["client_name"] || pretty,
-        owner: fm["owner"] || "",
-        industry: fm["industry"] || "",
-        location: fm["location"] || "",
-        status: (fm["status"] || "active").toLowerCase(),
-        mrr: fm["mrr"] ? Number(fm["mrr"]) : null,
-        email,
-        phone,
-        ghlLocationId,
-        updated: fm["updated"] || fm["date"] || "",
-      };
-    }));
-    // WHO COUNTS AS A CLIENT. wiki/clients/ holds 38 markdown files, but most
-    // are not clients — they are notes, reports, playbooks, prospect names, the
-    // page template ({{CLIENT_NAME}}) and a generated index. Counting the folder
-    // reported 37 "active clients". The deliberate, curated roster lives in the
-    // Supabase `crm_clients` table (4 rows). Membership comes from there; the
-    // vault supplies the detail. A vault page with no matching roster row is
-    // still returned, flagged `isClient: false`, so nothing is hidden — it just
-    // stops being counted as a client.
-    let roster: Set<string> = new Set();
-    let rosterRows: { name: string; slug: string }[] = [];
+    const truth = await getRevenueTruth();
+
+    // Contact detail the revenue truth does not carry, keyed by slug.
+    const detail = new Map<
+      string,
+      { file: string; owner: string; industry: string; location: string; email: string; phone: string; ghlLocationId: string; updated: string }
+    >();
     try {
-      const su = process.env.SONAR_SUPABASE_URL, sk = process.env.SONAR_SUPABASE_SERVICE_KEY;
-      if (su && sk) {
-        const rr = await fetch(`${su}/rest/v1/crm_clients?select=name,slug&active=is.true`, {
-          headers: { apikey: sk, Authorization: `Bearer ${sk}` }, cache: "no-store",
+      const files = (await listVaultFiles()).filter(
+        (rel) =>
+          rel.startsWith("wiki/clients/") &&
+          rel.endsWith(".md") &&
+          !rel.slice("wiki/clients/".length).includes("/") &&
+          !rel.split("/").pop()!.startsWith("_")
+      );
+      for (const rel of files) {
+        const f = rel.split("/").pop()!;
+        const text = (await readVaultFile(rel)) ?? "";
+        const fm = parseFrontmatter(text);
+        detail.set(f.replace(/\.md$/, ""), {
+          file: f,
+          owner: fm["owner"] || "",
+          industry: fm["industry"] || "",
+          location: fm["location"] || "",
+          // first contact details found in the body
+          email: text.match(/[\w.+-]+@[\w-]+\.[\w.]+/)?.[0] ?? "",
+          phone: text.match(/\(?\d{3}\)?[ -.]?\d{3}[-.]?\d{4}/)?.[0] ?? "",
+          ghlLocationId:
+            fm["ghl_location_id"] ||
+            text.match(/Location ID:\**\s*`?([A-Za-z0-9]{15,})`?/)?.[1] ||
+            "",
+          updated: fm["updated"] || fm["date"] || "",
         });
-        if (rr.ok) {
-          const rows = (await rr.json()) as { name: string; slug: string }[];
-          rosterRows = rows;
-          for (const r of rows) {
-            roster.add(norm(r.name));
-            roster.add(norm(r.slug));
-          }
-        }
       }
-    } catch { /* roster unavailable -> every page falls back to unflagged */ }
+    } catch { /* detail is optional; the roster + revenue still stand */ }
 
-    const rosterKnown = roster.size > 0;
-    for (const c of clients) {
-      // Without the roster we cannot claim to know, so leave it null rather
-      // than guessing either way.
-      (c as Record<string, unknown>).isClient = rosterKnown
-        ? roster.has(norm(c.name)) || roster.has(norm((c.file || "").replace(/^.*\//, "").replace(/\.md$/, "")))
-        : null;
-    }
-
-    // MRR is summed from an `mrr:` field in each client's vault page — and
-    // most clients do not have one. Reporting the bare sum implies it is the
-    // whole business: Jack saw "$700 MRR" the same day a $1,250 payment landed,
-    // because only one of four active clients has the field filled in. Report
-    // the coverage alongside the number so the gap is visible instead of
-    // silently understating revenue.
-    // A roster client with no vault page was previously invisible: the route
-    // only ever iterated markdown files, so Hero's Junk Removal and Northcomm
-    // Technologies simply did not exist in the OS despite being real clients.
-    // Add them as stubs flagged `needsVaultPage` — an honest "we know they
-    // exist and we are missing their detail" beats silently undercounting.
-    if (rosterKnown) {
-      const seen = new Set(clients.map((c) => norm(c.name)));
-      for (const r of rosterRows) {
-        if (seen.has(norm(r.name)) || seen.has(norm(r.slug))) continue;
-        clients.push({
-          file: "", name: r.name, owner: "", industry: "", location: "",
-          status: "active", mrr: null, email: "", phone: "",
-          ghlLocationId: "", updated: "",
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          ...( { isClient: true, needsVaultPage: true } as any ),
-        } as (typeof clients)[number]);
-      }
-    }
-
-    // Count only real roster clients, not every markdown file in the folder.
-    const active = clients.filter(
-      (c) => c.status === "active" &&
-             ((c as Record<string, unknown>).isClient !== false)
-    );
-    const withMrr = active.filter((c) => typeof c.mrr === "number" && c.mrr > 0);
-    const totalMrr = clients.reduce((s, c) => s + (c.mrr ?? 0), 0);
-    const mrrCoverage = {
-      activeClients: active.length,
-      clientsWithMrr: withMrr.length,
-      missing: active
-        .filter((c) => !(typeof c.mrr === "number" && c.mrr > 0))
-        .map((c) => c.name),
-      complete: active.length > 0 && withMrr.length === active.length,
-    };
-    return NextResponse.json({
-      clients, totalMrr, mrrCoverage,
-      rosterSource: rosterKnown ? "crm_clients" : "vault-only (roster unavailable)",
+    const clients = truth.allPages.map((c) => {
+      const d = detail.get(c.slug);
+      return {
+        file: d?.file ?? "",
+        slug: c.slug,
+        name: c.name,
+        owner: d?.owner ?? "",
+        industry: d?.industry ?? "",
+        location: d?.location ?? "",
+        status: c.status,
+        // Narrow on purpose: ONLY a confirmed recurring retainer. Anything else
+        // is null so no consumer can quietly add a one-time or expected figure
+        // into a monthly total. The full picture is in `revenue`.
+        mrr: c.basis === "monthly" || c.basis === "term" ? c.amount : null,
+        revenue: {
+          amount: c.amount,          // null = unknown, never zero-as-truth
+          basis: c.basis,
+          label: BASIS_LABEL[c.basis],
+          note: c.note,
+          question: c.question,
+          term: c.term,              // end date + months remaining, when fixed-term
+          evidence: c.evidence,      // paid invoices backing the figure
+          evidenceBacked: c.evidenceBacked,
+          countsTowardMrr: c.basis === "monthly" || c.basis === "term",
+        },
+        email: d?.email ?? "",
+        phone: d?.phone ?? "",
+        ghlLocationId: d?.ghlLocationId ?? "",
+        updated: d?.updated ?? "",
+        isClient: c.isClient,
+        needsVaultPage: c.needsVaultPage,
+      };
     });
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message, clients: [] }, { status: 500 });
+
+    return NextResponse.json({
+      asOf: truth.asOf,
+      clients,
+
+      // ── The measures, kept apart on purpose ─────────────────────────────
+      // EARNED: money actually recurring now. The headline number.
+      mrr: truth.mrr,
+      mrrDurable: truth.mrrDurable,
+      mrrExpiring: truth.mrrExpiring,
+      nextExpiry: truth.nextExpiry,
+      mrrClients: truth.mrrClients.map((c) => ({
+        name: c.name, amount: c.amount, basis: c.basis, term: c.term,
+        evidence: c.evidence, evidenceBacked: c.evidenceBacked,
+      })),
+      mrrBasis: truth.mrrBasisLine,
+      // PIPELINE: never earned, never summed into mrr. Display separately.
+      pipelineTotal: truth.pipelineTotal,
+      pipelineDeals: truth.pipelineDeals,
+      // Real money, collected once. NOT recurring. Never add to mrr.
+      oneTimeTotal: truth.oneTimeTotal,
+      oneTime: truth.oneTime.map((c) => ({ name: c.name, amount: c.amount })),
+      // Agreed/likely but NOT yet earned. Pipeline, not revenue.
+      expectedTotal: truth.expectedTotal,
+      expected: truth.expected.map((c) => ({ name: c.name, amount: c.amount, note: c.note })),
+      // Amount known, recurrence unconfirmed — held out of MRR by design.
+      unconfirmedTotal: truth.unconfirmedTotal,
+      unconfirmed: truth.unconfirmed.map((c) => ({ name: c.name, amount: c.amount, note: c.note })),
+
+      activeClients: truth.activeClients,
+      coverage: {
+        activeClients: truth.activeClients,
+        clientsWithFigure: truth.clientsWithFigure,
+        unknown: truth.unknown.map((c) => c.name),
+        complete: truth.activeClients > 0 && truth.clientsWithFigure === truth.activeClients,
+      },
+      rosterSource: truth.rosterSource,
+      questions: truth.questions,
+
+      // Back-compat for any consumer still reading the old field names. Same
+      // number as `mrr` — a legacy alias, never a second calculation.
+      totalMrr: truth.mrr,
+      mrrCoverage: {
+        activeClients: truth.activeClients,
+        clientsWithMrr: truth.mrrClients.length,
+        missing: truth.clients.filter((c) => c.basis !== "monthly" && c.basis !== "term").map((c) => c.name),
+        complete: truth.activeClients > 0 && truth.mrrClients.length === truth.activeClients,
+      },
+    });
+  } catch (e: unknown) {
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : String(e), clients: [] },
+      { status: 500 }
+    );
   }
 }

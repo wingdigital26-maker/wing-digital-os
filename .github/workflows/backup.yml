@@ -1,0 +1,103 @@
+# PC-OFF backup of the Wing OS.
+#
+# The local "WingOS Daily Backup" scheduled task can only run while Jack's PC is
+# awake, which is the one condition you cannot rely on the day you actually need
+# a backup. This runs the same job on a GitHub runner, sourcing the vault from
+# the private mirror repo instead of the C: drive.
+#
+# It deliberately does NOT retry itself into a green tick: any unreadable table,
+# any incomplete vault upsert, or a mirror that has gone stale fails the run,
+# fires a red heartbeat (which the cloud watchdog turns into a phone push), and
+# says exactly what was missing.
+name: os-backup
+
+on:
+  schedule:
+    # 08:10 UTC = ~03:10 Central. Offset from the local task so the two are
+    # distinguishable in the logs while both exist.
+    - cron: "10 8 * * *"
+  workflow_dispatch:
+    inputs:
+      skip_vault:
+        description: "Export tables only, skip the vault sync"
+        required: false
+        default: "0"
+
+concurrency:
+  group: os-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout OS repo (for the backup script + schema)
+        uses: actions/checkout@v4
+
+      - name: Preflight - required secrets present
+        env:
+          OS_SUPABASE_URL: ${{ secrets.OS_SUPABASE_URL }}
+          OS_SUPABASE_SERVICE_KEY: ${{ secrets.OS_SUPABASE_SERVICE_KEY }}
+          GH_VAULT_TOKEN: ${{ secrets.GH_VAULT_TOKEN }}
+        run: |
+          missing=""
+          [ -n "$OS_SUPABASE_URL" ] || missing="$missing OS_SUPABASE_URL"
+          [ -n "$OS_SUPABASE_SERVICE_KEY" ] || missing="$missing OS_SUPABASE_SERVICE_KEY"
+          [ -n "$GH_VAULT_TOKEN" ] || missing="$missing GH_VAULT_TOKEN"
+          if [ -n "$missing" ]; then
+            echo "MISSING REPO SECRETS:$missing"
+            echo "Add them under Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+          echo "all required secrets present"
+
+      - name: Checkout vault mirror
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.VAULT_REPO || 'wingdigital26-maker/wing-os-vault' }}
+          ref: ${{ vars.VAULT_BRANCH || 'master' }}
+          token: ${{ secrets.GH_VAULT_TOKEN }}
+          path: vault-mirror
+          # Depth 1 still carries the tip commit date, which is all the
+          # freshness check needs.
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install --quiet requests
+
+      - name: Run backup
+        env:
+          OS_SUPABASE_URL: ${{ secrets.OS_SUPABASE_URL }}
+          OS_SUPABASE_SERVICE_KEY: ${{ secrets.OS_SUPABASE_SERVICE_KEY }}
+          HEARTBEAT_URL: https://wing-digital-os.vercel.app/api/heartbeat
+          HEARTBEAT_KEY: ${{ secrets.HEARTBEAT_KEY }}
+          HEARTBEAT_AGENT: os-backup-cloud
+          VAULT_DIR: ${{ github.workspace }}/vault-mirror
+          BACKUP_OUT: ${{ github.workspace }}/backup-out
+          VAULT_MAX_AGE_HOURS: "72"
+          VAULT_MIN_DOCS: "50"
+          SKIP_VAULT: ${{ github.event.inputs.skip_vault }}
+        run: python scripts/cloud_backup.py
+
+      - name: Include schema in the artifact
+        if: always()
+        run: |
+          cp supabase/migrations/*.sql backup-out/ 2>/dev/null || \
+            echo "no migration SQL found to include"
+
+      - name: Upload backup artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: os-backup-${{ github.run_id }}
+          path: backup-out/
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Show manifest
+        if: always()
+        run: cat backup-out/MANIFEST.json || echo "no manifest was written"

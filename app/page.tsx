@@ -697,7 +697,16 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
           <div className="briefing-metrics" style={{ display: "flex", gap: 32, flexWrap: "wrap", alignItems: "flex-end" }}>
             <div>
               <div style={{ display: "flex", alignItems: "flex-end", gap: 10 }}>
-                <p style={{ fontSize: 36, fontWeight: 800, color: "var(--accent)", lineHeight: 1, textShadow: "0 0 24px rgba(34,211,238,0.35)", fontFamily: "'Space Grotesk', sans-serif" }}><CountUp value={sentToday ?? camp?.by_day?.[new Date().toLocaleDateString("en-CA")] ?? 0} /></p>
+                {/* A send count with no feed must not render as 0: a real
+                    zero-send day and a dead data source would look identical. */}
+                {(() => {
+                  const todaySent = sentToday ?? camp?.by_day?.[new Date().toLocaleDateString("en-CA")];
+                  return typeof todaySent === "number" ? (
+                    <p style={{ fontSize: 36, fontWeight: 800, color: "var(--accent)", lineHeight: 1, textShadow: "0 0 24px rgba(34,211,238,0.35)", fontFamily: "'Space Grotesk', sans-serif" }}><CountUp value={todaySent} /></p>
+                  ) : (
+                    <p style={{ fontSize: 22, fontWeight: 700, color: "var(--text-muted)", lineHeight: 1.4, fontFamily: "'Space Grotesk', sans-serif" }}>no data</p>
+                  );
+                })()}
                 {camp?.by_day && (() => {
                   const s = buildDailySeries(camp.by_day, 10).map(d => d.value);
                   const today = sentToday ?? s[s.length - 1] ?? 0;

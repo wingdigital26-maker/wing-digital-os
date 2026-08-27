@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
 import { motion, MotionConfig } from "motion/react";
-import { Bolt, Users, Cpu, Bulb, Plus, Calendar, Note, Sparkles } from "reicon-react";
+import { Bolt, Users, Cpu, Bulb, Calendar, Note, Sparkles } from "reicon-react";
 import { staggerContainer, riseItem, hoverSpring, cardHover, cardHoverPassive, cardTap } from "./components/motion";
 import { Sparkline, Delta, buildDailySeries } from "./components/Charts";
 import { StatTiles, MissionPanels, MissionStyles, Selection, StatTile, WatchdogBanner, WatchdogData, MissionData } from "./components/MissionControlCore";
@@ -78,11 +78,12 @@ export default function Home() {
     setVisited(v => (v.has(active) ? v : new Set(v).add(active)));
   }, [active]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [ghlData, setGhlData] = useState<any>(null);
+  const [revenueData, setRevenueData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [openNotePath, setOpenNotePath] = useState<string | undefined>();
+  // No CRM lead feed exists (GHL retired 2026-08-22), so there is no live
+  // "new leads" counter. Kept at 0 so the nav badge simply never shows.
   const [newLeadCount, setNewLeadCount] = useState(0);
-  const prevLeadCount = useRef(0);
 
   // Phone flag: on mobile the secondary Intel views (Competitor Intel, Activity
   // Log) are dropped from the sub-tab strip so the Vault tab opens straight to
@@ -122,7 +123,7 @@ export default function Home() {
     if (pullY >= PTR_TRIGGER) {
       setRefreshing(true);
       sfx.play("nav");
-      try { fetchGhl(); } catch { /* noop */ }
+      try { fetchRevenue(); } catch { /* noop */ }
       window.dispatchEvent(new CustomEvent("os:pull-refresh"));
       setTimeout(() => setRefreshing(false), 900);
     }
@@ -151,26 +152,39 @@ export default function Home() {
     window.dispatchEvent(new CustomEvent("jarvis:ask", { detail: context }));
   }
 
-  const fetchGhl = useCallback(() => {
-    fetch("/api/ghl")
+  // Revenue truth: /api/clients renders lib/revenue.ts (getRevenueTruth), the
+  // single source of truth for MRR + client counts. The old /api/ghl fetch is
+  // gone — that route is a permanent 410 since GHL was retired 2026-08-22.
+  const fetchRevenue = useCallback(() => {
+    fetch("/api/clients", { cache: "no-store" })
       .then(r => r.json())
       .then(d => {
-        setGhlData(d);
+        if (d.error) { setRevenueData({ error: d.error }); setLoading(false); return; }
+        setRevenueData({
+          mrr: d.mrr,
+          activeClientCount: d.activeClients,
+          nextExpiry: d.nextExpiry ?? null,
+          pipelineTotal: d.pipelineTotal ?? 0,
+          activeClients: (d.clients ?? [])
+            .filter((c: any) => c.status === "active" && c.isClient !== false)
+            .map((c: any) => ({
+              id: c.slug,
+              name: c.name,
+              value: c.revenue?.amount ?? null,
+              basisLabel: c.revenue?.label ?? "unknown",
+              countsTowardMrr: !!c.revenue?.countsTowardMrr,
+            })),
+        });
         setLoading(false);
-        const count = d.recentLeads?.length ?? 0;
-        if (prevLeadCount.current > 0 && count > prevLeadCount.current) {
-          setNewLeadCount(n => n + (count - prevLeadCount.current));
-        }
-        prevLeadCount.current = count;
       })
       .catch(() => setLoading(false));
   }, []);
 
   useEffect(() => {
-    fetchGhl();
-    const id = setInterval(fetchGhl, 5 * 60 * 1000); // every 5 minutes
+    fetchRevenue();
+    const id = setInterval(fetchRevenue, 5 * 60 * 1000); // every 5 minutes
     return () => clearInterval(id);
-  }, [fetchGhl]);
+  }, [fetchRevenue]);
 
   return (
     <MotionConfig reducedMotion="user">
@@ -325,7 +339,7 @@ export default function Home() {
           <style>{`@keyframes viewIn { from { transform: translateY(5px); } to { transform: none; } }`}</style>
           {/* Keep-alive views: each visited section stays mounted; only the
               active one is shown. Switching is instant, no reload/refetch. */}
-          {visited.has("command") && <div className="app-view" style={{ display: active === "command" ? "block" : "none" }}><CommandCenter data={ghlData} loading={loading} onSendToAI={sendToAI} /></div>}
+          {visited.has("command") && <div className="app-view" style={{ display: active === "command" ? "block" : "none" }}><CommandCenter data={revenueData} loading={loading} onSendToAI={sendToAI} /></div>}
           {visited.has("clients") && <div className="app-view" style={{ display: active === "clients" ? "block" : "none" }}><ClientsBoard /></div>}
           {visited.has("sonar") && <div className="app-view" style={{ display: active === "sonar" ? "block" : "none" }}><SonarBoard /></div>}
           {visited.has("crm") && <div className="app-view" style={{ display: active === "crm" ? "block" : "none" }}><CrmBoard /></div>}
@@ -334,7 +348,7 @@ export default function Home() {
           {visited.has("knowledge") && <div className="app-view" style={{ display: active === "knowledge" ? "block" : "none" }}><KnowledgeBase initialPath={openNotePath} onSendToAI={sendToAI} /></div>}
           {visited.has("agent") && <div className="app-view" style={{ display: active === "agent" ? "block" : "none" }}><MissionOps /></div>}
           {visited.has("log") && <div className="app-view" style={{ display: active === "log" ? "block" : "none" }}><ActivityLog /></div>}
-          {visited.has("personal") && <div className="app-view" style={{ display: active === "personal" ? "block" : "none" }}><PersonalSection data={ghlData} /></div>}
+          {visited.has("personal") && <div className="app-view" style={{ display: active === "personal" ? "block" : "none" }}><PersonalSection /></div>}
         </div>
       </main>
 
@@ -488,9 +502,7 @@ function GlobalDaBoss() {
 }
 
 function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: boolean; onSendToAI: (ctx: string) => void }) {
-  const [showAddLead, setShowAddLead] = useState(false);
   const [showNewNote, setShowNewNote] = useState(false);
-  const [leadForm, setLeadForm] = useState({ firstName: "", lastName: "", email: "", phone: "", tag: "" });
   const [noteForm, setNoteForm] = useState({ title: "", content: "" });
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState("");
@@ -506,7 +518,6 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
   const [missionStats, setMissionStats] = useState<{ tiles: StatTile[]; updated: string | null } | null>(null);
   const [watchdog, setWatchdog] = useState<WatchdogData | null | undefined>(undefined);
   const [statSelection, setStatSelection] = useState<Selection>(null);
-  const stats = data?.stats;
 
   // Command Center absorbs the mission stats row (MRR, active clients,
   // pipeline size, emails sent) — big tiles, zero configuration.
@@ -572,20 +583,6 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
       setColdStats({ dialedToday, booked });
     }).catch(() => {});
   }, []);
-  const locationId = data?.locationId ?? "";
-  const appointments = data?.appointments ?? [];
-  const todayAppts = appointments.filter((a: any) => {
-    const d = new Date(a.startTime);
-    const now = new Date();
-    return d.toDateString() === now.toDateString();
-  });
-
-  // Morning briefing: new leads today
-  const todayLeads = (data?.recentLeads ?? []).filter((l: any) => {
-    if (!l.dateAdded) return false;
-    return new Date(l.dateAdded).toDateString() === new Date().toDateString();
-  });
-
   // Hourly calendar refresh
   useEffect(() => {
     if (!showCalendar) return;
@@ -593,40 +590,18 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
     return () => clearInterval(id);
   }, [showCalendar]);
 
-  const ghlBase = `https://app.gohighlevel.com/v2/location/${locationId}`;
+  // Stats row. MRR is the only figure with a real source (lib/revenue.ts).
+  // Opened emails and appointments have NO data source since GHL was retired
+  // 2026-08-22, so they render an explicit no-data state — never a 0 as fact.
   const STATS = [
-    { label: "Opened Emails", value: loading ? "..." : (stats?.openedEmails ?? 0), color: "var(--green)", href: `${ghlBase}/conversations` },
-    { label: "MRR", value: loading ? "..." : `$${(stats?.mrr ?? 0).toLocaleString()}`, color: "var(--orange)" },
-    { label: "Appts This Week", value: loading ? "..." : (stats?.apptsThisWeek ?? 0), color: "var(--accent)", onClick: () => setShowCalendar(c => !c) },
+    { label: "Opened Emails", value: "no data", noSource: true, color: "var(--green)" },
+    { label: "MRR", value: loading ? "..." : (typeof data?.mrr === "number" ? `$${data.mrr.toLocaleString()}` : "unavailable"), color: "var(--orange)" },
+    { label: "Appts This Week", value: "no data", noSource: true, color: "var(--accent)", onClick: () => setShowCalendar(c => !c) },
   ];
 
   function showToast(msg: string) {
     setToast(msg);
     setTimeout(() => setToast(""), 3000);
-  }
-
-  async function submitLead() {
-    setSaving(true);
-    const [first, ...rest] = leadForm.firstName.trim().split(" ");
-    const res = await fetch("/api/ghl/contact", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        firstName: first,
-        lastName: rest.join(" ") || leadForm.lastName,
-        email: leadForm.email,
-        phone: leadForm.phone,
-        tags: leadForm.tag ? [leadForm.tag] : [],
-      }),
-    });
-    setSaving(false);
-    if (res.ok) {
-      showToast("Lead added.");
-      setShowAddLead(false);
-      setLeadForm({ firstName: "", lastName: "", email: "", phone: "", tag: "" });
-    } else {
-      showToast("No CRM connected. GHL retired, replacement pending.");
-    }
   }
 
   async function submitNote() {
@@ -668,9 +643,9 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
         </div>
       )}
 
-      {/* CRM amputated: /api/ghl now answers 410 with an error since GHL was
-          retired 2026-08-22. Say so instead of rendering zeroed tiles as fact. */}
-      {!loading && data?.error && (
+      {/* CRM amputated: GHL was retired 2026-08-22 and nothing replaced it.
+          Say so instead of rendering zeroed tiles as fact. */}
+      {!loading && (
         <div style={{
           border: "1px solid var(--border)", borderRadius: 12, padding: "12px 16px",
           background: "var(--bg-card)", fontSize: 12.5, color: "var(--text-muted)",
@@ -738,32 +713,40 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
               <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>emails sent today</p>
             </div>
             <div>
-              <p style={{ fontSize: 36, fontWeight: 800, color: "var(--green)", lineHeight: 1, textShadow: "0 0 24px rgba(74,222,128,0.35)", fontFamily: "'Space Grotesk', sans-serif" }}><CountUp prefix="$" value={stats?.mrr ?? 0} /></p>
-              <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>MRR · {data?.activeClients?.length ?? 0} active client{(data?.activeClients?.length ?? 0) === 1 ? "" : "s"}</p>
+              {typeof data?.mrr === "number" ? (
+                <p style={{ fontSize: 36, fontWeight: 800, color: "var(--green)", lineHeight: 1, textShadow: "0 0 24px rgba(74,222,128,0.35)", fontFamily: "'Space Grotesk', sans-serif" }}><CountUp prefix="$" value={data.mrr} /></p>
+              ) : (
+                <p style={{ fontSize: 22, fontWeight: 700, color: "var(--text-muted)", lineHeight: 1.4, fontFamily: "'Space Grotesk', sans-serif" }}>unavailable</p>
+              )}
+              <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>
+                MRR · {typeof data?.activeClientCount === "number"
+                  ? `${data.activeClientCount} active client${data.activeClientCount === 1 ? "" : "s"}`
+                  : "client count unavailable"}
+              </p>
               {/* A fixed-term deal reads as durable unless the headline says
                   otherwise. Warn while there is still time to renew. */}
-              {data?.revenue?.nextExpiry && (
+              {data?.nextExpiry && (
                 <p style={{ fontSize: 11, color: "var(--orange)", marginTop: 4 }}>
-                  ${data.revenue.nextExpiry.amount.toLocaleString()}/mo of this ends {data.revenue.nextExpiry.end}
-                  {" "}({data.revenue.nextExpiry.monthsRemaining} mo left) unless renewed
+                  ${data.nextExpiry.amount.toLocaleString()}/mo of this ends {data.nextExpiry.end}
+                  {" "}({data.nextExpiry.monthsRemaining} mo left) unless renewed
                 </p>
               )}
-              {(data?.revenue?.pipelineTotal ?? 0) > 0 && (
+              {(data?.pipelineTotal ?? 0) > 0 && (
                 // Pipeline sits beside the earned number, never inside it.
                 <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
-                  + ${data.revenue.pipelineTotal.toLocaleString()} pipeline — not earned, not in MRR
+                  + ${data.pipelineTotal.toLocaleString()} pipeline, not earned, not in MRR
                 </p>
               )}
             </div>
             <div>
-              <p style={{ fontSize: 36, fontWeight: 800, color: "var(--green)", lineHeight: 1, textShadow: "0 0 24px rgba(52,211,153,0.35)", fontFamily: "'Space Grotesk', sans-serif" }}><CountUp value={stats?.responded ?? 0} /></p>
-              <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>responded to me</p>
+              <p style={{ fontSize: 22, fontWeight: 700, color: "var(--text-muted)", lineHeight: 1.4, fontFamily: "'Space Grotesk', sans-serif" }}>no data</p>
+              <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>replies · no data source since GHL retired</p>
             </div>
             <div style={{ cursor: "pointer" }} onClick={() => setShowCalendar(c => !c)}>
-              <p style={{ fontSize: 36, fontWeight: 800, color: "var(--accent)", lineHeight: 1, textShadow: "0 0 24px rgba(96,165,250,0.35)", fontFamily: "'Space Grotesk', sans-serif" }}><CountUp value={todayAppts.length} /></p>
-              <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>appointments {showCalendar ? "▲" : "▼"}</p>
+              <p style={{ fontSize: 22, fontWeight: 700, color: "var(--text-muted)", lineHeight: 1.4, fontFamily: "'Space Grotesk', sans-serif" }}>no data</p>
+              <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>appointments · no data source {showCalendar ? "▲" : "▼"}</p>
             </div>
-            <button onClick={() => onSendToAI(`Today's Wing Digital briefing:\n- Emails sent today: ${sentToday ?? camp?.by_day?.[new Date().toLocaleDateString("en-CA")] ?? 0}\n- MRR: $${stats?.mrr ?? 0}\n- Responded: ${stats?.responded ?? 0}\n- Appointments today: ${todayAppts.length}\n\nWhat should I prioritize today to grow Wing Digital?`)}
+            <button onClick={() => onSendToAI(`Today's Wing Digital briefing:\n- Emails sent today: ${sentToday ?? camp?.by_day?.[new Date().toLocaleDateString("en-CA")] ?? 0}\n- MRR: ${typeof data?.mrr === "number" ? `$${data.mrr}` : "unavailable"}\n- Replies and appointments: no data source (GHL retired, no CRM connected)\n\nWhat should I prioritize today to grow Wing Digital?`)}
               style={{
                 marginLeft: "auto", fontSize: 12, fontWeight: 600, color: "#fff",
                 background: "linear-gradient(135deg, #E8692A, #f59e0b)",
@@ -790,26 +773,6 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
               </p>
             );
           })()}
-          {todayAppts.length > 0 && (
-            <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 6 }}>
-              {todayAppts.slice(0, 3).map((a: any) => (
-                <div key={a.id} style={{
-                  display: "flex", justifyContent: "space-between", alignItems: "center",
-                  padding: "8px 14px", background: "var(--bg-hover)", borderRadius: 10,
-                  border: "1px solid var(--border)",
-                }}>
-                  <span style={{ fontSize: 13, fontWeight: 600 }}>{a.contactName || a.title}</span>
-                  <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                    <span style={{ fontSize: 12, color: "var(--accent)", fontWeight: 600 }}>{a.startTime ? new Date(a.startTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : ""}</span>
-                    {a.contactId && locationId && (
-                      <a href={`https://app.gohighlevel.com/v2/location/${locationId}/contacts/detail/${a.contactId}`} target="_blank" rel="noreferrer"
-                        style={{ fontSize: 11, color: "var(--accent)", textDecoration: "none", fontWeight: 600 }}>GHL →</a>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
         </motion.div>
       )}
 
@@ -950,8 +913,13 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
                 <span className="live-dot" style={{ width: 6, height: 6, borderRadius: "50%", background: stat.color, boxShadow: `0 0 8px ${stat.color}` }} />
                 <p style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>{stat.label}</p>
               </div>
-              <p style={{ fontSize: 30, fontWeight: 700, color: stat.color, fontFamily: "'Space Grotesk', sans-serif", textShadow: `0 0 20px ${stat.color}44`, lineHeight: 1 }}>{stat.value}</p>
-              {(stat.onClick || stat.href) && <p style={{ fontSize: 10, color: stat.color, marginTop: 8, opacity: 0.8 }}>Open in GHL →</p>}
+              <p style={{
+                fontSize: stat.noSource ? 18 : 30, fontWeight: 700,
+                color: stat.noSource ? "var(--text-muted)" : stat.color,
+                fontFamily: "'Space Grotesk', sans-serif",
+                textShadow: stat.noSource ? "none" : `0 0 20px ${stat.color}44`, lineHeight: 1.2,
+              }}>{stat.value}</p>
+              {stat.noSource && <p style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 8 }}>No data source connected (GHL retired 2026-08-22)</p>}
             </>
           );
           const baseStyle: React.CSSProperties = {
@@ -960,32 +928,29 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
             border: "1px solid var(--border)",
             borderRadius: 16, padding: "18px 20px",
             boxShadow: "0 8px 24px var(--bg-hover), inset 0 1px 0 rgba(255,255,255,0.04)",
-            cursor: stat.onClick || stat.href ? "pointer" : "default",
+            cursor: stat.onClick ? "pointer" : "default",
             textDecoration: "none", display: "block", overflow: "hidden",
           };
-          const interactive = Boolean(stat.onClick || stat.href);
+          const interactive = Boolean(stat.onClick);
           // Every tile responds; interactive ones respond more.
           const hover = interactive ? cardHover : cardHoverPassive;
           const tap = interactive ? cardTap : undefined;
-          if (stat.href) return (
-            <motion.a key={stat.label} href={stat.href} target="_blank" rel="noreferrer" style={baseStyle}
-              whileHover={hover} whileTap={tap} transition={hoverSpring}>{inner}</motion.a>
-          );
           return <motion.div key={stat.label} onClick={stat.onClick ? () => { sfx.play("ping"); stat.onClick(); } : undefined} style={baseStyle}
             whileHover={hover} whileTap={tap} transition={hoverSpring}>{inner}</motion.div>;
         })}
       </motion.div>
 
-      {/* Week Calendar -- toggle */}
+      {/* Week Calendar -- toggle. No appointment feed exists (GHL retired),
+          so the grid renders empty with an explicit no-source note inside. */}
       {showCalendar && !loading && (
-        <WeekCalendar key={calendarKey} appointments={appointments} locationId={locationId} />
+        <WeekCalendar key={calendarKey} appointments={[]} />
       )}
 
-      {/* Quick Actions — floating pill row */}
+      {/* Quick Actions — floating pill row. "Add Lead" is gone: there is no
+          CRM to add a lead to, and a form that can only fail is worse than none. */}
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
         <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", marginRight: 4 }}>Quick</span>
         {[
-          { icon: Plus, label: "Add Lead", action: () => setShowAddLead(true), c: "var(--green)" },
           { icon: Calendar, label: "Calendar", action: () => setShowCalendar(c => !c), c: "var(--accent)" },
           { icon: Note, label: "New Note", action: () => setShowNewNote(true), c: "var(--accent-2)" },
           { icon: Sparkles, label: "Ask Claude", action: () => onSendToAI("What should I focus on today for Wing Digital?"), c: "#E8692A" },
@@ -1045,15 +1010,6 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
           ) : <p style={{ color: "var(--text-muted)", fontSize: 13 }}>No active clients on the roster</p>)}
         </div>
       </motion.div>
-
-      {/* Add Lead Modal */}
-      {showAddLead && <Modal title="Add Lead to GHL" onClose={() => setShowAddLead(false)}>
-        <ModalField label="Full Name" value={leadForm.firstName} onChange={v => setLeadForm(f => ({ ...f, firstName: v }))} placeholder="John Smith" />
-        <ModalField label="Email" value={leadForm.email} onChange={v => setLeadForm(f => ({ ...f, email: v }))} placeholder="john@example.com" type="email" />
-        <ModalField label="Phone" value={leadForm.phone} onChange={v => setLeadForm(f => ({ ...f, phone: v }))} placeholder="+1 (555) 000-0000" type="tel" />
-        <ModalField label="Industry Tag" value={leadForm.tag} onChange={v => setLeadForm(f => ({ ...f, tag: v }))} placeholder="roofing, HVAC, plumbing..." />
-        <ModalActions onCancel={() => setShowAddLead(false)} onSubmit={submitLead} saving={saving} submitLabel="Add to GHL" />
-      </Modal>}
 
       {/* New Note Modal */}
       {showNewNote && <Modal title="New Vault Note" onClose={() => setShowNewNote(false)}>
@@ -1136,159 +1092,6 @@ function parseCompetitorSections(content: string): { title: string; bullets: str
 
   if (current && current.bullets.length > 0) sections.push(current);
   return sections;
-}
-
-function Clients({ data, loading }: { data: any; loading: boolean }) {
-  const clients = data?.activeClients ?? [];
-  const mrr = data?.stats?.mrr ?? 0;
-  // Only the clients whose money actually makes up `mrr`. Every row carries the
-  // flag from the single source of truth, so this never re-derives the figure.
-  const payingCount = clients.filter((c: any) => c.countsTowardMrr).length;
-  const locationId = data?.locationId ?? "";
-  const [noteClient, setNoteClient] = useState<string | null>(null);
-  const [noteContent, setNoteContent] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [toast, setToast] = useState("");
-
-  function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(""), 3000); }
-
-  async function saveClientNote(clientName: string) {
-    setSaving(true);
-    const title = `${clientName} - Note ${new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
-    const filePath = `wiki/clients/${clientName.replace(/[^a-zA-Z0-9 ]/g, "").trim()}.md`;
-    const res = await fetch("/api/vault/write", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ filePath, content: `# ${title}\n\n${noteContent}` }),
-    });
-    setSaving(false);
-    if (res.ok) { showToast("Note saved to vault!"); setNoteClient(null); setNoteContent(""); }
-    else showToast("Save failed.");
-  }
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-      {toast && <div style={{ position: "fixed", bottom: 24, right: 24, background: "var(--green)", color: "#07080f", padding: "10px 18px", borderRadius: 10, fontWeight: 700, fontSize: 13, zIndex: 200 }}>{toast}</div>}
-      {noteClient && <Modal title={`Note for ${noteClient}`} onClose={() => setNoteClient(null)}>
-        <textarea value={noteContent} onChange={e => setNoteContent(e.target.value)} rows={6} placeholder="Write your note..."
-          style={{ background: "var(--bg-hover)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 12px", color: "var(--text-primary)", fontSize: 13, resize: "vertical", outline: "none", width: "100%" }} />
-        <ModalActions onCancel={() => setNoteClient(null)} onSubmit={() => saveClientNote(noteClient)} saving={saving} submitLabel="Save to Vault" />
-      </Modal>}
-      {/* MRR summary */}
-      <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
-        {[
-          { label: "Total Clients", value: loading ? "..." : clients.length, color: "var(--accent)" },
-          { label: "MRR", value: loading ? "..." : `$${mrr.toLocaleString()}`, color: "var(--green)" },
-          // "Avg Deal" used to be mrr / clients.length, which divided the earned
-          // MRR by EVERY active client including the ones contributing nothing to
-          // it — an average over a denominator the numerator does not cover. It
-          // read as "our typical client pays $312" when one client pays $1,250
-          // and the rest are unrecorded. Averaged over the contributors only.
-          {
-            label: "Avg MRR / paying client",
-            value: loading
-              ? "..."
-              : payingCount
-                ? `$${Math.round(mrr / payingCount).toLocaleString()}`
-                : "no data",
-            color: "var(--accent)",
-          },
-        ].map(s => (
-          <div key={s.label} style={{
-            background: `radial-gradient(ellipse 90% 80% at 50% -30%, ${s.color}14, transparent 60%), linear-gradient(180deg, var(--bg-card), var(--bg-card))`,
-            border: "1px solid var(--border)", borderRadius: 14, padding: "16px 22px",
-            flex: 1, minWidth: 140,
-            boxShadow: "0 8px 24px var(--bg-hover), inset 0 1px 0 rgba(255,255,255,0.04)",
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-              <span style={{ width: 5, height: 5, borderRadius: "50%", background: s.color, boxShadow: `0 0 7px ${s.color}` }} />
-              <p style={{ fontSize: 10.5, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>{s.label}</p>
-            </div>
-            <p style={{ fontSize: 26, fontWeight: 800, color: s.color, fontFamily: "'Space Grotesk', sans-serif", textShadow: `0 0 18px ${s.color}44`, lineHeight: 1 }}>{s.value}</p>
-          </div>
-        ))}
-      </div>
-
-      {loading ? <Spinner /> : clients.length ? (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 14 }}>
-          {clients.map((client: any) => (
-            <div key={client.id} style={{
-              background: "radial-gradient(ellipse 90% 60% at 50% -20%, rgba(52,211,153,0.1), transparent 60%), linear-gradient(180deg, var(--bg-card), var(--bg-card))",
-              border: "1px solid var(--border)",
-              borderRadius: 16, padding: 20,
-              boxShadow: "0 8px 24px var(--bg-hover), inset 0 1px 0 rgba(255,255,255,0.04)",
-              display: "flex", flexDirection: "column", gap: 12,
-            }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                  <div style={{
-                    width: 36, height: 36, borderRadius: 11, flexShrink: 0,
-                    background: "linear-gradient(135deg, rgba(52,211,153,0.25), rgba(34,211,238,0.12))",
-                    border: "1px solid rgba(52,211,153,0.35)",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 14, fontWeight: 800, color: "var(--green)",
-                    fontFamily: "'Space Grotesk', sans-serif",
-                  }}>{(client.name || "?").charAt(0).toUpperCase()}</div>
-                  <div>
-                    <p style={{ fontSize: 15, fontWeight: 700 }}>{client.name}</p>
-                    <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>{client.stage}</p>
-                  </div>
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  <p style={{ fontSize: 18, fontWeight: 800, color: "var(--green)", fontFamily: "'Space Grotesk', sans-serif", textShadow: "0 0 16px rgba(52,211,153,0.35)" }}>${client.value.toLocaleString()}</p>
-                  <p style={{ fontSize: 10, color: "var(--text-muted)" }}>deal value</p>
-                </div>
-              </div>
-
-              {/* Services placeholder -- will be real when GHL tags are set */}
-              <div>
-                <p style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>Services</p>
-                <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                  {(client.tags?.length ? client.tags : ["Active"]).slice(0, 4).map((t: string) => (
-                    <span key={t} style={{ fontSize: 10, background: "rgba(52,211,153,0.1)", color: "var(--green)", padding: "2px 10px", borderRadius: 999, border: "1px solid rgba(52,211,153,0.3)", fontWeight: 600 }}>{t}</span>
-                  ))}
-                </div>
-              </div>
-
-              <div style={{ display: "flex", gap: 8 }}>
-                {locationId && client.contactId ? (
-                  <a href={`https://app.gohighlevel.com/v2/location/${locationId}/contacts/detail/${client.contactId}`}
-                    target="_blank" rel="noreferrer" style={{
-                      flex: 1, padding: "7px 0", borderRadius: 999, fontSize: 12, cursor: "pointer",
-                      background: "transparent", border: "1px solid var(--border)", color: "var(--text-secondary)",
-                      textDecoration: "none", textAlign: "center", fontWeight: 500,
-                    }}>View in GHL →</a>
-                ) : (
-                  <a href={`https://app.gohighlevel.com/v2/location/${locationId}/opportunities/list`}
-                    target="_blank" rel="noreferrer" style={{
-                      flex: 1, padding: "7px 0", borderRadius: 999, fontSize: 12,
-                      background: "transparent", border: "1px solid var(--border)", color: "var(--text-secondary)",
-                      textDecoration: "none", textAlign: "center", fontWeight: 500,
-                    }}>View in GHL →</a>
-                )}
-                <button onClick={() => { setNoteClient(client.name); setNoteContent(""); }} style={{
-                  flex: 1, padding: "7px 0", borderRadius: 999, fontSize: 12, cursor: "pointer",
-                  background: "rgba(34,211,238,0.08)", border: "1px solid rgba(34,211,238,0.4)", color: "var(--accent)", fontWeight: 600,
-                }}>+ Note</button>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div style={{ padding: "60px 0", textAlign: "center", color: "var(--text-muted)" }}>
-          <p style={{ fontSize: 32, marginBottom: 10 }}>👥</p>
-          <p style={{ fontSize: 15, fontWeight: 600, marginBottom: 6 }}>No clients yet</p>
-          <p style={{ fontSize: 13 }}>Mark opportunities as "Won" in GHL and they'll appear here with their value and tags.</p>
-          <div style={{ marginTop: 24, padding: 20, background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 12, maxWidth: 460, margin: "24px auto 0", textAlign: "left" }}>
-            <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 10, color: "var(--text-primary)" }}>When you land clients, each card will show:</p>
-            {["Deal value and MRR contribution", "Active services (via GHL tags)", "Quick link to GHL contact", "Note-taking shortcut"].map(item => (
-              <p key={item} style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>✓ {item}</p>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
 }
 
 // Lightweight, dependency-free markdown -> React renderer for the note viewer.
@@ -1635,7 +1438,7 @@ function KnowledgeBase({ initialPath, onSendToAI }: { initialPath?: string; onSe
   );
 }
 
-function PersonalSection({ data }: { data: any }) {
+function PersonalSection() {
   const LS_TASKS = "wingos_tasks";
   const LS_GOALS = "wingos_goals";
   const LS_CLEP = "wingos_clep";
@@ -1685,14 +1488,6 @@ function PersonalSection({ data }: { data: any }) {
 
   const clepPct = Math.min(100, Math.round((clep.studied / clep.target) * 100));
   const daysLeft = Math.max(0, Math.ceil((new Date(clep.exam).getTime() - Date.now()) / 86400000));
-
-  // Lead follow-up tracker -- leads with no recent activity
-  const leads = data?.recentLeads ?? [];
-  const staleLeads = leads.filter((l: any) => {
-    if (!l.dateAdded) return false;
-    const days = (Date.now() - new Date(l.dateAdded).getTime()) / 86400000;
-    return days > 3;
-  }).slice(0, 8);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24, maxWidth: 900 }}>
@@ -1791,40 +1586,6 @@ function PersonalSection({ data }: { data: any }) {
         )}
       </div>
 
-      {/* Lead Follow-up Tracker */}
-      {staleLeads.length > 0 && (
-        <div style={{
-          background: "radial-gradient(ellipse 90% 60% at 50% -20%, rgba(251,113,133,0.1), transparent 60%), linear-gradient(180deg, var(--bg-card), var(--bg-card))",
-          border: "1px solid rgba(251,113,133,0.35)", borderRadius: 16, padding: 20,
-          boxShadow: "0 8px 24px var(--bg-hover), 0 0 24px rgba(251,113,133,0.06)",
-        }}>
-          <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>⚠️ Follow-up Needed</p>
-          <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 14 }}>These leads haven't been touched in 3+ days</p>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {staleLeads.map((lead: any) => {
-              const days = Math.floor((Date.now() - new Date(lead.dateAdded).getTime()) / 86400000);
-              return (
-                <div key={lead.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", background: "var(--bg-hover)", borderRadius: 10, borderLeft: "3px solid #f87171" }}>
-                  <div>
-                    <p style={{ fontSize: 13, fontWeight: 600 }}>{lead.name || "—"}</p>
-                    <p style={{ fontSize: 11, color: "var(--text-muted)" }}>{lead.email} {lead.tags?.slice(0, 1).map((t: string) => `· ${t}`).join("")}</p>
-                  </div>
-                  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                    <span style={{ fontSize: 11, color: "var(--red)", fontWeight: 700 }}>{days}d ago</span>
-                    {data?.locationId && lead.id && (
-                      <a href={`https://app.gohighlevel.com/v2/location/${data.locationId}/contacts/detail/${lead.id}`}
-                        target="_blank" rel="noreferrer"
-                        style={{ fontSize: 11, color: "var(--accent)", textDecoration: "none", background: "var(--accent-glow)", border: "1px solid var(--accent)", borderRadius: 6, padding: "3px 10px" }}>
-                        GHL →
-                      </a>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

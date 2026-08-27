@@ -19,7 +19,8 @@
 import fs from "fs";
 import { isGithubVault } from "./vaultSource";
 
-export type MetricSource = "live-db" | "live-cloud" | "live-ghl" | "snapshot";
+// "live-ghl" removed 2026-08-26: GHL retired, nothing can be live from it.
+export type MetricSource = "live-db" | "live-cloud" | "snapshot";
 
 // Staleness thresholds (hours) per metric family, per the honesty design.
 export const STALE_HOURS = {
@@ -318,7 +319,6 @@ export function sendsTodayHonest(
 export function provenanceLine(p: Provenance, subject = "snapshot"): string {
   if (p.source === "live-cloud") return "Live from Supabase (cloud), just now";
   if (p.source === "live-db") return "Live from prospects.db, just now";
-  if (p.source === "live-ghl") return "Live from the GHL API, just now";
   const d = asOfToDate(p.asOf);
   if (!d) return "From snapshot, age unknown - needs PC or state-sync";
   const min = Math.max(0, Math.floor((Date.now() - d.getTime()) / 60000));

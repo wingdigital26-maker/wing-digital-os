@@ -7,6 +7,7 @@ function isPublicPath(pathname: string): boolean {
   return (
     pathname === "/login" ||
     pathname === "/api/login" ||
+    pathname === "/api/logout" ||
     pathname.startsWith("/_next") ||
     pathname === "/favicon.ico" ||
     pathname === "/manifest.json" ||
@@ -80,8 +81,12 @@ export async function middleware(req: NextRequest) {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json({ error: "forbidden" }, { status: 403 });
     }
+    // Slug-less client sessions go to the bare /portal page (which resolves a
+    // fresh slug server-side or shows an honest "not linked" state + logout),
+    // NEVER back to /login -- that looped forever with an httpOnly cookie the
+    // user could not clear.
     const url = req.nextUrl.clone();
-    url.pathname = session.portal ? `/portal/${session.portal}` : "/login";
+    url.pathname = session.portal ? `/portal/${session.portal}` : "/portal";
     return NextResponse.redirect(url);
   }
 

@@ -72,12 +72,24 @@ export default function JacksonDashboard() {
   const [data, setData] = useState<JacksonData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [retired, setRetired] = useState(false);
   const [lastSync, setLastSync] = useState<Date | null>(null);
 
   const fetchData = useCallback(() => {
     fetch("/api/jackson")
-      .then((r) => r.json())
+      .then(async (r) => {
+        // 410 Gone: the reporting source was retired for good, so stop polling
+        // and tell the client the truth instead of promising a retry.
+        if (r.status === 410) {
+          setRetired(true);
+          setError(true);
+          setLoading(false);
+          return null;
+        }
+        return r.json();
+      })
       .then((d) => {
+        if (!d) return;
         if (d.error) {
           setError(true);
         } else {
@@ -95,9 +107,10 @@ export default function JacksonDashboard() {
 
   useEffect(() => {
     fetchData();
+    if (retired) return; // nothing to poll for, the source is gone for good
     const id = setInterval(fetchData, 5 * 60 * 1000); // auto-refresh every 5 min
     return () => clearInterval(id);
-  }, [fetchData]);
+  }, [fetchData, retired]);
 
   const s = data?.stats;
 
@@ -177,9 +190,9 @@ export default function JacksonDashboard() {
               gap: 7,
               fontSize: 11.5,
               fontWeight: 600,
-              color: BRAND.blue,
-              background: "rgba(16,192,240,0.10)",
-              border: `1px solid rgba(16,192,240,0.3)`,
+              color: retired ? "#9aa3c0" : BRAND.blue,
+              background: retired ? "rgba(154,163,192,0.10)" : "rgba(16,192,240,0.10)",
+              border: retired ? "1px solid rgba(154,163,192,0.3)" : `1px solid rgba(16,192,240,0.3)`,
               padding: "6px 13px",
               borderRadius: 999,
             }}
@@ -189,15 +202,19 @@ export default function JacksonDashboard() {
                 width: 7,
                 height: 7,
                 borderRadius: "50%",
-                background: BRAND.blue,
-                boxShadow: `0 0 8px ${BRAND.blue}`,
-                animation: "jpulse 2s ease-in-out infinite",
+                background: retired ? "#9aa3c0" : BRAND.blue,
+                boxShadow: retired ? "none" : `0 0 8px ${BRAND.blue}`,
+                animation: retired ? "none" : "jpulse 2s ease-in-out infinite",
               }}
             />
-            LIVE
+            {retired ? "NO DATA SOURCE" : "LIVE"}
           </div>
           <p style={{ fontSize: 11, color: "#545d7d", marginTop: 6 }}>
-            {lastSync ? `Updated ${lastSync.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}` : "Syncing…"}
+            {retired
+              ? "Reporting rebuild in progress"
+              : lastSync
+                ? `Updated ${lastSync.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`
+                : "Syncing…"}
           </p>
         </div>
       </header>
@@ -211,10 +228,14 @@ export default function JacksonDashboard() {
         {error ? (
           <Card>
             <p style={{ color: "#fb7185", fontSize: 14, fontWeight: 600 }}>
-              We couldn't reach your CRM right now.
+              {retired
+                ? "This reporting dashboard is being rebuilt."
+                : "We couldn't reach your reporting data right now."}
             </p>
             <p style={{ color: "#9aa3c0", fontSize: 12.5, marginTop: 6 }}>
-              This will retry automatically. If it persists, let your Wing Digital team know.
+              {retired
+                ? "Wing Digital moved off the previous marketing platform, so lead and pipeline reporting is not connected to a data source right now. Your Wing Digital team can walk you through current results in the meantime."
+                : "This will retry automatically. If it persists, let your Wing Digital team know."}
             </p>
           </Card>
         ) : (

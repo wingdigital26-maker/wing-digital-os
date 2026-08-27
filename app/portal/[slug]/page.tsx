@@ -62,7 +62,7 @@ export default async function PortalPage({ params }: { params: Promise<{ slug: s
   }
 
   const role = session.role;
-  const isStaff = role === "admin" || role === "staff";
+  const isStaff = role === "admin" || role === "owner" || role === "staff";
 
   // Look up the client by slug (service read; access is enforced below).
   const clients = await sbSelect<Client>({

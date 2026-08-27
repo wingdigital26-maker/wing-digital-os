@@ -47,6 +47,10 @@ export async function POST(req: Request) {
   const sbUrl = process.env.OS_SUPABASE_URL;
   const anon = process.env.OS_SUPABASE_ANON_KEY;
   if (email && sbUrl && anon) {
+    // Filled in only when Supabase positively authenticates the user. JWT
+    // minting happens AFTER the try/catch below so a signSession failure can
+    // never fall through to the legacy OS_PASSWORD path.
+    let authed: { uid: string; role: string; portal?: string } | null = null;
     try {
       const r = await fetch(`${sbUrl}/auth/v1/token?grant_type=password`, {
         method: "POST",
@@ -96,23 +100,51 @@ export async function POST(req: Request) {
               // Portal lookup is best-effort; the session still works without it.
             }
           }
-          store.delete(ip);
-          const res = NextResponse.json({ ok: true, role, portal });
-          const token = await signSession({ sub: uid, email, role, portal });
-          res.cookies.set("wingos_session", token, {
-            httpOnly: true,
-            sameSite: "lax",
-            secure: process.env.NODE_ENV === "production",
-            maxAge: WEEK,
-            path: "/",
-          });
-          return res;
+          authed = { uid, role, portal };
+        } else {
+          // Supabase OK but no user id -> failed attempt.
+          return fail();
         }
+      } else {
+        // Supabase said no -> count as a failed attempt.
+        return fail();
       }
-      // Supabase said no (or gave us no user) -> count as a failed attempt.
-      return fail();
     } catch {
       // Network/config problem reaching Supabase -> fall through to legacy path.
+    }
+
+    if (authed) {
+      // Supabase auth SUCCEEDED. From here on, nothing may fall through to the
+      // legacy OS_PASSWORD path: a broken session secret is a server
+      // misconfiguration, not a login failure.
+      let token: string;
+      try {
+        token = await signSession({
+          sub: authed.uid,
+          email,
+          role: authed.role,
+          portal: authed.portal,
+        });
+      } catch {
+        return NextResponse.json(
+          { ok: false, error: "auth misconfigured" },
+          { status: 500 }
+        );
+      }
+      store.delete(ip);
+      const res = NextResponse.json({
+        ok: true,
+        role: authed.role,
+        portal: authed.portal,
+      });
+      res.cookies.set("wingos_session", token, {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        maxAge: WEEK,
+        path: "/",
+      });
+      return res;
     }
   }
 

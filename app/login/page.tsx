@@ -16,8 +16,18 @@ export default function Login() {
       body: JSON.stringify({ email: email.trim(), password: pw }),
     });
     setLoading(false);
-    if (res.ok) window.location.href = "/";
-    else setError(true);
+    if (res.ok) {
+      // Client-role users go straight to their portal (or the bare /portal
+      // resolver page if no slug came back) so they never bounce off "/".
+      const data = await res.json().catch(() => ({} as any));
+      const isStaff =
+        data?.role === "admin" || data?.role === "owner" || data?.role === "staff";
+      if (data?.role && !isStaff) {
+        window.location.href = data.portal ? `/portal/${data.portal}` : "/portal";
+      } else {
+        window.location.href = "/";
+      }
+    } else setError(true);
   }
 
   return (

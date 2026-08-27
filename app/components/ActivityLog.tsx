@@ -3,19 +3,18 @@ import { useState, useEffect } from "react";
 
 interface LogEvent {
   id: string;
-  type: "lead" | "appointment" | "ai_claude" | "ai_hermes" | "vault" | "pipeline" | "coldcall";
+  // lead / appointment / pipeline event types were dropped with GHL (retired
+  // 2026-08-22): no source produces them, so the union no longer claims they exist.
+  type: "ai_claude" | "ai_hermes" | "vault" | "coldcall";
   title: string;
   detail: string;
   time: Date;
 }
 
 const TYPE_META: Record<LogEvent["type"], { icon: string; color: string; label: string }> = {
-  lead:        { icon: "👤", color: "var(--green)", label: "New Lead" },
-  appointment: { icon: "📅", color: "var(--accent)", label: "Appointment" },
   ai_claude:   { icon: "🟠", color: "#E8692A", label: "Claude" },
   ai_hermes:   { icon: "⚙️", color: "#6b7280", label: "Groq" },
   vault:       { icon: "📄", color: "var(--accent)", label: "Vault" },
-  pipeline:    { icon: "🎯", color: "var(--orange)", label: "Pipeline" },
   coldcall:    { icon: "📞", color: "var(--accent-2)", label: "Cold Call" },
 };
 

@@ -7,8 +7,11 @@ open on your phone.
 - **Framework:** Next.js 16 (App Router). Vercel auto-detects it — no `vercel.json` needed.
 - **Build command:** `next build` (already in `package.json`).
 - **Node:** 20.x (pinned via `engines` in `package.json`; Vercel default is fine).
-- **Auth gate:** `middleware.ts` password-protects the whole OS via the `OS_PASSWORD`
-  env var. If `OS_PASSWORD` is not set, the gate is OFF (local-only behavior).
+- **Auth gate:** `middleware.ts` protects the whole OS. It accepts either a Supabase
+  email/password session (signed with `AUTH_SESSION_SECRET`) or the legacy shared
+  `OS_PASSWORD`. The gate now FAILS CLOSED outside development: if `OS_PASSWORD` is
+  unset in a deployed environment, requests are refused (API routes get 503, pages
+  redirect to /login). Only local development runs ungated.
 
 ---
 
@@ -20,7 +23,11 @@ live in `C:\Users\wjack\ghl-cli\.env` and `wing-digital-os\.env.local` on the la
 
 | Vercel env var name | Maps to (.env name) | What it's for |
 |---|---|---|
-| `OS_PASSWORD` | `.env.local` → `OS_PASSWORD` | Login password gate for the whole OS (set this or the OS is public). |
+| `OS_PASSWORD` | `.env.local` → `OS_PASSWORD` | Legacy shared login password. Required in production: if unset, the gate fails closed and the deployed OS refuses requests (it does not go public). |
+| `AUTH_SESSION_SECRET` | `.env.local` → `AUTH_SESSION_SECRET` | REQUIRED on Vercel for Supabase email/password logins. Signs the `wingos_session` JWT cookie. Without it, Supabase logins return a 500 "auth misconfigured" error. |
+| `OS_SUPABASE_URL` | `.env.local` → `OS_SUPABASE_URL` | Supabase project URL for OS auth and portal data. |
+| `OS_SUPABASE_ANON_KEY` | `.env.local` → `OS_SUPABASE_ANON_KEY` | Supabase anon key (email/password sign-in). |
+| `OS_SUPABASE_SERVICE_KEY` | `.env.local` → `OS_SUPABASE_SERVICE_KEY` | Supabase service key (server-side role and portal-slug lookups). |
 | `GHL_JACKSON_ROOFING_PIT` | `ghl-cli/.env` → `GHL_JACKSON_ROOFING_PIT` | Jackson Roofing GHL Private Integration Token. **Powers Chris's dashboard** — set this and Jackson works fully in the cloud. |
 | `GHL_API_KEY` | `.env.local` → `GHL_API_KEY` | Wing's main GHL API key (contacts/opportunities routes). |
 | `GHL_LOCATION_ID` | `.env.local` → `GHL_LOCATION_ID` | Wing's GHL sub-account location id. |

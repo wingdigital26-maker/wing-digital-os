@@ -40,7 +40,7 @@ function fmt12(date: Date) {
   return `${h}:${m.toString().padStart(2, "0")}${ampm}`;
 }
 
-export default function WeekCalendar({ appointments, locationId }: { appointments: Appointment[]; locationId: string }) {
+export default function WeekCalendar({ appointments }: { appointments: Appointment[] }) {
   const [weekOffset, setWeekOffset] = useState(0);
   const [selected, setSelected] = useState<Appointment | null>(null);
   const days = getWeekDays(weekOffset);
@@ -67,8 +67,6 @@ export default function WeekCalendar({ appointments, locationId }: { appointment
     return Math.max(2, (dur / 13) * 100);
   }
 
-  const ghlBase = `https://app.gohighlevel.com/v2/location/${locationId}`;
-
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 0, background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 14, overflow: "hidden" }}>
 
@@ -88,7 +86,11 @@ export default function WeekCalendar({ appointments, locationId }: { appointment
               Today
             </button>
           )}
-          <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{appointments.length} appts this week</span>
+          <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
+            {appointments.length > 0
+              ? `${appointments.length} appts this week`
+              : "no appointment data source connected"}
+          </span>
         </div>
       </div>
 
@@ -180,12 +182,6 @@ export default function WeekCalendar({ appointments, locationId }: { appointment
             </span>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
-            {selected.contactId && (
-              <a href={`${ghlBase}/contacts/detail/${selected.contactId}`} target="_blank" rel="noreferrer"
-                style={{ fontSize: 12, color: "var(--accent)", background: "var(--accent-glow)", border: "1px solid var(--accent)", borderRadius: 8, padding: "6px 14px", textDecoration: "none", fontWeight: 600 }}>
-                View in GHL →
-              </a>
-            )}
             <button onClick={() => setSelected(null)} style={{ fontSize: 12, color: "var(--text-muted)", background: "transparent", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 12px", cursor: "pointer" }}>
               Dismiss
             </button>

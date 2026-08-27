@@ -15,10 +15,15 @@ import CrmScraperHealth, { ago, healthLook, isOffByChoice, type Watch } from "./
 // published for them. Reads /api/crm (Sonar Supabase + the vault + the content
 // engine's state file). Nothing here transmits — it keeps the work checked.
 
+// A client with no policy row, or with may_send anything but exactly true,
+// can never be sent for. DEFAULT DENY — absence of a row is itself a deny,
+// never an unknown to be rendered as blank.
+type SendPolicy = { client: string; may_send: boolean; scope_note: string | null };
+
 type ClientRollup = {
   client: string; total: number; draft: number; approved: number; sent: number;
   channels: string[]; byChannel: ChannelRoll[]; scraper: Scraper | null;
-  profile: ClientProfile | null; watch?: Watch;
+  profile: ClientProfile | null; watch?: Watch; sendPolicy: SendPolicy | null;
 };
 
 type Item = {
@@ -26,12 +31,17 @@ type Item = {
   recipient_url: string | null; subject: string | null; body: string | null;
   personalization: string | null; evidence_url: string | null;
   status: string; tier: string | null; created_at: string;
+  // null = not knowable right now (policy/queue read failed), never a guess.
+  sendable: boolean | null;
+  notSendableReason: string | null;
 };
 type Payload = {
   configured: boolean; error?: string;
   clients: ClientRollup[]; items: Item[];
   totals?: { total: number; draft: number; approved: number; sent: number };
   content?: ContentFeed;
+  sendPolicy?: { available: boolean; reason: string | null };
+  sendable?: { available: boolean; reason: string | null; count: number | null };
 };
 
 const STATUS_COLOR: Record<string, string> = {
@@ -370,6 +380,33 @@ export default function CrmBoard() {
               <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>{label}</div>
             </div>
           ))}
+          {/* How many rows could actually go out right now, distinct from how
+              many are approved. An approved row is only a request; this is
+              the count that survived client permission, suppression, channel
+              and body checks. Zero here must never look like a read failure,
+              and a read failure must never render as zero. */}
+          <div style={{
+            border: `1px solid ${data.sendable?.available === false ? "var(--red)" : "var(--border)"}`,
+            borderRadius: 12, padding: "8px 14px", background: "var(--bg-card)", minWidth: 168,
+          }}>
+            {data.sendable?.available === false ? (
+              <>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--red)" }}>Could not read policy</div>
+                <div style={{ fontSize: 10.5, color: "var(--text-secondary)", marginTop: 2, lineHeight: 1.4 }}>
+                  {data.sendable.reason ?? "The sendable queue could not be read."} Not the same as zero.
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: 20, fontWeight: 700, color: (data.sendable?.count ?? 0) > 0 ? "var(--green)" : "var(--text-primary)", fontVariantNumeric: "tabular-nums" }}>
+                  {data.sendable?.count ?? "—"}
+                </div>
+                <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>
+                  sendable right now{(data.sendable?.count ?? 0) === 0 ? ", because every client is denied or nothing is eligible" : ""}
+                </div>
+              </>
+            )}
+          </div>
         </div>
       )}
 
@@ -424,6 +461,41 @@ export default function CrmBoard() {
 
         {/* Everything for the selected client */}
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+
+          {/* Contract boundary, stated plainly. This is not a bug and not a
+              toggle to flip from the board — it is what was signed. Shown
+              before anything else for a denied client so an empty queue
+              reads as "by design" instead of "broken". */}
+          {current && data.sendPolicy?.available === false && (
+            <div style={{
+              border: "1px solid var(--red)", borderRadius: 12, padding: "10px 14px",
+              background: "var(--bg-card)",
+            }}>
+              <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--red)" }}>
+                Send permission could not be checked
+              </div>
+              <p style={{ margin: "4px 0 0", fontSize: 11.5, color: "var(--text-secondary)", lineHeight: 1.5 }}>
+                {data.sendPolicy.reason ?? "The send-policy table could not be read."} Treat every row for{" "}
+                {current.client} as NOT sendable until this is confirmed. A failed read is not permission.
+              </p>
+            </div>
+          )}
+          {current && data.sendPolicy?.available !== false && current.sendPolicy?.may_send !== true && (
+            <div style={{
+              border: "1px solid var(--orange)", borderRadius: 12, padding: "10px 14px",
+              background: "var(--bg-card)",
+            }}>
+              <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--orange)" }}>
+                {current.client} cannot be sent for. Contract limit, not a bug.
+              </div>
+              <p style={{ margin: "4px 0 0", fontSize: 11.5, color: "var(--text-secondary)", lineHeight: 1.5 }}>
+                {current.sendPolicy?.scope_note
+                  ?? `${current.client} has no send-policy row on file, which defaults to deny.`}
+                {" "}Approving rows below still keeps them checked, but nothing for this client can ever leave
+                Wing until the signed scope changes.
+              </p>
+            </div>
+          )}
 
           {current && (
             <CrmClientSummary
@@ -656,6 +728,20 @@ export default function CrmBoard() {
 
               {it.subject && (
                 <div style={{ fontSize: 13, fontWeight: 600 }}>{it.subject}</div>
+              )}
+
+              {/* Approved does not mean sendable. Name the specific reason,
+                  read from the data, never a generic "not ready". */}
+              {it.status === "approved" && it.sendable !== true && (
+                <div style={{
+                  fontSize: 11.5, lineHeight: 1.5, borderRadius: 8, padding: "6px 9px",
+                  background: "var(--bg-secondary)",
+                  color: it.sendable === null ? "var(--red)" : "var(--orange)",
+                  border: `1px solid ${it.sendable === null ? "var(--red)" : "var(--orange)"}`,
+                }}>
+                  <b>{it.sendable === null ? "Cannot confirm sendable: " : "Approved, but not sendable: "}</b>
+                  {it.notSendableReason ?? "No reason was returned for this row."}
+                </div>
               )}
 
               {/* The real fact this was personalized on — the thing that keeps

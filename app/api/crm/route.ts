@@ -634,6 +634,113 @@ async function contentFor(slug: string | null, name: string): Promise<ContentFee
   };
 }
 
+// ── Send policy + sendable queue ────────────────────────────────────────────
+// DEFAULT DENY. A client with no row in client_send_policy, or a row whose
+// may_send is not exactly true, can never be sent for — the view enforces
+// this server-side, but the board must SAY so per client, because an
+// approved row for a denied client looks identical to a sendable one
+// otherwise. This is a contract boundary, not a toggle to flip casually.
+export type SendPolicy = { client: string; may_send: boolean; scope_note: string | null };
+export type SendPolicyState = {
+  available: boolean;
+  reason: string | null;
+  byClient: Record<string, SendPolicy>;
+};
+
+async function sendPolicies(): Promise<SendPolicyState> {
+  const none = (reason: string): SendPolicyState => ({ available: false, reason, byClient: {} });
+  let res: Response;
+  try {
+    res = await sb("client_send_policy?select=client,may_send,scope_note");
+  } catch (e) {
+    return none(`Could not reach the send-policy table: ${e instanceof Error ? e.message : String(e)}`);
+  }
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    return none(`The send-policy table returned HTTP ${res.status}: ${body.slice(0, 200)}`);
+  }
+  const rows = (await res.json()) as SendPolicy[];
+  const byClient: Record<string, SendPolicy> = {};
+  for (const r of rows) byClient[norm(String(r.client ?? ""))] = r;
+  return { available: true, reason: null, byClient };
+}
+
+export type SendableState = {
+  available: boolean;
+  reason: string | null;
+  count: number | null;
+  ids: number[];
+};
+
+async function sendableQueue(): Promise<SendableState> {
+  const none = (reason: string): SendableState => ({ available: false, reason, count: null, ids: [] });
+  let res: Response;
+  try {
+    res = await sb("outbound_sendable?select=id", { Prefer: "count=exact" });
+  } catch (e) {
+    return none(`Could not reach the sendable view: ${e instanceof Error ? e.message : String(e)}`);
+  }
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    return none(`outbound_sendable returned HTTP ${res.status}: ${body.slice(0, 200)}`);
+  }
+  const total = Number((res.headers.get("content-range") || "").split("/").pop());
+  const rows = (await res.json()) as { id: number }[];
+  return {
+    available: true, reason: null,
+    count: Number.isFinite(total) ? total : rows.length,
+    ids: rows.map((r) => r.id),
+  };
+}
+
+async function suppressedEmails(): Promise<{ available: boolean; reason: string | null; set: Set<string> }> {
+  let res: Response;
+  try {
+    res = await sb("suppression?select=email");
+  } catch (e) {
+    return { available: false, reason: `Could not reach the suppression list: ${e instanceof Error ? e.message : String(e)}`, set: new Set() };
+  }
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    return { available: false, reason: `suppression returned HTTP ${res.status}: ${body.slice(0, 200)}`, set: new Set() };
+  }
+  const rows = (await res.json()) as { email: string }[];
+  return { available: true, reason: null, set: new Set(rows.map((r) => r.email.toLowerCase())) };
+}
+
+// Why this ONE approved row is not (yet) in the sendable queue. Derived only
+// from data actually returned above — never a guess, never a generic
+// "not sendable" with no cause. Only meaningful for status === "approved";
+// anything else has an obvious reason (still a draft, already sent, etc.).
+function notSendableReason(
+  it: { client: string | null; channel: string | null; recipient: string | null; body: string | null },
+  policy: SendPolicyState,
+  suppressed: Set<string>,
+): string | null {
+  const pol = it.client ? policy.byClient[norm(it.client)] : undefined;
+  if (!policy.available) {
+    return `The send-policy table could not be read (${policy.reason}), so permission cannot be confirmed.`;
+  }
+  if (!pol || pol.may_send !== true) {
+    return pol
+      ? `${it.client} is not permitted to send. ${pol.scope_note ?? "No scope note on file."}`
+      : `${it.client} has no send-policy row on file, which defaults to DENY.`;
+  }
+  if (it.channel !== "email") {
+    return `Only email is wired for sending. This row is on "${it.channel ?? "an unset channel"}".`;
+  }
+  if (!it.recipient) {
+    return "This row has no recipient email recorded, so there is nowhere to send it.";
+  }
+  if (suppressed.has(it.recipient.toLowerCase())) {
+    return `${it.recipient} is on the suppression list and must never be mailed.`;
+  }
+  if (!it.body) {
+    return "This row has no message body, so there is nothing to send.";
+  }
+  return "Approved and otherwise eligible, but not yet in the sendable queue. Verify the underlying row directly.";
+}
+
 export async function GET(req: Request) {
   const { url, key } = creds();
   if (!url || !key) {
@@ -692,6 +799,14 @@ export async function GET(req: Request) {
     // Per-run counters for every client, from the run log (may not exist yet).
     const runs = await watchRuns();
 
+    // Send policy (default deny), the sendable queue, and the suppression
+    // list. These decide whether an approved row can ever go out, and the
+    // board must show WHY, not just how many are approved.
+    const policy = await sendPolicies();
+    const sendable = await sendableQueue();
+    const suppression = await suppressedEmails();
+    const sendableIdSet = new Set(sendable.ids);
+
     // Key facts (MRR, status) come from the vault client pages, matched by name.
     const profiles = await clientProfiles();
     const profByName = new Map(profiles.map((p) => [norm(p.name), p]));
@@ -722,6 +837,7 @@ export async function GET(req: Request) {
             : null,
           watch: buildWatch(cfg, runs, lastRanTracked, c.draft, draftsReason, c.client),
           profile: profByName.get(norm(c.client)) ?? null,
+          sendPolicy: policy.available ? policy.byClient[norm(c.client)] ?? null : null,
         };
       })
       .sort((a, b) => b.total - a.total);
@@ -740,7 +856,22 @@ export async function GET(req: Request) {
     // Best-evidence first WITHIN the existing newest-first order is wrong — the
     // caller asked for newest. Keep the order the query returned and let the UI
     // sort; the rank is shipped on each row so it can.
-    const items = rawItems.map(shapeOutbound);
+    const items = rawItems.map((r) => {
+      const shaped = shapeOutbound(r);
+      const idNum = typeof r.id === "number" ? r.id : Number(r.id ?? NaN);
+      const rowSendable = sendable.available ? sendableIdSet.has(idNum) : null;
+      return {
+        ...shaped,
+        sendable: rowSendable,
+        notSendableReason:
+          shaped.status === "approved" && rowSendable !== true
+            ? notSendableReason(
+                { client: shaped.client, channel: shaped.channel, recipient: shaped.recipient, body: shaped.body },
+                policy, suppression.set,
+              )
+            : null,
+      };
+    });
 
     const totals = {
       total: all.length,
@@ -811,6 +942,8 @@ export async function GET(req: Request) {
     return NextResponse.json({
       configured: true, clients, items, totals, content,
       evidence, coverage, scan: scanned.meta,
+      sendPolicy: { available: policy.available, reason: policy.reason },
+      sendable: { available: sendable.available, reason: sendable.reason, count: sendable.count },
     });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);

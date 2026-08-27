@@ -363,7 +363,7 @@ export default function CrmBoard() {
       <header style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
         <h2 style={{ margin: 0, fontSize: 18, letterSpacing: "-0.01em" }}>CRM</h2>
         <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
-          Everything happening for each client. Nothing sends from here — you keep it checked.
+          Everything happening for each client. Nothing sends from here, you keep it checked.
         </span>
       </header>
 
@@ -399,7 +399,7 @@ export default function CrmBoard() {
             ) : (
               <>
                 <div style={{ fontSize: 20, fontWeight: 700, color: (data.sendable?.count ?? 0) > 0 ? "var(--green)" : "var(--text-primary)", fontVariantNumeric: "tabular-nums" }}>
-                  {data.sendable?.count ?? "—"}
+                  {data.sendable?.count ?? "not counted"}
                 </div>
                 <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>
                   sendable right now{(data.sendable?.count ?? 0) === 0 ? ", because every client is denied or nothing is eligible" : ""}
@@ -463,7 +463,7 @@ export default function CrmBoard() {
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
 
           {/* Contract boundary, stated plainly. This is not a bug and not a
-              toggle to flip from the board — it is what was signed. Shown
+              toggle to flip from the board, it is what was signed. Shown
               before anything else for a denied client so an empty queue
               reads as "by design" instead of "broken". */}
           {current && data.sendPolicy?.available === false && (
@@ -544,7 +544,7 @@ export default function CrmBoard() {
                 }}>◉ {cfg.name}&apos;s scraper</span>
                 <span style={{ fontSize: 11.5, color: "var(--text-secondary)" }}>
                   {isOffByChoice(cfg.channels) ? (
-                    <>platforms set to <b style={{ color: "var(--text-primary)" }}>none</b> — this
+                    <>platforms set to <b style={{ color: "var(--text-primary)" }}>none</b>, this
                     scraper is intentionally not hunting for anyone</>
                   ) : (
                     <>hunts <b style={{ color: "var(--text-primary)" }}>{cfg.scrape_niche || "?"}</b> customers
@@ -583,7 +583,7 @@ export default function CrmBoard() {
                   fontSize: 11.5, padding: "5px 14px", borderRadius: 8, cursor: "pointer",
                   border: "1px solid var(--accent)", color: "var(--accent)",
                   background: "transparent", fontWeight: 600,
-                }}>{cfgSaved ? "saved — next run uses this" : "save scraper settings"}</button>
+                }}>{cfgSaved ? "saved, next run uses this" : "save scraper settings"}</button>
                 {cfgErr && (
                   <p role="alert" style={{ color: "var(--red)", fontSize: 12, margin: "6px 0 0" }}>
                     Not saved: {cfgErr}. The next run still uses the old settings.
@@ -650,7 +650,7 @@ export default function CrmBoard() {
                 border: "1px solid var(--orange)", background: "var(--accent-glow)",
                 color: "var(--orange)", fontWeight: 650,
               }}>
-                showing the {focus === "parked" ? "parked" : focus} queue, all channels — clear ✕
+                showing the {focus === "parked" ? "parked" : focus} queue, all channels, clear ✕
               </button>
             )}
           </div>
@@ -669,7 +669,7 @@ export default function CrmBoard() {
               <p style={{ margin: "5px 0 0", fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.55 }}>
                 Nothing writes rows with <code>channel = &quot;sms&quot;</code> to the <code>outbound</code> table,
                 and Wing has no texting provider connected since GHL was retired. This lane will fill in on
-                its own once a sender starts drafting texts — nothing is being hidden.
+                its own once a sender starts drafting texts, nothing is being hidden.
               </p>
             </div>
           ) : visible.length === 0 ? (
@@ -683,10 +683,10 @@ export default function CrmBoard() {
                 {laneCounts[active] === 0
                   ? breakdown.total === 0
                     ? scrapingOff
-                      ? `No row has ever been written for ${client} on any channel — expected, since their scraping is off by choice.`
+                      ? `No row has ever been written for ${client} on any channel, expected, since their scraping is off by choice.`
                       : `No row has ever been written for ${client} on any channel.`
                     : `${client} has ${breakdown.total} row${breakdown.total === 1 ? "" : "s"}, but none of them on this channel.`
-                  : `This channel has ${laneCounts[active]} row${laneCounts[active] === 1 ? "" : "s"} in total — none of them ${status || "matching"}.`}
+                  : `This channel has ${laneCounts[active]} row${laneCounts[active] === 1 ? "" : "s"} in total, none of them ${status || "matching"}.`}
               </p>
             </div>
           ) : visible.map((it) => {
@@ -718,7 +718,7 @@ export default function CrmBoard() {
                     <span style={{
                       fontSize: 10.5, fontWeight: 700, padding: "2px 9px", borderRadius: 20,
                       border: "1px solid var(--orange)", color: "var(--orange)",
-                    }}>⚑ parked — needs you</span>
+                    }}>⚑ parked, needs you</span>
                   )}
                   <span style={{ fontSize: 11, fontWeight: 600, color: STATUS_COLOR[it.status] || "var(--text-primary)" }}>
                     {it.status}
@@ -744,7 +744,7 @@ export default function CrmBoard() {
                 </div>
               )}
 
-              {/* The real fact this was personalized on — the thing that keeps
+              {/* The real fact this was personalized on, the thing that keeps
                   it honest and non-generic. For a parked row it is instead the
                   reason a human has to step in. */}
               {it.personalization && (
@@ -775,7 +775,7 @@ export default function CrmBoard() {
                 />
               ) : (
                 <p style={{ margin: 0, fontSize: 11.5, color: "var(--text-muted)", lineHeight: 1.55 }}>
-                  No message was ever drafted for this row — the pipeline stopped at{" "}
+                  No message was ever drafted for this row, the pipeline stopped at{" "}
                   <b style={{ color: "var(--text-secondary)" }}>{it.status}</b>, so there is nothing to edit.
                   Open the source to judge it yourself.
                 </p>
@@ -797,7 +797,7 @@ export default function CrmBoard() {
                   <button onClick={() => act(it, "sent")} style={{ ...btn, borderColor: "var(--accent)", color: "var(--accent)" }}>mark sent</button>
                 )}
                 <button onClick={() => act(it, "skip")} style={btn}>
-                  {park ? "not our area — skip" : "skip"}
+                  {park ? "not our area, skip" : "skip"}
                 </button>
               </div>
               {actErr[it.id] && (
@@ -852,7 +852,7 @@ export function NeedsYou({ name, drafts, approved, parked, watch, scrapingOff, b
   });
   if (parked > 0) rows.push({
     id: "parked", n: parked, color: "var(--orange)", mark: "⚑", go: "parked",
-    title: `${parked} parked — a human has to locate ${parked === 1 ? "it" : "them"}`,
+    title: `${parked} parked, a human has to locate ${parked === 1 ? "it" : "them"}`,
     why: "Real demand, but the scraper could not resolve a city from the post, so it refused to guess. " +
          "Open each one, decide whether it is in the service area, then reply or skip.",
   });
@@ -901,7 +901,7 @@ export function NeedsYou({ name, drafts, approved, parked, watch, scrapingOff, b
       {clear ? (
         <p style={{ margin: 0, fontSize: 12, lineHeight: 1.6, color: "var(--text-secondary)" }}>
           Checked: drafts awaiting approval ({breakdown.draft}), approved-but-unsent ({breakdown.approved}),
-          leads parked for a location call ({breakdown.parked ?? "not counted — row list capped"}),
+          leads parked for a location call ({breakdown.parked ?? "not counted, row list capped"}),
           and scraper health
           {scrapingOff ? " (off by choice, so not flagged)"
             : watch ? ` (${healthLook(watch, null).label.toLowerCase()})`
@@ -965,7 +965,7 @@ export function Timeline({ name, events, rows, truncated, content, watch, scrapi
   );
   if (watch?.run) {
     gaps.push(
-      "Only the most recent scraper run is available — the API returns one run per client, so " +
+      "Only the most recent scraper run is available, the API returns one run per client, so " +
       "earlier runs are not in this history."
     );
   } else if (watch && !scrapingOff) {
@@ -976,7 +976,7 @@ export function Timeline({ name, events, rows, truncated, content, watch, scrapi
   }
   if (truncated) {
     gaps.push(
-      `Only the newest ${ROW_CAP} rows are returned per client, and that cap was hit — this history ` +
+      `Only the newest ${ROW_CAP} rows are returned per client, and that cap was hit, this history ` +
       `does not reach all the way back.`
     );
   }
@@ -1011,10 +1011,10 @@ export function Timeline({ name, events, rows, truncated, content, watch, scrapi
           <p style={{ margin: "5px 0 0", fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.55 }}>
             {scrapingOff
               ? `Not a single outbound row, and no publishing record. That is the expected history for a ` +
-                `client whose scraping is deliberately off — this timeline is empty because there is ` +
+                `client whose scraping is deliberately off, this timeline is empty because there is ` +
                 `genuinely nothing to show, not because a source failed.`
               : `No outbound row, no logged run and no publishing record carries a timestamp for this ` +
-                `client. That is an absence of data, not a quiet period — check the sources named below.`}
+                `client. That is an absence of data, not a quiet period, check the sources named below.`}
           </p>
         </div>
       ) : (
@@ -1082,7 +1082,7 @@ export function Timeline({ name, events, rows, truncated, content, watch, scrapi
         Built from {rows} outbound row{rows === 1 ? "" : "s"}
         {watch?.run ? ", 1 scraper run" : ""}
         {content?.available ? `, ${content.items.filter((c) => c.status === "published").length} published item(s)` : ""}
-        {" "}— no entry here is synthetic.
+        {" "}and no entry here is synthetic.
       </div>
     </section>
   );

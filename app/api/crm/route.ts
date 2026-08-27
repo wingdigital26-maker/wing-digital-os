@@ -715,8 +715,9 @@ async function suppressedEmails(): Promise<{ available: boolean; reason: string 
 function notSendableReason(
   it: { client: string | null; channel: string | null; recipient: string | null; body: string | null },
   policy: SendPolicyState,
-  suppressed: Set<string>,
+  suppression: { available: boolean; reason: string | null; set: Set<string> },
 ): string | null {
+  const suppressed = suppression.set;
   const pol = it.client ? policy.byClient[norm(it.client)] : undefined;
   if (!policy.available) {
     return `The send-policy table could not be read (${policy.reason}), so permission cannot be confirmed.`;
@@ -732,11 +733,18 @@ function notSendableReason(
   if (!it.recipient) {
     return "This row has no recipient email recorded, so there is nowhere to send it.";
   }
-  if (suppressed.has(it.recipient.toLowerCase())) {
+  if (suppressed.has(it.recipient.trim().toLowerCase())) {
     return `${it.recipient} is on the suppression list and must never be mailed.`;
   }
   if (!it.body) {
     return "This row has no message body, so there is nothing to send.";
+  }
+  // A failed suppression read leaves an EMPTY set, so the check above would
+  // return false for a genuinely suppressed address and we would fall through
+  // to the "otherwise eligible" line below. That sentence would be a claim we
+  // cannot support. An unreadable list is not a clean list.
+  if (!suppression.available) {
+    return `Cannot confirm this is safe to send: the suppression list could not be read (${suppression.reason ?? "no reason recorded"}). Everything else about this row passed, but do not treat that as clearance.`;
   }
   return "Approved and otherwise eligible, but not yet in the sendable queue. Verify the underlying row directly.";
 }
@@ -867,7 +875,7 @@ export async function GET(req: Request) {
           shaped.status === "approved" && rowSendable !== true
             ? notSendableReason(
                 { client: shaped.client, channel: shaped.channel, recipient: shaped.recipient, body: shaped.body },
-                policy, suppression.set,
+                policy, suppression,
               )
             : null,
       };
@@ -944,6 +952,14 @@ export async function GET(req: Request) {
       evidence, coverage, scan: scanned.meta,
       sendPolicy: { available: policy.available, reason: policy.reason },
       sendable: { available: sendable.available, reason: sendable.reason, count: sendable.count },
+      // Surfaced so an unreadable do-not-contact list is visible rather than
+      // silently behaving like an empty one. size is null when unavailable: we
+      // do not know it is zero, we know we could not read it.
+      suppression: {
+        available: suppression.available,
+        reason: suppression.reason,
+        size: suppression.available ? suppression.set.size : null,
+      },
     });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);

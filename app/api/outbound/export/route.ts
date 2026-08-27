@@ -118,9 +118,20 @@ export async function GET(req: Request) {
     );
   }
 
+  // Must match public.canonical_email in migration 0009 exactly. Lowercase,
+  // trim, and strip any plus tag, because info+x@d.com and info@d.com are the
+  // same mailbox. Dots are deliberately NOT stripped: that is Gmail specific
+  // and would wrongly collapse distinct addresses on other providers.
+  //
+  // This filter and the view previously agreed with each other while both
+  // applying the same incomplete rule, which is worse than disagreeing because
+  // it looks like corroboration. If you change one, change the other.
+  const canonical = (addr: string): string =>
+    (addr || "").trim().toLowerCase().replace(/\+[^@]*@/, "@");
+
   const blocked = new Set(
     ((await suppression.json().catch(() => [])) as { email?: string }[])
-      .map((r) => (r.email || "").trim().toLowerCase())
+      .map((r) => canonical(r.email || ""))
       .filter(Boolean)
   );
 
@@ -150,7 +161,7 @@ export async function GET(req: Request) {
   // can see that screening happened rather than assuming an empty list means
   // nothing was filtered.
   const before = rows.length;
-  rows = rows.filter((r) => !blocked.has((r.to || "").trim().toLowerCase()));
+  rows = rows.filter((r) => !blocked.has(canonical(r.to || "")));
   const removed = before - rows.length;
 
   if (format === "json") {

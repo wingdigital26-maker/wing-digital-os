@@ -217,26 +217,71 @@ export async function POST(req: Request) {
 
     if (outcome === "sent") {
       if (row.sent_at) {
-        // Idempotency: never move the clock on a row already marked sent.
+        // Fast path: the pre-check read already saw this row marked sent.
+        // Still not the idempotency mechanism by itself (see below), just an
+        // early exit that skips an unnecessary request.
         rowResults.push({
           id, outcome, status: "already_sent",
           detail: `row ${id} was already marked sent at ${row.sent_at}; timestamp was NOT overwritten`,
         });
         continue;
       }
-      const patchRes = await fetch(`${url}/rest/v1/outbound?id=eq.${id}`, {
-        method: "PATCH",
-        headers: {
-          apikey: key, Authorization: `Bearer ${key}`,
-          "Content-Type": "application/json", Prefer: "return=minimal",
-        },
-        body: JSON.stringify({ status: "sent", sent_at: now }),
-      });
+      // Atomic, conditional write: the filter includes sent_at=is.null so the
+      // database, not this handler, decides who wins a race between two
+      // concurrent reports for the same id. Two overlapping POSTs can both
+      // pass the read check above; only one of them can match this filter,
+      // because Postgres serializes the underlying row update. We ask for
+      // return=representation so we can tell, from the response body alone,
+      // whether OUR request was the one that actually moved sent_at.
+      let patchRes: Response;
+      try {
+        patchRes = await fetch(
+          `${url}/rest/v1/outbound?id=eq.${id}&sent_at=is.null`,
+          {
+            method: "PATCH",
+            headers: {
+              apikey: key, Authorization: `Bearer ${key}`,
+              "Content-Type": "application/json", Prefer: "return=representation",
+            },
+            body: JSON.stringify({ status: "sent", sent_at: now }),
+          }
+        );
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        rowResults.push({
+          id, outcome, status: "error",
+          detail: `failed to write sent_at: request to upstream failed: ${msg}. Row was NOT confirmed sent.`,
+        });
+        continue;
+      }
       if (!patchRes.ok) {
         const detail = await patchRes.text().catch(() => "");
         rowResults.push({
           id, outcome, status: "error",
           detail: `failed to write sent_at: HTTP ${patchRes.status} ${detail.slice(0, 300)}`,
+        });
+        continue;
+      }
+      let updatedRows: OutRow[];
+      try {
+        updatedRows = (await patchRes.json()) as OutRow[];
+      } catch {
+        // We cannot confirm the write landed from an unparseable response.
+        // This must not read as success.
+        rowResults.push({
+          id, outcome, status: "error",
+          detail: `write to ${id} returned HTTP ${patchRes.status} but the response body could not be parsed, so the write could not be confirmed`,
+        });
+        continue;
+      }
+      if (updatedRows.length === 0) {
+        // We lost the race (or the row was already sent by the time this
+        // request reached the database): sent_at was no longer null, so our
+        // conditional filter matched zero rows. This is not an error and it
+        // is not a fresh success; it is the other side of the same event.
+        rowResults.push({
+          id, outcome, status: "already_sent",
+          detail: `row ${id} was marked sent by a concurrent request; this request's write did NOT land, and sent_at was NOT overwritten`,
         });
         continue;
       }
@@ -313,11 +358,18 @@ export async function POST(req: Request) {
       }
     }
 
+    // return=representation here too: a bounce/complaint report can also
+    // arrive twice concurrently (a sender retrying a slow response, or two
+    // overlapping runs). Filtering on id alone and reading back the matched
+    // rows lets us confirm the write actually landed rather than assuming a
+    // 200 means the row was found and changed. The suppression upsert above
+    // is naturally idempotent (merge-duplicates), so it is not the concern
+    // here; a missing row match is.
     const patchRes = await fetch(`${url}/rest/v1/outbound?id=eq.${id}`, {
       method: "PATCH",
       headers: {
         apikey: key, Authorization: `Bearer ${key}`,
-        "Content-Type": "application/json", Prefer: "return=minimal",
+        "Content-Type": "application/json", Prefer: "return=representation",
       },
       // No sent_at here on purpose: a bounce/complaint is not a delivery.
       body: JSON.stringify({ status: statusForOutcome, last_send_attempt_at: now }),
@@ -330,6 +382,28 @@ export async function POST(req: Request) {
         detail:
           `row status update failed: HTTP ${patchRes.status} ${detail.slice(0, 300)}. ` +
           `Suppression ${suppressOk ? "WAS still recorded for " + email : "was not recorded"}.`,
+      });
+      continue;
+    }
+
+    let statusUpdatedRows: OutRow[];
+    try {
+      statusUpdatedRows = (await patchRes.json()) as OutRow[];
+    } catch {
+      rowResults.push({
+        id, outcome, status: "error",
+        detail:
+          `row status update returned HTTP ${patchRes.status} but the response body could not be parsed, ` +
+          `so the write could not be confirmed. Suppression ${suppressOk ? "WAS still recorded for " + email : "was not recorded"}.`,
+      });
+      continue;
+    }
+    if (statusUpdatedRows.length === 0) {
+      rowResults.push({
+        id, outcome, status: "error",
+        detail:
+          `row status update matched no rows for id ${id} (it may have been deleted between the earlier read and this write); ` +
+          `not marked "${statusForOutcome}". Suppression ${suppressOk ? "WAS still recorded for " + email : "was not recorded"}.`,
       });
       continue;
     }

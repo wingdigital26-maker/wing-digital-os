@@ -1,0 +1,535 @@
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jackson Roofing Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/* Colour here is information, not decoration: every hue maps to one content type
+   and means the same thing in the chart, the mix bar and the list. */
+:root{
+  --bg:#fbfaf8; --surface:#ffffff; --surface-2:#f4f2ee; --surface-3:#ebe8e2;
+  --border:rgba(46,40,32,.12); --border-hi:rgba(46,40,32,.3);
+  --accent:#0b7fa6; --accent-bg:rgba(11,127,166,.09); --accent-glow:rgba(11,127,166,.13);
+  --t1:#1c1a17; --t2:#59544c; --t3:#8a837a;
+  --ok:#2f7d55; --ok-bg:rgba(47,125,85,.11);
+  --display:"Fraunces",Georgia,serif;
+  --font:"Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --r:14px; --r-sm:9px;
+  --shadow:0 1px 2px rgba(46,40,32,.05),0 10px 30px -18px rgba(46,40,32,.35);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#14120f; --surface:#1c1a16; --surface-2:#24211c; --surface-3:#2d2922;
+    --border:rgba(214,204,190,.14); --border-hi:rgba(214,204,190,.32);
+    --accent:#1bc0ff; --accent-bg:rgba(27,192,255,.12); --accent-glow:rgba(27,192,255,.20);
+    --t1:#f3efe8; --t2:#a89f92; --t3:#7a7268;
+    --ok:#4ac585; --ok-bg:rgba(74,197,133,.13);
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px -18px rgba(0,0,0,.7);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#14120f; --surface:#1c1a16; --surface-2:#24211c; --surface-3:#2d2922;
+  --border:rgba(214,204,190,.14); --border-hi:rgba(214,204,190,.32);
+  --accent:#1bc0ff; --accent-bg:rgba(27,192,255,.12); --accent-glow:rgba(27,192,255,.20);
+  --t1:#f3efe8; --t2:#a89f92; --t3:#7a7268;
+  --ok:#4ac585; --ok-bg:rgba(74,197,133,.13);
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px -18px rgba(0,0,0,.7);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg);color:var(--t1);
+  line-height:1.55;-webkit-font-smoothing:antialiased}
+a{color:inherit}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+.wrap{max-width:920px;margin:0 auto;padding:0 24px}
+/* header */
+.hdr{background:var(--surface);border-bottom:1px solid var(--border)}
+.hdr-in{max-width:920px;margin:0 auto;padding:16px 24px;display:flex;align-items:center;gap:13px}
+/* The badge takes the brand's own dark tile and letter colour rather than the
+   accent. Painting white on the accent breaks the moment a brand's accent is a
+   light one -- Jackson's cyan in dark mode is unreadable under white text. */
+.mark{width:38px;height:38px;border-radius:11px;flex:0 0 auto;display:grid;place-items:center;
+  font-weight:700;font-size:.85rem;letter-spacing:.01em;
+  /* var() with the build-time value as fallback: the static build has no
+     --mark-bg set so the fallback wins, while the live page sets it per client
+     from the API payload. One rule serves both. */
+  background:var(--mark-bg, #0a0a0a);color:var(--mark-fg, #1bc0ff)}
+.hdr-name{font-size:1rem;font-weight:650;letter-spacing:-.012em}
+.hdr-sub{font-size:.76rem;color:var(--t3)}
+.hdr-r{margin-left:auto;display:flex;align-items:center;gap:9px}
+.tbtn{width:34px;height:34px;border-radius:9px;border:1px solid var(--border);
+  display:grid;place-items:center;color:var(--t2);transition:color .15s,border-color .15s}
+.tbtn:hover{color:var(--t1);border-color:var(--border-hi)}
+.tbtn svg{width:16px;height:16px}
+.i-sun{display:none}
+:root[data-theme="dark"] .i-moon{display:none}
+:root[data-theme="dark"] .i-sun{display:block}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]) .i-moon{display:none}
+  :root:not([data-theme="light"]) .i-sun{display:block}
+}
+/* hero */
+.hero{position:relative;overflow:hidden;border-bottom:1px solid var(--border);
+  background:var(--surface)}
+.hero::before{content:'';position:absolute;top:-230px;right:-140px;width:560px;height:560px;
+  border-radius:50%;background:radial-gradient(circle,var(--accent-glow) 0%,transparent 66%);
+  pointer-events:none}
+.hero-in{position:relative;max-width:920px;margin:0 auto;padding:46px 24px 40px}
+.eyebrow{font-size:.7rem;font-weight:700;letter-spacing:.15em;text-transform:uppercase;
+  color:var(--accent);margin-bottom:12px}
+.hero h1{font-family:var(--display);font-size:clamp(1.75rem,4vw,2.35rem);font-weight:700;
+  letter-spacing:-.02em;line-height:1.15;text-wrap:balance;max-width:20ch}
+.hero p{margin-top:11px;font-size:.97rem;color:var(--t2);max-width:56ch}
+/* stats */
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:30px}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
+  padding:18px 20px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+.stat::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent)}
+.stat-v{font-family:var(--display);font-size:2.1rem;font-weight:700;letter-spacing:-.03em;
+  line-height:1;font-variant-numeric:tabular-nums}
+.stat-l{margin-top:8px;font-size:.79rem;color:var(--t2);line-height:1.4}
+@media(max-width:620px){.stats{grid-template-columns:1fr}}
+/* sections */
+section{padding:44px 0 0}
+.sh{display:flex;align-items:baseline;gap:11px;flex-wrap:wrap}
+.sh h2{font-family:var(--display);font-size:1.22rem;font-weight:700;letter-spacing:-.015em}
+.sh .n{font-size:.79rem;color:var(--t3);font-variant-numeric:tabular-nums}
+.sd{font-size:.85rem;color:var(--t2);margin-top:4px;margin-bottom:18px;max-width:62ch}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
+  padding:20px 22px;box-shadow:var(--shadow)}
+/* monthly chart -- plain bars, value on top, month underneath */
+.chart{display:flex;align-items:stretch;gap:10px;height:200px}
+.cbar{flex:1;display:flex;flex-direction:column;align-items:center;min-width:0}
+.cbar-v{flex:0 0 auto;font-size:.76rem;font-weight:650;color:var(--t2);margin-bottom:6px;
+  font-variant-numeric:tabular-nums}
+/* The stack owns the height, so each segment's percentage has something real to
+   resolve against -- without this every bar collapses to its 3px minimum. */
+.cbar-stack{flex:1 1 auto;width:100%;max-width:54px;display:flex;flex-direction:column-reverse;
+  justify-content:flex-start;border-radius:5px;overflow:hidden}
+.cbar-seg{width:100%;flex:0 0 auto;transition:height .7s cubic-bezier(.22,1,.36,1)}
+.cbar-empty{width:100%;height:3px;flex:0 0 auto;border-radius:3px;background:var(--surface-3)}
+.cbar-l{flex:0 0 auto;margin-top:9px;font-size:.71rem;color:var(--t3);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.cnote{margin-top:16px;padding-top:14px;border-top:1px solid var(--border);
+  font-size:.78rem;color:var(--t3)}
+/* A dense chart (7+ bars) on a phone: 40px labels under 25px bars collide into
+   an unreadable smear. Thin to every other label; the bar titles keep the rest. */
+@media(max-width:560px){
+  .chart.dense .cbar:nth-child(even) .cbar-l{visibility:hidden}
+}
+/* type mix */
+.mix{display:flex;height:11px;border-radius:6px;overflow:hidden;gap:2px;margin-bottom:16px}
+/* min-width keeps a 1-of-40 segment visible instead of vanishing to a hairline */
+.mix-seg{min-width:8px;transition:flex-grow .7s cubic-bezier(.22,1,.36,1)}
+.keys{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:11px}
+.key{display:flex;align-items:baseline;gap:8px;font-size:.83rem}
+.key i{width:10px;height:10px;border-radius:3px;flex:0 0 auto;transform:translateY(1px)}
+.key .kn{color:var(--t2)}
+.key .kv{margin-left:auto;font-weight:650;font-variant-numeric:tabular-nums}
+/* search */
+.search{position:relative;margin-bottom:4px}
+.search svg{position:absolute;left:13px;top:50%;transform:translateY(-50%);
+  width:15px;height:15px;color:var(--t3)}
+.search input{width:100%;padding:11px 14px 11px 36px;border-radius:var(--r-sm);
+  border:1px solid var(--border);background:var(--surface);color:var(--t1);
+  font-size:.89rem;outline:none;transition:border-color .15s}
+.search input:focus{border-color:var(--accent)}
+.search input::placeholder{color:var(--t3)}
+/* list */
+.mgroup{margin-top:26px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.mlabel{font-size:.72rem;font-weight:700;letter-spacing:.11em;text-transform:uppercase;
+  color:var(--t3)}
+.row{display:flex;align-items:baseline;gap:14px;padding:13px 4px;
+  border-bottom:1px solid var(--border);transition:background .12s}
+.row:hover{background:var(--surface-2)}
+.row-dot{width:9px;height:9px;border-radius:3px;flex:0 0 auto;transform:translateY(4px)}
+.row-m{flex:1;min-width:0}
+.row-t{font-size:.93rem;font-weight:550;line-height:1.4}
+.row-t a{text-decoration:none;border-bottom:1px solid transparent;transition:color .15s,border-color .15s}
+.row-t a:hover{color:var(--accent);border-bottom-color:var(--accent)}
+.row-s{font-size:.77rem;color:var(--t3);margin-top:3px}
+.row-d{font-size:.79rem;color:var(--t3);white-space:nowrap;font-variant-numeric:tabular-nums}
+.more{margin-top:20px;padding:10px 18px;border-radius:var(--r-sm);border:1px solid var(--border);
+  font-size:.84rem;font-weight:600;color:var(--t2);transition:color .15s,border-color .15s}
+.more:hover{color:var(--t1);border-color:var(--border-hi)}
+.empty{padding:28px 4px;font-size:.87rem;color:var(--t3)}
+/* channels */
+.chans{display:grid;grid-template-columns:repeat(auto-fit,minmax(232px,1fr));gap:14px}
+.chan{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
+  padding:17px 19px;box-shadow:var(--shadow)}
+.chan-h{display:flex;align-items:center;gap:10px}
+.chan-i{width:30px;height:30px;border-radius:8px;flex:0 0 auto;display:grid;place-items:center;
+  background:var(--surface-2);color:var(--t2)}
+.chan-i svg{width:15px;height:15px}
+.chan.live .chan-i{background:var(--accent-bg);color:var(--accent)}
+.chan-n{font-size:.87rem;font-weight:650}
+.chan-v{margin-top:13px;font-family:var(--display);font-size:1.6rem;font-weight:700;
+  letter-spacing:-.025em;line-height:1;font-variant-numeric:tabular-nums}
+.chan-state{margin-top:13px;display:inline-block;font-size:.7rem;font-weight:700;
+  letter-spacing:.06em;text-transform:uppercase;padding:4px 9px;border-radius:5px;
+  background:var(--surface-2);color:var(--t3)}
+.chan-note{margin-top:9px;font-size:.79rem;color:var(--t2);line-height:1.5}
+/* pending */
+.prow{padding:14px 0;border-bottom:1px solid var(--border);display:flex;gap:12px;align-items:baseline}
+.prow:last-child{border-bottom:none}
+.prow .pd{width:8px;height:8px;border-radius:50%;background:var(--t3);opacity:.5;flex:0 0 auto}
+.pn{font-size:.88rem;font-weight:600}
+.pw{font-size:.8rem;color:var(--t2);margin-top:3px;max-width:60ch}
+.stale{margin-top:20px;padding:14px 17px;border-radius:var(--r);
+  border:1px solid var(--accent);background:var(--accent-bg);
+  font-size:.86rem;line-height:1.55}
+.foot{margin-top:56px;padding:24px 0 44px;border-top:1px solid var(--border);
+  font-size:.79rem;color:var(--t3)}
+.foot a{color:var(--accent);text-decoration:none}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+/* Print: a client saving this as a PDF gets the content, not the controls. */
+@media print{
+  .tbtn,.search,.more{display:none}
+  body{background:#fff;color:#000}
+  .card,.stat,.chan{box-shadow:none}
+  a{border-bottom:none!important}
+}
+</style>
+<header class="hdr">
+  <div class="hdr-in">
+    <div class="mark" id="mark"></div>
+    <div>
+      <div class="hdr-name" id="cname"></div>
+      <div class="hdr-sub" id="csub"></div>
+    </div>
+    <div class="hdr-r">
+      <button class="tbtn" id="theme" aria-label="Toggle light or dark">
+        <svg class="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        <svg class="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+<section class="hero">
+  <div class="hero-in">
+    <div class="eyebrow" id="eyebrow"></div>
+    <h1 id="headline"></h1>
+    <p id="subhead"></p>
+    <div class="stats" id="stats"></div>
+    <div id="stale"></div>
+  </div>
+</section>
+<main class="wrap">
+  <section>
+    <div class="sh"><h2>Published by month</h2></div>
+    <div class="sd" id="chart-sd"></div>
+    <div class="card">
+      <div class="chart" id="chart"></div>
+      <div class="cnote" id="cnote"></div>
+    </div>
+  </section>
+  <section>
+    <div class="sh"><h2>What we published</h2><span class="n" id="pubn"></span></div>
+    <div class="sd">Colours match the chart above. Click any title to open it on your site.</div>
+    <div class="card" style="margin-bottom:22px">
+      <div class="mix" id="mix"></div>
+      <div class="keys" id="keys"></div>
+    </div>
+    <div class="search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input id="q" type="search" placeholder="Search by title" autocomplete="off" aria-label="Search published work by title">
+    </div>
+    <div id="list"></div>
+    <button class="more" id="more" hidden></button>
+  </section>
+  <section id="out-sec">
+    <div class="sh"><h2>Outreach and social</h2><span class="n" id="outn"></span></div>
+    <div class="sd" id="out-sd"></div>
+    <div class="chans" id="chans"></div>
+    <div id="outlist"></div>
+  </section>
+  <section id="pages-sec">
+    <div class="sh"><h2>Other pages we maintain</h2><span class="n" id="pagen"></span></div>
+    <div class="sd">Pages on your site beyond the list above.</div>
+    <div id="pages"></div>
+  </section>
+  <section>
+    <div class="sh"><h2>Not connected yet</h2></div>
+    <div class="sd">We only show a number once it comes from a real source. These are blank on purpose, not zero.</div>
+    <div class="card" id="pending"></div>
+  </section>
+  <div class="foot">
+    Prepared by <a href="https://wingdigital.co" target="_blank" rel="noopener">Wing Digital</a>
+    &middot; <span id="stamp"></span>
+  </div>
+</main>
+<script>
+const DATA = {"generated":"2026-08-28","dataThrough":"2026-08-28","generatedAt":"2026-08-28T14:15:51","brand":{"name":"Jackson Roofing","initials":"JR","site":"https://jacksonroofingco.com","kicker":"Marketing dashboard","headline":"Everything Wing Digital is building for Jackson Roofing","subhead":"A live record of the content, pages and search work running on your site. Click anything to open it."},"engines":[{"name":"Blog engine","detail":"New posts on a set cadence","icon":"pen"},{"name":"City + service pages","detail":"Local pages built to rank","icon":"map"},{"name":"Google Business","detail":"Weekly posts to your profile","icon":"star"},{"name":"On-page SEO","detail":"Titles, schema, internal links","icon":"search"}],"types":{"blog":{"label":"Blog post","color":"#1bc0ff"},"city":{"label":"City page","color":"#5b8def"},"service":{"label":"Service page","color":"#8b7cf6"},"gbp":{"label":"Google post","color":"#2fbf8f"},"reviews":{"label":"Reviews","color":"#e0a13c"},"backlink":{"label":"Backlink","color":"#e26d9b"},"faq":{"label":"FAQ hub","color":"#00a5b5"},"other":{"label":"Other","color":"#7b8794"}},"outreach":{"intro":"Everything we send out under your name, and what is not running yet. Google Business posts are the only channel currently sending.","channels":[{"name":"Google Business posts","icon":"star","types":["gbp"],"state":"live","note":"Posts published straight to your Google Business Profile, where local searchers see you."},{"name":"Review requests","icon":"chat","types":[],"state":"not_connected","note":"Review requests went out through the old CRM, which was retired on 2026-08-22. Nothing is sending until a replacement is chosen."},{"name":"Email campaigns","icon":"mail","types":[],"state":"not_connected","note":"No email is being sent for you right now. This needs a CRM to replace the retired one before anything goes out."},{"name":"Facebook and Instagram","icon":"share","types":[],"state":"needs_access","note":"Not connected. We would need manager access to your pages before we could post or report on them."}]},"pendingMetrics":[{"name":"Google Search clicks and impressions","why":"Needs Search Console access for jacksonroofingco.com connected to the reporting account","state":"needs access"},{"name":"Keyword rankings","why":"Comes online with the same Search Console connection","state":"needs access"},{"name":"Calls and form leads","why":"The old CRM was retired on 2026-08-22. No lead source is connected to this dashboard yet","state":"not connected"},{"name":"Booked jobs and pipeline value","why":"Requires a CRM to replace the retired one before any number here would be real","state":"not connected"}],"items":[{"date":"2026-08-29","type":"reviews","title":"Reply to any new reviews","status":"planned","url":""},{"date":"2026-08-28","type":"blog","title":"How to Choose a Roofer in Allen Without Getting Burned","status":"published","url":"https://jacksonroofingco.com/how-to-choose-a-roofer-allen/"},{"date":"2026-08-28","type":"blog","title":"Getting Your North Texas Roof Ready for Hail Season","status":"published","url":"https://jacksonroofingco.com/roof-hail-season-prep/"},{"date":"2026-08-27","type":"gbp","title":"Google Business post + fresh job photo","status":"planned","url":""},{"date":"2026-08-26","type":"faq","title":"Add 3-4 answer-first FAQs + FAQPage schema","status":"planned","url":""},{"date":"2026-08-25","type":"blog","title":"Getting Your North Texas Roof Ready for Hail Season","status":"planned","url":""},{"date":"2026-08-24","type":"reviews","title":"Request reviews from 5-10 recent jobs","status":"planned","url":""},{"date":"2026-08-22","type":"reviews","title":"Reply to any new reviews","status":"planned","url":""},{"date":"2026-08-21","type":"blog","title":"What Actually Happens During a Free Roof Inspection","status":"planned","url":""},{"date":"2026-08-20","type":"gbp","title":"Google Business post + fresh job photo","status":"planned","url":""},{"date":"2026-08-19","type":"backlink","title":"1 BACKLINK action (manufacturer listing / chamber / citation)","status":"planned","url":""},{"date":"2026-08-18","type":"blog","title":"Best Roofing Materials for North Texas Homes","status":"planned","url":""},{"date":"2026-08-17","type":"reviews","title":"Request reviews from 5-10 recent jobs","status":"planned","url":""},{"date":"2026-08-15","type":"reviews","title":"Reply to any new reviews","status":"planned","url":""},{"date":"2026-08-14","type":"gbp","title":"Google Business post + fresh job photo","status":"drafted","url":""},{"date":"2026-08-14","type":"backlink","title":"1 citation / directory / partner backlink","status":"drafted","url":""},{"date":"2026-08-14","type":"blog","title":"How to Choose a Roofer in McKinney Without Getting Burned","status":"published","url":"https://jacksonroofingco.com/how-to-choose-a-roofer-mckinney/"},{"date":"2026-08-13","type":"blog","title":"Gutter Problems That Can Wreck a Good Roof","status":"drafted","url":""},{"date":"2026-08-12","type":"gbp","title":"Google Business post + fresh job photo","status":"drafted","url":""},{"date":"2026-08-12","type":"service","title":"Siding service page","status":"drafted","url":""},{"date":"2026-08-11","type":"blog","title":"Getting Your North Texas Roof Ready for Hail Season","status":"published","url":"https://jacksonroofingco.com/roof-hail-season-prep/"},{"date":"2026-08-10","type":"gbp","title":"Google Business post + fresh job photo","status":"drafted","url":""},{"date":"2026-08-10","type":"reviews","title":"Request reviews from recent jobs (via GHL)","status":"planned","url":""},{"date":"2026-08-08","type":"reviews","title":"Reply to any new reviews","status":"planned","url":""},{"date":"2026-08-07","type":"gbp","title":"Google Business post + fresh job photo","status":"drafted","url":""},{"date":"2026-08-07","type":"backlink","title":"1 citation / directory / partner backlink","status":"drafted","url":""},{"date":"2026-08-07","type":"blog","title":"Do Your Gutters Need Attention Before the Next Big Rain?","status":"published","url":"https://jacksonroofingco.com/gutters-before-the-next-big-rain/"},{"date":"2026-08-06","type":"blog","title":"How to Choose a Roofer in Frisco","status":"drafted","url":""},{"date":"2026-08-05","type":"gbp","title":"Google Business post + fresh job photo","status":"drafted","url":""},{"date":"2026-08-05","type":"city","title":"roof repair plano tx","status":"drafted","url":""},{"date":"2026-08-04","type":"blog","title":"How Much Does a New Roof Cost in Plano in 2026?","status":"published","url":"https://jacksonroofingco.com/new-roof-cost-plano/"},{"date":"2026-08-03","type":"gbp","title":"Google Business post + fresh job photo","status":"drafted","url":""},{"date":"2026-08-03","type":"reviews","title":"Request reviews from recent jobs (via GHL)","status":"planned","url":""},{"date":"2026-07-31","type":"gbp","title":"Google Business post + fresh job photo","status":"planned","url":""},{"date":"2026-07-31","type":"backlink","title":"1 citation / directory / partner backlink","status":"planned","url":""},{"date":"2026-07-30","type":"blog","title":"What a New Roof Costs in Plano and What Moves the Price","status":"planned","url":""},{"date":"2026-07-30","type":"blog","title":"Signs You Need a New Roof: A Plano Roofer Checklist","status":"published","url":"https://jacksonroofingco.com/signs-you-need-a-new-roof/"},{"date":"2026-07-29","type":"gbp","title":"Google Business post + fresh job photo","status":"planned","url":""},{"date":"2026-07-29","type":"service","title":"Gutters service page","status":"planned","url":""},{"date":"2026-07-28","type":"blog","title":"5 Signs Your Roof Needs Attention Before Winter","status":"drafted","url":""},{"date":"2026-07-27","type":"gbp","title":"Google Business post + fresh job photo","status":"drafted","url":""},{"date":"2026-07-27","type":"reviews","title":"Request reviews from recent jobs (via GHL)","status":"drafted","url":""},{"date":"2026-07-27","type":"blog","title":"What to Do After a North Texas Hailstorm","status":"published","url":"https://jacksonroofingco.com/what-to-do-after-a-hailstorm/"},{"date":"2026-07-24","type":"gbp","title":"Google Business post + fresh job photo","status":"drafted","url":""},{"date":"2026-07-24","type":"backlink","title":"1 citation / directory / partner backlink","status":"drafted","url":""},{"date":"2026-07-24","type":"blog","title":"Repair or Replace? A North Texas Roofer Honest Guide","status":"published","url":"https://jacksonroofingco.com/repair-or-replace-roof/"},{"date":"2026-07-23","type":"blog","title":"Roof Repair vs Full Replacement: How to Decide","status":"drafted","url":""},{"date":"2026-07-22","type":"gbp","title":"Google Business post + fresh job photo","status":"drafted","url":""},{"date":"2026-07-22","type":"city","title":"roof repair richardson tx","status":"drafted","url":""},{"date":"2026-07-22","type":"blog","title":"What Actually Happens During a Free Roof Inspection","status":"published","url":"https://jacksonroofingco.com/free-roof-inspection-explained/"},{"date":"2026-07-22","type":"blog","title":"Hail Damage vs Roof Wear: How to Tell the Difference","status":"published","url":"https://jacksonroofingco.com/hail-damage-vs-roof-wear/"},{"date":"2026-07-22","type":"blog","title":"Do You Need a Roof Permit in Richardson, TX?","status":"published","url":"https://jacksonroofingco.com/roof-permit-richardson-tx/"},{"date":"2026-07-21","type":"blog","title":"How Long Does a Roof Last in North Texas?","status":"published","url":""},{"date":"2026-07-20","type":"gbp","title":"Google Business post + fresh job photo","status":"published","url":""},{"date":"2026-07-20","type":"reviews","title":"Request reviews from recent jobs (via GHL)","status":"published","url":""}],"pages":[{"group":"Blog posts live on your site","icon":"pen","links":[{"title":"How to Choose a Roofer in Allen Without Getting Burned","url":"https://jacksonroofingco.com/how-to-choose-a-roofer-allen/"},{"title":"Getting Your North Texas Roof Ready for Hail Season","url":"https://jacksonroofingco.com/roof-hail-season-prep/"},{"title":"How to Choose a Roofer in McKinney Without Getting Burned","url":"https://jacksonroofingco.com/how-to-choose-a-roofer-mckinney/"},{"title":"Do Your Gutters Need Attention Before the Next Big Rain?","url":"https://jacksonroofingco.com/gutters-before-the-next-big-rain/"},{"title":"How Much Does a New Roof Cost in Plano in 2026?","url":"https://jacksonroofingco.com/new-roof-cost-plano/"},{"title":"Signs You Need a New Roof: A Plano Roofer Checklist","url":"https://jacksonroofingco.com/signs-you-need-a-new-roof/"},{"title":"What to Do After a North Texas Hailstorm","url":"https://jacksonroofingco.com/what-to-do-after-a-hailstorm/"},{"title":"Repair or Replace? A North Texas Roofer Honest Guide","url":"https://jacksonroofingco.com/repair-or-replace-roof/"},{"title":"What Actually Happens During a Free Roof Inspection","url":"https://jacksonroofingco.com/free-roof-inspection-explained/"},{"title":"Hail Damage vs Roof Wear: How to Tell the Difference","url":"https://jacksonroofingco.com/hail-damage-vs-roof-wear/"},{"title":"Do You Need a Roof Permit in Richardson, TX?","url":"https://jacksonroofingco.com/roof-permit-richardson-tx/"}]}]};
+(function(){
+  'use strict';
+  const $ = s => document.querySelector(s);
+  const esc = s => String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const MON  = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const MONS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  // Plain calendar dates parsed as LOCAL. new Date("2026-08-24") is UTC midnight,
+  // which lands on the 23rd in US timezones and shifts items into the wrong month.
+  const pd = s => { const p = String(s||'').split('-').map(Number);
+                    return p.length===3 ? new Date(p[0],p[1]-1,p[2]) : new Date(NaN); };
+  const fmt = s => { const d = pd(s); return isNaN(d) ? '—'
+      : d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); };
+  const meta = t => (DATA.types && DATA.types[t]) || {};
+  const label = t => meta(t).label || t || 'Item';
+  const color = t => meta(t).color || 'var(--accent)';
+  const b = DATA.brand || {};
+  $('#mark').textContent  = b.initials || '';
+  $('#cname').textContent = b.name || '';
+  $('#csub').textContent  = b.site ? b.site.replace(/^https?:\/\//,'') : '';
+  $('#eyebrow').textContent = b.kicker || 'Marketing dashboard';
+  $('#headline').textContent = b.headline || '';
+  $('#subhead').textContent  = b.subhead || '';
+  const ITEMS = (DATA.items||[]).slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  // Published only. Planned and drafted rows are internal scheduling state; on a
+  // client page they read as promises, and a stale source makes them promises
+  // for dates that have already gone by.
+  const PUB = ITEMS.filter(i => i.status === 'published' && !isNaN(pd(i.date)));
+  /* theme */
+  const root = document.documentElement;
+  try { const t = localStorage.getItem('wd-theme'); if (t) root.setAttribute('data-theme', t); } catch(e){}
+  const effective = () => root.getAttribute('data-theme')
+    || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  $('#theme').addEventListener('click', () => {
+    const t = effective() === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', t);
+    try { localStorage.setItem('wd-theme', t); } catch(e){}
+  });
+  /* freshness -- the age of the SOURCE, never the age of this build */
+  const through = DATA.dataThrough || DATA.generated;
+  const thruDate = pd(through);
+  const staleDays = Math.round((new Date().setHours(0,0,0,0) - thruDate) / 86400000);
+  $('#stamp').textContent = 'Current through ' + fmt(through);
+  if (staleDays > 10) {
+    $('#stale').innerHTML = '<div class="stale">This record stops on <b>'+esc(fmt(through))+
+      '</b>. Anything published after that date is not in here yet.</div>';
+  }
+  /* three stats */
+  const now = new Date();
+  const livePages = (DATA.pages||[]).reduce((s,g)=>s+g.links.length,0);
+  // Rolling 30 days, anchored to the END OF THE RECORD, not the calendar month.
+  // "Published in September: 0" on the morning of the 1st is technically true
+  // and completely misleading; a rolling window never has that cliff.
+  const anchor = !isNaN(thruDate) ? new Date(thruDate) : now;
+  const from30 = new Date(anchor); from30.setDate(anchor.getDate()-29);
+  [
+    { v: PUB.filter(i=>{ const d=pd(i.date); return d>=from30 && d<=anchor; }).length,
+      l: 'Published in the last 30 days' },
+    { v: PUB.length,  l: 'Published in total' },
+    { v: livePages,   l: 'Pages live on your site' }
+  ].forEach(s => {
+    const el = document.createElement('div');
+    el.className = 'stat';
+    el.innerHTML = '<div class="stat-v">'+s.v.toLocaleString()+'</div><div class="stat-l">'+esc(s.l)+'</div>';
+    $('#stats').appendChild(el);
+  });
+  /* ── the chart ───────────────────────────────────────────────
+     Buckets run from the first publish to the end of the RECORD -- never to
+     today, so a stale file cannot draw phantom empty periods that read as "they
+     stopped working". Empty buckets INSIDE that range are drawn as empty,
+     because a real gap is real information.
+     The bucket size adapts: a client three months in has nothing to read in a
+     one-bar monthly chart, so short histories are charted by week instead. */
+  let buckets = [], unit = 'month';
+  if (PUB.length) {
+    const firstD = pd(PUB[PUB.length-1].date);
+    const lastD  = (!isNaN(thruDate) && thruDate > firstD) ? thruDate : pd(PUB[0].date);
+    const monthSpan = (lastD.getFullYear()-firstD.getFullYear())*12 + (lastD.getMonth()-firstD.getMonth()) + 1;
+    unit = monthSpan < 3 ? 'week' : 'month';
+    if (unit === 'month') {
+      let y = firstD.getFullYear(), m = firstD.getMonth();
+      while (y < lastD.getFullYear() || (y === lastD.getFullYear() && m <= lastD.getMonth())) {
+        buckets.push({ label:MONS[m], full:MON[m]+' '+y, start:new Date(y,m,1),
+                       end:new Date(y,m+1,0), byType:{}, total:0 });
+        m++; if (m > 11) { m = 0; y++; }
+      }
+    } else {
+      // Weeks start Sunday, so a bar is one calendar week the client recognises.
+      const s = new Date(firstD); s.setDate(s.getDate() - s.getDay());
+      while (s <= lastD) {
+        const e = new Date(s); e.setDate(s.getDate()+6);
+        buckets.push({ label:MONS[s.getMonth()]+' '+s.getDate(),
+                       full:'Week of '+MONS[s.getMonth()]+' '+s.getDate(),
+                       start:new Date(s), end:e, byType:{}, total:0 });
+        s.setDate(s.getDate()+7);
+      }
+    }
+    if (buckets.length > 12) buckets.splice(0, buckets.length - 12);   // keep it legible
+    PUB.forEach(i => {
+      const d = pd(i.date);
+      const bk = buckets.find(x => d >= x.start && d <= x.end);
+      if (!bk) return;
+      bk.byType[i.type] = (bk.byType[i.type]||0) + 1;
+      bk.total++;
+    });
+  }
+  const maxB = Math.max(1, ...buckets.map(x=>x.total));
+  if (!buckets.length) {
+    $('#chart').innerHTML = '<div class="empty">Published work will chart here.</div>';
+    $('#chart-sd').textContent = 'Nothing published yet.';
+    $('#cnote').textContent = '';
+  } else {
+    document.querySelector('#chart').closest('section').querySelector('h2').textContent =
+      unit === 'week' ? 'Published by week' : 'Published by month';
+    $('#chart-sd').textContent = 'One bar per ' + unit +
+      ', split by what kind of work it was. Empty ' + unit + 's are shown as empty.';
+    if (buckets.length > 6) $('#chart').classList.add('dense');
+    $('#chart').innerHTML = buckets.map(bk => {
+      if (!bk.total) {
+        return '<div class="cbar" title="'+esc(bk.full)+': 0"><div class="cbar-v">0</div>'+
+               '<div class="cbar-stack"><div class="cbar-empty"></div></div>'+
+               '<div class="cbar-l">'+esc(bk.label)+'</div></div>';
+      }
+      const segs = Object.keys(bk.byType).sort().map(t =>
+        '<div class="cbar-seg" data-h="'+((bk.byType[t]/maxB)*100).toFixed(2)+
+        '" style="height:0;background:'+color(t)+'" title="'+esc(label(t))+': '+bk.byType[t]+'"></div>').join('');
+      return '<div class="cbar" title="'+esc(bk.full)+': '+bk.total+'"><div class="cbar-v">'+bk.total+'</div>'+
+             '<div class="cbar-stack">'+segs+'</div><div class="cbar-l">'+esc(bk.label)+'</div></div>';
+    }).join('');
+    // Heights are a percentage of the tallest bar; animate in after first paint.
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      document.querySelectorAll('.cbar-seg').forEach(s=>{ s.style.height = s.dataset.h + '%'; });
+    }));
+    const n = buckets.length;
+    // The final bucket usually runs past the record's end (a part-finished week
+    // or month). Report the record's cutoff, not a date that has not happened.
+    const recEnd = !isNaN(thruDate) ? thruDate : new Date();
+    const bEnd = buckets[n-1].end;
+    const endD = bEnd < recEnd ? bEnd : recEnd;
+    $('#cnote').textContent = 'Showing ' + n + ' ' + unit + (n===1?'':'s') +
+      ', through ' + fmt(endD.getFullYear()+'-'+
+        String(endD.getMonth()+1).padStart(2,'0')+'-'+
+        String(endD.getDate()).padStart(2,'0')) +
+      (staleDays > 10 ? ' — the end of this record, not the end of the work.' : '.');
+  }
+  /* ── type mix + key ──────────────────────────────────────── */
+  const counts = {};
+  PUB.forEach(i => counts[i.type] = (counts[i.type]||0)+1);
+  const kinds = Object.keys(counts).sort((a,b)=>counts[b]-counts[a]);
+  $('#mix').innerHTML = kinds.map(t =>
+    '<div class="mix-seg" style="flex-grow:'+counts[t]+';background:'+color(t)+
+    '" title="'+esc(label(t))+': '+counts[t]+'"></div>').join('');
+  $('#keys').innerHTML = kinds.map(t =>
+    '<div class="key"><i style="background:'+color(t)+'"></i>'+
+    '<span class="kn">'+esc(label(t))+'</span><span class="kv">'+counts[t]+'</span></div>').join('');
+  /* ── the list ────────────────────────────────────────────── */
+  const STEP = 15;
+  let shown = STEP, query = '';
+  function render(){
+    const rows = PUB.filter(i => !query || String(i.title||'').toLowerCase().includes(query));
+    const slice = rows.slice(0, shown);
+    $('#pubn').textContent = PUB.length + ' published';
+    if (!slice.length) {
+      $('#list').innerHTML = '<div class="empty">'+
+        (query ? 'Nothing matches that search.' : 'Published work will appear here.')+'</div>';
+      $('#more').hidden = true;
+      return;
+    }
+    let html = '', month = '';
+    slice.forEach(i => {
+      const key = (i.date||'').slice(0,7);
+      if (key !== month) {
+        month = key;
+        const d = pd(i.date);
+        html += '<div class="mgroup"><div class="mlabel">'+MON[d.getMonth()]+' '+d.getFullYear()+'</div></div>';
+      }
+      const t = i.url
+        ? '<a href="'+esc(i.url)+'" target="_blank" rel="noopener">'+esc(i.title)+'</a>'
+        : esc(i.title);
+      html += '<div class="row"><span class="row-dot" style="background:'+color(i.type)+'"></span>'+
+        '<div class="row-m"><div class="row-t">'+t+'</div>'+
+        '<div class="row-s">'+esc(label(i.type))+'</div></div>'+
+        '<div class="row-d">'+fmt(i.date)+'</div></div>';
+    });
+    $('#list').innerHTML = html;
+    const left = rows.length - slice.length;
+    $('#more').hidden = left <= 0;
+    $('#more').textContent = 'Show ' + Math.min(left, STEP) + ' more';
+  }
+  $('#q').addEventListener('input', e => {
+    query = e.target.value.toLowerCase().trim(); shown = STEP; render();
+  });
+  $('#more').addEventListener('click', () => { shown += STEP; render(); });
+  render();
+  /* ── outreach and social ─────────────────────────────────────
+     One card per channel. A channel only reports a NUMBER when it is genuinely
+     sending and we can count it; otherwise it says plainly why it is empty.
+     "Not in your plan" and "not connected" are different facts and must not be
+     collapsed into a zero -- a zero would read as "we sent nothing this month". */
+  const OUT = DATA.outreach || {};
+  const chans = OUT.channels || [];
+  const OICON = {
+    mail:'<path d="M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z"/><path d="m3 7 9 6 9-6"/>',
+    star:'<path d="M12 3l2.7 5.5 6.1.9-4.4 4.3 1 6-5.4-2.8L6.6 19.7l1-6L3.2 9.4l6.1-.9z"/>',
+    share:'<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/>',
+    chat:'<path d="M21 12a8 8 0 0 1-8 8H7l-4 3V12a8 8 0 0 1 8-8h2a8 8 0 0 1 8 8z"/>'
+  };
+  const oSvg = k => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">'+(OICON[k]||OICON.share)+'</svg>';
+  const STATE_LABEL = {
+    not_in_plan:   'Not in your plan',
+    not_connected: 'Not connected',
+    needs_access:  'Needs access'
+  };
+  // A channel's count is the number of PUBLISHED items of its types. Anything
+  // not counted from real records stays a state, never a number.
+  const sent = [];
+  chans.forEach(c => {
+    c._items = (c.types||[]).length
+      ? PUB.filter(i => c.types.indexOf(i.type) !== -1)
+      : [];
+    if (c.state === 'live') sent.push.apply(sent, c._items);
+  });
+  $('#out-sd').textContent = OUT.intro ||
+    'Everything we send out on your behalf, and what is not running yet.';
+  $('#outn').textContent = sent.length
+    ? sent.length + ' sent' : '';
+  $('#chans').innerHTML = chans.length ? chans.map(c => {
+    const live = c.state === 'live';
+    const body = live
+      ? '<div class="chan-v">'+c._items.length+'</div>'
+      : '<div class="chan-state">'+esc(STATE_LABEL[c.state] || c.state)+'</div>';
+    return '<div class="chan'+(live?' live':'')+'"><div class="chan-h">'+
+      '<div class="chan-i">'+oSvg(c.icon)+'</div><div class="chan-n">'+esc(c.name)+'</div></div>'+
+      body + '<div class="chan-note">'+esc(c.note||'')+'</div></div>';
+  }).join('') : '';
+  // The log underneath lists only what actually went out.
+  if (sent.length) {
+    sent.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+    $('#outlist').innerHTML = '<div class="mgroup"><div class="mlabel">Everything sent</div></div>' +
+      sent.map(i => '<div class="row"><span class="row-dot" style="background:'+color(i.type)+'"></span>'+
+        '<div class="row-m"><div class="row-t">'+(i.url
+          ? '<a href="'+esc(i.url)+'" target="_blank" rel="noopener">'+esc(i.title)+'</a>'
+          : esc(i.title))+'</div>'+
+        '<div class="row-s">'+esc(label(i.type))+'</div></div>'+
+        '<div class="row-d">'+fmt(i.date)+'</div></div>').join('');
+  } else {
+    $('#outlist').innerHTML = '';
+  }
+  if (!chans.length) $('#out-sec').hidden = true;
+  /* ── other pages: only what is NOT already listed above ──── */
+  const listed = new Set(ITEMS.map(i => i.url).filter(Boolean));
+  const groups = (DATA.pages||[])
+    .map(g => ({ group:g.group, links:g.links.filter(l => !listed.has(l.url)) }))
+    .filter(g => g.links.length);
+  const extra = groups.reduce((s,g)=>s+g.links.length,0);
+  if (!extra) {
+    $('#pages-sec').hidden = true;
+  } else {
+    $('#pagen').textContent = extra + (extra===1 ? ' page' : ' pages');
+    $('#pages').innerHTML = groups.map(g =>
+      (groups.length > 1 ? '<div class="mgroup"><div class="mlabel">'+esc(g.group)+'</div></div>' : '') +
+      g.links.map(l => '<div class="row"><span class="row-dot" style="background:var(--accent)"></span>'+
+        '<div class="row-m"><div class="row-t">'+
+        '<a href="'+esc(l.url)+'" target="_blank" rel="noopener">'+esc(l.title)+'</a>'+
+        '</div></div></div>').join('')
+    ).join('');
+  }
+  /* ── what is not wired up ────────────────────────────────── */
+  $('#pending').innerHTML = (DATA.pendingMetrics||[]).map(p =>
+    '<div class="prow"><span class="pd"></span><div><div class="pn">'+esc(p.name)+'</div>'+
+    '<div class="pw">'+esc(p.why)+'</div></div></div>').join('');
+})();
+</script>

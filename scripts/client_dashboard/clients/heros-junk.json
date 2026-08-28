@@ -1,0 +1,178 @@
+{
+  "_comment": "Hero's Junk Removal. Static site in its own repo, deployed by Cloudflare Pages. Publish dates come from the first commit that ADDED each file, so they are real. NO outbound email for this client, ever -- nothing in this dashboard should imply outreach.",
+  "brand": {
+    "name": "Hero's Junk Removal",
+    "initials": "HJ",
+    "site": "https://herosjunkremovaltx.com",
+    "kicker": "Marketing dashboard",
+    "headline": "Everything Wing Digital is building for Hero's Junk Removal",
+    "subhead": "A live record of the pages and posts running on your site. Click anything to open it on the real site."
+  },
+  "_theme_comment": "Hero's real brand, confirmed on the live site 2026-08-27: navy #0a2342 header, blue #16407a, red CTA #b22234. Their stylesheet's variable NAMES say teal/amber/green and are misleading -- the hex values that actually render are navy/blue/red. Dark mode lifts the red to #e2586a so it stays legible on a dark ground.",
+  "theme": {
+    "accent": "#e2586a",
+    "accent2": "#f08fa0",
+    "accent_bg": "rgba(226,88,106,.13)",
+    "accent_glow": "rgba(226,88,106,.20)",
+    "accent_light": "#b22234",
+    "accent2_light": "#d9455c",
+    "accent_bg_light": "rgba(178,34,52,.08)",
+    "accent_glow_light": "rgba(178,34,52,.12)",
+    "mark_bg": "#0a2342",
+    "mark_fg": "#ffffff"
+  },
+  "engines": [
+    {
+      "name": "Blog engine",
+      "detail": "4 to 5 posts a week",
+      "icon": "pen"
+    },
+    {
+      "name": "Service pages",
+      "detail": "One page per job we haul",
+      "icon": "map"
+    },
+    {
+      "name": "On-page SEO",
+      "detail": "Titles, schema, internal links",
+      "icon": "search"
+    },
+    {
+      "name": "Internal linking",
+      "detail": "New posts wired to old ones",
+      "icon": "link"
+    }
+  ],
+  "_types_comment": "Drawn from their own red / white / blue palette rather than a generic chart set.",
+  "types": {
+    "blog": {
+      "label": "Blog post",
+      "color": "#4a86e8"
+    },
+    "service": {
+      "label": "Service page",
+      "color": "#c9384a"
+    },
+    "city": {
+      "label": "City page",
+      "color": "#d9903c"
+    },
+    "core": {
+      "label": "Core page",
+      "color": "#2c6ba8"
+    },
+    "other": {
+      "label": "Other",
+      "color": "#7a8ba3"
+    }
+  },
+  "_outreach_comment": "HARD RULE: no outbound email for this client, ever. The email card must say that is deliberate, never that it is broken or pending -- a 'not connected' there would read as a missing service they are paying for.",
+  "outreach": {
+    "intro": "Everything we send out under your name, and what is not running yet. Your plan is search-led, so nothing is being emailed on your behalf.",
+    "channels": [
+      {
+        "name": "Email campaigns",
+        "icon": "mail",
+        "types": [],
+        "state": "not_in_plan",
+        "note": "By design. Your plan wins work through search, not inbox outreach, so we do not send email under your name."
+      },
+      {
+        "name": "Google Business posts",
+        "icon": "star",
+        "types": [],
+        "state": "needs_access",
+        "note": "Ready to run as soon as we have manager access to your Google Business Profile."
+      },
+      {
+        "name": "Facebook and Instagram",
+        "icon": "share",
+        "types": [],
+        "state": "needs_access",
+        "note": "Not connected. We would need access to your pages before we could post or report on them."
+      },
+      {
+        "name": "Review requests",
+        "icon": "chat",
+        "types": [],
+        "state": "not_connected",
+        "note": "No review request system is wired up yet. This is the fastest lever once the Google profile is connected."
+      }
+    ]
+  },
+  "sources": [
+    {
+      "kind": "git_repo",
+      "repo": "C:\\Users\\wjack\\heros-junk-removal",
+      "base_url": "https://herosjunkremovaltx.com",
+      "globs": [
+        {
+          "glob": "blog/*.html",
+          "type": "blog",
+          "skip": [
+            "index.html"
+          ]
+        },
+        {
+          "glob": "services/*.html",
+          "type": "service",
+          "skip": [
+            "index.html"
+          ]
+        }
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "group": "Blog posts live on your site",
+      "icon": "pen",
+      "repo": "C:\\Users\\wjack\\heros-junk-removal",
+      "base_url": "https://herosjunkremovaltx.com",
+      "dir": "blog",
+      "skip": [
+        "index.html"
+      ]
+    },
+    {
+      "group": "Service pages",
+      "icon": "map",
+      "repo": "C:\\Users\\wjack\\heros-junk-removal",
+      "base_url": "https://herosjunkremovaltx.com",
+      "dir": "services",
+      "skip": [
+        "index.html"
+      ]
+    },
+    {
+      "group": "Core site pages",
+      "icon": "globe",
+      "repo": "C:\\Users\\wjack\\heros-junk-removal",
+      "base_url": "https://herosjunkremovaltx.com",
+      "dir": "",
+      "skip": []
+    }
+  ],
+  "pendingMetrics": [
+    {
+      "name": "Google Search clicks and impressions",
+      "why": "Needs Search Console access for herosjunkremovaltx.com connected to the reporting account",
+      "state": "needs access"
+    },
+    {
+      "name": "Keyword rankings",
+      "why": "Comes online with the same Search Console connection",
+      "state": "needs access"
+    },
+    {
+      "name": "Google Business Profile views",
+      "why": "Needs manager access to the Google Business Profile",
+      "state": "needs access"
+    },
+    {
+      "name": "Calls and form leads",
+      "why": "The contact form does not report back to us yet, so no lead count here would be trustworthy",
+      "state": "not connected"
+    }
+  ]
+}

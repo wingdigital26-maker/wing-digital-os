@@ -18,6 +18,14 @@ function isPublicPath(pathname: string): boolean {
     // Client-facing dashboards: the HTML shell is public, but the DATA endpoints
     // (/api/jackson*) are separately guarded by JACKSON_DASHBOARD_KEY.
     pathname === "/jackson-dashboard.html" ||
+    // Interactive client dashboards (scripts/client_dashboard/build.py). Each file
+    // is self-contained: the client's own published content, no secrets, no API
+    // calls. Public by design so a client can open the link without a login.
+    pathname.startsWith("/dashboards/") ||
+    // Live dashboard data. Public by design: it is the client's own published
+    // content, assembled from sources anyone can already read (their WordPress
+    // REST feed, their public repo, their sitemap). No secret passes through it.
+    pathname.startsWith("/api/dashboard/") ||
     pathname === "/jackson" ||
     pathname === "/jackson-v2" ||
     pathname.startsWith("/api/jackson") ||

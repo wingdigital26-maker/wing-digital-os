@@ -22,6 +22,15 @@ export type ContentSource = {
   globs?: Array<{ dir: string; type: string; skip?: string[] }>;
 };
 
+/** Cloudflare Web Analytics, read per client from the zone we control. */
+export type AnalyticsSource = {
+  kind: "cloudflare";
+  /** Zone id for the client's domain, from the Cloudflare dashboard overview. */
+  zoneId?: string;
+  /** Env var holding the API token (Zone > Analytics: Read). */
+  tokenEnv: string;
+};
+
 export type ClientConfig = {
   brand: {
     name: string; initials: string; site: string;
@@ -30,6 +39,8 @@ export type ClientConfig = {
   theme: Record<string, string>;
   types: Record<string, { label: string; color: string }>;
   sources: ContentSource[];
+  /** Optional: traffic source. Omit and the dashboard shows an honest pending state. */
+  analytics?: AnalyticsSource;
   pageGroups?: Array<{ group: string; types: string[] }>;
   outreach?: {
     intro: string;
@@ -74,6 +85,11 @@ export const CLIENTS: Record<string, ClientConfig> = {
         ],
       },
     ],
+    // Hero's DNS runs on Cloudflare nameservers, so the zone is in Wing's own
+    // Cloudflare account and its analytics are readable with a scoped token.
+    // (Jackson is NOT comparable: his nameservers are GoDaddy's, so the
+    // Cloudflare in front of that site is GoDaddy's CDN, not a zone we hold.)
+    analytics: { kind: "cloudflare", tokenEnv: "CLOUDFLARE_API_TOKEN" },
     pageGroups: [
       { group: "Blog posts live on your site", types: ["blog"] },
       { group: "Service pages", types: ["service", "city"] },

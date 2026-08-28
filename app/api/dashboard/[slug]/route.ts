@@ -142,6 +142,82 @@ async function fromSitemap(src: ContentSource): Promise<Item[]> {
   return out;
 }
 
+/**
+ * Cloudflare Web Analytics via the GraphQL API.
+ *
+ * Returns null for every "we cannot know" case (no token, no zone, API error)
+ * rather than zeros -- a zero on a traffic tile reads to a client as "nobody
+ * visited your site", which is a very different claim from "we are not
+ * connected yet". The dashboard renders the pending state when this is null.
+ *
+ * Uses rumPageloadEventsAdaptiveGroups (the beacon's own dataset) rather than
+ * zone httpRequests: zone requests count bots and asset fetches, so reporting
+ * them to a client as "visits" would overstate reality.
+ */
+async function fetchCloudflare(cfg: ClientConfig) {
+  const a = cfg.analytics;
+  if (!a || a.kind !== "cloudflare") return null;
+  const token = process.env[a.tokenEnv];
+  if (!token) return null;                       // not wired up yet
+
+  const host = cfg.brand.site.replace(/^https?:\/\//, "").replace(/\/$/, "");
+  const auth = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+
+  try {
+    // Resolve the zone from the domain so no ID has to be copied by hand.
+    let zoneId = a.zoneId;
+    let accountId: string | undefined;
+    const zr = await fetch(
+      `https://api.cloudflare.com/client/v4/zones?name=${encodeURIComponent(host)}`,
+      { headers: auth, next: { revalidate } }
+    );
+    const zj = await zr.json();
+    if (zj?.success && zj.result?.length) {
+      zoneId = zoneId || zj.result[0].id;
+      accountId = zj.result[0].account?.id;
+    }
+    if (!accountId) return null;
+
+    const end = new Date();
+    const start = new Date(end);
+    start.setDate(end.getDate() - 29);
+    const iso = (d: Date) => d.toISOString().slice(0, 10);
+
+    const query = `query($account:String!,$start:Date!,$end:Date!){
+      viewer { accounts(filter:{accountTag:$account}) {
+        total: rumPageloadEventsAdaptiveGroups(
+          limit:1, filter:{date_geq:$start, date_leq:$end, requestHost:"${host}"}
+        ) { count }
+        daily: rumPageloadEventsAdaptiveGroups(
+          limit:100, filter:{date_geq:$start, date_leq:$end, requestHost:"${host}"},
+          orderBy:[date_ASC]
+        ) { count dimensions { date } }
+      } }
+    }`;
+
+    const gr = await fetch("https://api.cloudflare.com/client/v4/graphql", {
+      method: "POST",
+      headers: auth,
+      body: JSON.stringify({ query, variables: { account: accountId, start: iso(start), end: iso(end) } }),
+      next: { revalidate },
+    });
+    const gj = await gr.json();
+    const acct = gj?.data?.viewer?.accounts?.[0];
+    if (!acct) return null;
+
+    const total = acct.total?.[0]?.count ?? 0;
+    const daily = (acct.daily || []).map((d: { count: number; dimensions: { date: string } }) => ({
+      date: d.dimensions.date,
+      count: d.count,
+    }));
+    // Beacon enabled but nothing recorded yet is a real, reportable zero --
+    // distinct from "not connected", which is the null above.
+    return { pageviews30d: total, daily, zoneId };
+  } catch {
+    return null;
+  }
+}
+
 async function collect(cfg: ClientConfig) {
   const items: Item[] = [];
   const failed: string[] = [];
@@ -180,7 +256,10 @@ export async function GET(
     return NextResponse.json({ error: `unknown client '${slug}'` }, { status: 404 });
   }
 
-  const { items, failed } = await collect(cfg);
+  const [{ items, failed }, traffic] = await Promise.all([
+    collect(cfg),
+    fetchCloudflare(cfg),
+  ]);
 
   // Live sources are current as of NOW -- unlike the old local state file, which
   // was only as fresh as the last time Jack's PC ran a script.
@@ -198,7 +277,14 @@ export async function GET(
       theme: cfg.theme,
       types: cfg.types,
       outreach: cfg.outreach || {},
-      pendingMetrics: cfg.pendingMetrics || [],
+      // null when no traffic source is wired: the page then shows the named
+      // pending state instead of a zero that would read as "nobody visited".
+      traffic,
+      // Drop the "website visits" pending row once real traffic is flowing --
+      // otherwise the page would show the number AND claim it is unavailable.
+      pendingMetrics: (cfg.pendingMetrics || []).filter(
+        (p) => !(traffic && /website visits/i.test(p.name))
+      ),
       items,
       // Live pages are derived from the same public records, so a page can never
       // appear here that is not actually reachable on the client's site.

@@ -108,8 +108,11 @@ section{padding:44px 0 0}
   padding:20px 22px;box-shadow:var(--shadow)}
 
 /* monthly chart -- plain bars, value on top, month underneath */
-.chart{display:flex;align-items:stretch;gap:10px;height:200px}
-.cbar{flex:1;display:flex;flex-direction:column;align-items:center;min-width:0}
+/* justify-content:center + a per-bar max-width keeps a short series (a new
+   client with two months of history) looking deliberate instead of two thin
+   columns stranded in a wide empty box. */
+.chart{display:flex;align-items:stretch;justify-content:center;gap:10px;height:200px}
+.cbar{flex:1 1 0;max-width:110px;display:flex;flex-direction:column;align-items:center;min-width:0}
 .cbar-v{flex:0 0 auto;font-size:.76rem;font-weight:650;color:var(--t2);margin-bottom:6px;
   font-variant-numeric:tabular-nums}
 /* The stack owns the height, so each segment's percentage has something real to
@@ -347,12 +350,20 @@ function bootDashboard(){
   // and completely misleading; a rolling window never has that cliff.
   const anchor = !isNaN(thruDate) ? new Date(thruDate) : now;
   const from30 = new Date(anchor); from30.setDate(anchor.getDate()-29);
-  [
+  const statList = [
     { v: PUB.filter(i=>{ const d=pd(i.date); return d>=from30 && d<=anchor; }).length,
       l: 'Published in the last 30 days' },
     { v: PUB.length,  l: 'Published in total' },
     { v: livePages,   l: 'Pages live on your site' }
-  ].forEach(s => {
+  ];
+  // Website visits lead when we genuinely have them. DATA.traffic is null while
+  // no source is wired, and the page keeps its named pending row instead --
+  // a zero here would tell the client nobody visited, which is a different claim.
+  if (DATA.traffic && typeof DATA.traffic.pageviews30d === 'number') {
+    statList.unshift({ v: DATA.traffic.pageviews30d, l: 'Website visits, last 30 days' });
+    document.querySelector('.stats').style.gridTemplateColumns = 'repeat(auto-fit,minmax(180px,1fr))';
+  }
+  statList.forEach(s => {
     const el = document.createElement('div');
     el.className = 'stat';
     el.innerHTML = '<div class="stat-v">'+s.v.toLocaleString()+'</div><div class="stat-l">'+esc(s.l)+'</div>';
@@ -400,6 +411,11 @@ function bootDashboard(){
       bk.byType[i.type] = (bk.byType[i.type]||0) + 1;
       bk.total++;
     });
+    // Trim empty buckets off the FRONT only, and only once totals exist. A run
+    // of zeros before the first piece of work is not information -- it is the
+    // window being wider than the relationship, and it makes an active client
+    // look dormant. Gaps in the middle and at the end are kept: those are real.
+    while (buckets.length > 1 && !buckets[0].total) buckets.shift();
   }
   const maxB = Math.max(1, ...buckets.map(x=>x.total));
 

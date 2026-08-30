@@ -16,6 +16,9 @@ const STATUS_COLORS: Record<string, string> = {
 
 const TIER_LABELS: Record<number, string> = { 1: "Tier 1", 2: "Tier 2", 3: "Tier 3" };
 
+// var() color strings cannot take hex-alpha suffixes; mix toward transparent instead
+const alpha = (c: string, pct: number) => `color-mix(in srgb, ${c} ${pct}%, transparent)`;
+
 export default function ColdCallBoard({ onSendToAI }: { onSendToAI: (ctx: string) => void }) {
   const [prospects, setProspects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -181,7 +184,7 @@ export default function ColdCallBoard({ onSendToAI }: { onSendToAI: (ctx: string
               ].map(b => (
                 <button key={b.s} onClick={() => sessionLog(b.s)} disabled={logging !== null} style={{
                   padding: "16px 0", borderRadius: 14, fontSize: 14, fontWeight: 700, cursor: "pointer",
-                  background: `${b.c}14`, border: `1px solid ${b.c}55`, color: b.c,
+                  background: alpha(b.c, 8), border: `1px solid ${alpha(b.c, 33)}`, color: b.c,
                   opacity: logging !== null ? 0.5 : 1,
                 }}>{b.label}</button>
               ))}
@@ -223,7 +226,7 @@ export default function ColdCallBoard({ onSendToAI }: { onSendToAI: (ctx: string
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
         {STAT_CARDS.map(s => (
           <div key={s.label} style={{
-            background: `radial-gradient(ellipse 90% 80% at 50% -30%, ${s.color}14, transparent 60%), linear-gradient(180deg, var(--bg-card), var(--bg-card))`,
+            background: `radial-gradient(ellipse 90% 80% at 50% -30%, ${alpha(s.color, 8)}, transparent 60%), linear-gradient(180deg, var(--bg-card), var(--bg-card))`,
             border: "1px solid var(--border)", borderRadius: 14, padding: "14px 18px",
             boxShadow: "0 8px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.04)",
           }}>
@@ -231,7 +234,7 @@ export default function ColdCallBoard({ onSendToAI }: { onSendToAI: (ctx: string
               <span style={{ width: 5, height: 5, borderRadius: "50%", background: s.color, boxShadow: `0 0 7px ${s.color}` }} />
               <p style={{ fontSize: 10.5, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>{s.label}</p>
             </div>
-            <p style={{ fontSize: 24, fontWeight: 800, color: s.color, fontFamily: "'Space Grotesk', sans-serif", textShadow: `0 0 18px ${s.color}44`, lineHeight: 1 }}>{loading ? "..." : s.value}</p>
+            <p style={{ fontSize: 24, fontWeight: 800, color: s.color, fontFamily: "'Space Grotesk', sans-serif", textShadow: `0 0 18px ${alpha(s.color, 27)}`, lineHeight: 1 }}>{loading ? "..." : s.value}</p>
           </div>
         ))}
       </div>
@@ -310,7 +313,7 @@ export default function ColdCallBoard({ onSendToAI }: { onSendToAI: (ctx: string
                   {p.phone && (
                     <a href={`tel:${p.phone}`} style={{ fontSize: 12.5, color: "var(--accent)", fontWeight: 700, textDecoration: "none", whiteSpace: "nowrap" }}>{p.phone}</a>
                   )}
-                  <span style={{ background: sc + "1e", color: sc, fontSize: 10.5, fontWeight: 700, padding: "3px 10px", borderRadius: 999, border: `1px solid ${sc}44`, whiteSpace: "nowrap" }}>
+                  <span style={{ background: alpha(sc, 12), color: sc, fontSize: 10.5, fontWeight: 700, padding: "3px 10px", borderRadius: 999, border: `1px solid ${alpha(sc, 27)}`, whiteSpace: "nowrap" }}>
                     {p.status || "new"}
                   </span>
                   <select value="" onChange={e => { if (e.target.value) logCall(p.id, e.target.value); }}

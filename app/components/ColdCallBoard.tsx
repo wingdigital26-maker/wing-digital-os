@@ -10,8 +10,8 @@ const STATUS_COLORS: Record<string, string> = {
   "callback": "var(--accent-2)",
   "emailed": "var(--accent)",
   "booked": "var(--green)",
-  "not-interested": "#6b7280",
-  "closed": "#6b7280",
+  "not-interested": "var(--muted, #6b7280)",
+  "closed": "var(--muted, #6b7280)",
 };
 
 const TIER_LABELS: Record<number, string> = { 1: "Tier 1", 2: "Tier 2", 3: "Tier 3" };
@@ -117,7 +117,7 @@ export default function ColdCallBoard({ onSendToAI }: { onSendToAI: (ctx: string
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-      {toast && <div style={{ position: "fixed", bottom: 24, right: 24, background: "var(--green)", color: "#07080f", padding: "10px 18px", borderRadius: 10, fontWeight: 700, fontSize: 13, zIndex: 200 }}>{toast}</div>}
+      {toast && <div style={{ position: "fixed", bottom: 24, right: 24, background: "var(--green)", color: "var(--on-accent, #07080f)", padding: "10px 18px", borderRadius: 10, fontWeight: 700, fontSize: 13, zIndex: 200 }}>{toast}</div>}
 
       {/* Call Session Mode — full screen */}
       {session && current && (
@@ -177,7 +177,7 @@ export default function ColdCallBoard({ onSendToAI }: { onSendToAI: (ctx: string
                 { s: "voicemail", label: "Voicemail", c: "var(--orange)" },
                 { s: "callback", label: "Callback", c: "var(--accent-2)" },
                 { s: "booked", label: "Booked 🎯", c: "var(--green)" },
-                { s: "not-interested", label: "Not Interested", c: "#6b7280" },
+                { s: "not-interested", label: "Not Interested", c: "var(--muted, #6b7280)" },
               ].map(b => (
                 <button key={b.s} onClick={() => sessionLog(b.s)} disabled={logging !== null} style={{
                   padding: "16px 0", borderRadius: 14, fontSize: 14, fontWeight: 700, cursor: "pointer",
@@ -204,8 +204,8 @@ export default function ColdCallBoard({ onSendToAI }: { onSendToAI: (ctx: string
         <div style={{ display: "flex", gap: 8 }}>
           <button onClick={startSession} disabled={loading} style={{
             padding: "8px 20px", borderRadius: 999, fontSize: 12.5, cursor: "pointer", fontWeight: 700,
-            border: "none", background: "linear-gradient(135deg, #34d399, #22d3ee)",
-            color: "#07080f", boxShadow: "0 4px 16px rgba(52,211,153,0.3)",
+            border: "none", background: "linear-gradient(135deg, var(--green-bright, #34d399), var(--cyan, #22d3ee))",
+            color: "var(--on-accent, #07080f)", boxShadow: "0 4px 16px rgba(52,211,153,0.3)",
           }}>
             ▶ Start Call Session
           </button>
@@ -248,7 +248,7 @@ export default function ColdCallBoard({ onSendToAI }: { onSendToAI: (ctx: string
           <span style={{ opacity: 0.6 }}>·</span>
           <span>at 5% it&apos;s <b style={{ color: "var(--green)" }}>${projected5.toLocaleString()}/mo</b></span>
           <button onClick={() => onSendToAI(`My roofing cold call campaign: ${active.length} active leads, ${fresh} not yet called, ${followup} in follow-up, ${booked} booked. Price point $2,000/mo. What should I focus on in today's call session?`)}
-            style={{ marginLeft: "auto", fontSize: 11.5, fontWeight: 600, color: "#E8692A", background: "transparent", border: "none", cursor: "pointer" }}>
+            style={{ marginLeft: "auto", fontSize: 11.5, fontWeight: 600, color: "var(--claude-orange, #E8692A)", background: "transparent", border: "none", cursor: "pointer" }}>
             ✦ Ask Claude →
           </button>
         </div>
@@ -288,7 +288,7 @@ export default function ColdCallBoard({ onSendToAI }: { onSendToAI: (ctx: string
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {filtered.slice(0, 60).map(p => {
-            const sc = STATUS_COLORS[p.status || "new"] ?? "#6b7280";
+            const sc = STATUS_COLORS[p.status || "new"] ?? "var(--muted, #6b7280)";
             const expanded = expandedId === p.id;
             return (
               <div key={p.id} style={{
@@ -336,7 +336,7 @@ export default function ColdCallBoard({ onSendToAI }: { onSendToAI: (ctx: string
                     )}
                     <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
                       <button onClick={() => onSendToAI(`Roofing prospect from my cold call list:\nCompany: ${p.name} (${p.city})\nReviews: ${p.google_reviews ?? "unknown"} at ${p.google_rating ?? "?"}★\nStatus: ${p.status || "new"}\nHook: ${p.call_hook ?? "none"}\nNotes: ${p.call_notes ?? "none"}\n\nCoach me on the best angle for this call.`)}
-                        style={{ fontSize: 11, color: "#E8692A", background: "transparent", border: "none", cursor: "pointer", padding: 0, fontWeight: 600 }}>
+                        style={{ fontSize: 11, color: "var(--claude-orange, #E8692A)", background: "transparent", border: "none", cursor: "pointer", padding: 0, fontWeight: 600 }}>
                         ✦ Ask Claude to coach this call →
                       </button>
                       <a href={`/api/audit?name=${encodeURIComponent(p.name)}`} target="_blank" rel="noreferrer"

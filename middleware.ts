@@ -32,12 +32,14 @@ function isPublicPath(pathname: string): boolean {
     // Machine endpoints: heartbeat ingest (PC posts with x-heartbeat-key), the
     // agent notification pipe (same key), the Vercel cron watchdog (Bearer
     // CRON_SECRET), and the schedule app's due-tomorrow push trigger (Bearer
-    // SCHEDULE_PUSH_SECRET, called twice a day by a GitHub Actions job).
+    // SCHEDULE_PUSH_SECRET, called twice a day by a GitHub Actions job), and
+    // the schedule app's lecture summariser (Bearer LECTURE_API_SECRET).
     // All verify their own key inside the route and fail closed.
     pathname === "/api/heartbeat" ||
     pathname === "/api/notify" ||
     pathname === "/api/cron/watchdog" ||
     pathname === "/api/push/schedule" ||
+    pathname === "/api/lecture/summarize" ||
     pathname.startsWith("/demo-freshco") ||
     pathname.startsWith("/demo-roofing") ||
     pathname.startsWith("/demo-clearhaul") ||

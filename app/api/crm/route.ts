@@ -242,6 +242,26 @@ function outboundEvidence(r: OutRow): OutboundEvidence {
   };
 }
 
+/**
+ * Every clickable destination this row carries, each labelled with WHAT it is.
+ * The two URL columns were always in the payload, but the UI collapsed them
+ * with `evidence_url || recipient_url` and rendered one unlabelled "open"
+ * link — so a row's second link was unreachable and a row with neither
+ * rendered nothing at all. Shipping them as an explicit list makes "this row
+ * has no source" a fact in the payload rather than an absence the UI has to
+ * notice.
+ */
+export type SourceLinkOut = { url: string; kind: "evidence" | "recipient" };
+
+function sourceLinksOf(r: OutRow): SourceLinkOut[] {
+  const out: SourceLinkOut[] = [];
+  const ev = s(r.evidence_url);
+  const rec = s(r.recipient_url);
+  if (ev) out.push({ url: ev, kind: "evidence" });
+  if (rec && rec !== ev) out.push({ url: rec, kind: "recipient" });
+  return out;
+}
+
 function shapeOutbound(r: OutRow) {
   const tier = s(r.tier);
   const t = tier ? TIER_MEANING[tier] : undefined;
@@ -272,6 +292,7 @@ function shapeOutbound(r: OutRow) {
                    `what it is worth cannot be stated. Treat it as unranked, not as low.` }
       : null,
     evidence: outboundEvidence(r),
+    sourceLinks: sourceLinksOf(r),
     bodyState: s(r.body)
       ? "written"
       : "MISSING, this row has no message body at all, so there is nothing to " +

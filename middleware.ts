@@ -30,11 +30,14 @@ function isPublicPath(pathname: string): boolean {
     pathname === "/jackson-v2" ||
     pathname.startsWith("/api/jackson") ||
     // Machine endpoints: heartbeat ingest (PC posts with x-heartbeat-key), the
-    // agent notification pipe (same key), and the Vercel cron watchdog (Bearer
-    // CRON_SECRET). All verify their own key inside the route and fail closed.
+    // agent notification pipe (same key), the Vercel cron watchdog (Bearer
+    // CRON_SECRET), and the schedule app's due-tomorrow push trigger (Bearer
+    // SCHEDULE_PUSH_SECRET, called twice a day by a GitHub Actions job).
+    // All verify their own key inside the route and fail closed.
     pathname === "/api/heartbeat" ||
     pathname === "/api/notify" ||
     pathname === "/api/cron/watchdog" ||
+    pathname === "/api/push/schedule" ||
     pathname.startsWith("/demo-freshco") ||
     pathname.startsWith("/demo-roofing") ||
     pathname.startsWith("/demo-clearhaul") ||
@@ -80,6 +83,35 @@ export async function middleware(req: NextRequest) {
       session.role === "owner" ||
       session.role === "staff";
     if (isStaff) return NextResponse.next();
+
+    // Caller-role sessions reach the Cold Call Room and NOTHING else. These are
+    // outside dialers working Jack's lead list; they must never see revenue,
+    // the client roster, Sonar, Jarvis, or any client's data. Scoped here at the
+    // edge AND re-checked inside every /api/calls route.
+    if (session.role === "caller") {
+      if (
+        pathname === "/calls" ||
+        pathname.startsWith("/calls/") ||
+        pathname.startsWith("/api/calls/")
+      ) {
+        // The caller-account admin screen is for Jack only.
+        if (pathname.startsWith("/calls/team") || pathname.startsWith("/api/calls/callers")) {
+          if (pathname.startsWith("/api/")) {
+            return NextResponse.json({ error: "forbidden" }, { status: 403 });
+          }
+          const url = req.nextUrl.clone();
+          url.pathname = "/calls";
+          return NextResponse.redirect(url);
+        }
+        return NextResponse.next();
+      }
+      if (pathname.startsWith("/api/")) {
+        return NextResponse.json({ error: "forbidden" }, { status: 403 });
+      }
+      const url = req.nextUrl.clone();
+      url.pathname = "/calls";
+      return NextResponse.redirect(url);
+    }
 
     // Client-role sessions only ever reach their client portal. Everything
     // else -- admin pages AND admin API routes -- is blocked.

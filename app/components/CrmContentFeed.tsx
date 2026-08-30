@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { SourceLink, NoSourceLink } from "./CrmRowDetail";
 
 // Delivery-side activity for a client: the blog posts, city pages, Google
 // Business posts and review pushes the content engine actually recorded.
@@ -105,12 +106,9 @@ export default function CrmContentFeed({ feed, client }: { feed: ContentFeed; cl
                 {it.title || "(untitled)"}
               </span>
               {it.url ? (
-                <a href={it.url} target="_blank" rel="noopener"
-                  style={{ fontSize: 11.5, color: "var(--accent)", textDecoration: "none" }}>
-                  open ↗
-                </a>
+                <SourceLink url={it.url} kind="published" compact />
               ) : it.status === "published" ? (
-                <span style={{ fontSize: 11, color: "var(--text-muted)" }}>no link logged</span>
+                <NoSourceLink what="Published, but no link was logged" compact />
               ) : null}
               <span style={{ fontSize: 11, fontWeight: 600, color: statusColor(it.status), minWidth: 66, textAlign: "right" }}>
                 {it.status || "unknown"}

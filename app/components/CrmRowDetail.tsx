@@ -41,6 +41,106 @@ const EVIDENCE_COLOR: Record<Evidence["sourceKind"], string> = {
   none: "var(--text-muted)",
 };
 
+// ── Source links ───────────────────────────────────────────────────────────
+// Jack's #1 complaint was that he could not click through to the post a draft
+// was built from. The URLs were always in the payload; they were rendered as a
+// bare, underline-less "open ↗" wedged into the button row, and were hidden
+// entirely when the URL was null. Both are fixed here, in ONE component every
+// surface uses, so a link always looks like a link and a missing link always
+// says so out loud.
+
+/** Friendly name for the site a URL points at, read from its host only. */
+export function platformOf(url: string): { name: string; noun: string } {
+  let host = "";
+  try { host = new URL(url).hostname.replace(/^www\./, "").toLowerCase(); }
+  catch { return { name: "the source page", noun: "page" }; }
+  const on = (...parts: string[]) => parts.some((p) => host === p || host.endsWith(`.${p}`));
+  if (on("reddit.com", "redd.it")) return { name: "Reddit", noun: "post" };
+  if (on("nextdoor.com")) return { name: "Nextdoor", noun: "post" };
+  if (on("facebook.com", "fb.com")) return { name: "Facebook", noun: "post" };
+  if (on("instagram.com")) return { name: "Instagram", noun: "post" };
+  if (on("tiktok.com")) return { name: "TikTok", noun: "video" };
+  if (on("twitter.com", "x.com")) return { name: "X", noun: "post" };
+  if (on("linkedin.com")) return { name: "LinkedIn", noun: "post" };
+  if (on("craigslist.org")) return { name: "Craigslist", noun: "listing" };
+  if (on("estatesales.net", "estatesale.com")) return { name: "EstateSales.net", noun: "listing" };
+  if (on("yelp.com")) return { name: "Yelp", noun: "page" };
+  if (on("youtube.com", "youtu.be")) return { name: "YouTube", noun: "video" };
+  if (host.includes("permit")) return { name: "the permit record", noun: "record" };
+  return { name: host, noun: "page" };
+}
+
+/**
+ * What this link IS, which is not cosmetic. "evidence" is the page the claim
+ * was actually read from; "recipient" is merely the prospect's own site and
+ * proves nothing about the claim. They must never look identical.
+ */
+export type LinkKind = "evidence" | "recipient" | "matched" | "published";
+
+const LINK_COLOR: Record<LinkKind, string> = {
+  evidence: "var(--green)",
+  recipient: "var(--orange)",
+  matched: "var(--orange)",
+  published: "var(--accent)",
+};
+
+/** The human sentence naming where the click goes. */
+export function linkLabel(url: string, kind: LinkKind): string {
+  const p = platformOf(url);
+  if (kind === "evidence") return `View the ${p.name} ${p.noun} this was written from`;
+  if (kind === "matched") return `View the matched ${p.name} ${p.noun} (not verified evidence)`;
+  if (kind === "published") return `View the published ${p.noun}`;
+  return p.noun === "page" && !/^[A-Z]/.test(p.name)
+    ? "Open their website"
+    : `Open their ${p.name} ${p.noun}`;
+}
+
+/** A real anchor: underlined, coloured, labelled by destination, new tab. */
+export function SourceLink({ url, kind, compact }: { url: string; kind: LinkKind; compact?: boolean }) {
+  const color = LINK_COLOR[kind];
+  let host = url;
+  try { host = new URL(url).hostname.replace(/^www\./, ""); } catch { /* show raw */ }
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={url}
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        display: "inline-flex", alignItems: "baseline", gap: 6, maxWidth: "100%",
+        fontSize: compact ? 11.5 : 12.5, fontWeight: 600, color,
+        textDecoration: "underline", textUnderlineOffset: 3,
+        border: `1px solid ${color}`, borderRadius: 8, padding: "3px 9px",
+        background: "var(--bg-card)", wordBreak: "break-word",
+      }}
+    >
+      <span>{linkLabel(url, kind)} ↗</span>
+      <span style={{ fontSize: 10.5, fontWeight: 500, color: "var(--text-muted)", textDecoration: "none" }}>
+        {host}
+      </span>
+    </a>
+  );
+}
+
+/**
+ * The honest empty state. Never hidden, never faked — a draft with no captured
+ * source is exactly the draft Jack most needs to spot, so it gets a louder
+ * treatment than a working link, not a quieter one.
+ */
+export function NoSourceLink({ what, compact }: { what: string; compact?: boolean }) {
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", gap: 6,
+      fontSize: compact ? 11.5 : 12, fontWeight: 600, color: "var(--red)",
+      border: "1px dashed var(--red)", borderRadius: 8, padding: "3px 9px",
+      background: "transparent",
+    }}>
+      ⚠ {what}
+    </span>
+  );
+}
+
 const heading: React.CSSProperties = {
   fontSize: 10.5, textTransform: "uppercase", letterSpacing: ".1em",
   fontWeight: 700, color: "var(--accent)",
@@ -133,7 +233,14 @@ export default function CrmRowDetail({ it, onClose }: { it: DetailItem; onClose:
           <Field name="Recipient" value={it.recipient} empty="No recipient recorded." />
           <Field name="Recipient handle" value={it.recipientHandle ?? null} empty="No handle recorded." />
         </div>
-        <Field name="Recipient page" value={it.recipient_url} empty="No recipient URL recorded." />
+        <div>
+          <div style={label}>Recipient page</div>
+          <div style={{ marginTop: 4 }}>
+            {it.recipient_url
+              ? <SourceLink url={it.recipient_url} kind="recipient" />
+              : <NoSourceLink what="No recipient page captured for this lead" />}
+          </div>
+        </div>
       </div>
 
       {/* ── Why we think this person is worth contacting ───────────────── */}
@@ -197,18 +304,27 @@ export default function CrmRowDetail({ it, onClose }: { it: DetailItem; onClose:
 
           <div style={{ marginTop: 8 }}>
             <div style={label}>Source page</div>
-            {ev?.sourceUrl ? (
-              <a href={ev.sourceUrl} target="_blank" rel="noopener" style={{ fontSize: 12, color: "var(--accent)" }}>
-                {ev.sourceUrl} ↗
-              </a>
-            ) : (
-              <p style={{ margin: "3px 0 0", fontSize: 12, fontStyle: "italic", color: "var(--text-muted)" }}>
-                No evidence URL recorded.
+            <div style={{ marginTop: 4 }}>
+              {ev?.sourceUrl
+                ? <SourceLink url={ev.sourceUrl} kind={sourceKind === "evidence" ? "evidence" : "recipient"} />
+                : <NoSourceLink what="No source link captured for this lead" />}
+            </div>
+            {sourceKind === "recipient_only" && (
+              <p style={{ margin: "5px 0 0", fontSize: 11.5, lineHeight: 1.5, color: "var(--orange)" }}>
+                This is the prospect&rsquo;s own page, not the page the claim was read from.
+                It is a place to start checking, not proof.
               </p>
             )}
           </div>
 
-          <Field name="evidence_url (raw)" value={it.evidence_url} empty="No evidence URL recorded." />
+          <div style={{ marginTop: 8 }}>
+            <div style={label}>evidence_url (raw)</div>
+            <div style={{ marginTop: 4 }}>
+              {it.evidence_url
+                ? <SourceLink url={it.evidence_url} kind="evidence" />
+                : <NoSourceLink what="No source link captured for this lead" />}
+            </div>
+          </div>
 
           {ev?.detail && (
             <p style={{ margin: "9px 0 0", fontSize: 11.5, lineHeight: 1.55, color: "var(--text-secondary)" }}>

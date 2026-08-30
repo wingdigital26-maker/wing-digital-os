@@ -6,7 +6,10 @@ import CrmClientSummary, {
 } from "./CrmClientSummary";
 import CrmContentFeed, { type ContentFeed, type ContentItem } from "./CrmContentFeed";
 import CrmScraperHealth, { ago, healthLook, isOffByChoice, type Watch } from "./CrmScraperHealth";
-import CrmRowDetail, { type DetailItem, type Evidence, type Review, type TierInfo } from "./CrmRowDetail";
+import CrmRowDetail, {
+  SourceLink, NoSourceLink,
+  type LinkKind, type DetailItem, type Evidence, type Review, type TierInfo,
+} from "./CrmRowDetail";
 
 // CRM — everything happening for a client, compartmentalized by client.
 //
@@ -118,6 +121,10 @@ type Ev = {
   exact: boolean; when: string;
   mark: string; color: string; kind: string;
   title: string; detail?: string | null; url?: string | null; status?: string;
+  /** What the url IS, so the anchor can name its destination honestly. */
+  urlKind?: LinkKind;
+  /** true for an outbound row that carries no URL at all — the gap is shown. */
+  noSource?: boolean;
 };
 
 export function buildTimeline(items: Item[], watch: Watch | undefined, content: ContentFeed | undefined): Ev[] {
@@ -140,6 +147,8 @@ export function buildTimeline(items: Item[], watch: Watch | undefined, content: 
       title: `${CHANNEL_LABEL[it.channel] || it.channel || "unlabeled"} · ${it.recipient || "(no recipient recorded)"}`,
       detail: parked ? parkReason(it) : it.personalization,
       url: it.evidence_url || it.recipient_url,
+      urlKind: it.evidence_url ? "evidence" : "recipient",
+      noSource: !it.evidence_url && !it.recipient_url,
       status: it.status,
     });
   }
@@ -169,7 +178,7 @@ export function buildTimeline(items: Item[], watch: Watch | undefined, content: 
     evs.push({
       key: `c${i}`, at: t, exact: false, when: c.date,
       mark: "◆", color: "var(--green)", kind: "published",
-      title: c.title || "(untitled)", detail: c.type, url: c.url,
+      title: c.title || "(untitled)", detail: c.type, url: c.url, urlKind: "published",
     });
   }
 
@@ -809,11 +818,18 @@ export default function CrmBoard() {
               )}
 
               <div style={{ display: "flex", gap: 7, flexWrap: "wrap", alignItems: "center" }}>
-                {(it.recipient_url || it.evidence_url) && (
-                  <a href={it.evidence_url || it.recipient_url || "#"} target="_blank" rel="noopener"
-                    style={{ fontSize: 11.5, color: "var(--accent)", textDecoration: "none" }}>
-                    {park ? "open the post to find the city ↗" : "open ↗"}
-                  </a>
+                {/* Every URL this row carries, as a real labelled anchor.
+                    evidence_url and recipient_url are shown SEPARATELY, not
+                    collapsed with `||`: the page a claim was read from and the
+                    prospect's own homepage are different things, and only one
+                    of them checks the claim. When neither exists, the gap is
+                    stated rather than hidden. */}
+                {it.evidence_url && <SourceLink url={it.evidence_url} kind="evidence" compact />}
+                {it.recipient_url && it.recipient_url !== it.evidence_url && (
+                  <SourceLink url={it.recipient_url} kind="recipient" compact />
+                )}
+                {!it.evidence_url && !it.recipient_url && (
+                  <NoSourceLink what="No source link captured for this lead" compact />
                 )}
                 {writable && (
                   <button onClick={() => copy(it)} style={btn}>{copied === it.id ? "copied" : "copy"}</button>
@@ -1080,10 +1096,11 @@ export function Timeline({ name, events, rows, truncated, content, watch, scrapi
                   <span style={{ fontSize: 12.5, color: "var(--text-primary)", flex: 1, minWidth: 160 }}>
                     {e.title}
                   </span>
-                  {e.url && (
-                    <a href={e.url} target="_blank" rel="noopener"
-                      style={{ fontSize: 11, color: "var(--accent)", textDecoration: "none" }}>open ↗</a>
-                  )}
+                  {e.url
+                    ? <SourceLink url={e.url} kind={e.urlKind ?? "recipient"} compact />
+                    : e.noSource
+                    ? <NoSourceLink what="No source link captured" compact />
+                    : null}
                 </div>
                 {e.detail && (
                   <p style={{

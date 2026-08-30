@@ -22,7 +22,11 @@ export default function Login() {
       const data = await res.json().catch(() => ({} as any));
       const isStaff =
         data?.role === "admin" || data?.role === "owner" || data?.role === "staff";
-      if (data?.role && !isStaff) {
+      // Callers land straight in the Cold Call Room -- it is the only place
+      // they can go, so bouncing them via "/" would just be a wasted redirect.
+      if (data?.role === "caller") {
+        window.location.href = "/calls";
+      } else if (data?.role && !isStaff) {
         window.location.href = data.portal ? `/portal/${data.portal}` : "/portal";
       } else {
         window.location.href = "/";

@@ -177,7 +177,16 @@ const section: React.CSSProperties = {
   paddingTop: 12, borderTop: "1px solid var(--border)",
 };
 
-export default function CrmRowDetail({ it, onClose }: { it: DetailItem; onClose: () => void }) {
+export default function CrmRowDetail({
+  it, onClose, actions,
+}: {
+  it: DetailItem;
+  onClose: () => void;
+  /** Optional decision controls, rendered at the top of the panel so the
+   *  action is the first thing in reach rather than the last. Omitted by the
+   *  surfaces that only read (CrmBoard passes nothing and is unchanged). */
+  actions?: React.ReactNode;
+}) {
   const ev = it.evidence;
   const sourceKind = ev?.sourceKind ?? "none";
 
@@ -207,6 +216,15 @@ export default function CrmRowDetail({ it, onClose }: { it: DetailItem; onClose:
           close
         </button>
       </div>
+
+      {actions && (
+        <div style={{
+          border: "1px solid var(--border)", borderRadius: 10, padding: "10px 12px",
+          background: "var(--bg-card)",
+        }}>
+          {actions}
+        </div>
+      )}
 
       {/* ── The message ─────────────────────────────────────────────────── */}
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>

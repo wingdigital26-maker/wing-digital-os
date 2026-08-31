@@ -1,0 +1,475 @@
+import { NextResponse } from "next/server";
+import { sbUrl, sbService } from "../../../lib/osSupabase";
+import { GET as schoolGET, SCHEDULE_URL, type SchoolPayload } from "../school/route";
+
+// ───────────────────────────────────────────────────────────────────────────
+// Calendar API — every real dated thing on Jack's plate, in one feed.
+//
+// Four lanes, each independently configured and each reported honestly:
+//
+//   google    Google Calendar, read through the calendar's private iCal
+//             address (GOOGLE_CALENDAR_ICS_URL). Read-only, no OAuth, works
+//             PC-off from the cloud. Not set = the lane reports itself
+//             unconfigured and names the variable. It never invents events.
+//   callbacks Scheduled call-backs from the Cold Call Room
+//             (OS Supabase call_leads.next_action_at).
+//   payments  Invoice due dates and the next recurring payment
+//             (Sonar Supabase invoices).
+//   school    Jack's class schedule, expanded from the LIVE published
+//             schedule app. See the school lane below.
+//
+// Nothing here is ever synthesized. A lane with no credential returns zero
+// events and says which credential is missing; a lane that errors says so.
+// ───────────────────────────────────────────────────────────────────────────
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+export type CalendarSource = "google" | "callbacks" | "payments" | "school";
+
+export type CalendarEvent = {
+  id: string;
+  source: CalendarSource;
+  title: string;
+  /** ISO instant, or YYYY-MM-DD for an all-day event. */
+  start: string;
+  end: string | null;
+  allDay: boolean;
+  /** Secondary line: who it is with, or what it is worth. */
+  detail: string | null;
+  /** Real link back to the record this event came from. Never invented. */
+  url: string | null;
+  /** True when `url` leaves the OS and needs target=_blank. */
+  external: boolean;
+  status: string | null;
+};
+
+export type LaneStatus = {
+  source: CalendarSource;
+  label: string;
+  configured: boolean;
+  /** Exactly which credential is missing, when one is. */
+  missing: string | null;
+  error: string | null;
+  count: number;
+};
+
+// ── iCal parsing ───────────────────────────────────────────────────────────
+
+// Unfold RFC 5545 continuation lines (a leading space or tab continues the
+// previous line) before anything is parsed out of them.
+function unfold(text: string): string[] {
+  const out: string[] = [];
+  for (const raw of text.split(/\r\n|\n|\r/)) {
+    if ((raw.startsWith(" ") || raw.startsWith("\t")) && out.length) {
+      out[out.length - 1] += raw.slice(1);
+    } else {
+      out.push(raw);
+    }
+  }
+  return out;
+}
+
+function unescapeText(v: string): string {
+  return v
+    .replace(/\\n/gi, " ")
+    .replace(/\\,/g, ",")
+    .replace(/\\;/g, ";")
+    .replace(/\\\\/g, "\\");
+}
+
+type IcsTime = { value: string; allDay: boolean } | null;
+
+// DTSTART / DTEND to either a YYYY-MM-DD (all-day) or an ISO instant.
+// A trailing Z is UTC. A floating or TZID-qualified local time is emitted
+// without an offset so the browser reads it in its own zone, which is the
+// zone Jack is in and the zone the calendar was authored in.
+function icsTime(params: string, value: string): IcsTime {
+  const v = value.trim();
+  if (/VALUE=DATE(?![-A-Z])/i.test(params) || /^\d{8}$/.test(v)) {
+    const m = /^(\d{4})(\d{2})(\d{2})$/.exec(v);
+    return m ? { value: `${m[1]}-${m[2]}-${m[3]}`, allDay: true } : null;
+  }
+  const m = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(Z)?$/.exec(v);
+  if (!m) return null;
+  const base = `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}`;
+  return { value: m[7] ? `${base}Z` : base, allDay: false };
+}
+
+function parseIcs(text: string): CalendarEvent[] {
+  const events: CalendarEvent[] = [];
+  let cur: Record<string, { params: string; value: string }> | null = null;
+
+  for (const line of unfold(text)) {
+    if (line === "BEGIN:VEVENT") {
+      cur = {};
+      continue;
+    }
+    if (line === "END:VEVENT") {
+      if (cur) {
+        const start = cur.DTSTART ? icsTime(cur.DTSTART.params, cur.DTSTART.value) : null;
+        if (start) {
+          const end = cur.DTEND ? icsTime(cur.DTEND.params, cur.DTEND.value) : null;
+          const uid = cur.UID?.value ?? `${start.value}-${events.length}`;
+          const status = cur.STATUS?.value ? cur.STATUS.value.toLowerCase() : null;
+          // The link is used ONLY when the feed actually carries one. Google's
+          // iCal export supplies URL:…/calendar/event?eid=…; when it does not,
+          // the event simply has no link rather than a guessed one.
+          const url = cur.URL?.value?.trim() || null;
+          if (status !== "cancelled") {
+            events.push({
+              id: `google:${uid}`,
+              source: "google",
+              title: unescapeText(cur.SUMMARY?.value ?? "(no title)"),
+              start: start.value,
+              end: end ? end.value : null,
+              allDay: start.allDay,
+              detail: cur.LOCATION?.value ? unescapeText(cur.LOCATION.value) : null,
+              url: url && /^https?:\/\//i.test(url) ? url : null,
+              external: true,
+              status,
+            });
+          }
+        }
+      }
+      cur = null;
+      continue;
+    }
+    if (!cur) continue;
+    const colon = line.indexOf(":");
+    if (colon < 0) continue;
+    const left = line.slice(0, colon);
+    const semi = left.indexOf(";");
+    const name = (semi < 0 ? left : left.slice(0, semi)).toUpperCase();
+    cur[name] = { params: semi < 0 ? "" : left.slice(semi + 1), value: line.slice(colon + 1) };
+  }
+  return events;
+}
+
+// ── Lanes ──────────────────────────────────────────────────────────────────
+
+async function googleLane(): Promise<{ lane: LaneStatus; events: CalendarEvent[] }> {
+  const feed = process.env.GOOGLE_CALENDAR_ICS_URL;
+  const lane: LaneStatus = {
+    source: "google",
+    label: "Google Calendar",
+    configured: Boolean(feed),
+    missing: feed ? null : "GOOGLE_CALENDAR_ICS_URL",
+    error: null,
+    count: 0,
+  };
+  if (!feed) return { lane, events: [] };
+  try {
+    const res = await fetch(feed, { cache: "no-store" });
+    if (!res.ok) {
+      lane.error = `Google Calendar feed returned HTTP ${res.status}`;
+      return { lane, events: [] };
+    }
+    const events = parseIcs(await res.text());
+    lane.count = events.length;
+    return { lane, events };
+  } catch (e) {
+    lane.error = `Google Calendar feed unreachable: ${String(e)}`;
+    return { lane, events: [] };
+  }
+}
+
+type LeadRow = {
+  id: string;
+  company: string | null;
+  contact_name: string | null;
+  phone: string | null;
+  status: string | null;
+  next_action_at: string | null;
+};
+
+async function callbackLane(): Promise<{ lane: LaneStatus; events: CalendarEvent[] }> {
+  const url = sbUrl();
+  const key = sbService();
+  const lane: LaneStatus = {
+    source: "callbacks",
+    label: "Call-backs",
+    configured: Boolean(url && key),
+    missing: url && key ? null : "OS_SUPABASE_URL / OS_SUPABASE_SERVICE_KEY",
+    error: null,
+    count: 0,
+  };
+  if (!url || !key) return { lane, events: [] };
+  try {
+    const res = await fetch(
+      `${url}/rest/v1/call_leads?select=id,company,contact_name,phone,status,next_action_at` +
+        `&next_action_at=not.is.null&order=next_action_at.asc&limit=500`,
+      { headers: { apikey: key, Authorization: `Bearer ${key}` }, cache: "no-store" }
+    );
+    if (!res.ok) {
+      lane.error = `Call room read failed (HTTP ${res.status})`;
+      return { lane, events: [] };
+    }
+    const rows = (await res.json()) as LeadRow[];
+    const events = rows
+      .filter((r) => r.next_action_at)
+      .map<CalendarEvent>((r) => ({
+        id: `callback:${r.id}`,
+        source: "callbacks",
+        title: r.company?.trim() || r.contact_name?.trim() || "Call-back",
+        start: r.next_action_at as string,
+        end: null,
+        allDay: false,
+        detail: [r.contact_name, r.phone].filter(Boolean).join(" · ") || null,
+        url: "/calls",
+        external: false,
+        status: r.status,
+      }));
+    lane.count = events.length;
+    return { lane, events };
+  } catch (e) {
+    lane.error = `Call room unreachable: ${String(e)}`;
+    return { lane, events: [] };
+  }
+}
+
+type InvoiceRow = {
+  id: number;
+  client: string;
+  invoice_no: string;
+  amount_cents: number;
+  currency: string | null;
+  status: string;
+  due_on: string | null;
+  next_due_on: string | null;
+};
+
+function money(cents: number, currency = "USD"): string {
+  const n = Math.round(Number.isFinite(cents) ? cents : 0);
+  const sym = currency === "USD" ? "$" : `${currency} `;
+  return `${sym}${Math.floor(Math.abs(n) / 100).toLocaleString("en-US")}.${String(
+    Math.abs(n) % 100
+  ).padStart(2, "0")}`;
+}
+
+async function paymentLane(): Promise<{ lane: LaneStatus; events: CalendarEvent[] }> {
+  const url = process.env.SONAR_SUPABASE_URL;
+  const key = process.env.SONAR_SUPABASE_SERVICE_KEY;
+  const lane: LaneStatus = {
+    source: "payments",
+    label: "Payments due",
+    configured: Boolean(url && key),
+    missing: url && key ? null : "SONAR_SUPABASE_URL / SONAR_SUPABASE_SERVICE_KEY",
+    error: null,
+    count: 0,
+  };
+  if (!url || !key) return { lane, events: [] };
+  try {
+    const res = await fetch(
+      `${url}/rest/v1/invoices?select=id,client,invoice_no,amount_cents,currency,status,due_on,next_due_on&limit=1000`,
+      { headers: { apikey: key, Authorization: `Bearer ${key}` }, cache: "no-store" }
+    );
+    if (!res.ok) {
+      lane.error = `Invoices read failed (HTTP ${res.status})`;
+      return { lane, events: [] };
+    }
+    const rows = (await res.json()) as InvoiceRow[];
+    const events: CalendarEvent[] = [];
+    for (const r of rows) {
+      if (r.status === "void") continue;
+      // One marker per real date on the row: when it is due, and when the
+      // recurring schedule expects the next one. Deduped so a row whose two
+      // dates agree is only drawn once.
+      const dates = new Set<string>();
+      if (r.due_on) dates.add(r.due_on.slice(0, 10));
+      if (r.next_due_on) dates.add(r.next_due_on.slice(0, 10));
+      for (const d of dates) {
+        events.push({
+          id: `payment:${r.id}:${d}`,
+          source: "payments",
+          title: r.client,
+          start: d,
+          end: null,
+          allDay: true,
+          detail: `${money(r.amount_cents, r.currency || "USD")} · ${r.invoice_no}`,
+          url: "#invoices",
+          external: false,
+          status: r.status,
+        });
+      }
+    }
+    lane.count = events.length;
+    return { lane, events };
+  } catch (e) {
+    lane.error = `Invoices unreachable: ${String(e)}`;
+    return { lane, events: [] };
+  }
+}
+
+// ── School lane ────────────────────────────────────────────────────────────
+//
+// Jack's classes are recurring weekly meetings ("Astronomy MWF 14:00-14:50"),
+// not dated events, so the calendar cannot draw them until they are expanded
+// into one real dated meeting per day the class actually meets.
+//
+// The data is NOT duplicated here. We call /api/school's own handler, which
+// fetches the published schedule app live with its cache-buster and no-store,
+// and parses the DATA block. That keeps exactly one parser in the codebase and
+// keeps this lane as live as that route is: edit the markers, run build.py, and
+// the next request here sees the new courses. Nothing is snapshotted.
+//
+// Bounds come from the schedule's own SEMESTER block, never from a constant in
+// this file: classes run from `start` through `lastClass`, and finals are drawn
+// only on the dates the courses themselves carry. If the live fetch fails, the
+// lane reports the failure by name and returns zero events. It never falls back
+// to a remembered schedule.
+
+// build.py's day letters. R is Thursday and U is Sunday, the standard
+// university shorthand that avoids the T/Th and S/Su collisions.
+const DAY_LETTER: Record<string, number> = { U: 0, M: 1, T: 2, W: 3, R: 4, F: 5, S: 6 };
+
+function ymd(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate()
+  ).padStart(2, "0")}`;
+}
+
+function parseYmd(v: string): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v.trim());
+  if (!m) return null;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/** "14:00" on a given day → a floating local ISO the browser reads in Jack's
+ *  own zone, the same convention the iCal lane uses for local times. */
+function at(day: Date, hhmm: string): string | null {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm.trim());
+  if (!m) return null;
+  return `${ymd(day)}T${String(Number(m[1])).padStart(2, "0")}:${m[2]}:00`;
+}
+
+function where(bldg: string, room: string): string | null {
+  const b = bldg.trim();
+  const r = room.trim();
+  if (b && r) return `${b} ${r}`;
+  return b || r || null;
+}
+
+async function schoolLane(): Promise<{ lane: LaneStatus; events: CalendarEvent[] }> {
+  const lane: LaneStatus = {
+    source: "school",
+    label: "Classes",
+    // The schedule app is public, so this lane needs no credential. It is
+    // configured whenever the live page can actually be read.
+    configured: true,
+    missing: null,
+    error: null,
+    count: 0,
+  };
+
+  let payload: SchoolPayload;
+  try {
+    payload = (await (await schoolGET()).json()) as SchoolPayload;
+  } catch (e) {
+    lane.configured = false;
+    lane.error = `Class schedule unreachable: ${String(e)}`;
+    return { lane, events: [] };
+  }
+
+  if (!payload.ok) {
+    lane.configured = false;
+    lane.error = `Class schedule: ${payload.error ?? "the published schedule app could not be read."}`;
+    return { lane, events: [] };
+  }
+
+  const from = payload.semester?.start ? parseYmd(payload.semester.start) : null;
+  const lastClass = payload.semester?.lastClass ? parseYmd(payload.semester.lastClass) : null;
+  if (!from || !lastClass) {
+    lane.configured = false;
+    lane.error =
+      "Class schedule: the published schedule has no semester start and last-class dates, " +
+      "so recurring classes cannot be placed on real days.";
+    return { lane, events: [] };
+  }
+
+  const finalsEnd = payload.semester?.finalsEnd ? parseYmd(payload.semester.finalsEnd) : null;
+  const events: CalendarEvent[] = [];
+
+  for (const [ci, c] of payload.courses.entries()) {
+    const title = c.short?.trim() || c.title?.trim();
+    if (!title) continue;
+    const room = where(c.bldg, c.room);
+    const detail = [c.code, room].filter(Boolean).join(" · ") || null;
+
+    // One dated meeting per day the class actually meets, walked day by day
+    // between the semester's own bounds. Nothing outside them is drawn.
+    const wanted = new Set(
+      c.days
+        .toUpperCase()
+        .split("")
+        .map((ch) => DAY_LETTER[ch])
+        .filter((n): n is number => n !== undefined)
+    );
+    if (wanted.size && c.start) {
+      for (const d = new Date(from); d <= lastClass; d.setDate(d.getDate() + 1)) {
+        if (!wanted.has(d.getDay())) continue;
+        const start = at(d, c.start);
+        if (!start) continue;
+        events.push({
+          id: `school:${ci}:${ymd(d)}`,
+          source: "school",
+          title,
+          start,
+          end: c.end ? at(d, c.end) : null,
+          allDay: false,
+          detail,
+          url: SCHEDULE_URL,
+          external: true,
+          status: "class",
+        });
+      }
+    }
+
+    // Finals, only when the course carries a real date. A final marked TBA has
+    // no day to sit on, so it is left off rather than guessed onto one.
+    const f = c.final;
+    if (f && f.date && !f.tba) {
+      const fd = parseYmd(f.date);
+      if (fd && fd >= from && (!finalsEnd || fd <= finalsEnd)) {
+        const fStart = f.start ? at(fd, f.start) : null;
+        const fRoom = where(f.bldg ?? "", f.room ?? "") ?? room;
+        events.push({
+          id: `school:${ci}:final:${ymd(fd)}`,
+          source: "school",
+          title: `Final: ${title}`,
+          start: fStart ?? ymd(fd),
+          end: fStart && f.end ? at(fd, f.end) : null,
+          allDay: !fStart,
+          detail: [c.code, fRoom].filter(Boolean).join(" · ") || null,
+          url: SCHEDULE_URL,
+          external: true,
+          status: "final",
+        });
+      }
+    }
+  }
+
+  lane.count = events.length;
+  return { lane, events };
+}
+
+export async function GET() {
+  const [g, c, p, s] = await Promise.all([
+    googleLane(),
+    callbackLane(),
+    paymentLane(),
+    schoolLane(),
+  ]);
+  const events = [...g.events, ...c.events, ...p.events, ...s.events].sort((a, b) =>
+    a.start < b.start ? -1 : a.start > b.start ? 1 : 0
+  );
+  const now = new Date();
+  return NextResponse.json({
+    events,
+    lanes: [g.lane, c.lane, p.lane, s.lane],
+    today: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
+      now.getDate()
+    ).padStart(2, "0")}`,
+  });
+}

@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
 import { motion, MotionConfig } from "motion/react";
-import { Bolt, Users, Cpu, Bulb, Calendar, Note, Sparkles } from "reicon-react";
+import { Bolt, Users, Cpu, Bulb, Calendar, Note, Sparkles, Backpack } from "reicon-react";
 import { staggerContainer, riseItem, hoverSpring, cardHover, cardHoverPassive, cardTap } from "./components/motion";
 import { Sparkline, Delta, buildDailySeries } from "./components/Charts";
 import { StatTiles, MissionPanels, MissionStyles, Selection, StatTile, WatchdogBanner, WatchdogData, MissionData } from "./components/MissionControlCore";
@@ -14,14 +14,26 @@ type IconType = React.ComponentType<{ size?: number; color?: string }>;
 const VaultGraph = dynamic(() => import("./components/VaultGraph"), { ssr: false });
 const Search = dynamic(() => import("./components/Search"), { ssr: false });
 const ActivityLog = dynamic(() => import("./components/ActivityLog"), { ssr: false });
-const WeekCalendar = dynamic(() => import("./components/WeekCalendar"), { ssr: false });
 const MissionOps = dynamic(() => import("./components/MissionOps"), { ssr: false });
 const ClientsBoard = dynamic(() => import("./components/ClientsBoard"), { ssr: false });
 const SonarBoard = dynamic(() => import("./components/SonarBoard"), { ssr: false });
-const CrmBoard = dynamic(() => import("./components/CrmBoard"), { ssr: false });
-const ClientInbox = dynamic(() => import("./components/ClientInbox"), { ssr: false });
-const PipelineBoard = dynamic(() => import("./components/PipelineBoard"), { ssr: false });
-const InvoicesBoard = dynamic(() => import("./components/InvoicesBoard"), { ssr: false });
+// One CRM surface (2026-08-30). Inbox was only Outbound filtered to drafts, so
+// it is a default filter now, not a screen. Pipeline is folded in as two record
+// types; no record and no field was dropped.
+const CrmWorkspace = dynamic(() => import("./components/CrmWorkspace"), { ssr: false });
+// Automated messaging QA board — the cold-email engine's queue with rendered
+// per-recipient previews. Lives beside the CRM because it is the same
+// "double-check before it goes out" workflow, on the automated lane.
+const MessagingBoard = dynamic(() => import("./components/MessagingBoard"), { ssr: false });
+// CrmBoard / ClientInbox / PipelineBoard are no longer mounted here. The files
+// are kept on disk as a fallback if the merged view ever needs to be backed out.
+// InvoicesBoard is mounted by CalendarSection as its second tab, not directly.
+// Live pull from the published class schedule app. Never a snapshot: if the
+// fetch fails it renders the failure, it does not fall back to an older copy.
+const SchoolSection = dynamic(() => import("./components/SchoolBoard"), { ssr: false });
+// Calendar replaced "Money" 2026-08-30. Invoices lives on as its second tab, so
+// billing data is one click away rather than gone.
+const CalendarSection = dynamic(() => import("./components/CalendarBoard"), { ssr: false });
 const CompetitorIntel = dynamic(() => import("./components/CompetitorIntel"), { ssr: false });
 
 type NavGroup = {
@@ -45,21 +57,31 @@ const NAV: NavGroup[] = [
     ],
   },
   {
-    // Outbound = messages drafted FOR a client. Pipeline = Wing's own book of
-    // business (contacts and deals), the GoHighLevel replacement.
+    // ONE CRM surface. Inbox, Outbound and Pipeline were merged 2026-08-30:
+    // three tabs for one workflow meant the source post lived in one tab and
+    // the draft in another, so a draft had nothing to click through to.
+    // Pipeline's data (Wing's own book of business, the GoHighLevel
+    // replacement) is folded in as a category, never deleted.
     id: "crm", label: "CRM", icon: Note,
     subs: [
-      // Inbox is first because it is the one that asks for a decision. Outbound
-      // is for browsing everything ever drafted; Inbox is the queue of what is
-      // still waiting on Jack, per client.
-      { id: "inbox", label: "Inbox" },
-      { id: "pipeline", label: "Pipeline" },
-      { id: "crm", label: "Outbound" },
+      { id: "crm", label: "Everything" },
+      // The automated-sending QA board (2026-08-31): who the cold-email engine
+      // will contact next, the exact rendered message each would get, and the
+      // guardrail counts. Read-only against the sender's own Supabase.
+      { id: "messaging", label: "Automated messaging" },
     ],
   },
   {
-    id: "money", label: "Money", icon: Calendar,
-    subs: [{ id: "invoices", label: "Invoices & Payments" }],
+    // One sub only. The section owns its own Calendar/Invoices tabs, so listing
+    // them here too showed everything twice.
+    id: "calendar", label: "Calendar", icon: Calendar,
+    subs: [{ id: "calendar", label: "Calendar" }],
+  },
+  {
+    // Backpack, not Bulb: Intel already owns Bulb and the two read as the same
+    // section in the rail.
+    id: "school", label: "School", icon: Backpack,
+    subs: [{ id: "school", label: "Class Schedule" }],
   },
   {
     id: "agent", label: "Agents", icon: Cpu,
@@ -74,6 +96,16 @@ const NAV: NavGroup[] = [
     ],
   },
 ];
+
+// Views that existed before the 2026-08-30 restructure. Old deep links and any
+// panel still dispatching the old id land on the merged view instead of a dead
+// screen. Keep these entries; removing one silently breaks a bookmark.
+const LEGACY_VIEW_ALIAS: Record<string, string> = {
+  inbox: "crm",
+  pipeline: "crm",
+  money: "calendar",
+  invoices: "calendar",
+};
 
 // which group owns a given view id
 function groupOf(viewId: string): NavGroup {
@@ -145,8 +177,10 @@ export default function Home() {
   // to a section: window.dispatchEvent(new CustomEvent("os:navigate", { detail: "clients" })).
   useEffect(() => {
     const onNav = (e: Event) => {
-      const id = (e as CustomEvent).detail;
-      if (typeof id === "string" && NAV.some(g => g.subs.some(s => s.id === id))) setActive(id);
+      const raw = (e as CustomEvent).detail;
+      if (typeof raw !== "string") return;
+      const id = LEGACY_VIEW_ALIAS[raw] ?? raw;
+      if (NAV.some(g => g.subs.some(s => s.id === id))) setActive(id);
     };
     window.addEventListener("os:navigate", onNav);
     return () => window.removeEventListener("os:navigate", onNav);
@@ -353,14 +387,14 @@ export default function Home() {
           {visited.has("command") && <div className="app-view" style={{ display: active === "command" ? "block" : "none" }}><CommandCenter data={revenueData} loading={loading} onSendToAI={sendToAI} /></div>}
           {visited.has("clients") && <div className="app-view" style={{ display: active === "clients" ? "block" : "none" }}><ClientsBoard /></div>}
           {visited.has("sonar") && <div className="app-view" style={{ display: active === "sonar" ? "block" : "none" }}><SonarBoard /></div>}
-          {visited.has("pipeline") && <div className="app-view" style={{ display: active === "pipeline" ? "block" : "none" }}><PipelineBoard /></div>}
-          {visited.has("inbox") && <div className="app-view" style={{ display: active === "inbox" ? "block" : "none" }}><ClientInbox /></div>}
-          {visited.has("crm") && <div className="app-view" style={{ display: active === "crm" ? "block" : "none" }}><CrmBoard /></div>}
-          {visited.has("invoices") && <div className="app-view" style={{ display: active === "invoices" ? "block" : "none" }}><InvoicesBoard /></div>}
+          {visited.has("crm") && <div className="app-view" style={{ display: active === "crm" ? "block" : "none" }}><CrmWorkspace /></div>}
+          {visited.has("messaging") && <div className="app-view" style={{ display: active === "messaging" ? "block" : "none" }}><MessagingBoard /></div>}
+          {visited.has("calendar") && <div className="app-view" style={{ display: active === "calendar" ? "block" : "none" }}><CalendarSection /></div>}
           {visited.has("competitors") && <div className="app-view" style={{ display: active === "competitors" ? "block" : "none" }}><CompetitorIntel onSendToAI={sendToAI} /></div>}
           {visited.has("knowledge") && <div className="app-view" style={{ display: active === "knowledge" ? "block" : "none" }}><KnowledgeBase initialPath={openNotePath} onSendToAI={sendToAI} /></div>}
           {visited.has("agent") && <div className="app-view" style={{ display: active === "agent" ? "block" : "none" }}><MissionOps /></div>}
           {visited.has("log") && <div className="app-view" style={{ display: active === "log" ? "block" : "none" }}><ActivityLog /></div>}
+          {visited.has("school") && <div className="app-view" style={{ display: active === "school" ? "block" : "none" }}><SchoolSection /></div>}
           {visited.has("personal") && <div className="app-view" style={{ display: active === "personal" ? "block" : "none" }}><PersonalSection /></div>}
         </div>
       </main>
@@ -520,11 +554,16 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState("");
 
-  const [showCalendar, setShowCalendar] = useState(false);
-  const [calendarKey, setCalendarKey] = useState(0);
+  // One calendar in the OS. Anything here that used to open an inline grid now
+  // jumps to the Calendar section, which has the real events on it.
+  const goToCalendar = useCallback(() => {
+    sfx.play("nav");
+    window.dispatchEvent(new CustomEvent("os:navigate", { detail: "calendar" }));
+  }, []);
   const [coldStats, setColdStats] = useState<{ dialedToday: number; booked: number } | null>(null);
   const [brief, setBrief] = useState<any>(null);
   const [showBriefing, setShowBriefing] = useState(false);
+  const [showAllStats, setShowAllStats] = useState(false);
   const [camp, setCamp] = useState<any>(null);
   const [sentToday, setSentToday] = useState<number | null>(null);
   const [agentHealth, setAgentHealth] = useState<any[]>([]);
@@ -596,21 +635,19 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
       setColdStats({ dialedToday, booked });
     }).catch(() => {});
   }, []);
-  // Hourly calendar refresh
-  useEffect(() => {
-    if (!showCalendar) return;
-    const id = setInterval(() => setCalendarKey(k => k + 1), 60 * 60 * 1000);
-    return () => clearInterval(id);
-  }, [showCalendar]);
 
   // Stats row. MRR is the only figure with a real source (lib/revenue.ts).
   // Opened emails and appointments have NO data source since GHL was retired
   // 2026-08-22, so they render an explicit no-data state — never a 0 as fact.
+  // Condensed 2026-08-30: only figures with a real source get a tile. Two of the
+  // three tiles here were permanently "no data" and were taking the best space on
+  // the screen to say nothing. They are now one honest footnote line below.
   const STATS = [
-    { label: "Opened Emails", value: "no data", noSource: true, color: "var(--green)" },
     { label: "MRR", value: loading ? "..." : (typeof data?.mrr === "number" ? `$${data.mrr.toLocaleString()}` : "unavailable"), color: "var(--orange)" },
-    { label: "Appts This Week", value: "no data", noSource: true, color: "var(--accent)", onClick: () => setShowCalendar(c => !c) },
   ];
+  // Not instrumented yet. Named explicitly so the gap stays visible without
+  // occupying a tile. See the tracking plan; both are blocked on Jack.
+  const NOT_INSTRUMENTED = ["Opened emails", "Appointments booked"];
 
   function showToast(msg: string) {
     setToast(msg);
@@ -764,9 +801,9 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
               <p style={{ fontSize: 22, fontWeight: 700, color: "var(--text-muted)", lineHeight: 1.4, fontFamily: "'Space Grotesk', sans-serif" }}>no data</p>
               <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>replies · no data source since GHL retired</p>
             </div>
-            <div style={{ cursor: "pointer" }} onClick={() => setShowCalendar(c => !c)}>
+            <div style={{ cursor: "pointer" }} onClick={() => goToCalendar()}>
               <p style={{ fontSize: 22, fontWeight: 700, color: "var(--text-muted)", lineHeight: 1.4, fontFamily: "'Space Grotesk', sans-serif" }}>no data</p>
-              <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>appointments · no data source {showCalendar ? "▲" : "▼"}</p>
+              <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>appointments · no feed connected, open Calendar</p>
             </div>
             <button onClick={() => onSendToAI(`Today's Wing Digital briefing:\n- Emails sent today: ${sentToday ?? camp?.by_day?.[new Date().toLocaleDateString("en-CA")] ?? 0}\n- MRR: ${typeof data?.mrr === "number" ? `$${data.mrr}` : "unavailable"}\n- Replies and appointments: no data source (GHL retired, no CRM connected)\n\nWhat should I prioritize today to grow Wing Digital?`)}
               style={{
@@ -799,12 +836,31 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
       )}
 
       {/* Mission stats row — every tile clicks through to its breakdown panel */}
-      {missionStats && missionStats.tiles.length > 0 && (
-        <motion.div variants={riseItem}>
-          <MissionStyles />
-          <StatTiles tiles={missionStats.tiles} onSelect={setStatSelection} />
-        </motion.div>
-      )}
+      {/* Condensed 2026-08-30: this rendered up to 7 tiles, which read as a wall
+          rather than a summary. The 4 that drive a decision show by default; the
+          accounting detail is one click away rather than gone. Full Mission
+          Control still shows every tile. */}
+      {missionStats && missionStats.tiles.length > 0 && (() => {
+        const PRIMARY = ["MRR", "Active Clients", "Pipeline", "Untouched Leads"];
+        const primary = missionStats.tiles.filter(t => PRIMARY.includes(t.label));
+        const rest = missionStats.tiles.filter(t => !PRIMARY.includes(t.label));
+        const shown = showAllStats ? [...primary, ...rest] : primary;
+        return (
+          <motion.div variants={riseItem}>
+            <MissionStyles />
+            <StatTiles tiles={shown} onSelect={setStatSelection} />
+            {rest.length > 0 && (
+              <button onClick={() => { sfx.play("nav"); setShowAllStats(s => !s); }} style={{
+                marginTop: 10, background: "none", border: "none", cursor: "pointer",
+                fontSize: 11, fontWeight: 700, color: "var(--text-muted)",
+                letterSpacing: "0.04em", padding: "4px 2px",
+              }}>
+                {showAllStats ? "show less" : `show ${rest.length} more`}
+              </button>
+            )}
+          </motion.div>
+        );
+      })()}
       <MissionPanels selection={statSelection} data={null} onSelect={setStatSelection} />
 
       {/* Dispatch agent briefing */}
@@ -962,18 +1018,22 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
         })}
       </motion.div>
 
-      {/* Week Calendar -- toggle. No appointment feed exists (GHL retired),
-          so the grid renders empty with an explicit no-source note inside. */}
-      {showCalendar && !loading && (
-        <WeekCalendar key={calendarKey} appointments={[]} />
-      )}
+      {/* The honest gap, in one line instead of two dead tiles. */}
+      <p style={{ fontSize: 10.5, color: "var(--text-muted)", marginTop: -4 }}>
+        Not instrumented yet: {NOT_INSTRUMENTED.join(", ")}. No tracking is installed, so these have no number rather than a zero.
+      </p>
+
+      {/* Removed 2026-08-30: this was a SECOND calendar, permanently empty
+          (appointments={[]} hardcoded). The Calendar section is now the one
+          calendar and carries real payments, call-backs and class schedule, so
+          both the quick action and the tile below navigate there instead. */}
 
       {/* Quick Actions — floating pill row. "Add Lead" is gone: there is no
           CRM to add a lead to, and a form that can only fail is worse than none. */}
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
         <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", marginRight: 4 }}>Quick</span>
         {[
-          { icon: Calendar, label: "Calendar", action: () => setShowCalendar(c => !c), c: "var(--accent)" },
+          { icon: Calendar, label: "Calendar", action: goToCalendar, c: "var(--accent)" },
           { icon: Note, label: "New Note", action: () => setShowNewNote(true), c: "var(--accent-2)" },
           { icon: Sparkles, label: "Ask Claude", action: () => onSendToAI("What should I focus on today for Wing Digital?"), c: "#E8692A" },
         ].map(btn => (

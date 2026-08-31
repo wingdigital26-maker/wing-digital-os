@@ -1,18 +1,38 @@
 "use client";
 import { useState } from "react";
 
-interface Appointment {
+// One thing on the week grid. Every field past `startTime` is optional so the
+// same grid can draw a Google Calendar event, a scheduled call-back and a
+// payment due date without any of them being padded with invented values.
+export interface Appointment {
   id: string;
   title: string;
-  contactName: string;
-  contactId: string;
+  contactName?: string;
+  contactId?: string;
   startTime: string;
-  endTime: string;
-  status: string;
+  endTime?: string | null;
+  status?: string | null;
+  /** Real link back to the source record. Never invented. */
+  url?: string | null;
+  /** True when the link leaves the OS and needs target=_blank. */
+  external?: boolean;
+  /** Which feed this came from, used for the colour key. */
+  source?: string;
+  /** Secondary line: who it is with, or what it is worth. */
+  detail?: string | null;
+  /** All-day items sit in the band above the hour grid, not inside it. */
+  allDay?: boolean;
 }
 
 const HOURS = Array.from({ length: 13 }, (_, i) => i + 7); // 7am - 7pm
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+export const SOURCE_COLOR: Record<string, string> = {
+  google: "var(--accent)",
+  callbacks: "var(--orange)",
+  payments: "var(--green)",
+  // Classes get their own colour so school reads apart from work at a glance.
+  school: "var(--accent-2)",
+};
 const STATUS_COLOR: Record<string, string> = {
   confirmed: "var(--green)",
   booked: "var(--accent)",
@@ -33,6 +53,15 @@ function getWeekDays(offset = 0): Date[] {
   });
 }
 
+// A date string from the feed to a real local Date. A plain YYYY-MM-DD is
+// built field by field, because handing it to Date() would read it as UTC
+// midnight and render the day before in every US timezone.
+export function toLocal(value: string): Date {
+  const d = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (d) return new Date(Number(d[1]), Number(d[2]) - 1, Number(d[3]));
+  return new Date(value);
+}
+
 function fmt12(date: Date) {
   let h = date.getHours(), m = date.getMinutes();
   const ampm = h >= 12 ? "pm" : "am";
@@ -40,21 +69,51 @@ function fmt12(date: Date) {
   return `${h}:${m.toString().padStart(2, "0")}${ampm}`;
 }
 
-export default function WeekCalendar({ appointments }: { appointments: Appointment[] }) {
+export default function WeekCalendar({
+  appointments,
+  emptyNote,
+}: {
+  appointments: Appointment[];
+  /** Shown instead of a count when there is nothing to draw. Must say what is
+   *  actually missing; it is never a placeholder for hidden data. */
+  emptyNote?: string;
+}) {
   const [weekOffset, setWeekOffset] = useState(0);
   const [selected, setSelected] = useState<Appointment | null>(null);
   const days = getWeekDays(weekOffset);
   const today = new Date();
 
-  // Map appointments to their day slot
+  function sameDay(a: Date, day: Date) {
+    return (
+      a.getFullYear() === day.getFullYear() &&
+      a.getMonth() === day.getMonth() &&
+      a.getDate() === day.getDate()
+    );
+  }
+
+  // Map events to their day slot. All-day items are kept out of the hour grid;
+  // they have no hour to sit at and would otherwise pile onto 12am.
   function apptForDay(day: Date) {
-    return appointments.filter(a => {
-      if (!a.startTime) return false;
-      const d = new Date(a.startTime);
-      return d.getFullYear() === day.getFullYear() &&
-        d.getMonth() === day.getMonth() &&
-        d.getDate() === day.getDate();
-    });
+    return appointments.filter(
+      (a) => a.startTime && !a.allDay && sameDay(toLocal(a.startTime), day)
+    );
+  }
+  function allDayForDay(day: Date) {
+    return appointments.filter(
+      (a) => a.startTime && a.allDay && sameDay(toLocal(a.startTime), day)
+    );
+  }
+
+  const inWeek = appointments.filter(
+    (a) => a.startTime && days.some((d) => sameDay(toLocal(a.startTime), d))
+  ).length;
+
+  function colorFor(a: Appointment) {
+    return (
+      (a.source ? SOURCE_COLOR[a.source] : undefined) ??
+      (a.status ? STATUS_COLOR[a.status.toLowerCase()] : undefined) ??
+      "var(--accent)"
+    );
   }
 
   function topPct(date: Date) {
@@ -87,9 +146,9 @@ export default function WeekCalendar({ appointments }: { appointments: Appointme
             </button>
           )}
           <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
-            {appointments.length > 0
-              ? `${appointments.length} appts this week`
-              : "no appointment data source connected"}
+            {inWeek > 0
+              ? `${inWeek} ${inWeek === 1 ? "event" : "events"} this week`
+              : emptyNote ?? "nothing scheduled this week"}
           </span>
         </div>
       </div>
@@ -114,6 +173,37 @@ export default function WeekCalendar({ appointments }: { appointments: Appointme
           );
         })}
       </div>
+
+      {/* All-day band — payment due dates and all-day calendar events. Only
+          drawn when the week actually has some. */}
+      {days.some((d) => allDayForDay(d).length > 0) && (
+        <div style={{ display: "grid", gridTemplateColumns: "48px repeat(7, 1fr)", borderBottom: "1px solid var(--border)" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", paddingRight: 8 }}>
+            <span style={{ fontSize: 9, color: "var(--text-muted)", textTransform: "uppercase" }}>all day</span>
+          </div>
+          {days.map((day, i) => (
+            <div key={i} style={{ borderLeft: "1px solid var(--border)", padding: 3, display: "grid", gap: 3 }}>
+              {allDayForDay(day).map((a) => {
+                const color = colorFor(a);
+                return (
+                  <button
+                    key={a.id}
+                    onClick={() => setSelected(a)}
+                    style={{
+                      background: color + "22", border: `1px solid ${color}`, borderLeft: `3px solid ${color}`,
+                      borderRadius: 6, padding: "2px 5px", cursor: "pointer", textAlign: "left",
+                      font: "inherit", color: "var(--text-primary)", fontSize: 10, fontWeight: 600,
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                    }}
+                  >
+                    {a.title}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Time grid */}
       <div style={{ display: "grid", gridTemplateColumns: "48px repeat(7, 1fr)", height: 520, overflow: "auto", position: "relative" }}>
@@ -141,11 +231,11 @@ export default function WeekCalendar({ appointments }: { appointments: Appointme
               ))}
               {/* Appointments */}
               {dayAppts.map(a => {
-                const start = new Date(a.startTime);
-                const end = a.endTime ? new Date(a.endTime) : new Date(start.getTime() + 60 * 60 * 1000);
+                const start = toLocal(a.startTime);
+                const end = a.endTime ? toLocal(a.endTime) : new Date(start.getTime() + 60 * 60 * 1000);
                 const top = topPct(start);
                 const height = heightPct(start, end);
-                const color = STATUS_COLOR[a.status?.toLowerCase()] ?? "var(--accent)";
+                const color = colorFor(a);
                 return (
                   <div key={a.id} onClick={() => setSelected(a)} style={{
                     position: "absolute",
@@ -174,14 +264,41 @@ export default function WeekCalendar({ appointments }: { appointments: Appointme
           <div>
             <p style={{ fontSize: 13, fontWeight: 700 }}>{selected.title}</p>
             <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
-              {selected.contactName} · {selected.startTime ? fmt12(new Date(selected.startTime)) : "—"}
-              {selected.endTime ? ` – ${fmt12(new Date(selected.endTime))}` : ""}
+              {[
+                selected.contactName || selected.detail,
+                selected.allDay
+                  ? "all day"
+                  : selected.startTime
+                  ? `${fmt12(toLocal(selected.startTime))}${
+                      selected.endTime ? ` to ${fmt12(toLocal(selected.endTime))}` : ""
+                    }`
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
             </p>
-            <span style={{ fontSize: 10, color: STATUS_COLOR[selected.status?.toLowerCase()] ?? "var(--accent)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-              {selected.status ?? "Booked"}
-            </span>
+            {selected.status ? (
+              <span style={{ fontSize: 10, color: colorFor(selected), fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                {selected.status}
+              </span>
+            ) : null}
           </div>
           <div style={{ display: "flex", gap: 8 }}>
+            {/* Only a link the feed actually gave us. No link is shown for an
+                event whose source record has no address. */}
+            {selected.url ? (
+              <a
+                href={selected.url}
+                {...(selected.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+                style={{ fontSize: 12, color: "var(--accent)", background: "var(--accent-glow)", border: "1px solid var(--accent)", borderRadius: 8, padding: "6px 12px", textDecoration: "none" }}
+              >
+                {selected.source === "school"
+                  ? "Open schedule app"
+                  : selected.external
+                  ? "Open in Google Calendar"
+                  : "Open source"}
+              </a>
+            ) : null}
             <button onClick={() => setSelected(null)} style={{ fontSize: 12, color: "var(--text-muted)", background: "transparent", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 12px", cursor: "pointer" }}>
               Dismiss
             </button>

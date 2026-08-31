@@ -50,10 +50,17 @@ function StatusPill({ s }: { s: AgentStatus }) {
   );
 }
 
+/** Shared grid track definition: the section header row and every agent row
+ *  use the same columns so the labels line up as one table. */
+const ROW_COLUMNS = "minmax(180px, 1.3fr) 118px 92px 100px minmax(0, 1.9fr)";
+
+/** A cell value. The per-cell label is printed ONLY on narrow screens, where the
+ *  grid collapses and the column header is hidden; on desktop the single header
+ *  row above the list carries the label instead of repeating it on every row. */
 function Meta({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
   return (
     <div style={{ minWidth: 0 }}>
-      <div style={{ fontSize: 9, letterSpacing: "0.14em", color: "var(--text-muted)", textTransform: "uppercase", marginBottom: 3 }}>
+      <div className="agents-cell-label" style={{ fontSize: 9, letterSpacing: "0.14em", color: "var(--text-muted)", textTransform: "uppercase", marginBottom: 3 }}>
         {label}
       </div>
       <div style={{
@@ -62,6 +69,30 @@ function Meta({ label, value, accent }: { label: string; value: string; accent?:
       }}>
         {value}
       </div>
+    </div>
+  );
+}
+
+/** One column header per section, instead of the same three micro-labels
+ *  repeated on every single row. */
+function ColumnHeader() {
+  const cell: React.CSSProperties = {
+    fontSize: 9, letterSpacing: "0.14em", color: "var(--text-muted)",
+    textTransform: "uppercase", whiteSpace: "nowrap",
+  };
+  return (
+    <div
+      className="agents-colhead"
+      style={{
+        display: "grid", gridTemplateColumns: ROW_COLUMNS, gap: 18,
+        padding: "0 18px 8px",
+      }}
+    >
+      <div style={cell}>Agent</div>
+      <div style={cell}>Status</div>
+      <div style={cell}>Last run</div>
+      <div style={cell}>Next run</div>
+      <div style={cell}>Last result</div>
     </div>
   );
 }
@@ -82,9 +113,9 @@ function AgentRow({ a, onSelect }: { a: AgentCard; onSelect: (s: Selection) => v
       onMouseLeave={() => setHover(false)}
       style={{
         display: "grid",
-        gridTemplateColumns: "minmax(200px, 1.5fr) 120px 110px 110px minmax(0, 1.4fr)",
+        gridTemplateColumns: ROW_COLUMNS,
         gap: 18, alignItems: "center",
-        padding: "14px 18px",
+        padding: "12px 18px",
         borderTop: "1px solid var(--border)",
         background: hover ? "var(--bg-hover)" : "transparent",
         opacity: a.enabled || a.trial ? 1 : 0.55,
@@ -102,32 +133,62 @@ function AgentRow({ a, onSelect }: { a: AgentCard; onSelect: (s: Selection) => v
       <Meta label="Last run" value={lastRun} />
       <Meta label="Next run" value={nextRun} accent={Boolean(a.enabled && a.nextRunAt)} />
       <div style={{ minWidth: 0 }}>
-        <div style={{ fontSize: 9, letterSpacing: "0.14em", color: "var(--text-muted)", textTransform: "uppercase", marginBottom: 3 }}>
+        <div className="agents-cell-label" style={{ fontSize: 9, letterSpacing: "0.14em", color: "var(--text-muted)", textTransform: "uppercase", marginBottom: 3 }}>
           Last result
         </div>
         <div style={{ fontSize: 12, color: "var(--text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {a.lastLogLine ? tightLine(a.lastLogLine, 70) : <span style={{ color: "var(--text-muted)" }}>—</span>}
+          {a.lastLogLine ? tightLine(a.lastLogLine, 70) : <span style={{ color: "var(--text-muted)" }}>none logged</span>}
         </div>
       </div>
     </div>
   );
 }
 
-function Section({ title, count, note, children }: {
-  title: string; count: number; note: string; children: React.ReactNode;
+/** How many rows a roster section shows before it collapses behind a count.
+ *  Keeps the bottom of the page a fixed, scannable height as agents are added. */
+const ROW_CAP = 8;
+
+function RosterSection({ title, note, empty, agents, onSelect }: {
+  title: string; note: string; empty: string;
+  agents: AgentCard[]; onSelect: (s: Selection) => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const hidden = Math.max(0, agents.length - ROW_CAP);
+  const shown = expanded ? agents : agents.slice(0, ROW_CAP);
+
   return (
     <section style={{
       background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 14, overflow: "hidden",
     }}>
-      <header style={{ padding: "14px 18px", display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+      <header style={{ padding: "14px 18px 10px", display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
         <h2 style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--text-primary)", margin: 0 }}>
           {title}
         </h2>
-        <span style={{ fontSize: 11, fontFamily: MONO, color: "var(--text-muted)" }}>{count}</span>
+        <span style={{ fontSize: 11, fontFamily: MONO, color: "var(--text-muted)" }}>{agents.length}</span>
         <span style={{ fontSize: 11, color: "var(--text-muted)", marginLeft: "auto" }}>{note}</span>
       </header>
-      {children}
+
+      {agents.length > 0 && <ColumnHeader />}
+      {shown.map(a => <AgentRow key={a.key} a={a} onSelect={onSelect} />)}
+
+      {agents.length === 0 && (
+        <div style={{ padding: "16px 18px", fontSize: 12, color: "var(--text-muted)", borderTop: "1px solid var(--border)" }}>
+          {empty}
+        </div>
+      )}
+
+      {hidden > 0 && (
+        <button
+          onClick={() => setExpanded(v => !v)}
+          style={{
+            width: "100%", background: "none", border: "none", borderTop: "1px solid var(--border)",
+            padding: "10px 18px", textAlign: "left", cursor: "pointer",
+            fontSize: 11, fontFamily: MONO, color: "var(--accent)",
+          }}
+        >
+          {expanded ? "show fewer" : `show ${hidden} more`}
+        </button>
+      )}
     </section>
   );
 }
@@ -189,7 +250,15 @@ export default function MissionOps() {
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       <MissionStyles />
       <style>{`
+        /* Desktop: one column header per section, so the same three micro-labels
+           are not reprinted on every row. */
+        @media (min-width: 901px) {
+          .agents-cell-label { display: none; }
+        }
+        /* Narrow: the grid collapses, the column header goes away and each cell
+           carries its own label again. */
         @media (max-width: 900px) {
+          .agents-colhead { display: none !important; }
           .agents-row { grid-template-columns: minmax(0, 1fr) auto !important; row-gap: 10px !important; }
           .agents-row > *:nth-child(n+3) { grid-column: span 2; }
         }
@@ -280,23 +349,21 @@ export default function MissionOps() {
 
           <div className="mission-ops-grid" style={{ display: "grid", gridTemplateColumns: "minmax(0, 2fr) minmax(280px, 1fr)", gap: 20, alignItems: "start" }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 20, minWidth: 0 }}>
-              <Section title="Scheduled" count={scheduled.length} note="runs on a cron, unattended">
-                {scheduled.map(a => <AgentRow key={a.key} a={a} onSelect={setSelection} />)}
-                {scheduled.length === 0 && (
-                  <div style={{ padding: "18px", fontSize: 12, color: "var(--text-muted)", borderTop: "1px solid var(--border)" }}>
-                    No scheduled internal agents.
-                  </div>
-                )}
-              </Section>
+              <RosterSection
+                title="Scheduled"
+                note="runs on a cron, unattended"
+                empty="No scheduled internal agents."
+                agents={scheduled}
+                onSelect={setSelection}
+              />
 
-              <Section title="On demand" count={crew.length} note="you invoke these by name">
-                {crew.map(a => <AgentRow key={a.key} a={a} onSelect={setSelection} />)}
-                {crew.length === 0 && (
-                  <div style={{ padding: "18px", fontSize: 12, color: "var(--text-muted)", borderTop: "1px solid var(--border)" }}>
-                    No on-demand agents.
-                  </div>
-                )}
-              </Section>
+              <RosterSection
+                title="On demand"
+                note="you invoke these by name"
+                empty="No on-demand agents."
+                agents={crew}
+                onSelect={setSelection}
+              />
             </div>
 
             {/* Compact activity ticker */}
@@ -311,7 +378,9 @@ export default function MissionOps() {
                 </span>
               </h2>
               <div style={{ maxHeight: 560, overflowY: "auto", paddingRight: 6 }}>
-                <FeedTicker feed={data.feed} />
+                {/* 14 lines instead of 6: the ticker sat well short of the
+                    roster beside it and left the bottom-right corner empty. */}
+                <FeedTicker feed={data.feed} initial={14} />
               </div>
             </section>
           </div>

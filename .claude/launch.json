@@ -11,6 +11,13 @@
       "port": 3000
     },
     {
+      "name": "wing-os-autoport",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "autoPort": true,
+      "port": 3000
+    },
+    {
       "name": "wing-os-dev-alt",
       "runtimeExecutable": "npm",
       "runtimeArgs": [

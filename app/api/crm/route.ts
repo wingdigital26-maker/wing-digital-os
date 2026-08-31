@@ -1090,6 +1090,13 @@ export async function GET(req: Request) {
   const client = searchParams.get("client") || "";
   const status = searchParams.get("status") || "";
   const channel = searchParams.get("channel") || "";
+  // The item list used to be hard-capped at 200 with nothing said about it, so
+  // "everything ever drafted" silently meant "the newest 200". The cap is now a
+  // parameter AND is reported back, so a truncated list can say it is truncated.
+  const rawLimit = Number(searchParams.get("limit"));
+  const itemLimit = Number.isFinite(rawLimit)
+    ? Math.min(2000, Math.max(1, Math.trunc(rawLimit)))
+    : 200;
 
   try {
     // Per-client rollup for the sidebar: how many drafts vs approved vs sent.
@@ -1160,6 +1167,15 @@ export async function GET(req: Request) {
     const clients = Object.values(byClient)
       .map((c) => {
         const cfg = cfgByName[c.client] ?? null;
+        // ── Handover lane, derived from client_send_policy and nothing else ──
+        // A client Wing may not send for is not a broken client. Their drafts
+        // are working exactly as intended: they are leads to hand over. Which
+        // clients those are is read from the policy table (default deny), never
+        // from a name written into this codebase, so the day a policy row
+        // flips the lane follows it without an edit here.
+        const pol = policy.available ? policy.byClient[norm(c.client)] ?? null : null;
+        const sendPolicyState: "may_send" | "deny" | "unknown" =
+          !policy.available ? "unknown" : pol?.may_send === true ? "may_send" : "deny";
         return {
           ...c,
           channels: Array.from(c.channels).sort(),
@@ -1177,7 +1193,20 @@ export async function GET(req: Request) {
             : null,
           watch: buildWatch(cfg, runs, lastRanTracked, c.draft, draftsReason, c.client),
           profile: profByName.get(norm(c.client)) ?? null,
-          sendPolicy: policy.available ? policy.byClient[norm(c.client)] ?? null : null,
+          sendPolicy: pol,
+          sendPolicyState,
+          /** True when this client's drafts belong in the handover lane rather
+           *  than in Wing's own approval queue. */
+          handover: sendPolicyState === "deny",
+          handoverReason:
+            sendPolicyState !== "deny"
+              ? null
+              : pol
+              ? pol.scope_note?.replace(/\s+/g, " ").trim() ||
+                `${pol.client} is marked may_send = false in client_send_policy and no scope ` +
+                `note was recorded. Wing does not send for them.`
+              : `${c.client} has no row in client_send_policy, which defaults to deny. ` +
+                `Wing does not send for them.`,
         };
       })
       .sort((a, b) => b.total - a.total);
@@ -1188,7 +1217,7 @@ export async function GET(req: Request) {
       status ? `status=eq.${encodeURIComponent(status)}` : "",
       channel ? `channel=eq.${encodeURIComponent(channel)}` : "",
       "order=created_at.desc",
-      "limit=200",
+      `limit=${itemLimit}`,
       `select=${OUTBOUND_COLUMNS.join(",")}`,
     ].filter(Boolean).join("&");
     const res = await sb(`outbound?${filters}`);
@@ -1297,6 +1326,19 @@ export async function GET(req: Request) {
 
     return NextResponse.json({
       configured: true, clients, items, totals, content,
+      // Whether the list above is all of it. `capped` true means rows matching
+      // the current filters were left out, and the UI must say so rather than
+      // presenting a page as the whole table.
+      itemsMeta: {
+        limit: itemLimit,
+        returned: items.length,
+        capped: items.length === itemLimit,
+        note: items.length === itemLimit
+          ? `This list stopped at the ${itemLimit}-row limit, so there are almost ` +
+            `certainly more rows matching these filters than are shown. Narrow the ` +
+            `filters to see the rest.`
+          : null,
+      },
       evidence, coverage, scan: scanned.meta, unified,
       sendPolicy: { available: policy.available, reason: policy.reason },
       sendable: { available: sendable.available, reason: sendable.reason, count: sendable.count },

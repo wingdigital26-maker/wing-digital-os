@@ -1452,7 +1452,7 @@ export function FeedList({ feed, limit }: { feed: FeedEntry[]; limit?: number })
 }
 
 // ── Feed ticker (calm main-view default: ~6 one-liners + "view all") ───────
-export function FeedTicker({ feed }: { feed: FeedEntry[] }) {
+export function FeedTicker({ feed, initial = 6 }: { feed: FeedEntry[]; initial?: number }) {
   const [all, setAll] = useState(false);
   if (all) {
     return (
@@ -1465,7 +1465,7 @@ export function FeedTicker({ feed }: { feed: FeedEntry[] }) {
       </div>
     );
   }
-  const shown = feed.slice(0, 6);
+  const shown = feed.slice(0, initial);
   return (
     <div>
       {shown.length === 0 && <div style={{ fontSize: 12, color: "var(--text-muted)" }}>log.md unavailable</div>}
@@ -1481,7 +1481,7 @@ export function FeedTicker({ feed }: { feed: FeedEntry[] }) {
           }}>{tightLine(e.title)}</span>
         </div>
       ))}
-      {feed.length > 6 && (
+      {feed.length > initial && (
         <button onClick={() => setAll(true)} style={{
           background: "none", border: "none", color: "var(--accent, #22d3ee)",
           cursor: "pointer", fontSize: 11, padding: 0,

@@ -1,5 +1,12 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+
+// The Today screen: the first thing anyone sees when they open Outbound. Its
+// only job is to answer "what do I do right now" with real numbers. Every
+// empty section says what is missing rather than showing a zero that looks
+// like a measurement.
+//
+// Page chrome (header, nav, sign-out, container) belongs to app/calls/layout.tsx.
 
 type Lead = {
   id: string;
@@ -7,22 +14,15 @@ type Lead = {
   contact_name: string | null;
   title: string | null;
   phone: string | null;
-  email: string | null;
-  website: string | null;
-  linkedin: string | null;
   city: string | null;
+  state: string | null;
   vertical: string | null;
-  employees: number | null;
-  revenue: number | null;
   score: number | null;
   signals: string | null;
   status: string;
-  claim: "free" | "mine" | "taken";
-  claimed_by_email: string | null;
-  last_outcome: string | null;
-  last_called_at: string | null;
-  call_count: number;
   next_action_at: string | null;
+  claimed_by_email: string | null;
+  overdue?: boolean;
 };
 
 type Activity = {
@@ -31,422 +31,396 @@ type Activity = {
   outcome: string;
   notes: string | null;
   created_at: string;
+  company: string | null;
 };
 
-const OUTCOMES: { key: string; label: string; tone: string }[] = [
-  { key: "booked", label: "Booked a call", tone: "#22c55e" },
-  { key: "callback", label: "Call back later", tone: "#eab308" },
-  { key: "contacted", label: "Spoke, no yes", tone: "#38bdf8" },
-  { key: "no_answer", label: "No answer", tone: "#94a3b8" },
+type Stats = {
+  me: { email: string; role: string; isAdmin: boolean };
+  dialable: number;
+  excluded: number | null;
+  funnel: Record<string, number>;
+  next: Lead[];
+  callbacks: Lead[];
+  activity: Activity[];
+  today: {
+    since: string;
+    calls: number;
+    booked: number;
+    people: { email: string; calls: number; booked: number }[];
+  };
+};
+
+const STAGES: { key: string; label: string; tone: string }[] = [
+  { key: "new", label: "Not called yet", tone: "#22d3ee" },
+  { key: "contacted", label: "Spoken to", tone: "#38bdf8" },
+  { key: "callback", label: "Call backs", tone: "#eab308" },
+  { key: "booked", label: "Booked", tone: "#22c55e" },
   { key: "not_interested", label: "Not interested", tone: "#f97316" },
   { key: "bad_number", label: "Bad number", tone: "#a78bfa" },
   { key: "dnc", label: "Do not call", tone: "#ef4444" },
 ];
 
-const FILTERS = [
-  { key: "new", label: "Not called yet" },
-  { key: "callback", label: "Call backs" },
-  { key: "contacted", label: "Spoken to" },
-  { key: "booked", label: "Booked" },
-  { key: "all", label: "Everything" },
-];
+const OUTCOME_LABEL: Record<string, string> = {
+  booked: "Booked a call",
+  callback: "Call back later",
+  contacted: "Spoke, no yes",
+  no_answer: "No answer",
+  not_interested: "Not interested",
+  bad_number: "Bad number",
+  dnc: "Do not call",
+};
+const OUTCOME_TONE: Record<string, string> = {
+  booked: "#22c55e",
+  callback: "#eab308",
+  contacted: "#38bdf8",
+  no_answer: "#94a3b8",
+  not_interested: "#f97316",
+  bad_number: "#a78bfa",
+  dnc: "#ef4444",
+};
 
-const statusColor = (s: string) =>
-  OUTCOMES.find((o) => o.key === s)?.tone ?? "#64748b";
+function ago(iso: string) {
+  const ms = Date.now() - Date.parse(iso);
+  const m = Math.round(ms / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return new Date(iso).toLocaleDateString();
+}
 
-export default function CallRoom() {
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [counts, setCounts] = useState<Record<string, number>>({});
-  const [me, setMe] = useState<{ email: string; role: string; isAdmin: boolean } | null>(null);
-  const [filter, setFilter] = useState("new");
-  const [q, setQ] = useState("");
-  const [active, setActive] = useState<Lead | null>(null);
-  const [history, setHistory] = useState<Activity[]>([]);
-  const [notes, setNotes] = useState("");
-  const [callbackAt, setCallbackAt] = useState("");
-  const [busy, setBusy] = useState(false);
+function due(iso: string) {
+  const ms = Date.parse(iso) - Date.now();
+  const m = Math.round(Math.abs(ms) / 60000);
+  const s = m < 60 ? `${m}m` : m < 1440 ? `${Math.round(m / 60)}h` : `${Math.round(m / 1440)}d`;
+  return ms < 0 ? `${s} overdue` : `due in ${s}`;
+}
+
+export default function TodayDashboard() {
+  const [d, setD] = useState<Stats | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [flash, setFlash] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
-    const p = new URLSearchParams({ status: filter });
-    if (q.trim()) p.set("q", q.trim());
-    const r = await fetch(`/api/calls/leads?${p}`, { cache: "no-store" });
-    if (!r.ok) {
-      const d = await r.json().catch(() => ({}));
-      setError(d.error ?? "Could not load leads");
-      setLoading(false);
-      return;
+    try {
+      const r = await fetch("/api/calls/stats", { cache: "no-store" });
+      const body = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setError(body.error ?? `Could not load the dashboard (HTTP ${r.status})`);
+        setD(null);
+      } else {
+        setD(body as Stats);
+        setError(null);
+      }
+    } catch {
+      setError("Could not reach the server.");
     }
-    const d = await r.json();
-    setLeads(d.leads ?? []);
-    setCounts(d.counts ?? {});
-    setMe(d.me ?? null);
-    setError(null);
     setLoading(false);
-  }, [filter, q]);
+  }, []);
 
   useEffect(() => {
     load();
+    const t = setInterval(load, 30000);
+    return () => clearInterval(t);
   }, [load]);
 
-  // Refresh while idle so a caller sees what teammates are claiming in near
-  // real time. Paused while a lead is open so the list cannot shuffle mid-call.
-  useEffect(() => {
-    if (active) return;
-    const t = setInterval(load, 20000);
-    return () => clearInterval(t);
-  }, [active, load]);
+  if (loading) return <p style={muted}>Loading today…</p>;
 
-  async function openLead(lead: Lead) {
-    setError(null);
-    setNotes("");
-    setCallbackAt("");
-    setBusy(true);
-    const r = await fetch("/api/calls/claim", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ leadId: lead.id }),
-    });
-    setBusy(false);
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok) {
-      setError(d.error ?? "Could not open that lead");
-      load();
-      return;
-    }
-    setActive(lead);
-    // Shared-password sessions get no lock. Say so instead of implying a hold.
-    if (d.locked === false && d.note) setError(d.note);
-    const h = await fetch(`/api/calls/disposition?leadId=${lead.id}`, { cache: "no-store" });
-    setHistory(h.ok ? (await h.json()).activity ?? [] : []);
+  if (error) {
+    return (
+      <div style={{ ...card, borderColor: "rgba(239,68,68,0.4)", background: "rgba(239,68,68,0.10)" }}>
+        <p style={{ fontSize: 15, fontWeight: 700, color: "#f87171" }}>Dashboard unavailable</p>
+        <p style={{ fontSize: 13, marginTop: 6, color: "var(--text-muted)", lineHeight: 1.5 }}>{error}</p>
+      </div>
+    );
   }
+  if (!d) return null;
 
-  async function closeLead(release = true) {
-    if (active && release) {
-      await fetch("/api/calls/claim", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ leadId: active.id, release: true }),
-      });
-    }
-    setActive(null);
-    setHistory([]);
-    load();
-  }
-
-  async function disposition(outcome: string) {
-    if (!active) return;
-    setBusy(true);
-    setError(null);
-    const r = await fetch("/api/calls/disposition", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        leadId: active.id,
-        outcome,
-        notes: notes.trim() || undefined,
-        nextActionAt: callbackAt ? new Date(callbackAt).toISOString() : undefined,
-      }),
-    });
-    setBusy(false);
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok && r.status !== 207) {
-      setError(d.error ?? "Could not save that");
-      return;
-    }
-    if (d.warning) setError(d.warning);
-    setFlash(`${active.company}: ${OUTCOMES.find((o) => o.key === outcome)?.label ?? outcome}`);
-    setTimeout(() => setFlash(null), 3500);
-    setActive(null);
-    setHistory([]);
-    load();
-  }
-
-  const shown = useMemo(() => leads, [leads]);
+  const totalDial = d.dialable;
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--bg-primary)", color: "var(--text-primary)" }}>
-      <div style={{ maxWidth: 1180, margin: "0 auto", padding: "28px 20px 80px" }}>
-        {/* header */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-          <div>
-            <h1 style={{ fontSize: 26, fontWeight: 800, letterSpacing: -0.5 }}>Cold Call Room</h1>
-            <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>
-              {me ? `Signed in as ${me.email}` : "Shared leads. Claim one, dial it, log what happened."}
-            </p>
+    <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+      <div>
+        <h1 style={{ fontSize: 24, fontWeight: 800, letterSpacing: -0.5 }}>Today</h1>
+        <p style={{ ...muted, marginTop: 4 }}>
+          {totalDial} dialable {totalDial === 1 ? "lead" : "leads"} in the room
+          {d.excluded !== null && d.excluded > 0
+            ? ` · ${d.excluded} more failed the quality audit and are held back`
+            : ""}
+        </p>
+      </div>
+
+      {/* today's numbers */}
+      <section>
+        <h2 style={h2}>Today&rsquo;s numbers</h2>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 10 }}>
+          <div style={card}>
+            <p style={statNum}>{d.today.calls}</p>
+            <p style={statLabel}>calls logged today</p>
           </div>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            {me?.isAdmin && (
-              <a href="/calls/team" style={btnGhost}>Manage callers</a>
-            )}
-            <a href="/api/logout" style={btnGhost}>Sign out</a>
+          <div style={card}>
+            <p style={{ ...statNum, color: d.today.booked > 0 ? "#4ade80" : "var(--text-primary)" }}>
+              {d.today.booked}
+            </p>
+            <p style={statLabel}>booked today</p>
           </div>
         </div>
-
-        {flash && (
-          <div style={{ ...banner, background: "rgba(34,197,94,0.12)", borderColor: "rgba(34,197,94,0.4)", color: "#4ade80" }}>
-            Logged — {flash}
+        {d.today.calls === 0 ? (
+          <p style={{ ...muted, marginTop: 10 }}>
+            Nobody has logged a call today. The first dial of the day is on the list below.
+          </p>
+        ) : d.today.people.length > 1 ? (
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+            {d.today.people.map((p) => (
+              <span key={p.email} style={{ ...pillSoft }}>
+                {p.email} — {p.calls} {p.calls === 1 ? "call" : "calls"}
+                {p.booked > 0 ? `, ${p.booked} booked` : ""}
+              </span>
+            ))}
           </div>
-        )}
-        {error && (
-          <div style={{ ...banner, background: "rgba(239,68,68,0.12)", borderColor: "rgba(239,68,68,0.4)", color: "#f87171" }}>
-            {error}
-          </div>
-        )}
+        ) : null}
+      </section>
 
-        {/* filters */}
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 20, alignItems: "center" }}>
-          {FILTERS.map((f) => {
-            const on = filter === f.key;
-            const n = f.key === "all" ? Object.values(counts).reduce((a, b) => a + b, 0) : counts[f.key] ?? 0;
+      {/* funnel */}
+      <section>
+        <h2 style={h2}>Where the pipeline stands</h2>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 10 }}>
+          {STAGES.map((s) => {
+            const n = d.funnel[s.key] ?? 0;
             return (
-              <button key={f.key} onClick={() => setFilter(f.key)} style={{
-                ...chip,
-                background: on ? "linear-gradient(135deg,#22d3ee,#0e7490)" : "var(--bg-card)",
-                borderColor: on ? "transparent" : "var(--border)",
-                color: on ? "#fff" : "var(--text-muted)",
-                fontWeight: on ? 700 : 500,
-              }}>
-                {f.label} {n > 0 && <span style={{ opacity: 0.75 }}>{n}</span>}
-              </button>
+              <div key={s.key} style={{ ...card, borderColor: n > 0 ? `${s.tone}55` : "var(--border)" }}>
+                <p style={{ ...statNum, fontSize: 24, color: n > 0 ? s.tone : "var(--text-muted)" }}>{n}</p>
+                <p style={statLabel}>{s.label}</p>
+              </div>
             );
           })}
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search company, contact, city"
-            style={{
-              marginLeft: "auto", minWidth: 220, background: "var(--bg-hover)",
-              border: "1px solid var(--border)", borderRadius: 10, padding: "9px 12px",
-              color: "var(--text-primary)", fontSize: 13, outline: "none",
-            }}
-          />
         </div>
+        <p style={{ ...muted, marginTop: 8 }}>
+          Counted across the {totalDial} leads that passed the quality audit. Excluded leads are
+          never counted here.
+        </p>
+      </section>
 
-        {/* list */}
-        <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 10 }}>
-          {loading && <p style={{ color: "var(--text-muted)", fontSize: 13 }}>Loading leads…</p>}
-          {!loading && shown.length === 0 && (
-            <div style={{ ...card, textAlign: "center", padding: 40, color: "var(--text-muted)" }}>
-              <p style={{ fontSize: 15, fontWeight: 600 }}>Nothing here</p>
-              <p style={{ fontSize: 13, marginTop: 6 }}>
-                {filter === "new"
-                  ? "Every lead in this list has been called. Try another filter."
-                  : "No leads match this filter yet."}
-              </p>
-            </div>
-          )}
-          {shown.map((l) => (
-            <div key={l.id} style={{ ...card, display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap" }}>
-              <div style={{
-                width: 44, height: 44, borderRadius: 11, flexShrink: 0,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                background: "var(--bg-hover)", border: "1px solid var(--border)",
-                fontSize: 14, fontWeight: 800, color: (l.score ?? 0) >= 65 ? "#4ade80" : "var(--text-muted)",
-              }}>{l.score ?? 0}</div>
-
-              <div style={{ flex: "1 1 260px", minWidth: 0 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                  <span style={{ fontSize: 15, fontWeight: 700 }}>{l.company}</span>
-                  <span style={{ ...pill, borderColor: statusColor(l.status), color: statusColor(l.status) }}>
-                    {OUTCOMES.find((o) => o.key === l.status)?.label ?? "Not called yet"}
-                  </span>
-                  {l.claim === "taken" && (
-                    <span style={{ ...pill, borderColor: "#f97316", color: "#f97316" }}>
-                      on a call with {l.claimed_by_email ?? "someone"}
+      {/* callbacks due */}
+      <section>
+        <div style={sectionHead}>
+          <h2 style={{ ...h2, marginBottom: 0 }}>Owed a call back right now</h2>
+          <a href="/calls/callbacks" style={btnGhost}>All callbacks</a>
+        </div>
+        {d.callbacks.length === 0 ? (
+          <div style={{ ...card, color: "var(--text-muted)", fontSize: 13 }}>
+            No callback is due yet. Anything scheduled for later shows up here when its time
+            arrives.
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {d.callbacks.map((l) => (
+              <div
+                key={l.id}
+                style={{
+                  ...card,
+                  display: "flex",
+                  gap: 12,
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                  borderColor: l.overdue ? "rgba(239,68,68,0.55)" : "rgba(234,179,8,0.45)",
+                  background: l.overdue ? "rgba(239,68,68,0.08)" : "var(--bg-card)",
+                }}
+              >
+                <div style={{ flex: "1 1 240px", minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 15, fontWeight: 700 }}>{l.company}</span>
+                    <span
+                      style={{
+                        ...pill,
+                        borderColor: l.overdue ? "#ef4444" : "#eab308",
+                        color: l.overdue ? "#f87171" : "#eab308",
+                      }}
+                    >
+                      {l.next_action_at ? due(l.next_action_at) : "due"}
                     </span>
+                  </div>
+                  <p style={{ ...muted, marginTop: 4 }}>
+                    {[l.contact_name, l.title, l.city].filter(Boolean).join(" · ") || "No named contact"}
+                  </p>
+                </div>
+                {l.phone && (
+                  <a href={`tel:${l.phone.replace(/[^+\d]/g, "")}`} style={btnPrimary}>
+                    Call {l.phone}
+                  </a>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* do these next */}
+      <section>
+        <div style={sectionHead}>
+          <h2 style={{ ...h2, marginBottom: 0 }}>Do these next</h2>
+          <a href="/calls/list" style={btnGhost}>Open the dial list</a>
+        </div>
+        {d.next.length === 0 ? (
+          <div style={{ ...card, color: "var(--text-muted)", fontSize: 13 }}>
+            Every dialable lead has been called at least once. Nothing is waiting for a first
+            attempt — work the callbacks, or load more leads.
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {d.next.map((l) => (
+              <div key={l.id} style={{ ...card, display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+                <div
+                  style={{
+                    width: 42, height: 42, borderRadius: 11, flexShrink: 0,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    background: "var(--bg-hover)", border: "1px solid var(--border)",
+                    fontSize: 14, fontWeight: 800,
+                    color: (l.score ?? 0) >= 65 ? "#4ade80" : "var(--text-muted)",
+                  }}
+                >
+                  {l.score ?? 0}
+                </div>
+                <div style={{ flex: "1 1 260px", minWidth: 0 }}>
+                  <span style={{ fontSize: 15, fontWeight: 700 }}>{l.company}</span>
+                  <p style={{ ...muted, marginTop: 4 }}>
+                    {[l.contact_name, l.title, l.city, l.vertical].filter(Boolean).join(" · ") ||
+                      "No named contact"}
+                  </p>
+                  {l.signals && (
+                    <p style={{ fontSize: 12, color: "#7dd3fc", marginTop: 5, lineHeight: 1.45 }}>
+                      {l.signals}
+                    </p>
                   )}
                 </div>
-                <p style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 4 }}>
-                  {[l.contact_name, l.title, l.city, l.vertical, l.employees ? `${l.employees} emp` : null]
-                    .filter(Boolean).join(" · ")}
-                </p>
-                {l.signals && (
-                  <p style={{ fontSize: 12, color: "#7dd3fc", marginTop: 5, lineHeight: 1.45 }}>{l.signals}</p>
+                {l.phone ? (
+                  <a
+                    href={`tel:${l.phone.replace(/[^+\d]/g, "")}`}
+                    style={{ ...btnPrimary, fontVariantNumeric: "tabular-nums" }}
+                  >
+                    Call {l.phone}
+                  </a>
+                ) : (
+                  <span style={{ ...btnGhost, opacity: 0.5 }}>no phone on file</span>
                 )}
-                {l.call_count > 0 && (
-                  <p style={{ fontSize: 11.5, color: "var(--text-muted)", marginTop: 4 }}>
-                    {l.call_count} previous {l.call_count === 1 ? "attempt" : "attempts"}
-                    {l.last_called_at ? ` · last ${new Date(l.last_called_at).toLocaleDateString()}` : ""}
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* recent activity */}
+      <section>
+        <h2 style={h2}>What the team just did</h2>
+        {d.activity.length === 0 ? (
+          <div style={{ ...card, color: "var(--text-muted)", fontSize: 13 }}>
+            No calls have been logged yet — this fills in the moment someone dispositions a lead.
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {d.activity.map((a) => (
+              <div key={a.id} style={{ ...card, padding: "11px 14px" }}>
+                <div style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 13.5, fontWeight: 700 }}>
+                    {a.company ?? "a lead no longer in the room"}
+                  </span>
+                  <span
+                    style={{
+                      ...pill,
+                      borderColor: OUTCOME_TONE[a.outcome] ?? "#64748b",
+                      color: OUTCOME_TONE[a.outcome] ?? "#94a3b8",
+                    }}
+                  >
+                    {OUTCOME_LABEL[a.outcome] ?? a.outcome}
+                  </span>
+                  <span style={{ ...muted, marginLeft: "auto" }}>
+                    {a.user_email ?? "unknown caller"} · {ago(a.created_at)}
+                  </span>
+                </div>
+                {a.notes && (
+                  <p style={{ fontSize: 12.5, marginTop: 5, lineHeight: 1.45, color: "var(--text-muted)" }}>
+                    {a.notes}
                   </p>
                 )}
               </div>
-
-              <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
-                {l.phone ? (
-                  <a href={`tel:${l.phone.replace(/[^+\d]/g, "")}`} style={{ ...btnGhost, fontVariantNumeric: "tabular-nums" }}>
-                    {l.phone}
-                  </a>
-                ) : (
-                  <span style={{ ...btnGhost, opacity: 0.5, cursor: "default" }}>no phone</span>
-                )}
-                <button
-                  onClick={() => openLead(l)}
-                  disabled={busy || l.claim === "taken"}
-                  style={{
-                    ...btnPrimary,
-                    opacity: busy || l.claim === "taken" ? 0.45 : 1,
-                    cursor: l.claim === "taken" ? "not-allowed" : "pointer",
-                  }}
-                >
-                  {l.claim === "taken" ? "In use" : "Call"}
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* call panel */}
-      {active && (
-        <div
-          onClick={(e) => e.target === e.currentTarget && closeLead()}
-          style={{
-            position: "fixed", inset: 0, background: "rgba(0,0,0,0.65)",
-            display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 50,
-            backdropFilter: "blur(3px)",
-          }}
-        >
-          <div style={{
-            width: "min(680px, 100%)", maxHeight: "92vh", overflowY: "auto",
-            background: "var(--bg-card)", border: "1px solid var(--border)",
-            borderRadius: "20px 20px 0 0", padding: 24,
-            boxShadow: "0 -20px 60px rgba(0,0,0,0.6)",
-          }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
-              <div>
-                <h2 style={{ fontSize: 20, fontWeight: 800 }}>{active.company}</h2>
-                <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 3 }}>
-                  {[active.contact_name, active.title].filter(Boolean).join(" · ") || "No named contact"}
-                </p>
-              </div>
-              <button onClick={() => closeLead()} style={btnGhost}>Close</button>
-            </div>
-
-            {active.signals && (
-              <div style={{
-                marginTop: 14, padding: 12, borderRadius: 10,
-                background: "rgba(56,189,248,0.08)", border: "1px solid rgba(56,189,248,0.25)",
-              }}>
-                <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: "#7dd3fc", fontWeight: 700 }}>
-                  Why they are worth calling
-                </p>
-                <p style={{ fontSize: 13, marginTop: 5, lineHeight: 1.5 }}>{active.signals}</p>
-              </div>
-            )}
-
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 14 }}>
-              {active.phone && (
-                <a href={`tel:${active.phone.replace(/[^+\d]/g, "")}`} style={{ ...btnPrimary, textDecoration: "none" }}>
-                  Call {active.phone}
-                </a>
-              )}
-              {active.website && <a href={active.website} target="_blank" rel="noreferrer" style={btnGhost}>Website</a>}
-              {active.linkedin && <a href={active.linkedin} target="_blank" rel="noreferrer" style={btnGhost}>LinkedIn</a>}
-              {active.email && <a href={`mailto:${active.email}`} style={btnGhost}>{active.email}</a>}
-            </div>
-
-            {history.length > 0 && (
-              <div style={{ marginTop: 18 }}>
-                <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: "var(--text-muted)", fontWeight: 700 }}>
-                  What already happened
-                </p>
-                <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 8 }}>
-                  {history.map((h) => (
-                    <div key={h.id} style={{ fontSize: 12.5, padding: 10, borderRadius: 8, background: "var(--bg-hover)" }}>
-                      <span style={{ color: statusColor(h.outcome), fontWeight: 700 }}>
-                        {OUTCOMES.find((o) => o.key === h.outcome)?.label ?? h.outcome}
-                      </span>
-                      <span style={{ color: "var(--text-muted)" }}>
-                        {" "}· {h.user_email ?? "unknown"} · {new Date(h.created_at).toLocaleString()}
-                      </span>
-                      {h.notes && <p style={{ marginTop: 4, lineHeight: 1.45 }}>{h.notes}</p>}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="What did they say? (optional, but the next caller will thank you)"
-              rows={3}
-              style={{
-                width: "100%", marginTop: 16, background: "var(--bg-hover)",
-                border: "1px solid var(--border)", borderRadius: 10, padding: 12,
-                color: "var(--text-primary)", fontSize: 13, outline: "none",
-                resize: "vertical", fontFamily: "inherit",
-              }}
-            />
-
-            <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              <label style={{ fontSize: 12, color: "var(--text-muted)" }}>Call back on</label>
-              <input
-                type="datetime-local"
-                value={callbackAt}
-                onChange={(e) => setCallbackAt(e.target.value)}
-                style={{
-                  background: "var(--bg-hover)", border: "1px solid var(--border)",
-                  borderRadius: 8, padding: "7px 10px", color: "var(--text-primary)", fontSize: 12.5,
-                }}
-              />
-            </div>
-
-            <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: "var(--text-muted)", fontWeight: 700, marginTop: 18 }}>
-              How did it go?
-            </p>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 8, marginTop: 8 }}>
-              {OUTCOMES.map((o) => (
-                <button
-                  key={o.key}
-                  disabled={busy}
-                  onClick={() => disposition(o.key)}
-                  style={{
-                    padding: "11px 12px", borderRadius: 10, cursor: busy ? "wait" : "pointer",
-                    border: `1px solid ${o.tone}55`, background: `${o.tone}18`,
-                    color: o.tone, fontSize: 13, fontWeight: 700, opacity: busy ? 0.6 : 1,
-                  }}
-                >
-                  {o.label}
-                </button>
-              ))}
-            </div>
-            <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 12, lineHeight: 1.5 }}>
-              This lead is held for you for 20 minutes so nobody double-dials it. Logging an
-              outcome releases it automatically.
-            </p>
+            ))}
           </div>
-        </div>
-      )}
+        )}
+      </section>
     </div>
   );
 }
 
 const card: React.CSSProperties = {
-  background: "var(--bg-card)", border: "1px solid var(--border)",
-  borderRadius: 14, padding: "14px 16px",
+  background: "var(--bg-card)",
+  border: "1px solid var(--border)",
+  borderRadius: 14,
+  padding: "14px 16px",
 };
-const chip: React.CSSProperties = {
-  padding: "7px 13px", borderRadius: 999, border: "1px solid", fontSize: 12.5, cursor: "pointer",
+const muted: React.CSSProperties = { fontSize: 12.5, color: "var(--text-muted)" };
+const h2: React.CSSProperties = {
+  fontSize: 11,
+  textTransform: "uppercase",
+  letterSpacing: 0.7,
+  color: "var(--text-muted)",
+  fontWeight: 700,
+  marginBottom: 10,
+};
+const sectionHead: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 10,
+  marginBottom: 10,
+  flexWrap: "wrap",
+};
+const statNum: React.CSSProperties = {
+  fontSize: 30,
+  fontWeight: 800,
+  letterSpacing: -1,
+  lineHeight: 1.1,
+};
+const statLabel: React.CSSProperties = {
+  fontSize: 12,
+  color: "var(--text-muted)",
+  marginTop: 3,
 };
 const pill: React.CSSProperties = {
-  padding: "2px 8px", borderRadius: 999, border: "1px solid", fontSize: 10.5, fontWeight: 700,
-  textTransform: "uppercase", letterSpacing: 0.4,
+  padding: "2px 8px",
+  borderRadius: 999,
+  border: "1px solid",
+  fontSize: 10.5,
+  fontWeight: 700,
+  textTransform: "uppercase",
+  letterSpacing: 0.4,
+};
+const pillSoft: React.CSSProperties = {
+  padding: "6px 11px",
+  borderRadius: 999,
+  border: "1px solid var(--border)",
+  background: "var(--bg-hover)",
+  fontSize: 12,
+  color: "var(--text-primary)",
 };
 const btnPrimary: React.CSSProperties = {
-  padding: "9px 16px", borderRadius: 10, border: "none",
-  background: "linear-gradient(135deg,#22d3ee,#0e7490)", color: "#fff",
-  fontSize: 13, fontWeight: 700, cursor: "pointer",
+  padding: "9px 16px",
+  borderRadius: 10,
+  border: "none",
+  background: "linear-gradient(135deg,#22d3ee,#0e7490)",
+  color: "#fff",
+  fontSize: 13,
+  fontWeight: 700,
+  cursor: "pointer",
+  textDecoration: "none",
 };
 const btnGhost: React.CSSProperties = {
-  padding: "8px 14px", borderRadius: 10, border: "1px solid var(--border)",
-  background: "var(--bg-hover)", color: "var(--text-primary)",
-  fontSize: 12.5, fontWeight: 600, cursor: "pointer", textDecoration: "none",
-};
-const banner: React.CSSProperties = {
-  marginTop: 14, padding: "11px 14px", borderRadius: 10,
-  border: "1px solid", fontSize: 13, fontWeight: 600,
+  padding: "8px 14px",
+  borderRadius: 10,
+  border: "1px solid var(--border)",
+  background: "var(--bg-hover)",
+  color: "var(--text-primary)",
+  fontSize: 12.5,
+  fontWeight: 600,
+  cursor: "pointer",
+  textDecoration: "none",
 };

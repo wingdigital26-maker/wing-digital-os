@@ -48,17 +48,30 @@ def load_env() -> dict:
 def fetch_leads(source: str | None) -> list[dict]:
     db = sqlite3.connect(DB)
     db.row_factory = sqlite3.Row
-    # excluded_reason is the quality gate and it is not negotiable. The trade
-    # tag is NOT used as a gate when --source is given: a source tag already
-    # names an audited batch exactly, and some of those rows carry an older
-    # trade label from a previous scrape (e.g. 'commercial-plumbing'). Gating on
-    # trade as well silently dropped three perfectly good leads.
+    # Rejected leads come up TOO, flagged, with the reason attached. Syncing
+    # only the survivors made the quality pass invisible -- you could not tell
+    # "we found 65 leads" from "we found 100 and rejected 35" -- and it meant
+    # the same dead company got re-imported on every future scrape. The dial
+    # list filters excluded rows out; the Sources screen shows them.
+    #
+    # The trade tag is NOT used as a gate when --source is given: a source tag
+    # already names an audited batch exactly, and some of those rows carry an
+    # older trade label from a previous scrape (e.g. 'commercial-plumbing').
+    # Gating on trade as well silently dropped three perfectly good leads.
     q = """
         SELECT name, owner_name, email, phone, website, linkedin, city, state,
                vertical, intent_score, signals, source, audit_notes, excluded_reason
           FROM prospects
-         WHERE (excluded_reason IS NULL OR excluded_reason = '')
-           AND email IS NOT NULL AND email <> ''
+         -- A lead needs a way to be REACHED, not specifically an email. This is
+         -- a call room: a business with a phone and no email is perfectly
+         -- dialable, and requiring an email silently hid six audited leads.
+         --
+         -- The outer parens are load-bearing. Without them the trailing
+         -- "AND source = ?" binds to the phone branch only (AND > OR), so the
+         -- email branch loses its source filter and the query returns the whole
+         -- prospects table -- 1,757 rows instead of 100.
+         WHERE ((email IS NOT NULL AND email <> '')
+             OR (phone IS NOT NULL AND phone <> ''))
     """
     args: list = []
     if source:
@@ -99,6 +112,8 @@ def to_call_lead(r: dict) -> dict:
         "score": int(r.get("intent_score") or 0),
         "signals": r.get("signals"),
         "source": r.get("source"),
+        "excluded": bool((r.get("excluded_reason") or "").strip()),
+        "excluded_reason": (r.get("excluded_reason") or "").strip() or None,
     }
 
 
@@ -142,15 +157,35 @@ def main() -> int:
     leads = [to_call_lead(r) for r in rows]
     leads.sort(key=lambda x: -x["score"])
 
-    print(f"{len(leads)} serviceable leads ready to sync"
+    # Collapse duplicates BEFORE sending. Postgres rejects an upsert whose batch
+    # contains the same conflict key twice ("ON CONFLICT DO UPDATE command
+    # cannot affect row a second time"), and prospects.db legitimately holds
+    # near-duplicate company rows from different scrapes. Highest score wins,
+    # since that row carries the richest enrichment.
+    deduped: dict[str, dict] = {}
+    for l in leads:
+        k = (l["company"] or "").strip().lower()
+        if not k:
+            continue
+        if k not in deduped:
+            deduped[k] = l
+    dropped = len(leads) - len(deduped)
+    if dropped:
+        print(f"  collapsed {dropped} duplicate company rows before syncing")
+    leads = list(deduped.values())
+
+    callable_ = [l for l in leads if not l["excluded"]]
+    rejected = [l for l in leads if l["excluded"]]
+    print(f"{len(leads)} leads ready to sync"
           + (f" (source={args.source})" if args.source else ""))
-    no_phone = [l for l in leads if not l["phone"]]
+    print(f"  {len(callable_)} dialable, {len(rejected)} rejected by the quality pass")
+    no_phone = [l for l in callable_ if not l["phone"]]
     if no_phone:
-        print(f"  note: {len(no_phone)} have no phone number and can only be emailed")
-    for l in leads[:10]:
+        print(f"  note: {len(no_phone)} dialable leads have no phone and can only be emailed")
+    for l in callable_[:10]:
         print(f"  {l['score']:3d}  {l['company'][:40]:40s} {l['phone'] or '(no phone)'}")
-    if len(leads) > 10:
-        print(f"  ... and {len(leads) - 10} more")
+    if len(callable_) > 10:
+        print(f"  ... and {len(callable_) - 10} more")
 
     if not args.commit:
         print("\nDRY RUN. Nothing was written. Re-run with --commit to push.")
@@ -172,7 +207,33 @@ def main() -> int:
             return 1
         sent += len(chunk)
 
-    print(f"\nPushed {sent} leads into the call room.")
+    # Record the batch so the Sources screen reports facts, not guesses.
+    batch = {
+        "source": args.source or "mixed",
+        "total": len(leads),
+        "serviceable": len(callable_),
+        "excluded": len(rejected),
+    }
+    req = urllib.request.Request(
+        f"{url}/rest/v1/call_lead_batches",
+        data=json.dumps(batch).encode(),
+        method="POST",
+        headers={
+            "apikey": key,
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json",
+            "Prefer": "return=minimal",
+        },
+    )
+    try:
+        urllib.request.urlopen(req, timeout=30)
+    except Exception as e:  # noqa: BLE001
+        # The leads are in; a missing batch row is cosmetic, so say so rather
+        # than failing a sync that actually worked.
+        print(f"  (leads synced, but the batch record failed: {e})", file=sys.stderr)
+
+    print(f"\nPushed {sent} leads into the call room "
+          f"({len(callable_)} dialable, {len(rejected)} flagged as rejected).")
     return 0
 
 

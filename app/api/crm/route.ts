@@ -3,6 +3,9 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { listVaultFiles, readVaultFile } from "@/lib/vaultSource";
 import { getRevenueTruth, BASIS_LABEL, type RevenueBasis } from "@/lib/revenue";
+// OS-project Supabase helpers, used by the unified inbound+outbound section
+// below to read the call room (call_leads / call_activity) server-side.
+import { getOsSession, hasLegacyAuth, sbUrl, sbService } from "@/lib/osSupabase";
 
 // ───────────────────────────────────────────────────────────────────────────
 // CRM API — every outbound message, compartmentalized by the client it is FOR.
@@ -770,6 +773,314 @@ function notSendableReason(
   return "Approved and otherwise eligible, but not yet in the sendable queue. Verify the underlying row directly.";
 }
 
+// ───────────────────────────────────────────────────────────────────────────
+// UNIFIED VIEW — the OS Supabase project (NOT Sonar).
+//
+// Two pipelines that genuinely exist and are genuinely different:
+//   INBOUND  crm_contacts / crm_deals / crm_activities, moving through the
+//            seven crm_stages rows (New → Contacted → Replied → Call Booked →
+//            Proposal Out → Won / Lost).
+//   OUTBOUND call_leads / call_activity — the Cold Call Room, whose lead
+//            vocabulary (new / contacted / callback / booked / not_interested /
+//            bad_number / dnc) is its OWN thing.
+//
+// They are NOT flattened into a shared funnel. "Contacted" on a deal means a
+// human wrote to a business that came to us; "contacted" on a call lead means a
+// dialer got somebody on the phone. Mapping one onto the other would invent a
+// funnel neither side has. Each keeps its own stages; only the activity stream
+// is merged, and every entry there is labelled with the side it came from.
+//
+// Read directly here rather than through /api/calls/* — those routes are scoped
+// to the caller role and belong to the call room. Same service-key fetch pattern
+// as app/api/calls/_guard.ts sbGet.
+// ───────────────────────────────────────────────────────────────────────────
+
+const STAFF_ROLES = new Set(["admin", "owner", "staff"]);
+
+/** Staff-only. The unified view carries call-room data; client-role sessions
+ *  must never see it. Middleware already 403s them off /api/*, this is the
+ *  second lock so the payload does not depend on a matcher staying correct. */
+async function isStaff(): Promise<boolean> {
+  const session = await getOsSession();
+  if (session) return STAFF_ROLES.has(session.role);
+  // Legacy shared-password access is Jack himself.
+  return await hasLegacyAuth();
+}
+
+type OsRes<T> = { rows: T[]; total: number | null; error: string | null };
+
+async function osGet<T>(table: string, qs: string, exact = false): Promise<OsRes<T>> {
+  const url = sbUrl();
+  const key = sbService();
+  if (!url || !key) {
+    return { rows: [], total: null, error: "OS_SUPABASE_URL / OS_SUPABASE_SERVICE_KEY are not set on this deployment." };
+  }
+  try {
+    const r = await fetch(`${url}/rest/v1/${table}?${qs}`, {
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+        ...(exact ? { Prefer: "count=exact" } : {}),
+      },
+      cache: "no-store",
+    });
+    if (!r.ok) {
+      const body = await r.text().catch(() => "");
+      return { rows: [], total: null, error: `${table} returned HTTP ${r.status}: ${body.slice(0, 180)}` };
+    }
+    const n = Number((r.headers.get("content-range") || "").split("/").pop());
+    return { rows: (await r.json()) as T[], total: Number.isFinite(n) ? n : null, error: null };
+  } catch (e) {
+    return { rows: [], total: null, error: `Could not reach ${table}: ${e instanceof Error ? e.message : String(e)}` };
+  }
+}
+
+async function osCount(table: string, filter = ""): Promise<number | null> {
+  const r = await osGet<{ id: unknown }>(table, `select=id${filter ? `&${filter}` : ""}&limit=1`, true);
+  return r.error ? null : r.total;
+}
+
+export type StreamEntry = {
+  key: string;
+  side: "inbound" | "outbound";
+  at: string;                    // ISO, straight from the row
+  kind: string;                  // crm_activities.kind | call_activity.outcome
+  who: string | null;            // who did it, when the row records it
+  subject: string;               // the person/company it happened with
+  detail: string | null;
+  durationSec: number | null;    // outbound only
+  nextActionAt: string | null;   // outbound only
+};
+
+const STAGE_CAP = 12;   // deals shown per inbound stage
+const LEAD_CAP = 400;   // call_leads read for the outbound rollup
+
+async function buildUnified() {
+  if (!(await isStaff())) {
+    return {
+      available: false,
+      reason:
+        "The unified pipeline view is staff-only, because it carries Cold Call Room data. " +
+        "This session's role is not admin, owner or staff.",
+      inbound: null, outbound: null, stream: null,
+    };
+  }
+
+  // ── INBOUND ──────────────────────────────────────────────────────────────
+  const stagesR = await osGet<{ id: number; key: string; label: string; sort: number; is_won: boolean; is_lost: boolean }>(
+    "crm_stages", "select=id,key,label,sort,is_won,is_lost&order=sort.asc"
+  );
+  const dealsR = await osGet<{
+    id: number; stage_id: number; title: string; value_cents: number | null;
+    status: string; expected_close: string | null; created_at: string; updated_at: string;
+    crm_contacts: { id: number; business_name: string; contact_name: string | null; city: string | null; state: string | null } | null;
+  }>(
+    "crm_deals",
+    "select=id,stage_id,title,value_cents,status,expected_close,created_at,updated_at," +
+    "crm_contacts(id,business_name,contact_name,city,state)&order=updated_at.desc&limit=500"
+  );
+  const contactsTotal = await osCount("crm_contacts");
+  const contactsDnc = await osCount("crm_contacts", "do_not_contact=is.true");
+  const actR = await osGet<{
+    id: number; contact_id: number | null; deal_id: number | null; kind: string;
+    outcome: string | null; body: string | null; occurred_at: string; source: string | null;
+    created_by: string | null;
+    crm_contacts: { business_name: string } | null;
+  }>(
+    "crm_activities",
+    "select=id,contact_id,deal_id,kind,outcome,body,occurred_at,source,created_by," +
+    "crm_contacts(business_name)&order=occurred_at.desc&limit=60"
+  );
+
+  const openDeals = dealsR.rows.filter((d) => d.status === "open");
+  const inboundStages = stagesR.rows.map((st) => {
+    const mine = openDeals.filter((d) => d.stage_id === st.id);
+    const quoted = mine.filter((d) => typeof d.value_cents === "number");
+    return {
+      key: st.key, label: st.label, sort: st.sort,
+      isWon: st.is_won, isLost: st.is_lost,
+      deals: mine.length,
+      unquoted: mine.length - quoted.length,
+      // null, never 0, when nothing in the stage carries a quote.
+      valueCents: quoted.length ? quoted.reduce((n, d) => n + (d.value_cents as number), 0) : null,
+      rows: mine.slice(0, STAGE_CAP).map((d) => ({
+        id: d.id, title: d.title, valueCents: d.value_cents,
+        business: d.crm_contacts?.business_name ?? null,
+        person: d.crm_contacts?.contact_name ?? null,
+        where: [d.crm_contacts?.city, d.crm_contacts?.state].filter(Boolean).join(", ") || null,
+        expectedClose: d.expected_close, updatedAt: d.updated_at,
+      })),
+      truncated: mine.length > STAGE_CAP,
+    };
+  });
+
+  const inbound = {
+    available: !stagesR.error && !dealsR.error,
+    reason: stagesR.error ?? dealsR.error,
+    contacts: contactsTotal,
+    contactsReason: contactsTotal == null ? "crm_contacts could not be counted, so this is unknown — not zero." : null,
+    doNotContact: contactsDnc,
+    deals: openDeals.length,
+    dealsTotal: dealsR.rows.length,
+    stages: inboundStages,
+    activityCount: actR.error ? null : actR.rows.length,
+  };
+
+  // ── OUTBOUND ─────────────────────────────────────────────────────────────
+  const leadsR = await osGet<{
+    id: number; company: string; contact_name: string | null; title: string | null;
+    city: string | null; state: string | null; vertical: string | null;
+    score: number | null; status: string; last_outcome: string | null;
+    last_called_at: string | null; call_count: number | null; next_action_at: string | null;
+    excluded: boolean; excluded_reason: string | null; source: string | null;
+    created_at: string; updated_at: string;
+  }>(
+    "call_leads",
+    "select=id,company,contact_name,title,city,state,vertical,score,status,last_outcome," +
+    "last_called_at,call_count,next_action_at,excluded,excluded_reason,source,created_at,updated_at" +
+    `&order=score.desc.nullslast&limit=${LEAD_CAP}`
+  );
+  const leadsTotal = await osCount("call_leads");
+  const callActR = await osGet<{
+    id: number; lead_id: number; user_email: string | null; outcome: string;
+    notes: string | null; duration_sec: number | null; next_action_at: string | null;
+    created_at: string;
+    call_leads: { company: string; contact_name: string | null } | null;
+  }>(
+    "call_activity",
+    "select=id,lead_id,user_email,outcome,notes,duration_sec,next_action_at,created_at," +
+    "call_leads(company,contact_name)&order=created_at.desc&limit=60"
+  );
+
+  const leads = leadsR.rows;
+  const dialable = leads.filter((l) => !l.excluded);
+  const rejected = leads.filter((l) => l.excluded);
+
+  // The call room's OWN vocabulary. Working stages sit on the board in order;
+  // the terminal outcomes are counted separately because a dead number is not
+  // a later stage of a conversation, it is the end of one.
+  const WORKING = [
+    { key: "new", label: "Not called yet", note: "Audited, dialable, nobody has picked up the phone for them." },
+    { key: "contacted", label: "Contacted", note: "A dialer reached a human. The conversation is live." },
+    { key: "callback", label: "Callback due", note: "They asked to be called again. This is the queue that rots if ignored." },
+    { key: "booked", label: "Booked", note: "A meeting is on the calendar out of a cold call." },
+  ] as const;
+  const TERMINAL = [
+    { key: "not_interested", label: "Not interested" },
+    { key: "bad_number", label: "Bad number" },
+    { key: "dnc", label: "Do not call" },
+  ] as const;
+
+  const countStatus = (k: string) => dialable.filter((l) => l.status === k).length;
+  const outboundStages = WORKING.map((s) => {
+    const mine = dialable.filter((l) => l.status === s.key);
+    return {
+      key: s.key, label: s.label, note: s.note, leads: mine.length,
+      rows: mine.slice(0, STAGE_CAP).map((l) => ({
+        id: l.id, company: l.company, person: l.contact_name, title: l.title,
+        where: [l.city, l.state].filter(Boolean).join(", ") || null,
+        vertical: l.vertical, score: l.score, callCount: l.call_count ?? 0,
+        lastCalledAt: l.last_called_at, nextActionAt: l.next_action_at,
+      })),
+      truncated: mine.length > STAGE_CAP,
+    };
+  });
+
+  const reasonRoll: Record<string, number> = {};
+  for (const l of rejected) {
+    const k = (l.excluded_reason || "no reason recorded").trim();
+    reasonRoll[k] = (reasonRoll[k] ?? 0) + 1;
+  }
+
+  const sources = Array.from(new Set(leads.map((l) => l.source).filter(Boolean))) as string[];
+
+  const outbound = {
+    available: !leadsR.error,
+    reason: leadsR.error,
+    total: leadsTotal ?? leads.length,
+    read: leads.length,
+    truncated: leadsTotal != null && leadsTotal > leads.length,
+    dialable: dialable.length,
+    rejected: rejected.length,
+    sources,
+    stages: outboundStages,
+    terminal: TERMINAL.map((t) => ({ key: t.key, label: t.label, leads: countStatus(t.key) })),
+    excludedReasons: Object.entries(reasonRoll)
+      .map(([reason, n]) => ({ reason, n }))
+      .sort((a, b) => b.n - a.n),
+    activityCount: callActR.error ? null : callActR.rows.length,
+    activityReason: callActR.error,
+  };
+
+  // ── MERGED ACTIVITY STREAM ───────────────────────────────────────────────
+  const stream: StreamEntry[] = [];
+  for (const a of actR.rows) {
+    stream.push({
+      key: `in${a.id}`, side: "inbound", at: a.occurred_at,
+      kind: a.outcome ? `${a.kind} · ${a.outcome}` : a.kind,
+      who: a.created_by ?? a.source ?? null,
+      subject: a.crm_contacts?.business_name ?? (a.deal_id ? `deal #${a.deal_id}` : `contact #${a.contact_id ?? "?"}`),
+      detail: a.body,
+      durationSec: null, nextActionAt: null,
+    });
+  }
+  for (const c of callActR.rows) {
+    const co = c.call_leads?.company ?? `lead #${c.lead_id}`;
+    stream.push({
+      key: `out${c.id}`, side: "outbound", at: c.created_at,
+      kind: `call · ${c.outcome}`,
+      who: c.user_email,
+      subject: c.call_leads?.contact_name ? `${co} — ${c.call_leads.contact_name}` : co,
+      detail: c.notes,
+      durationSec: c.duration_sec, nextActionAt: c.next_action_at,
+    });
+  }
+  stream.sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
+
+  // Why the stream looks the way it does. An empty list must never be silent.
+  const streamGaps: string[] = [];
+  if (actR.error) streamGaps.push(`Inbound activity could not be read: ${actR.error}`);
+  else if (actR.rows.length === 0) {
+    streamGaps.push(
+      "crm_activities has no rows at all. Nothing has ever been logged against an inbound contact " +
+      "or deal, so there is no inbound history to show — this is an empty table, not a filtered view."
+    );
+  }
+  if (callActR.error) streamGaps.push(`Call activity could not be read: ${callActR.error}`);
+  else if (callActR.rows.length === 0) {
+    streamGaps.push(
+      "call_activity has no rows at all. Nobody has made a call out of the Cold Call Room yet, so " +
+      `there is no outbound history — the ${outbound.dialable} dialable leads are waiting, not worked.`
+    );
+  }
+
+  return {
+    available: true,
+    reason: null,
+    inbound,
+    outbound,
+    stream: {
+      entries: stream.slice(0, 80),
+      inboundCount: actR.rows.length,
+      outboundCount: callActR.rows.length,
+      gaps: streamGaps,
+      cap: 60,
+    },
+    // The one honest cross-pipeline number: distinct people/companies in play.
+    // It is a SUM of two disjoint tables, not a deduplicated union — nothing in
+    // the schema links a call_lead to a crm_contact, so claiming a de-duped
+    // figure would be a guess.
+    summary: {
+      inboundContacts: contactsTotal,
+      outboundLeads: leadsTotal ?? leads.length,
+      total: contactsTotal == null ? null : contactsTotal + (leadsTotal ?? leads.length),
+      note:
+        "Inbound and outbound are counted from separate tables with no key joining them, so this " +
+        "total is a sum, not a de-duplicated union. A business could in principle appear on both sides.",
+    },
+  };
+}
+
 export async function GET(req: Request) {
   const { url, key } = creds();
   if (!url || !key) {
@@ -968,9 +1279,25 @@ export async function GET(req: Request) {
       coverage.sort((a, b) => b.filled - a.filled);
     }
 
+    // The combined inbound + outbound section. Built last and defensively: a
+    // failure here must degrade to an honest "unavailable" note rather than
+    // taking down the whole CRM payload that the rest of the board depends on.
+    let unified: Awaited<ReturnType<typeof buildUnified>> | {
+      available: false; reason: string; inbound: null; outbound: null; stream: null;
+    };
+    try {
+      unified = await buildUnified();
+    } catch (e: unknown) {
+      unified = {
+        available: false,
+        reason: `The combined pipeline could not be read: ${e instanceof Error ? e.message : String(e)}`,
+        inbound: null, outbound: null, stream: null,
+      };
+    }
+
     return NextResponse.json({
       configured: true, clients, items, totals, content,
-      evidence, coverage, scan: scanned.meta,
+      evidence, coverage, scan: scanned.meta, unified,
       sendPolicy: { available: policy.available, reason: policy.reason },
       sendable: { available: sendable.available, reason: sendable.reason, count: sendable.count },
       // Surfaced so an unreadable do-not-contact list is visible rather than

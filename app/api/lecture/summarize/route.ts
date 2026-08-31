@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { bearerOk, clientIp, estimateCost, lectureLimits, reserve, settle } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -39,9 +40,8 @@ function str(v: unknown): string {
 }
 
 function authorized(req: NextRequest): boolean {
-  const secret = process.env.LECTURE_API_SECRET;
-  if (!secret) return false; // fail CLOSED: no key configured => nobody gets in
-  return req.headers.get("authorization") === `Bearer ${secret}`;
+  // Constant-time compare, and fails closed when LECTURE_API_SECRET is unset.
+  return bearerOk(req.headers.get("authorization"), process.env.LECTURE_API_SECRET);
 }
 
 const SYSTEM = `You summarize a single university lecture from the student's own raw notes, and (when present) a machine speech-to-text transcript of the same lecture. The student is Jack. Your output is read as if it were his notes, so it has to be true to them.
@@ -111,7 +111,49 @@ const SCHEMA = {
   },
 } as const;
 
+// The schedule app is served from a different origin (GitHub Pages), so the
+// browser preflights this route and discards any response without CORS headers.
+//
+// This used to be Access-Control-Allow-Origin: *. That was not the real hole --
+// no cookies are involved, so there is no ambient authority for another origin
+// to borrow, and anyone holding the bearer bypasses CORS entirely with curl.
+// But narrowing it is free and it removes one way a leaked token gets used: a
+// random page can no longer read this route's responses from a victim's
+// browser. Requests with no Origin at all (curl, GitHub Actions) are untouched;
+// CORS was never their gate.
+const ALLOWED_ORIGINS = (
+  process.env.LECTURE_ALLOWED_ORIGINS ||
+  "https://wingdigital26-maker.github.io,http://localhost:3000,http://localhost:3002"
+)
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+function corsHeaders(req: NextRequest): Record<string, string> {
+  const base: Record<string, string> = {
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Max-Age": "86400",
+    Vary: "Origin",
+  };
+  const origin = req.headers.get("origin");
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    base["Access-Control-Allow-Origin"] = origin;
+  }
+  return base;
+}
+
+export async function OPTIONS(req: NextRequest) {
+  return new Response(null, { status: 204, headers: corsHeaders(req) });
+}
+
 export async function POST(req: NextRequest) {
+  const res = await handlePost(req);
+  for (const [k, v] of Object.entries(corsHeaders(req))) res.headers.set(k, v);
+  return res;
+}
+
+async function handlePost(req: NextRequest) {
   if (!authorized(req)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
@@ -165,6 +207,32 @@ export async function POST(req: NextRequest) {
     });
   }
 
+  // ---- Rate limit + spend ceiling -------------------------------------
+  // Claimed only now, once we know the request is authorized, well-formed and
+  // genuinely about to spend money. See lib/rateLimit.ts for exactly what these
+  // caps do and do not stop. Counters are in Postgres, not in memory: this
+  // route runs on stateless, horizontally scaled Vercel functions, so an
+  // in-process counter would cap one instance and nothing else.
+  const ip = clientIp(req);
+  const limits = lectureLimits();
+  const est = estimateCost(size);
+  const claim = await reserve(ip, limits, est);
+  if (!claim.ok) {
+    // Fail CLOSED when the counter itself is down: refusing to summarize is
+    // recoverable, an uncapped Anthropic bill is not.
+    const status = claim.reason === "backend" ? 503 : 429;
+    return NextResponse.json(
+      {
+        error: claim.reason === "backend" ? "rate limiter unavailable" : "rate limited",
+        reason: claim.reason,
+        detail: claim.detail,
+        retryAfterSeconds: claim.retryAfter,
+        limits,
+      },
+      { status, headers: { "Retry-After": String(claim.retryAfter) } }
+    );
+  }
+
   let res: Response;
   try {
     res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -176,7 +244,11 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 4096,
+        // 8192, not 4096: a dense 60k-char lecture with adaptive thinking at
+        // effort high can otherwise stop_reason:"max_tokens" and turn a real
+        // lecture into a 502. Headroom is free -- output is billed on tokens
+        // actually produced, not on this ceiling.
+        max_tokens: 8192,
         system: SYSTEM,
         thinking: { type: "adaptive" },
         output_config: {
@@ -187,6 +259,10 @@ export async function POST(req: NextRequest) {
       }),
     });
   } catch (e) {
+    // Never reached the model, so nothing was billed: hand the estimate back.
+    // The call slot itself stays counted -- a client that can fail 30 times can
+    // fail 30 times, and that is the point of the cap.
+    await settle(ip, est, 0);
     return NextResponse.json(
       { error: "could not reach the summarizer", detail: String(e) },
       { status: 502 }
@@ -195,6 +271,7 @@ export async function POST(req: NextRequest) {
 
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
+    await settle(ip, est, 0);
     return NextResponse.json(
       { error: `summarizer returned ${res.status}`, detail: detail.slice(0, 500) },
       { status: 502 }
@@ -203,8 +280,16 @@ export async function POST(req: NextRequest) {
 
   const data = await res.json().catch(() => null);
   if (!data) {
+    await settle(ip, est, 0);
     return NextResponse.json({ error: "summarizer returned unreadable output" }, { status: 502 });
   }
+
+  // From here the model DID run, so bill the real usage against the ceiling
+  // even on the paths where we cannot use its answer.
+  const inputTokens = data.usage?.input_tokens ?? 0;
+  const outputTokens = data.usage?.output_tokens ?? 0;
+  const cost = (inputTokens * 5 + outputTokens * 25) / 1_000_000;
+  await settle(ip, est, cost);
 
   if (data.stop_reason === "refusal") {
     return NextResponse.json(
@@ -232,9 +317,6 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const inputTokens = data.usage?.input_tokens ?? 0;
-  const outputTokens = data.usage?.output_tokens ?? 0;
-
   return NextResponse.json({
     configured: true,
     course: course || null,
@@ -242,6 +324,11 @@ export async function POST(req: NextRequest) {
     hadTranscript: Boolean(transcript),
     summary,
     model: data.model ?? MODEL,
-    cost: (inputTokens * 5 + outputTokens * 25) / 1_000_000,
+    cost,
+    budget: {
+      callsToday: claim.dayCalls,
+      dailyCallCap: limits.globalDaily,
+      dailySpendCapUsd: limits.spendUsd,
+    },
   });
 }

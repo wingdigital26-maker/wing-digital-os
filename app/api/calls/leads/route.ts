@@ -48,6 +48,15 @@ export async function GET(req: Request) {
   const q = (url.searchParams.get("q") ?? "").trim();
 
   const parts = ["select=*", "order=score.desc,company.asc", "limit=500"];
+
+  // Leads that failed the quality audit (excluded=true, with excluded_reason)
+  // are NEVER dialable and must not reach the dial list -- not merely be hidden
+  // by the client, which would still ship 35 rejected businesses over the wire
+  // and skew every count computed here. The Sources screen asks for them
+  // explicitly with ?includeExcluded=1 to show WHY they were cut.
+  const includeExcluded = url.searchParams.get("includeExcluded") === "1";
+  if (!includeExcluded) parts.push("excluded=is.false");
+
   if (status && status !== "all") parts.push(`status=eq.${encodeURIComponent(status)}`);
   if (q) {
     const safe = q.replace(/[(),*]/g, " ").trim();

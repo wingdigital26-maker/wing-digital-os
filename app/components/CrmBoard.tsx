@@ -6,6 +6,7 @@ import CrmClientSummary, {
 } from "./CrmClientSummary";
 import CrmContentFeed, { type ContentFeed, type ContentItem } from "./CrmContentFeed";
 import CrmScraperHealth, { ago, healthLook, isOffByChoice, type Watch } from "./CrmScraperHealth";
+import CrmUnified, { type Unified } from "./CrmUnified";
 import CrmRowDetail, {
   SourceLink, NoSourceLink,
   type LinkKind, type DetailItem, type Evidence, type Review, type TierInfo,
@@ -57,6 +58,10 @@ type Payload = {
   content?: ContentFeed;
   sendPolicy?: { available: boolean; reason: string | null };
   sendable?: { available: boolean; reason: string | null; count: number | null };
+  // Both pipelines in one shape: the inbound CRM and the outbound cold call
+  // room, deliberately kept separate rather than merged. Optional because an
+  // older payload may not carry it, and the view says so when it is missing.
+  unified?: Unified;
 };
 
 const STATUS_COLOR: Record<string, string> = {
@@ -189,6 +194,9 @@ export default function CrmBoard() {
   const [data, setData] = useState<Payload | null>(null);
   const [err, setErr] = useState("");
   const [client, setClient] = useState<string>("");
+  // Which half of the CRM you are looking at: the per-client message work that
+  // this board has always shown, or both pipelines end to end.
+  const [view, setView] = useState<"clients" | "unified">("clients");
   const [status, setStatus] = useState<string>("draft");
   // When set, the list ignores lane + status and shows exactly the pile the
   // "needs you" panel pointed at. Clicking a queue has to take you TO it.
@@ -390,6 +398,30 @@ export default function CrmBoard() {
         </span>
       </header>
 
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+        {([["clients", "Client work"], ["unified", "Both pipelines"]] as
+          ["clients" | "unified", string][]).map(([id, label]) => {
+          const on = view === id;
+          return (
+            <button key={id} onClick={() => setView(id)} style={{
+              fontSize: 12.5, padding: "6px 15px", borderRadius: 10, cursor: "pointer",
+              fontWeight: on ? 650 : 500,
+              border: `1px solid ${on ? "var(--accent)" : "var(--border)"}`,
+              background: on ? "var(--accent-glow)" : "transparent",
+              color: on ? "var(--accent)" : "var(--text-secondary)",
+            }}>{label}</button>
+          );
+        })}
+        <span style={{ fontSize: 11.5, color: "var(--text-muted)" }}>
+          {view === "unified"
+            ? "outbound cold calls and the inbound CRM, side by side"
+            : "per-client message queues, scrapers and published work"}
+        </span>
+      </div>
+
+      {view === "unified" && <CrmUnified unified={data.unified} />}
+
+      {view === "clients" && <>
       {t && (
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           {([["Total", t.total, null], ["Drafts", t.draft, null],
@@ -860,6 +892,7 @@ export default function CrmBoard() {
           )}
         </div>
       </div>
+      </>}
     </div>
   );
 }

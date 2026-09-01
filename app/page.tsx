@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
 import { motion, MotionConfig } from "motion/react";
-import { Bolt, Users, Cpu, Bulb, Calendar, Note, Sparkles, Backpack } from "reicon-react";
+import { Bolt, Users, Cpu, Bulb, Calendar, Note, Sparkles } from "reicon-react";
 import { staggerContainer, riseItem, hoverSpring, cardHover, cardHoverPassive, cardTap } from "./components/motion";
 import { Sparkline, Delta, buildDailySeries } from "./components/Charts";
 import { StatTiles, MissionPanels, MissionStyles, Selection, StatTile, WatchdogBanner, WatchdogData, MissionData } from "./components/MissionControlCore";
@@ -21,26 +21,18 @@ const SonarBoard = dynamic(() => import("./components/SonarBoard"), { ssr: false
 // it is a default filter now, not a screen. Pipeline is folded in as two record
 // types; no record and no field was dropped.
 const CrmWorkspace = dynamic(() => import("./components/CrmWorkspace"), { ssr: false });
-// Automated messaging QA board — the cold-email engine's queue with rendered
-// per-recipient previews. Lives beside the CRM because it is the same
-// "double-check before it goes out" workflow, on the automated lane.
-const MessagingBoard = dynamic(() => import("./components/MessagingBoard"), { ssr: false });
-// Unified sent-message tracking (2026-08-31): every SMS + email the OS logged,
-// threaded per contact, with delivery-status chips. Backed by the `messages`
-// ledger (migration 0014) via /api/messages. Read-only; nothing sends.
-const MessagesBoard = dynamic(() => import("./components/MessagesBoard"), { ssr: false });
-// CrmBoard / ClientInbox / PipelineBoard are no longer mounted here. The files
-// are kept on disk as a fallback if the merged view ever needs to be backed out.
+// Email hub (2026-09-01): MessagingBoard + MessagesBoard + DeliverabilityBoard
+// behind one tab with internal pills. The three boards moved there untouched.
+const EmailHub = dynamic(() => import("./components/EmailHub"), { ssr: false });
+// CrmBoard / ClientInbox / PipelineBoard / SchoolBoard are no longer mounted
+// here. Files kept on disk as fallbacks; School was removed from the nav
+// 2026-09-01 (classes still show as the school lane on the Calendar).
 // InvoicesBoard is mounted by CalendarSection as its second tab, not directly.
-// Live pull from the published class schedule app. Never a snapshot: if the
-// fetch fails it renders the failure, it does not fall back to an older copy.
-const SchoolSection = dynamic(() => import("./components/SchoolBoard"), { ssr: false });
 // Calendar replaced "Money" 2026-08-30. Invoices lives on as its second tab, so
 // billing data is one click away rather than gone.
 const CalendarSection = dynamic(() => import("./components/CalendarBoard"), { ssr: false });
 const CompetitorIntel = dynamic(() => import("./components/CompetitorIntel"), { ssr: false });
 const ReplyInboxBoard = dynamic(() => import("./components/ReplyInboxBoard"), { ssr: false });
-const DeliverabilityBoard = dynamic(() => import("./components/DeliverabilityBoard"), { ssr: false });
 const StormBoard = dynamic(() => import("./components/StormBoard"), { ssr: false });
 
 type NavGroup = {
@@ -81,22 +73,16 @@ const NAV: NavGroup[] = [
     hint: "Contacts, outreach emails, replies, and email health",
     subs: [
       { id: "crm", label: "Everything" },
-      // The automated-sending QA board (2026-08-31): who the cold-email engine
-      // will contact next, the exact rendered message each would get, and the
-      // guardrail counts. Read-only against the sender's own Supabase.
-      { id: "messaging", label: "Automated messaging" },
-      // The unified sent-message ledger (2026-08-31): SMS + email, both
-      // directions, threaded per contact with carrier delivery statuses.
-      { id: "messages", label: "Messages" },
       // Reply Inbox (2026-09-01): every inbound cold-email reply, hot first,
       // with the thread and an editable draft. Read/draft only; never sends.
       { id: "replies", label: "Reply Inbox" },
       // Sequences (2026-09-01): the GHL-workflow replacement. Routed section
       // (/sequences), not an in-shell view — see EXTERNAL_SUB_LINKS.
       { id: "sequences", label: "Sequences" },
-      // Email Health (2026-09-01): SPF/DKIM/DMARC, warmup caps, suppression,
-      // send outcomes as green/yellow/red cards. Report-only surface.
-      { id: "deliverability", label: "Email Health" },
+      // Email (2026-09-01, Jack: "too many tabs"): one tab wrapping the
+      // automated-send queue, the sent-message ledger, and email health as
+      // internal pills. See EmailHub.tsx; old ids alias here.
+      { id: "email", label: "Email" },
     ],
   },
   {
@@ -106,13 +92,9 @@ const NAV: NavGroup[] = [
     hint: "Your schedule, plus invoices one tab over",
     subs: [{ id: "calendar", label: "Calendar" }],
   },
-  {
-    // Backpack, not Bulb: Intel already owns Bulb and the two read as the same
-    // section in the rail.
-    id: "school", label: "School", icon: Backpack,
-    hint: "Your class schedule",
-    subs: [{ id: "school", label: "Class Schedule" }],
-  },
+  // School section removed 2026-09-01 (Jack: "get rid of the school schedule
+  // completely"). Classes still show as the school lane on the Calendar; the
+  // legacy alias below keeps old links landing there.
   {
     id: "agent", label: "Agents", icon: Cpu,
     hint: "What the automated agents are doing right now",
@@ -137,6 +119,12 @@ const LEGACY_VIEW_ALIAS: Record<string, string> = {
   pipeline: "crm",
   money: "calendar",
   invoices: "calendar",
+  // 2026-09-01 consolidation: School folded into Calendar, three email tabs
+  // folded into the Email hub.
+  school: "calendar",
+  messaging: "email",
+  messages: "email",
+  deliverability: "email",
 };
 
 // Sub-tabs that are real routed pages rather than in-shell views. Clicking one
@@ -464,11 +452,9 @@ export default function Home() {
           {visited.has("clients") && <div className="app-view" style={{ display: active === "clients" ? "block" : "none" }}><ClientsBoard /></div>}
           {visited.has("sonar") && <div className="app-view" style={{ display: active === "sonar" ? "block" : "none" }}><SonarBoard /></div>}
           {visited.has("crm") && <div className="app-view" style={{ display: active === "crm" ? "block" : "none" }}><CrmWorkspace /></div>}
-          {visited.has("messaging") && <div className="app-view" style={{ display: active === "messaging" ? "block" : "none" }}><MessagingBoard /></div>}
-          {visited.has("messages") && <div className="app-view" style={{ display: active === "messages" ? "block" : "none" }}><MessagesBoard /></div>}
+          {visited.has("email") && <div className="app-view" style={{ display: active === "email" ? "block" : "none" }}><EmailHub /></div>}
           {visited.has("replies") && <div className="app-view" style={{ display: active === "replies" ? "block" : "none" }}><ReplyInboxBoard /></div>}
           {visited.has("storms") && <div className="app-view" style={{ display: active === "storms" ? "block" : "none" }}><StormBoard /></div>}
-          {visited.has("deliverability") && <div className="app-view" style={{ display: active === "deliverability" ? "block" : "none" }}><DeliverabilityBoard /></div>}
           {visited.has("calendar") && <div className="app-view" style={{ display: active === "calendar" ? "block" : "none" }}><CalendarSection /></div>}
           {visited.has("competitors") && <div className="app-view" style={{ display: active === "competitors" ? "block" : "none" }}><CompetitorIntel onSendToAI={sendToAI} /></div>}
           {visited.has("knowledge") && <div className="app-view" style={{ display: active === "knowledge" ? "block" : "none" }}><KnowledgeBase initialPath={openNotePath} onSendToAI={sendToAI} /></div>}
@@ -476,7 +462,6 @@ export default function Home() {
           {visited.has("log") && <div className="app-view" style={{ display: active === "log" ? "block" : "none" }}><ActivityLog /></div>}
           {/* Jack-only views never mount for a restricted session, even when a
               stale `visited` entry exists from before the role resolved. */}
-          {fullAccess && visited.has("school") && <div className="app-view" style={{ display: active === "school" ? "block" : "none" }}><SchoolSection /></div>}
           {fullAccess && visited.has("personal") && <div className="app-view" style={{ display: active === "personal" ? "block" : "none" }}><PersonalSection /></div>}
         </div>
       </main>

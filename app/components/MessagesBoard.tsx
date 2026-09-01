@@ -7,7 +7,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 // Three views:
 //  * Conversations — per-contact threads, newest activity first, unread on
 //    top, with a manual reply box (SMS threads only, human action only).
-//  * Activity — a flat timeline of everything sent/received across clients.
 //  * Twilio status — what is actually going on with the SMS pipe, from
 //    /api/sms/health: env vars present (names only), live account + webhook
 //    checks when configured, exact remaining setup steps when not.
@@ -362,7 +361,7 @@ export default function MessagesBoard() {
   const [loading, setLoading] = useState(true);
   const [client, setClient] = useState("");
   const [channel, setChannel] = useState("");
-  const [view, setView] = useState<"threads" | "activity" | "twilio">("threads");
+  const [view, setView] = useState<"threads" | "twilio">("threads");
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState<string | null>(null);
 
@@ -389,10 +388,6 @@ export default function MessagesBoard() {
   const visibleThreads = useMemo(
     () => threads.filter((t) => matches(search, t.name, t.company, t.counterpart, ...t.messages.map((m) => m.body))),
     [threads, search]
-  );
-  const visibleActivity = useMemo(
-    () => (data ? data.items.filter((m) => matches(search, m.contact_name, m.contact_company, counterpart(m), m.body)) : []),
-    [data, search]
   );
 
   const markRead = useCallback(async (t: Thread) => {
@@ -491,7 +486,6 @@ export default function MessagesBoard() {
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
         {([
           ["threads", "Conversations"],
-          ["activity", "Activity"],
           ["twilio", "Twilio status"],
         ] as const).map(([v, name]) => (
           <button key={v} type="button" onClick={() => setView(v)} style={pill(view === v)}>{name}</button>
@@ -552,7 +546,7 @@ export default function MessagesBoard() {
             </div>
           )}
           {!data.emptyNote && search.trim() &&
-            (view === "threads" ? visibleThreads.length === 0 : visibleActivity.length === 0) && (
+            visibleThreads.length === 0 && (
             <div style={{ fontSize: 12.5, color: "var(--text-muted)" }}>
               Nothing matches “{search.trim()}”. The rows are still in the ledger — clear the search to see them.
             </div>
@@ -631,35 +625,6 @@ export default function MessagesBoard() {
             </div>
           )}
 
-          {view === "activity" && (
-            <div style={{ display: "grid", gap: 6 }}>
-              {visibleActivity.map((m) => (
-                <div key={m.id} style={{
-                  border: `1px solid ${m.error ? "var(--red)" : "var(--border)"}`,
-                  borderRadius: 10, background: "var(--bg-card)", padding: "9px 12px",
-                  display: "grid", gap: 4,
-                }}>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 7, alignItems: "baseline" }}>
-                    <Chip tone={m.channel === "sms" ? "var(--accent)" : "var(--text-secondary)"} text={m.channel.toUpperCase()} />
-                    <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--text-primary)" }}>
-                      {m.direction === "inbound" ? `← from ${displayName(m)}` : `→ to ${displayName(m)}`}
-                    </span>
-                    <Chip tone={statusTone(m.status, m.error)} text={m.status} />
-                    {m.client_slug && <span style={{ fontSize: 11, color: "var(--text-muted)" }}>for {m.client_slug}</span>}
-                    <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-muted)" }}>{when(m.created_at)}</span>
-                  </div>
-                  <div style={{
-                    fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.5,
-                    overflow: "hidden", textOverflow: "ellipsis",
-                    display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
-                  }}>
-                    {m.body || "(no body recorded)"}
-                  </div>
-                  {m.error && <div style={{ fontSize: 11.5, color: "var(--red)" }}>{m.error}</div>}
-                </div>
-              ))}
-            </div>
-          )}
         </>
       )}
     </div>

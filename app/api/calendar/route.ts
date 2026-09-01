@@ -25,7 +25,13 @@ import { GET as schoolGET, SCHEDULE_URL, type SchoolPayload } from "../school/ro
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export type CalendarSource = "google" | "callbacks" | "payments" | "school";
+export type CalendarSource =
+  | "google"
+  | "callbacks"
+  | "payments"
+  | "school"
+  | "blocks"
+  | "stripe";
 
 export type CalendarEvent = {
   id: string;
@@ -42,6 +48,10 @@ export type CalendarEvent = {
   /** True when `url` leaves the OS and needs target=_blank. */
   external: boolean;
   status: string | null;
+  /** Explicit colour token, when the source colours per-item (block categories). */
+  color?: string | null;
+  /** The raw calendar_blocks row behind a block event, so the UI can edit it. */
+  block?: BlockRow | null;
 };
 
 export type LaneStatus = {
@@ -52,6 +62,8 @@ export type LaneStatus = {
   missing: string | null;
   error: string | null;
   count: number;
+  /** Honest plain-language state when a configured lane is simply empty. */
+  note?: string | null;
 };
 
 // ── iCal parsing ───────────────────────────────────────────────────────────
@@ -454,20 +466,255 @@ async function schoolLane(): Promise<{ lane: LaneStatus; events: CalendarEvent[]
   return { lane, events };
 }
 
+// ── Blocks lane ────────────────────────────────────────────────────────────
+//
+// Jack's own manual time-blocks (calendar_blocks, migration 0015; CRUD in
+// /api/blocks). A one-off block is one event on its date. recurrence='weekly'
+// repeats every week on the anchor date's weekday, from that date forward,
+// expanded here into real dated instances across a bounded window (8 weeks
+// back, 16 weeks forward) so both the month and week grids see them without
+// the table ever storing generated rows.
+
+export type BlockRow = {
+  id: string;
+  title: string;
+  date: string;       // YYYY-MM-DD anchor
+  start_time: string; // HH:MM:SS
+  end_time: string;
+  category: string;
+  notes: string | null;
+  recurrence: string | null;
+};
+
+// Category → colour token. The UI stays token-only; hex never appears.
+export const BLOCK_COLOR: Record<string, string> = {
+  study: "var(--accent-2)",
+  call: "var(--orange)",
+  work: "var(--accent)",
+  personal: "var(--green)",
+  other: "var(--text-muted)",
+};
+
+const hhmm = (t: string) => t.slice(0, 5);
+
+async function blocksLane(): Promise<{ lane: LaneStatus; events: CalendarEvent[] }> {
+  const url = sbUrl();
+  const key = sbService();
+  const lane: LaneStatus = {
+    source: "blocks",
+    label: "Time blocks",
+    configured: Boolean(url && key),
+    missing: url && key ? null : "OS_SUPABASE_URL / OS_SUPABASE_SERVICE_KEY",
+    error: null,
+    count: 0,
+    note: null,
+  };
+  if (!url || !key) return { lane, events: [] };
+  try {
+    const res = await fetch(
+      `${url}/rest/v1/calendar_blocks?select=*&order=date.asc,start_time.asc&limit=1000`,
+      { headers: { apikey: key, Authorization: `Bearer ${key}` }, cache: "no-store" }
+    );
+    if (!res.ok) {
+      lane.error = `Time blocks read failed (HTTP ${res.status})`;
+      return { lane, events: [] };
+    }
+    const rows = (await res.json()) as BlockRow[];
+    if (!rows.length) {
+      lane.note = "No time blocks yet — click a day to add one.";
+      return { lane, events: [] };
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const winStart = new Date(today); winStart.setDate(winStart.getDate() - 56);
+    const winEnd = new Date(today);   winEnd.setDate(winEnd.getDate() + 112);
+
+    const events: CalendarEvent[] = [];
+    const push = (r: BlockRow, day: Date) => {
+      const dk = ymd(day);
+      events.push({
+        id: `block:${r.id}:${dk}`,
+        source: "blocks",
+        title: r.title,
+        start: `${dk}T${hhmm(r.start_time)}:00`,
+        end: `${dk}T${hhmm(r.end_time)}:00`,
+        allDay: false,
+        detail: [r.category, r.notes].filter(Boolean).join(" · ") || null,
+        url: null,
+        external: false,
+        status: r.recurrence === "weekly" ? "weekly" : null,
+        color: BLOCK_COLOR[r.category] ?? "var(--accent)",
+        block: r,
+      });
+    };
+
+    for (const r of rows) {
+      const anchor = parseYmd(r.date);
+      if (!anchor) continue;
+      if (r.recurrence === "weekly") {
+        const from = anchor > winStart ? anchor : winStart;
+        for (const d = new Date(from); d <= winEnd; d.setDate(d.getDate() + 1)) {
+          if (d.getDay() === anchor.getDay() && d >= anchor) push(r, d);
+        }
+      } else {
+        push(r, anchor);
+      }
+    }
+    lane.count = events.length;
+    return { lane, events };
+  } catch (e) {
+    lane.error = `Time blocks unreachable: ${String(e)}`;
+    return { lane, events: [] };
+  }
+}
+
+// ── Stripe lane ────────────────────────────────────────────────────────────
+//
+// Real money on real dates from Wing's live Stripe account, via the restricted
+// key in STRIPE_SECRET_KEY. Two reads, both plain REST (no SDK):
+//
+//   invoices       due dates for open/paid invoices; an open invoice past its
+//                  due date is reported overdue. Draft/void/uncollectible are
+//                  skipped — they have no calendar meaning.
+//   subscriptions  each active subscription's current_period_end = the next
+//                  recurring charge.
+//
+// A configured account with nothing billed yet says so in plain words (note),
+// which is the expected state today. Nothing is ever synthesized.
+
+type StripeInvoice = {
+  id: string;
+  number: string | null;
+  status: string;
+  due_date: number | null;
+  amount_due: number;
+  currency: string;
+  customer_name: string | null;
+  customer_email: string | null;
+  hosted_invoice_url: string | null;
+};
+
+type StripeSub = {
+  id: string;
+  status: string;
+  current_period_end: number | null;
+  items?: { data?: { price?: { unit_amount: number | null; currency: string } }[] };
+};
+
+function epochYmd(sec: number): string {
+  return ymd(new Date(sec * 1000));
+}
+
+async function stripeGet(key: string, path: string) {
+  return fetch(`https://api.stripe.com/v1/${path}`, {
+    headers: { Authorization: `Bearer ${key}` },
+    cache: "no-store",
+  });
+}
+
+async function stripeLane(): Promise<{ lane: LaneStatus; events: CalendarEvent[] }> {
+  const key = process.env.STRIPE_SECRET_KEY;
+  const lane: LaneStatus = {
+    source: "stripe",
+    label: "Stripe",
+    configured: Boolean(key),
+    missing: key ? null : "STRIPE_SECRET_KEY",
+    error: null,
+    count: 0,
+    note: null,
+  };
+  if (!key) return { lane, events: [] };
+
+  const events: CalendarEvent[] = [];
+  const nowSec = Math.floor(Date.now() / 1000);
+  try {
+    const [invRes, subRes] = await Promise.all([
+      stripeGet(key, "invoices?limit=100"),
+      stripeGet(key, "subscriptions?status=active&limit=100"),
+    ]);
+
+    if (!invRes.ok) {
+      lane.error = `Stripe invoices read failed (HTTP ${invRes.status})`;
+    } else {
+      const inv = (await invRes.json()) as { data: StripeInvoice[] };
+      for (const r of inv.data ?? []) {
+        if (!["open", "paid"].includes(r.status)) continue;
+        // An invoice with no due date has no day to sit on; skipped, not guessed.
+        if (!r.due_date) continue;
+        const overdue = r.status === "open" && r.due_date < nowSec;
+        events.push({
+          id: `stripe:inv:${r.id}`,
+          source: "stripe",
+          title: r.customer_name || r.customer_email || r.number || "Stripe invoice",
+          start: epochYmd(r.due_date),
+          end: null,
+          allDay: true,
+          detail: `${money(r.amount_due, r.currency.toUpperCase())} · ${
+            overdue ? "OVERDUE" : r.status
+          }${r.number ? ` · ${r.number}` : ""}`,
+          url: r.hosted_invoice_url,
+          external: true,
+          status: overdue ? "overdue" : r.status,
+        });
+      }
+    }
+
+    if (!subRes.ok) {
+      const msg = `Stripe subscriptions read failed (HTTP ${subRes.status})`;
+      lane.error = lane.error ? `${lane.error}; ${msg}` : msg;
+    } else {
+      const subs = (await subRes.json()) as { data: StripeSub[] };
+      for (const s of subs.data ?? []) {
+        if (!s.current_period_end) continue;
+        const price = s.items?.data?.[0]?.price;
+        events.push({
+          id: `stripe:sub:${s.id}`,
+          source: "stripe",
+          title: "Stripe subscription renews",
+          start: epochYmd(s.current_period_end),
+          end: null,
+          allDay: true,
+          detail:
+            price?.unit_amount != null
+              ? `${money(price.unit_amount, (price.currency || "usd").toUpperCase())} recurring`
+              : "recurring payment",
+          url: `https://dashboard.stripe.com/subscriptions/${s.id}`,
+          external: true,
+          status: s.status,
+        });
+      }
+    }
+
+    lane.count = events.length;
+    if (!lane.error && events.length === 0) {
+      lane.note = "Stripe is connected but has no invoices or subscriptions with dates yet.";
+    }
+    return { lane, events };
+  } catch (e) {
+    lane.error = `Stripe unreachable: ${String(e)}`;
+    return { lane, events: [] };
+  }
+}
+
 export async function GET() {
-  const [g, c, p, s] = await Promise.all([
+  const [g, c, p, s, b, st] = await Promise.all([
     googleLane(),
     callbackLane(),
     paymentLane(),
     schoolLane(),
+    blocksLane(),
+    stripeLane(),
   ]);
-  const events = [...g.events, ...c.events, ...p.events, ...s.events].sort((a, b) =>
-    a.start < b.start ? -1 : a.start > b.start ? 1 : 0
+  const events = [
+    ...g.events, ...c.events, ...p.events, ...s.events, ...b.events, ...st.events,
+  ].sort((a, b2) =>
+    a.start < b2.start ? -1 : a.start > b2.start ? 1 : 0
   );
   const now = new Date();
   return NextResponse.json({
     events,
-    lanes: [g.lane, c.lane, p.lane, s.lane],
+    lanes: [g.lane, c.lane, p.lane, s.lane, b.lane, st.lane],
     today: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
       now.getDate()
     ).padStart(2, "0")}`,

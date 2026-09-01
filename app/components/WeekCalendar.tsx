@@ -22,6 +22,8 @@ export interface Appointment {
   detail?: string | null;
   /** All-day items sit in the band above the hour grid, not inside it. */
   allDay?: boolean;
+  /** Explicit colour token; wins over the source colour (block categories). */
+  color?: string | null;
 }
 
 const HOURS = Array.from({ length: 13 }, (_, i) => i + 7); // 7am - 7pm
@@ -32,6 +34,10 @@ export const SOURCE_COLOR: Record<string, string> = {
   payments: "var(--green)",
   // Classes get their own colour so school reads apart from work at a glance.
   school: "var(--accent-2)",
+  // Stripe money markers; Jack's own manual blocks colour per-category instead
+  // (each block event carries its own `color`), so "blocks" here is a fallback.
+  stripe: "var(--accent-dim)",
+  blocks: "var(--accent)",
 };
 const STATUS_COLOR: Record<string, string> = {
   confirmed: "var(--green)",
@@ -72,11 +78,15 @@ function fmt12(date: Date) {
 export default function WeekCalendar({
   appointments,
   emptyNote,
+  onEdit,
 }: {
   appointments: Appointment[];
   /** Shown instead of a count when there is nothing to draw. Must say what is
    *  actually missing; it is never a placeholder for hidden data. */
   emptyNote?: string;
+  /** When set, an editable item (a manual time-block) gets an Edit button in
+   *  the detail panel. Called with the appointment's id. */
+  onEdit?: (a: Appointment) => void;
 }) {
   const [weekOffset, setWeekOffset] = useState(0);
   const [selected, setSelected] = useState<Appointment | null>(null);
@@ -110,6 +120,7 @@ export default function WeekCalendar({
 
   function colorFor(a: Appointment) {
     return (
+      a.color ??
       (a.source ? SOURCE_COLOR[a.source] : undefined) ??
       (a.status ? STATUS_COLOR[a.status.toLowerCase()] : undefined) ??
       "var(--accent)"
@@ -242,7 +253,8 @@ export default function WeekCalendar({
                     top: `${top}%`, height: `${height}%`,
                     left: 2, right: 2,
                     background: color + "22",
-                    border: `1px solid ${color}`,
+                    // Manual time-blocks read apart from feed events: dashed edge.
+                    border: `1px ${a.source === "blocks" ? "dashed" : "solid"} ${color}`,
                     borderLeft: `3px solid ${color}`,
                     borderRadius: 6, padding: "3px 6px",
                     cursor: "pointer", overflow: "hidden",
@@ -284,6 +296,14 @@ export default function WeekCalendar({
             ) : null}
           </div>
           <div style={{ display: "flex", gap: 8 }}>
+            {onEdit && selected.source === "blocks" ? (
+              <button
+                onClick={() => { onEdit(selected); setSelected(null); }}
+                style={{ fontSize: 12, color: "var(--accent)", background: "var(--accent-glow)", border: "1px solid var(--accent)", borderRadius: 8, padding: "6px 12px", cursor: "pointer" }}
+              >
+                Edit block
+              </button>
+            ) : null}
             {/* Only a link the feed actually gave us. No link is shown for an
                 event whose source record has no address. */}
             {selected.url ? (

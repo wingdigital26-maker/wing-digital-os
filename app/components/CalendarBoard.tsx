@@ -21,7 +21,20 @@ const InvoicesBoard = dynamic(() => import("./InvoicesBoard"), { ssr: false });
 // total and payment calendar they had before.
 // ───────────────────────────────────────────────────────────────────────────
 
-type CalendarSource = "google" | "callbacks" | "payments" | "school";
+type CalendarSource = "google" | "callbacks" | "payments" | "school" | "blocks" | "stripe";
+
+// One row of Jack's own calendar_blocks table, carried on each block event so
+// the UI can open it straight into the edit form.
+type BlockRow = {
+  id: string;
+  title: string;
+  date: string;
+  start_time: string;
+  end_time: string;
+  category: string;
+  notes: string | null;
+  recurrence: string | null;
+};
 
 type ApiEvent = {
   id: string;
@@ -34,6 +47,8 @@ type ApiEvent = {
   url: string | null;
   external: boolean;
   status: string | null;
+  color?: string | null;
+  block?: BlockRow | null;
 };
 
 type Lane = {
@@ -43,7 +58,39 @@ type Lane = {
   missing: string | null;
   error: string | null;
   count: number;
+  note?: string | null;
 };
+
+const BLOCK_CATEGORIES = ["study", "call", "work", "personal", "other"] as const;
+
+// What the block form is editing. `id` empty = creating a new block.
+type BlockDraft = {
+  id: string;
+  title: string;
+  date: string;
+  start_time: string;
+  end_time: string;
+  category: string;
+  notes: string;
+  weekly: boolean;
+};
+
+function emptyDraft(date: string): BlockDraft {
+  return { id: "", title: "", date, start_time: "09:00", end_time: "10:00", category: "work", notes: "", weekly: false };
+}
+
+function draftFrom(b: BlockRow): BlockDraft {
+  return {
+    id: b.id,
+    title: b.title,
+    date: b.date,
+    start_time: b.start_time.slice(0, 5),
+    end_time: b.end_time.slice(0, 5),
+    category: b.category,
+    notes: b.notes ?? "",
+    weekly: b.recurrence === "weekly",
+  };
+}
 
 type Payload = { events: ApiEvent[]; lanes: Lane[]; today: string };
 
@@ -78,7 +125,9 @@ export type CalendarSectionProps = {
 
 export default function CalendarSection({
   initialTab = "calendar",
-  initialView = "month",
+  // Jack wants the week grid first — time blocks laid out like a class
+  // schedule — with the month grid one toggle away.
+  initialView = "week",
 }: CalendarSectionProps) {
   const [tab, setTab] = useState<"calendar" | "invoices">(initialTab);
   const [view, setView] = useState<"month" | "week">(initialView);
@@ -86,6 +135,21 @@ export default function CalendarSection({
   const [err, setErr] = useState("");
   const [monthOffset, setMonthOffset] = useState(0);
   const [openDay, setOpenDay] = useState<string | null>(null);
+
+  // The block form: null = closed; a draft with no id = creating.
+  const [draft, setDraft] = useState<BlockDraft | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [formErr, setFormErr] = useState("");
+
+  async function load() {
+    try {
+      const d = (await (await fetch("/api/calendar")).json()) as Payload;
+      setData(d);
+      setErr("");
+    } catch (e) {
+      setErr(String(e));
+    }
+  }
 
   useEffect(() => {
     let live = true;
@@ -100,6 +164,60 @@ export default function CalendarSection({
       live = false;
     };
   }, []);
+
+  async function saveDraft() {
+    if (!draft) return;
+    setSaving(true);
+    setFormErr("");
+    try {
+      const body = {
+        ...(draft.id ? { id: draft.id } : {}),
+        title: draft.title,
+        date: draft.date,
+        start_time: draft.start_time,
+        end_time: draft.end_time,
+        category: draft.category,
+        notes: draft.notes || null,
+        recurrence: draft.weekly ? "weekly" : null,
+      };
+      const res = await fetch("/api/blocks", {
+        method: draft.id ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setFormErr(out?.error || `Save failed (HTTP ${res.status})`);
+        return;
+      }
+      setDraft(null);
+      await load();
+    } catch (e) {
+      setFormErr(String(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deleteDraft() {
+    if (!draft?.id) return;
+    setSaving(true);
+    setFormErr("");
+    try {
+      const res = await fetch(`/api/blocks?id=${encodeURIComponent(draft.id)}`, { method: "DELETE" });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setFormErr(out?.error || `Delete failed (HTTP ${res.status})`);
+        return;
+      }
+      setDraft(null);
+      await load();
+    } catch (e) {
+      setFormErr(String(e));
+    } finally {
+      setSaving(false);
+    }
+  }
 
   const events = useMemo(() => data?.events ?? [], [data]);
 
@@ -131,6 +249,7 @@ export default function CalendarSection({
         source: e.source,
         detail: e.detail,
         allDay: e.allDay,
+        color: e.color ?? null,
       })),
     [events]
   );
@@ -211,6 +330,11 @@ export default function CalendarSection({
                 {l.label} is not connected. Missing: <code style={{ color: "var(--orange)" }}>{l.missing}</code>
               </p>
             ))}
+            {lanes.filter((l) => l.note).map((l) => (
+              <p key={`n-${l.source}`} style={{ margin: 0, fontSize: 12, color: "var(--text-muted)" }}>
+                {l.note}
+              </p>
+            ))}
             {laneErrors.map((l) => (
               <p key={`e-${l.source}`} style={{ margin: 0, fontSize: 12, color: "var(--red)" }}>
                 {l.error}
@@ -219,19 +343,41 @@ export default function CalendarSection({
             {err ? <p style={{ margin: 0, fontSize: 12, color: "var(--red)" }}>Calendar: {err}</p> : null}
           </section>
 
-          {/* View switch */}
+          {/* View switch + the one write this calendar owns: add a block. */}
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            <button type="button" onClick={() => setView("month")} style={tabBtn(view === "month")}>
-              Month
-            </button>
             <button type="button" onClick={() => setView("week")} style={tabBtn(view === "week")}>
               Week
             </button>
+            <button type="button" onClick={() => setView("month")} style={tabBtn(view === "month")}>
+              Month
+            </button>
+            <button
+              type="button"
+              onClick={() => { setFormErr(""); setDraft(emptyDraft(todayKey)); }}
+              style={{ ...tabBtn(false), marginLeft: "auto", borderColor: "var(--accent)", color: "var(--accent)" }}
+            >
+              + Add block
+            </button>
           </div>
+
+          {draft ? (
+            <BlockForm
+              draft={draft}
+              setDraft={setDraft}
+              onSave={saveDraft}
+              onDelete={deleteDraft}
+              saving={saving}
+              error={formErr}
+            />
+          ) : null}
 
           {view === "week" ? (
             <WeekCalendar
               appointments={weekEvents}
+              onEdit={(a) => {
+                const ev = events.find((e) => e.id === a.id);
+                if (ev?.block) { setFormErr(""); setDraft(draftFrom(ev.block)); }
+              }}
               emptyNote={
                 missingCreds.length
                   ? `nothing scheduled · missing ${missingCreds.map((l) => l.missing).join(", ")}`
@@ -322,7 +468,7 @@ export default function CalendarSection({
                         {c.day}
                       </span>
                       {list.slice(0, 3).map((e) => {
-                        const color = SOURCE_COLOR[e.source] ?? "var(--accent)";
+                        const color = e.color ?? SOURCE_COLOR[e.source] ?? "var(--accent)";
                         return (
                           <span
                             key={e.id}
@@ -330,6 +476,8 @@ export default function CalendarSection({
                             style={{
                               fontSize: 10, lineHeight: 1.3, borderRadius: 4,
                               padding: "1px 4px", background: color + "22",
+                              // Manual blocks read apart from feed events: dashed edge.
+                              border: e.source === "blocks" ? `1px dashed ${color}` : "none",
                               borderLeft: `2px solid ${color}`, color: "var(--text-primary)",
                               overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                             }}
@@ -353,18 +501,28 @@ export default function CalendarSection({
                 <div style={{ borderTop: "1px solid var(--border)", padding: "12px 16px", display: "grid", gap: 8 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
                     <strong style={{ ...num, fontSize: 13 }}>{openDay}</strong>
-                    <button type="button" onClick={() => setOpenDay(null)} style={btn}>Close</button>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button
+                        type="button"
+                        onClick={() => { setFormErr(""); setDraft(emptyDraft(openDay)); }}
+                        style={{ ...btn, borderColor: "var(--accent)", color: "var(--accent)" }}
+                      >
+                        + Add block here
+                      </button>
+                      <button type="button" onClick={() => setOpenDay(null)} style={btn}>Close</button>
+                    </div>
                   </div>
                   {openEvents.length === 0 ? (
                     <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)" }}>Nothing on this day.</p>
                   ) : null}
                   {openEvents.map((e) => {
-                    const color = SOURCE_COLOR[e.source] ?? "var(--accent)";
+                    const color = e.color ?? SOURCE_COLOR[e.source] ?? "var(--accent)";
                     return (
                       <div
                         key={e.id}
                         style={{
-                          border: "1px solid var(--border)", borderLeft: `3px solid ${color}`,
+                          border: e.source === "blocks" ? `1px dashed ${color}` : "1px solid var(--border)",
+                          borderLeft: `3px solid ${color}`,
                           borderRadius: 10, padding: 10, background: "var(--bg-secondary)",
                           display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap",
                         }}
@@ -379,6 +537,15 @@ export default function CalendarSection({
                         <span style={{ fontSize: 10, color, textTransform: "uppercase", letterSpacing: "0.06em" }}>
                           {e.source}
                         </span>
+                        {e.block ? (
+                          <button
+                            type="button"
+                            onClick={() => { setFormErr(""); setDraft(draftFrom(e.block as BlockRow)); }}
+                            style={{ ...btn, marginLeft: "auto", borderColor: "var(--accent)", color: "var(--accent)" }}
+                          >
+                            Edit
+                          </button>
+                        ) : null}
                         {e.url ? (
                           e.external ? (
                             <a
@@ -409,6 +576,116 @@ export default function CalendarSection({
     </div>
   );
 }
+
+// ── Block form ─────────────────────────────────────────────────────────────
+// One small card that both creates and edits. Plain inputs, stacked on narrow
+// screens via flex-wrap, token colours only.
+function BlockForm({
+  draft,
+  setDraft,
+  onSave,
+  onDelete,
+  saving,
+  error,
+}: {
+  draft: BlockDraft;
+  setDraft: (d: BlockDraft | null) => void;
+  onSave: () => void;
+  onDelete: () => void;
+  saving: boolean;
+  error: string;
+}) {
+  const set = (patch: Partial<BlockDraft>) => setDraft({ ...draft, ...patch });
+  return (
+    <section style={{ ...card, display: "grid", gap: 10 }}>
+      <strong style={{ fontSize: 13 }}>{draft.id ? "Edit block" : "New block"}</strong>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <label style={label}>
+          Title
+          <input
+            value={draft.title}
+            onChange={(e) => set({ title: e.target.value })}
+            placeholder="Study, calls, deep work…"
+            style={{ ...input, minWidth: 180 }}
+          />
+        </label>
+        <label style={label}>
+          Date
+          <input type="date" value={draft.date} onChange={(e) => set({ date: e.target.value })} style={input} />
+        </label>
+        <label style={label}>
+          Start
+          <input type="time" value={draft.start_time} onChange={(e) => set({ start_time: e.target.value })} style={input} />
+        </label>
+        <label style={label}>
+          End
+          <input type="time" value={draft.end_time} onChange={(e) => set({ end_time: e.target.value })} style={input} />
+        </label>
+        <label style={label}>
+          Category
+          <select value={draft.category} onChange={(e) => set({ category: e.target.value })} style={input}>
+            {BLOCK_CATEGORIES.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <label style={{ ...label, width: "100%" }}>
+        Notes (optional)
+        <input value={draft.notes} onChange={(e) => set({ notes: e.target.value })} style={input} />
+      </label>
+      <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--text-secondary)", cursor: "pointer" }}>
+        <input type="checkbox" checked={draft.weekly} onChange={(e) => set({ weekly: e.target.checked })} />
+        Repeat weekly on this weekday
+      </label>
+      {error ? <p style={{ margin: 0, fontSize: 12, color: "var(--red)" }}>{error}</p> : null}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={saving}
+          style={{ ...btn, borderColor: "var(--accent)", color: "var(--accent)", background: "var(--accent-glow)", opacity: saving ? 0.6 : 1 }}
+        >
+          {saving ? "Saving…" : draft.id ? "Save changes" : "Add block"}
+        </button>
+        <button type="button" onClick={() => setDraft(null)} disabled={saving} style={btn}>
+          Cancel
+        </button>
+        {draft.id ? (
+          <button
+            type="button"
+            onClick={onDelete}
+            disabled={saving}
+            style={{ ...btn, marginLeft: "auto", borderColor: "var(--red)", color: "var(--red)" }}
+          >
+            Delete block
+          </button>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+const label: React.CSSProperties = {
+  display: "grid",
+  gap: 4,
+  fontSize: 11,
+  color: "var(--text-muted)",
+  textTransform: "uppercase",
+  letterSpacing: "0.05em",
+  flex: "1 1 120px",
+};
+
+const input: React.CSSProperties = {
+  font: "inherit",
+  fontSize: 13,
+  color: "var(--text-primary)",
+  background: "var(--bg-secondary)",
+  border: "1px solid var(--border)",
+  borderRadius: 8,
+  padding: "7px 10px",
+  width: "100%",
+};
 
 const card: React.CSSProperties = {
   background: "var(--bg-card)",

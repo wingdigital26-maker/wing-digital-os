@@ -118,7 +118,7 @@ const isTrial = (key: string, enabled: boolean) => !enabled && !RETIRED.has(key)
 const CREW = [
   { key: "dispatch", name: "Dispatch", role: "Morning briefing, orders the day's dial list", match: /dispatch/i },
   { key: "reply-triage", name: "Reply-Triage", role: "Classifies inbound replies HOT/WARM/COLD", match: /reply-triage|triage/i },
-  { key: "builder", name: "Builder", role: "Client onboarding runner in GHL", match: /builder|onboard/i },
+  { key: "builder", name: "Builder", role: "Retired — was the GoHighLevel onboarding runner; no replacement yet", match: /builder|onboard/i },
 ];
 
 // ── Scheduled-tasks disk state (local only) ────────────────────────────────
@@ -360,14 +360,9 @@ function watchdogStateFor(wd: Watchdog, key: string, name: string): string | nul
 }
 
 // ── Real-world links ───────────────────────────────────────────────────────
-// GHL location ids come from Jack's own tooling (ghl-cli/apollo_outreach.py),
-// not guessed. URL patterns are GHL's stable v2 app routes.
-const GHL_WING_LOCATION = "rJ45gqUrsMXwb7pVjXQY";
-const GHL_JACKSON_LOCATION = "T2HknbMbA9IJ3qFGLm1G";
-const ghlConversationsUrl = (loc: string) =>
-  `https://app.gohighlevel.com/v2/location/${loc}/conversations/conversations`;
-const ghlContactsUrl = (loc: string) =>
-  `https://app.gohighlevel.com/v2/location/${loc}/contacts/smart_list/All`;
+// GoHighLevel was fully retired 2026-08-22 — its deep links are dead (401) and
+// were removed. Outreach/CRM data now lives in the OS's own CRM (Supabase),
+// reachable from the CRM tab of the OS itself.
 
 // Live-site domains the OS is allowed to link to as publish targets. Links are
 // only ever rendered when a real URL on one of these hosts appears in the
@@ -709,8 +704,7 @@ async function statDetail(id: string) {
           : todayRows.length ? "Recipient businesses and send times below." : "No send rows to show.",
       ],
       items: todayRows.map((r) => ({ label: r.company, value: (r.when.slice(11) || r.when).trim(), note: r.city })),
-      note: st.note ?? "Per-contact GHL links are not derivable here (company names, not contact ids). Use the contacts list link and search the company name.",
-      links: [{ label: "Open Wing contacts in GHL", url: ghlContactsUrl(GHL_WING_LOCATION) }],
+      note: st.note ?? "Per-contact detail lives in the OS CRM (CRM tab) — search the company name there.",
     });
   }
 
@@ -822,16 +816,16 @@ const AGENT_SYSTEMS: Record<string, Wire[]> = {
   ],
   "b2b-outreach-engine": [
     { id: "email", label: "EMAIL", direction: "writes" },
-    { id: "ghl-wing", label: "GHL WING", direction: "both" },
+    { id: "ghl-wing", label: "OS CRM", direction: "both" },
     { id: "scheduler", label: "SCHEDULER", direction: "reads" },
   ],
   "b2b-prospector-daily": [
     { id: "vault", label: "VAULT", direction: "writes" },
-    { id: "ghl-wing", label: "GHL WING", direction: "reads" },
+    { id: "ghl-wing", label: "OS CRM", direction: "reads" },
     { id: "scheduler", label: "SCHEDULER", direction: "reads" },
   ],
   closer: [
-    { id: "ghl-wing", label: "GHL WING", direction: "both" },
+    { id: "ghl-wing", label: "OS CRM", direction: "both" },
     { id: "email", label: "EMAIL", direction: "reads" },
     { id: "vault", label: "VAULT", direction: "writes" },
     { id: "scheduler", label: "SCHEDULER", direction: "reads" },
@@ -839,11 +833,11 @@ const AGENT_SYSTEMS: Record<string, Wire[]> = {
   "call-prep": [
     { id: "vault", label: "VAULT", direction: "both" },
     { id: "clients", label: "CLIENTS", direction: "reads" },
-    { id: "ghl-wing", label: "GHL WING", direction: "reads" },
+    { id: "ghl-wing", label: "OS CRM", direction: "reads" },
     { id: "scheduler", label: "SCHEDULER", direction: "reads" },
   ],
   "client-report": [
-    { id: "ghl-clients", label: "GHL", direction: "reads" },
+    { id: "ghl-clients", label: "CLIENT CRM", direction: "reads" },
     { id: "clients", label: "CLIENTS", direction: "reads" },
     { id: "website", label: "WEB/SEO", direction: "reads" },
     { id: "vault", label: "VAULT", direction: "writes" },
@@ -851,17 +845,17 @@ const AGENT_SYSTEMS: Record<string, Wire[]> = {
   ],
   dispatch: [
     { id: "vault", label: "VAULT", direction: "writes" },
-    { id: "ghl-clients", label: "GHL", direction: "reads" },
-    { id: "ghl-wing", label: "GHL WING", direction: "reads" },
+    { id: "ghl-clients", label: "CLIENT CRM", direction: "reads" },
+    { id: "ghl-wing", label: "OS CRM", direction: "reads" },
   ],
   "reply-triage": [
-    { id: "ghl-clients", label: "GHL", direction: "reads" },
-    { id: "ghl-wing", label: "GHL WING", direction: "reads" },
+    { id: "ghl-clients", label: "CLIENT CRM", direction: "reads" },
+    { id: "ghl-wing", label: "OS CRM", direction: "reads" },
     { id: "email", label: "EMAIL", direction: "reads" },
     { id: "vault", label: "VAULT", direction: "writes" },
   ],
   builder: [
-    { id: "ghl-clients", label: "GHL", direction: "writes" },
+    { id: "ghl-clients", label: "CLIENT CRM", direction: "writes" },
     { id: "clients", label: "CLIENTS", direction: "writes" },
   ],
 };
@@ -882,7 +876,7 @@ const ARTIFACTS: ArtifactMeta[] = [
   { id: "business-snapshot", label: "Biz snapshot", system: "vault", producedBy: "dispatch", path: "wiki/state/business-snapshot.md", blurb: "The live business state: MRR, active clients, pipeline." },
   { id: "outreach-snapshot", label: "Outreach snapshot", system: "email", producedBy: "b2b-outreach-engine", path: "wiki/state/outreach-snapshot.md", blurb: "Cold-email pipeline counts and send totals." },
   { id: "content-calendar", label: "Content calendar", system: "website", producedBy: "content-engine-weekly", path: "wiki/campaigns/jackson-social-calendar.md", blurb: "Jackson Roofing's rolling content and social calendar." },
-  { id: "prospects-db", label: "prospects.db", system: "ghl-wing", producedBy: "b2b-prospector-daily", path: "wiki/automations/prospects-db.md", blurb: "The self-refilling prospect database behind outreach." },
+  { id: "prospects-db", label: "prospects.db", system: "ghl-wing", producedBy: "b2b-prospector-daily", path: "wiki/automations/prospects-db.md", blurb: "The self-refilling prospect database behind outreach (Supabase + local prospects.db)." },
   { id: "replies-inbox", label: "Replies inbox", system: "ghl-wing", producedBy: "reply-triage", path: "wiki/state/replies-inbox.md", blurb: "Triage page of inbound replies, HOT flagged loudly." },
 ];
 
@@ -945,14 +939,9 @@ async function artifactDetail(id: string) {
   }
   // Real outbound links for artifacts that mirror a live system. Only URL
   // patterns constructible from real data (documented GHL location ids).
+  // GoHighLevel deep links removed 2026-08-22 (GHL retired, links dead). The
+  // live data now lives in the OS's own CRM tab, same app — no external link.
   const links: { label: string; url: string }[] = [];
-  if (meta.id === "replies-inbox") {
-    links.push({ label: "Open Wing conversations in GHL", url: ghlConversationsUrl(GHL_WING_LOCATION) });
-    links.push({ label: "Open Jackson conversations in GHL", url: ghlConversationsUrl(GHL_JACKSON_LOCATION) });
-  }
-  if (meta.id === "outreach-snapshot" || meta.id === "prospects-db") {
-    links.push({ label: "Open Wing contacts in GHL", url: ghlContactsUrl(GHL_WING_LOCATION) });
-  }
   return NextResponse.json({
     id: meta.id,
     label: meta.label,
@@ -993,25 +982,25 @@ const ROLE_LONG: Record<string, string> = {
   "renewal-content-weekly":
     "Renewal Health (Lynette Wing) weekly content engine. Mirror of Jackson's content engine adapted for her static site and health/YMYL rules: 2 blog posts and a service page, Pexels images, health-claim gate, then publishes via the static-site publisher. No diagnose/treat/cure claims, ever.",
   "b2b-outreach-engine":
-    "Wing Digital's live B2B cold-email campaign, approved live by Jack on 2026-08-06. Every 30 minutes between 8am and 8pm it checks the send window and daily cap, dry-runs the outreach script, and only fires real sends when the dry run is clean. Never exceeds the daily cap, never touches client subaccounts, and stops loudly if anything looks broken.",
+    "Wing Digital's live B2B cold-email campaign, approved live by Jack on 2026-08-06. Every 30 minutes between 8am and 8pm it checks the send window and daily cap, dry-runs the outreach script, and only fires real sends when the dry run is clean. Never exceeds the daily cap, never touches client accounts, and stops loudly if anything looks broken.",
   "b2b-prospector-daily":
     "Daily 6:15am lead scout. Runs b2b-lead-find to scan DFW for high-value B2B, warehouse, and commercial-ops leads using the free scrapers (Google Maps + OpenStreetMap) and stages them in prospects.db so the outreach engine never runs dry. Finds and stages only, never sends.",
   closer:
-    "Closer agent, in trial (disabled). Turns HOT and WARM cold-email replies from Wing Digital's own B2B outreach into booked 15-minute calls. Reads each prospect's full GHL thread, drafts a personalized, human, non-salesy reply that drives to the booking link, and queues it. Draft-only by default: it never sends to a real prospect without the closer:reply autonomy grant. Surfaces HOT drafts loudly so no hot lead rots.",
+    "Closer agent, in trial (disabled). Turns HOT and WARM cold-email replies from Wing Digital's own B2B outreach into booked 15-minute calls. Reads each prospect's full reply thread in the OS CRM, drafts a personalized, human, non-salesy reply that drives to the booking link, and queues it. Draft-only by default: it never sends to a real prospect without the closer:reply autonomy grant. Surfaces HOT drafts loudly so no hot lead rots.",
   "call-prep":
     "Call-Prep agent, in trial (disabled). Consumes Dispatch's ordered dial list and, for each prospect, produces a skimmable one-page brief: overview, the online-presence gaps Wing fixes, the decision-maker, a tailored opener, and the single strongest value hook, so Jack walks into every call informed.",
   "client-report":
     "Client-Report agent, in trial (disabled). On the 1st of each month, for each paying client, it pulls the month's real numbers (new leads, appointments, opportunities, content published with live links, GSC rankings and traffic, wins), computes month-over-month deltas, and assembles a branded, client-facing value report. Honest: zeros and declines are shown with context, never faked. Never auto-sends; it builds the deliverable and surfaces it for Jack to review and send.",
   dispatch:
-    "Morning briefing agent. Regenerates campaign data, orders the day's dial list, checks GHL, and writes a one-page briefing so Jack is call-ready.",
+    "Morning briefing agent. Regenerates campaign data, orders the day's dial list, checks the OS CRM, and writes a one-page briefing so Jack is call-ready.",
   prospector:
     "Lead scout. Scans new DFW cities for leads, stages them as enriching, runs full enrichment, and produces a ready-to-promote list for Jack's approval.",
   outreach:
     "B2B cold email sender, live since 8/6. Checks the send window and daily cap, dry-runs the outreach script, then fires for real if clean. Logs every run.",
   "reply-triage":
-    "Reply triage. Scans both GHL accounts for unread prospect replies, classifies each HOT/WARM/COLD, writes a condensed triage page into the vault, and surfaces HOT replies loudly.",
+    "Reply triage. Scans the outreach reply inbox for unread prospect replies, classifies each HOT/WARM/COLD, writes a condensed triage page into the vault, and surfaces HOT replies loudly.",
   builder:
-    "Client onboarding runner. When a new client signs, executes the full onboarding SOP in GHL and hands Jack the UI-only checklist.",
+    "Retired. This was the GoHighLevel onboarding runner; GHL was fully retired 2026-08-22 and client onboarding has no automated replacement yet — onboarding is run by hand (say \"onboard [client]\").",
 };
 
 // Read the agent's SKILL.md description from the local scheduled-tasks dir.
@@ -1071,10 +1060,12 @@ async function agentDetail(key: string) {
     return NextResponse.json({ error: `unknown agent '${key}'` }, { status: 404 });
   }
 
-  const [logRaw, wdRaw] = await Promise.all([
+  const [logRaw, wdRaw, heartbeats] = await Promise.all([
     readVaultFile("wiki/log.md"),
     readVaultFile("wiki/state/watchdog.md"),
+    readHeartbeats(),
   ]);
+  const filesFacts = filesFactsOf(heartbeatFor(heartbeats, key, meta?.name ?? key));
   const watchdogState = watchdogStateFor(parseWatchdog(wdRaw), meta.key, meta.name);
   // Last ~200 log entries, newest first, filtered to this agent.
   const all = logRaw ? parseLog(logRaw).slice(-200).reverse() : [];
@@ -1140,6 +1131,7 @@ async function agentDetail(key: string) {
     nextRunAt: nextAt ? nextAt.toISOString() : null,
     summary,
     systems: AGENT_SYSTEMS[key] ?? [{ id: "vault", label: "VAULT", direction: "both" }],
+    filesFacts,
     activity,
     olderActivity,
     artifact,
@@ -1248,12 +1240,15 @@ interface AgentFeedRow {
   url: string | null;
   level: string;
   created_at: string;
+  meta?: { files_changed?: number; files?: string[] } | null;
+  filesChanged?: number | null;
+  files?: string[];
 }
 
 async function readAgentFeed(): Promise<AgentFeedRow[]> {
   const rows = await sbSelect<AgentFeedRow>({
     table: "os_feed",
-    select: "id,agent,title,body,url,level,created_at",
+    select: "id,agent,title,body,url,level,created_at,meta",
     service: true,
     query: "order=created_at.desc&limit=25",
   });
@@ -1262,7 +1257,56 @@ async function readAgentFeed(): Promise<AgentFeedRow[]> {
     agent: clean(redact(r.agent)).slice(0, 80),
     title: clean(redact(r.title)).slice(0, 120),
     body: r.body ? clean(redact(r.body)).slice(0, 500) : null,
+    // Honest surface: only present when the run actually reported a count.
+    filesChanged: typeof r.meta?.files_changed === "number" ? r.meta.files_changed : null,
+    files: Array.isArray(r.meta?.files) ? r.meta!.files!.slice(0, 25).map((f) => redact(String(f)).slice(0, 300)) : undefined,
+    meta: undefined,
   }));
+}
+
+// ── agent heartbeats (agent_heartbeats via /api/heartbeat) ─────────────────
+// Local + cloud runners upsert one row per agent; meta may carry the run's
+// files_changed count and short file list. Read with the service key here so
+// the browser never needs the ingest key. Degrades to [] when unreachable.
+interface HeartbeatRow {
+  agent: string;
+  status: string;
+  message: string | null;
+  last_beat: string;
+  meta?: { files_changed?: number; files_changed_at?: string; files?: string[] } | null;
+}
+
+async function readHeartbeats(): Promise<HeartbeatRow[]> {
+  return sbSelect<HeartbeatRow>({
+    table: "agent_heartbeats",
+    select: "agent,status,message,last_beat,meta",
+    service: true,
+    query: "order=last_beat.desc&limit=50",
+  });
+}
+
+// Loose match a heartbeat agent name to a roster key/name (same spirit as
+// watchdogStateFor): "renewal-content" beats match the renewal-content-weekly
+// card, "outreach" beats match the outreach engine.
+function heartbeatFor(rows: HeartbeatRow[], key: string, name: string): HeartbeatRow | null {
+  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const nk = norm(key), nn = norm(name);
+  for (const r of rows) {
+    const w = norm(r.agent);
+    if (!w) continue;
+    if (w === nk || w === nn || nk.includes(w) || w.includes(nn) || nn.includes(w)) return r;
+  }
+  return null;
+}
+
+// The files-changed facts a card/panel renders, or null when never reported.
+function filesFactsOf(hb: HeartbeatRow | null): { filesChanged: number; filesChangedAt: string | null; files: string[] } | null {
+  if (!hb || typeof hb.meta?.files_changed !== "number") return null;
+  return {
+    filesChanged: hb.meta.files_changed,
+    filesChangedAt: hb.meta.files_changed_at ?? hb.last_beat ?? null,
+    files: Array.isArray(hb.meta.files) ? hb.meta.files.slice(0, 25).map((f) => redact(String(f)).slice(0, 300)) : [],
+  };
 }
 
 // ── main handler ───────────────────────────────────────────────────────────
@@ -1288,8 +1332,9 @@ export async function GET(req: NextRequest) {
     readOutreachLive(),
   ]);
 
-  // What the agents reported through /api/notify since the last look.
-  const agentFeed = await readAgentFeed();
+  // What the agents reported through /api/notify since the last look, plus
+  // the latest heartbeat per agent (which may carry files-changed facts).
+  const [agentFeed, heartbeats] = await Promise.all([readAgentFeed(), readHeartbeats()]);
 
   // Vault activity today (git-first, mtime fallback) + scheduled content posts.
   const vaultToday = countVaultFilesToday();
@@ -1326,6 +1371,7 @@ export async function GET(req: NextRequest) {
       lastLogDate: mention?.date ?? null,
       lastLogLine: mention ? clean(mention.title) : null,
       watchdogState: watchdogStateFor(watchdog, s.key, s.name),
+      filesFacts: filesFactsOf(heartbeatFor(heartbeats, s.key, s.name)),
     };
   });
 
@@ -1346,6 +1392,7 @@ export async function GET(req: NextRequest) {
       lastLogDate: mention?.date ?? null,
       lastLogLine: mention ? clean(mention.title) : null,
       watchdogState: watchdogStateFor(watchdog, c.key, c.name),
+      filesFacts: filesFactsOf(heartbeatFor(heartbeats, c.key, c.name)),
     };
   });
 

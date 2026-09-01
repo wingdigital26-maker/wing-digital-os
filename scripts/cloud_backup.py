@@ -73,21 +73,26 @@ def die(msg):
     sys.exit(2)
 
 
-def heartbeat(status, message):
+def heartbeat(status, message, files_changed=None):
     url = os.environ.get("HEARTBEAT_URL")
     key = os.environ.get("HEARTBEAT_KEY")
     if not url or not key:
         print(f"[heartbeat skipped: not configured] {status}: {message}")
         return
+    payload = {
+        "agent": os.environ.get("HEARTBEAT_AGENT", "os-backup-cloud"),
+        "status": status,
+        "message": message[:500],
+    }
+    # Optional: how many files this run wrote. Shows as "N files updated" on
+    # the OS Agents tab. Only sent when known — never a fabricated 0.
+    if isinstance(files_changed, int) and files_changed >= 0:
+        payload["files_changed"] = files_changed
     try:
         r = requests.post(
             url,
             headers={"x-heartbeat-key": key, "Content-Type": "application/json"},
-            data=json.dumps({
-                "agent": os.environ.get("HEARTBEAT_AGENT", "os-backup-cloud"),
-                "status": status,
-                "message": message[:500],
-            }),
+            data=json.dumps(payload),
             timeout=30,
         )
         print(f"[heartbeat {status}] -> HTTP {r.status_code}")
@@ -312,10 +317,12 @@ def main():
     tbl = ", ".join(f"{t}={n}" for t, n in summary.items())
     if skip_vault:
         print("\nPARTIAL BACKUP - TABLES ONLY, NO VAULT IN THIS ARCHIVE.")
-        heartbeat("ok", f"OS cloud backup PARTIAL - TABLES ONLY, NO VAULT: {tbl}")
+        heartbeat("ok", f"OS cloud backup PARTIAL - TABLES ONLY, NO VAULT: {tbl}",
+                  files_changed=len(summary))
         return 0
     print("\nbackup complete and verified.")
-    heartbeat("ok", f"OS cloud backup ok: {docs_ok} vault pages, {tbl}")
+    heartbeat("ok", f"OS cloud backup ok: {docs_ok} vault pages, {tbl}",
+              files_changed=docs_ok + len(summary))
     return 0
 
 

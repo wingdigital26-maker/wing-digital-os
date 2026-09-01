@@ -20,6 +20,20 @@ export async function POST(req: NextRequest) {
   const b = await req.json().catch(() => null);
   if (!b?.agent || typeof b.agent !== "string")
     return NextResponse.json({ error: "agent required" }, { status: 400 });
+  // Optional run metadata folded into meta: files_changed count + short file
+  // list. Only stored when reported, so the UI can stay honest (nothing ≠ 0).
+  let meta = b.meta && typeof b.meta === "object" ? { ...b.meta } : null;
+  const fc = Number(b.files_changed);
+  if (b.files_changed != null && Number.isFinite(fc) && fc >= 0) {
+    meta = { ...(meta ?? {}), files_changed: Math.min(Math.floor(fc), 100000), files_changed_at: new Date().toISOString() };
+  }
+  if (Array.isArray(b.files)) {
+    const files = b.files
+      .filter((f: unknown) => typeof f === "string" && (f as string).trim())
+      .slice(0, 25)
+      .map((f: string) => f.slice(0, 300));
+    if (files.length) meta = { ...(meta ?? {}), files };
+  }
   const r = await fetch(`${url}/rest/v1/agent_heartbeats?on_conflict=agent`, {
     method: "POST",
     headers: {
@@ -32,7 +46,7 @@ export async function POST(req: NextRequest) {
       agent: b.agent,
       status: b.status === "error" || b.status === "disabled" ? b.status : "ok",
       message: typeof b.message === "string" ? b.message.slice(0, 500) : null,
-      meta: b.meta ?? null,
+      meta,
       last_beat: new Date().toISOString(),
     }),
   });

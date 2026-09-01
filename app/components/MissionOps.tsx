@@ -16,7 +16,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   MissionData, Selection, Dot, MissionStyles, OpsMap, FeedTicker,
-  MissionPanels, NextUpStrip, WatchdogBanner, AgentCard,
+  MissionPanels, NextUpStrip, WatchdogBanner, AgentCard, FilesChangedChip,
   isInternalAgent, fmtCountdown, fmtAge, shortDate, tightLine,
 } from "./MissionControlCore";
 
@@ -136,8 +136,12 @@ function AgentRow({ a, onSelect }: { a: AgentCard; onSelect: (s: Selection) => v
         <div className="agents-cell-label" style={{ fontSize: 9, letterSpacing: "0.14em", color: "var(--text-muted)", textTransform: "uppercase", marginBottom: 3 }}>
           Last result
         </div>
-        <div style={{ fontSize: 12, color: "var(--text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {a.lastLogLine ? tightLine(a.lastLogLine, 70) : <span style={{ color: "var(--text-muted)" }}>none logged</span>}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+          <span style={{ fontSize: 12, color: "var(--text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>
+            {a.lastLogLine ? tightLine(a.lastLogLine, 70) : <span style={{ color: "var(--text-muted)" }}>none logged</span>}
+          </span>
+          {/* Only when the run reported a count — unreported runs show nothing. */}
+          <FilesChangedChip facts={a.filesFacts} />
         </div>
       </div>
     </div>

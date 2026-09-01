@@ -32,7 +32,11 @@ export interface AgentCard {
   lastLogDate: string | null;
   lastLogLine: string | null;
   watchdogState?: string | null; // OK | LATE | SILENT | DISABLED per watchdog.md
+  // Files updated by the last reported run (from the heartbeat meta). null /
+  // absent = the run did not report a count, and the UI shows nothing (never 0).
+  filesFacts?: FilesFacts | null;
 }
+export interface FilesFacts { filesChanged: number; filesChangedAt: string | null; files: string[] }
 export interface WatchdogProblem { text: string; url: string | null }
 export interface WatchdogData {
   available: boolean;
@@ -113,6 +117,8 @@ export interface AgentFeedEntry {
   url: string | null;
   level: string;
   created_at: string;
+  filesChanged?: number | null; // only when the run reported it — never a fake 0
+  files?: string[];
 }
 export interface AgentWire { id: string; label: string; direction: "reads" | "writes" | "both" }
 export interface AgentDetail {
@@ -131,6 +137,7 @@ export interface AgentDetail {
   lastRunAt: string | null;
   nextRunAt: string | null;
   summary?: { what: string; last: string; next: string };
+  filesFacts?: FilesFacts | null;
   systems: AgentWire[];
   activity: FeedEntry[];
   olderActivity?: number;
@@ -155,8 +162,11 @@ export interface ArtifactDetail {
 // Systems split into precise pieces so the moving parts are visible.
 export const SYSTEMS = [
   { id: "vault", label: "VAULT", color: "var(--accent-2)", blurb: "The Obsidian brain: log.md, hot.md, state snapshots, client pages. Most agents write their results here." },
-  { id: "ghl-clients", label: "GHL", color: "var(--orange)", blurb: "Client subaccounts in GoHighLevel (Jackson Roofing today, more as clients sign): contacts, pipelines, conversations, calendars." },
-  { id: "ghl-wing", label: "GHL WING", color: "var(--orange)", blurb: "Wing Digital's own GoHighLevel account: the outreach CRM, reply inbox, and prospect pipeline." },
+  // ids keep their historical "ghl-*" values so wiring/keys stay stable, but
+  // the labels reflect the current stack: GoHighLevel was retired 2026-08-22
+  // and the CRM now lives in the OS itself (Supabase-backed).
+  { id: "ghl-clients", label: "CLIENT CRM", color: "var(--orange)", blurb: "Client records in the OS CRM (Supabase): contacts, pipelines, conversations. Replaced the retired GoHighLevel client subaccounts." },
+  { id: "ghl-wing", label: "OS CRM", color: "var(--orange)", blurb: "Wing Digital's own outreach CRM in the OS (Supabase + prospects.db): prospect pipeline, reply inbox, cloud send lanes. Replaced the retired GoHighLevel account." },
   { id: "email", label: "EMAIL", color: "var(--accent)", blurb: "The cold-email path: the autonomous outreach sender and the inbox it feeds." },
   { id: "clients", label: "CLIENTS", color: "var(--green)", blurb: "Live client deliverables: Jackson Roofing, Renewal Health, and the health board that watches them." },
   { id: "scheduler", label: "SCHEDULER", color: "var(--accent)", blurb: "The scheduled-tasks runner on Jack's PC that fires the daily and weekly agents." },
@@ -1334,7 +1344,7 @@ export function FreshnessMark({ source, updated, stale }: { source: MetricSource
   const mono = "'JetBrains Mono', monospace";
   if (source === "live-db" || source === "live-ghl") {
     return (
-      <span title={source === "live-db" ? "Live from prospects.db, just now" : "Live from the GHL API, just now"}
+      <span title={source === "live-db" ? "Live from prospects.db, just now" : "Live from the CRM, just now"}
         style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 9, color: "var(--green)", fontFamily: mono }}>
         <Dot color="var(--green)" pulse /> live
       </span>
@@ -1423,6 +1433,49 @@ export function NextUpStrip({ agents, onSelect }: { agents: AgentCard[]; onSelec
   );
 }
 
+// ── Safe linkification ─────────────────────────────────────────────────────
+// Agent-reported text often carries live URLs. Render http(s) URLs as real
+// links (new tab, rel noopener) and everything else as plain text — never
+// innerHTML, so nothing an agent reports can inject markup.
+const URL_RE = /(https?:\/\/[^\s<>"'`)\]]+)/g;
+export function linkify(text: string): React.ReactNode {
+  if (!text || !/https?:\/\//.test(text)) return text;
+  const parts = text.split(URL_RE);
+  return parts.map((part, i) => {
+    if (/^https?:\/\//.test(part)) {
+      const url = part.replace(/[.,;:!?]+$/, "");
+      const trail = part.slice(url.length);
+      return (
+        <span key={i}>
+          <a href={url} target="_blank" rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            style={{ color: "var(--accent)", textDecoration: "none", borderBottom: "1px dotted var(--accent)", wordBreak: "break-all" }}>
+            {url}
+          </a>
+          {trail}
+        </span>
+      );
+    }
+    return <span key={i}>{part}</span>;
+  });
+}
+
+// "12 files updated" chip. Renders ONLY when a run actually reported a count —
+// an unreported run shows nothing here, never a fake 0.
+export function FilesChangedChip({ facts }: { facts?: FilesFacts | null }) {
+  if (!facts || typeof facts.filesChanged !== "number") return null;
+  return (
+    <span title={facts.filesChangedAt ? `reported ${new Date(facts.filesChangedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : "reported by the agent's last run"}
+      style={{
+        display: "inline-flex", alignItems: "center", gap: 5, fontSize: 10,
+        fontFamily: "'JetBrains Mono', monospace", color: "var(--accent-2)",
+        border: "1px solid var(--border)", borderRadius: 99, padding: "1px 8px", whiteSpace: "nowrap",
+      }}>
+      {facts.filesChanged} file{facts.filesChanged === 1 ? "" : "s"} updated
+    </span>
+  );
+}
+
 // ── Feed list (click a line to expand the full entry) ──────────────────────
 export function FeedList({ feed, limit }: { feed: FeedEntry[]; limit?: number }) {
   const [open, setOpen] = useState<number | null>(null);
@@ -1440,9 +1493,9 @@ export function FeedList({ feed, limit }: { feed: FeedEntry[]; limit?: number })
               <span style={{ color: TYPE_COLOR[e.type] ?? "var(--text-secondary)", textTransform: "uppercase", fontSize: 10, letterSpacing: "0.08em" }}>{e.type}</span>
               <span style={{ marginLeft: "auto", color: "var(--text-muted)", fontSize: 10 }}>{expanded ? "collapse" : "expand"}</span>
             </div>
-            <div style={{ fontSize: 12, color: "var(--text-primary)", margin: "2px 0" }}>{expanded ? e.title : tightLine(e.title)}</div>
+            <div style={{ fontSize: 12, color: "var(--text-primary)", margin: "2px 0" }}>{expanded ? linkify(e.title) : tightLine(e.title)}</div>
             {(expanded ? e.lines : []).map((l, j) => (
-              <div key={j} style={{ fontSize: 11, color: "var(--text-muted)", lineHeight: 1.5 }}>{l}</div>
+              <div key={j} style={{ fontSize: 11, color: "var(--text-muted)", lineHeight: 1.5 }}>{linkify(l)}</div>
             ))}
           </div>
         );
@@ -1531,17 +1584,31 @@ export function AgentFeed({ entries }: { entries: AgentFeedEntry[] }) {
                 {e.agent.toUpperCase()}
               </span>
               {push && <span style={{ fontSize: 9, letterSpacing: "0.1em", color: "var(--accent, #22d3ee)" }}>PUSHED</span>}
+              {typeof e.filesChanged === "number" && (
+                <span style={{ fontSize: 10, color: "var(--accent-2)" }}>
+                  {e.filesChanged} file{e.filesChanged === 1 ? "" : "s"} updated
+                </span>
+              )}
               <span style={{ marginLeft: "auto", fontSize: 10, color: "var(--text-muted)" }}>{isoAge(e.created_at)}</span>
             </div>
             <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 3, fontWeight: push ? 600 : 400 }}>
               {e.url ? (
-                <a href={e.url} style={{ color: "inherit", textDecoration: "none", borderBottom: "1px dotted var(--border)" }}>{e.title}</a>
+                // Structured url field: external links open a new tab safely;
+                // OS-internal paths (/mission etc.) stay same-tab.
+                <a href={e.url}
+                  {...(/^https?:\/\//.test(e.url) ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+                  style={{ color: "inherit", textDecoration: "none", borderBottom: "1px dotted var(--border)" }}>{e.title}</a>
               ) : (
-                e.title
+                linkify(e.title)
               )}
             </div>
             {e.body && (
-              <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2, lineHeight: 1.45 }}>{e.body}</div>
+              <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2, lineHeight: 1.45 }}>{linkify(e.body)}</div>
+            )}
+            {(e.files?.length ?? 0) > 0 && (
+              <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2, fontFamily: "'JetBrains Mono', monospace", lineHeight: 1.5 }}>
+                {e.files!.map((f, i) => <div key={i}>{linkify(f)}</div>)}
+              </div>
             )}
           </div>
         );
@@ -1776,6 +1843,7 @@ function AgentPanel({ agentKey, onClose, onSelect }: {
             {detail.watchdogState === "LATE" && <Pill text="LATE (DA BOSS)" color="var(--orange)" />}
             {detail.watchdogState === "DISABLED" && <Pill text="DISABLED (DA BOSS)" color="#6b7280" />}
             {detail.installed === false && <Pill text="NOT INSTALLED" color="var(--orange)" />}
+            <FilesChangedChip facts={detail.filesFacts} />
           </div>
 
           {/* lead: what this is / what it did last / what happens next */}
@@ -1784,6 +1852,20 @@ function AgentPanel({ agentKey, onClose, onSelect }: {
             detail.summary?.last ?? "",
             detail.summary?.next ?? "",
           ]} />
+
+          {detail.filesFacts && (
+            <Section title={`Files changed (${detail.filesFacts.filesChanged})`} defaultOpen>
+              <div style={{ fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.5, marginBottom: detail.filesFacts.files.length ? 6 : 0 }}>
+                Last reported run updated {detail.filesFacts.filesChanged} file{detail.filesFacts.filesChanged === 1 ? "" : "s"}
+                {detail.filesFacts.filesChangedAt ? ` (reported ${new Date(detail.filesFacts.filesChangedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })})` : ""}.
+              </div>
+              {detail.filesFacts.files.map((f, i) => (
+                <div key={i} style={{ fontSize: 11, fontFamily: "'JetBrains Mono', monospace", color: "var(--text-muted)", lineHeight: 1.6, wordBreak: "break-all" }}>
+                  {linkify(f)}
+                </div>
+              ))}
+            </Section>
+          )}
 
           <Section title={`Activity (${activity.length})`} defaultOpen>
             {activity.length === 0 && <div style={{ fontSize: 12, color: "var(--text-muted)" }}>No log entries mention this agent yet.</div>}

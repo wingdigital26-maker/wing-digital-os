@@ -30,6 +30,26 @@ export async function POST(req: NextRequest) {
   const link = typeof b.url === "string" ? b.url.slice(0, 300) : null;
   const level = b.level === "push" ? "push" : "feed";
 
+  // Optional run metadata: how many files this run updated, and (optionally) a
+  // short list of the file paths or URLs. Only stored when actually reported —
+  // a run that sent no count gets meta null, and the UI shows nothing (never 0).
+  let meta: { files_changed?: number; files?: string[] } | null = null;
+  const fc = Number(b.files_changed);
+  if (b.files_changed != null && Number.isFinite(fc) && fc >= 0) {
+    meta = { files_changed: Math.min(Math.floor(fc), 100000) };
+  }
+  if (Array.isArray(b.files)) {
+    const files = b.files
+      .filter((f: unknown) => typeof f === "string" && (f as string).trim())
+      .slice(0, 25)
+      .map((f: string) => f.slice(0, 300));
+    if (files.length) {
+      meta = meta ?? {};
+      meta.files = files;
+      if (meta.files_changed == null) meta.files_changed = files.length;
+    }
+  }
+
   const r = await fetch(`${url}/rest/v1/os_feed`, {
     method: "POST",
     headers: {
@@ -37,7 +57,7 @@ export async function POST(req: NextRequest) {
       Authorization: `Bearer ${key}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ agent: b.agent.slice(0, 80), title, body, url: link, level }),
+    body: JSON.stringify({ agent: b.agent.slice(0, 80), title, body, url: link, level, meta }),
   });
   if (!r.ok) return NextResponse.json({ error: "feed write failed" }, { status: 500 });
 

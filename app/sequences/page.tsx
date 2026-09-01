@@ -22,7 +22,7 @@ export default function SequencesPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ kind: "ok" | "warn"; text: string } | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -41,18 +41,34 @@ export default function SequencesPage() {
   }, [load]);
 
   const setStatus = async (id: string, status: string) => {
+    if (status === "active") {
+      const ok = window.confirm(
+        "Activate this sequence?\n\n" +
+          "What this does: the separate sending machine will start picking up this sequence's due emails on its next run.\n\n" +
+          "What this does NOT do: nothing is sent from this dashboard, ever, and nobody new is added. You can pause any time."
+      );
+      if (!ok) return;
+    }
     setBusy(id);
+    setNotice(null);
     try {
       const r = await fetch("/api/sequences", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, status }),
       });
-      const d = await r.json();
+      const d = await r.json().catch(() => null);
       if (!r.ok) throw new Error(d?.message || `HTTP ${r.status}`);
       await load();
+      setNotice({
+        kind: "ok",
+        text:
+          status === "active"
+            ? "Activated. The sender will pick up this sequence's due emails on its next run."
+            : "Paused. The sender can no longer see this sequence's emails.",
+      });
     } catch (e) {
-      setNotice(e instanceof Error ? e.message : String(e));
+      setNotice({ kind: "warn", text: e instanceof Error ? e.message : String(e) });
     } finally {
       setBusy(null);
     }
@@ -68,25 +84,37 @@ export default function SequencesPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
       });
-      const d = await r.json();
+      const d = await r.json().catch(() => null);
       if (!r.ok) throw new Error(d?.message || `HTTP ${r.status}`);
       window.location.href = `/sequences/${d.sequence.id}`;
     } catch (e) {
-      setNotice(e instanceof Error ? e.message : String(e));
+      setNotice({ kind: "warn", text: e instanceof Error ? e.message : String(e) });
       setBusy(null);
     }
   };
 
   const seed = async () => {
     setBusy("seed");
+    setNotice(null);
     try {
       const r = await fetch("/api/sequences/seed", { method: "POST" });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d?.message || `HTTP ${r.status}`);
-      setNotice(d.seeded ? "Imported the current cold email cadence as a draft." : d.reason);
+      // Never let an unexpected body (HTML error page, empty response) turn
+      // the click into silence: parse defensively and always say SOMETHING.
+      const d = await r.json().catch(() => null);
+      if (!r.ok) throw new Error(d?.message || d?.error || `The server said no (HTTP ${r.status}).`);
+      if (d?.seeded) {
+        setNotice({ kind: "ok", text: "Imported the current cold email cadence as a draft sequence." });
+      } else {
+        setNotice({
+          kind: "warn",
+          text:
+            d?.reason ||
+            "Nothing was imported, and the server did not say why. Try reloading the page.",
+        });
+      }
       await load();
     } catch (e) {
-      setNotice(e instanceof Error ? e.message : String(e));
+      setNotice({ kind: "warn", text: e instanceof Error ? e.message : String(e) });
     } finally {
       setBusy(null);
     }
@@ -114,13 +142,30 @@ export default function SequencesPage() {
         <button onClick={create} disabled={busy === "create" || !newName.trim()} style={btnPrimary}>
           Create sequence
         </button>
-        <button onClick={seed} disabled={busy === "seed"} style={btn}>
-          Seed from current cadence
+        <button
+          onClick={seed}
+          disabled={busy === "seed"}
+          title="One-click import of the D1/D3/D7 cold email cadence as a new draft sequence"
+          style={btn}
+        >
+          {busy === "seed" ? "Importing..." : "Import current cadence"}
         </button>
       </div>
 
       {notice && (
-        <div style={{ ...card, borderColor: "var(--orange)", marginBottom: 14, fontSize: 13 }}>{notice}</div>
+        <div
+          role="status"
+          style={{
+            ...card,
+            borderColor: notice.kind === "ok" ? "var(--green)" : "var(--orange)",
+            color: notice.kind === "ok" ? "var(--green)" : "var(--orange)",
+            fontWeight: 600,
+            marginBottom: 14,
+            fontSize: 13,
+          }}
+        >
+          {notice.text}
+        </div>
       )}
       {error && (
         <div style={{ ...card, borderColor: "var(--red)", marginBottom: 14, fontSize: 13 }}>
@@ -132,7 +177,7 @@ export default function SequencesPage() {
 
       {items?.length === 0 && (
         <div style={{ ...card, textAlign: "center", padding: 40, color: "var(--text-secondary)", fontSize: 14 }}>
-          No sequences yet. Create one or click Seed to import your current cold email cadence.
+          No sequences yet. Create one, or click Import current cadence to bring in the cold email cadence you already run.
         </div>
       )}
 
@@ -147,8 +192,8 @@ export default function SequencesPage() {
                   : `${s.stepCount} email${s.stepCount === 1 ? "" : "s"}`}
                 {" · "}
                 {s.enrolledTotal === 0
-                  ? "nobody enrolled"
-                  : `${s.enrolledActive} of ${s.enrolledTotal} enrolled and active`}
+                  ? "nobody in it yet"
+                  : `${s.enrolledActive} of ${s.enrolledTotal} ${s.enrolledTotal === 1 ? "person" : "people"} in it still getting emails`}
               </div>
             </a>
             <StatusPill status={s.status} />

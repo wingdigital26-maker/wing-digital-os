@@ -104,14 +104,23 @@ export default function SequenceEditorPage() {
     call(() => fetch(`/api/sequences/steps?id=${encodeURIComponent(stepId)}`, { method: "DELETE" }));
   };
 
-  const setStatus = (status: string) =>
-    call(() =>
+  const setStatus = (status: string) => {
+    if (status === "active") {
+      const ok = window.confirm(
+        "Activate this sequence?\n\n" +
+          "What this does: the separate sending machine will start picking up this sequence's due emails on its next run.\n\n" +
+          "What this does NOT do: nothing is sent from this dashboard, ever, and nobody new is added. You can pause any time."
+      );
+      if (!ok) return;
+    }
+    return call(() =>
       fetch("/api/sequences", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, status }),
       })
     );
+  };
 
   const rename = () => {
     const name = window.prompt("Rename this sequence:", seq?.name ?? "");
@@ -126,7 +135,7 @@ export default function SequenceEditorPage() {
   };
 
   const removeSequence = async () => {
-    if (!window.confirm("Delete this whole sequence and everyone enrolled on it? This cannot be undone.")) return;
+    if (!window.confirm("Delete this whole sequence and everyone on it? This cannot be undone.")) return;
     const ok = await call(() => fetch(`/api/sequences?id=${encodeURIComponent(id)}`, { method: "DELETE" }));
     if (ok) window.location.href = "/sequences";
   };
@@ -176,10 +185,10 @@ export default function SequenceEditorPage() {
       </div>
       <div style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 18 }}>
         {enrollments.length === 0 ? (
-          <>Nobody is enrolled yet. <a href="/sequences/people" style={{ color: "inherit" }}>Add people on the People tab.</a></>
+          <>Nobody is in this sequence yet. <a href="/sequences/people" style={{ color: "inherit" }}>Add people on the People tab.</a></>
         ) : (
           <a href={`/sequences/people?sequence_id=${seq.id}`} style={{ color: "inherit" }}>
-            {activeEnrolled} of {enrollments.length} enrolled people active. View them on the People tab.
+            {activeEnrolled} of {enrollments.length} people in this sequence still getting emails. View them on the People tab.
           </a>
         )}
       </div>
@@ -275,10 +284,9 @@ export default function SequenceEditorPage() {
       </div>
 
       <div style={{ ...card, marginTop: 20, fontSize: 12.5, color: "var(--text-secondary)" }}>
-        <strong>Personalization tags:</strong> type these anywhere in a subject or body and they fill in per
-        person when the email goes out: <code>{"{{first_name}}"}</code> (their first name, falls back to
-        &quot;there&quot;), <code>{"{{company}}"}</code> (their company), <code>{"{{city}}"}</code> (their city).
-        If a person is missing the data for a tag, that email is held instead of going out half-filled.
+        <strong>Personalization:</strong> write <code>{"{{first_name}}"}</code>, <code>{"{{company}}"}</code> or{" "}
+        <code>{"{{city}}"}</code> anywhere, e.g. &quot;Hi {"{{first_name}}"}, quick idea for {"{{company}}"}&quot;.
+        An email missing a tag&apos;s data is held, never sent half-filled.
       </div>
     </div>
   );

@@ -238,7 +238,7 @@ export default function Callbacks() {
 
       {flash && (
         <div style={{ ...banner, background: "rgba(34,197,94,0.12)", borderColor: "rgba(34,197,94,0.4)", color: "#4ade80" }}>
-          Logged — {flash}
+          Logged: {flash}
         </div>
       )}
       {error && (
@@ -474,9 +474,9 @@ export default function Callbacks() {
                   disabled={busy}
                   onClick={() => disposition(o.key)}
                   style={{
-                    padding: "11px 12px", borderRadius: 10, cursor: busy ? "wait" : "pointer",
+                    padding: "14px 12px", minHeight: 48, borderRadius: 10, cursor: busy ? "wait" : "pointer",
                     border: `1px solid ${o.tone}55`, background: `${o.tone}18`,
-                    color: o.tone, fontSize: 13, fontWeight: 700, opacity: busy ? 0.6 : 1,
+                    color: o.tone, fontSize: 14, fontWeight: 700, opacity: busy ? 0.6 : 1,
                   }}
                 >
                   {o.label}
@@ -503,7 +503,9 @@ const pill: React.CSSProperties = {
   textTransform: "uppercase", letterSpacing: 0.4,
 };
 const btnPrimary: React.CSSProperties = {
-  padding: "9px 16px", borderRadius: 10, border: "none",
+  padding: "12px 18px", minHeight: 44,
+  display: "inline-flex", alignItems: "center", justifyContent: "center",
+  borderRadius: 10, border: "none",
   background: "linear-gradient(135deg,#22d3ee,#0e7490)", color: "#fff",
   fontSize: 13, fontWeight: 700, cursor: "pointer",
 };

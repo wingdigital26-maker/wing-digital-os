@@ -138,8 +138,7 @@ export default function Team() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--bg-primary)", color: "var(--text-primary)" }}>
-      <div style={{ maxWidth: 900, margin: "0 auto", padding: "28px 20px 80px" }}>
+    <div style={{ maxWidth: 900, margin: "0 auto" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <div>
             <h1 style={{ fontSize: 24, fontWeight: 800, letterSpacing: -0.4 }}>Call room access</h1>
@@ -156,6 +155,10 @@ export default function Team() {
         {/* create */}
         <div style={{ ...card, marginTop: 20 }}>
           <p style={{ fontSize: 14, fontWeight: 700 }}>Add a caller</p>
+          <p style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 4, lineHeight: 1.5 }}>
+            A caller login opens the Call Room only: the dial list, callbacks, booked calls, and
+            the team schedule. It cannot see clients, money, or anything else in the OS.
+          </p>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))", gap: 10, marginTop: 12 }}>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Their name" style={input} />
             <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="their@email.com" type="email" style={input} />
@@ -202,10 +205,19 @@ export default function Team() {
                     }}>{c.role}</span>
                   </p>
                   <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 3 }}>
-                    {c.calls} {c.calls === 1 ? "call" : "calls"} logged · {c.booked} booked ·{" "}
-                    <span style={{ color: "#38bdf8" }}>{openId === c.id ? "hide their calls" : "see their calls"}</span>
+                    {c.calls} {c.calls === 1 ? "call" : "calls"} logged · {c.booked} booked
                   </p>
                 </div>
+                <span
+                  style={{
+                    ...btnGhost,
+                    color: "#38bdf8",
+                    borderColor: "rgba(56,189,248,0.4)",
+                    flexShrink: 0,
+                  }}
+                >
+                  {openId === c.id ? "Hide their calls ▲" : "See their calls ▼"}
+                </span>
                 {c.role === "caller" && (
                   <button onClick={(e) => { e.stopPropagation(); setRole(c.id, "client"); }} disabled={busy} style={{ ...btnGhost, color: "#f87171", borderColor: "rgba(248,113,113,0.4)" }}>
                     Revoke access
@@ -275,7 +287,6 @@ export default function Team() {
             </div>
           ))}
         </div>
-      </div>
     </div>
   );
 }

@@ -82,8 +82,17 @@ type BlockDraft = {
   weekly: boolean;
 };
 
+// New blocks default to the next round hour so the form is usually ready to
+// save with just a title.
+function nextRoundHour(): { start: string; end: string } {
+  const h = Math.min(new Date().getHours() + 1, 22);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return { start: `${p(h)}:00`, end: `${p(Math.min(h + 1, 23))}:00` };
+}
+
 function emptyDraft(date: string): BlockDraft {
-  return { id: "", title: "", date, start_time: "09:00", end_time: "10:00", category: "work", notes: "", weekly: false };
+  const t = nextRoundHour();
+  return { id: "", title: "", date, start_time: t.start, end_time: t.end, category: "work", notes: "", weekly: false };
 }
 
 function draftFrom(b: BlockRow): BlockDraft {
@@ -313,30 +322,37 @@ export default function CalendarSection({
           {/* Which feeds are live, and exactly what is missing when one is not. */}
           <section style={{ ...card, display: "grid", gap: 8 }}>
             <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center" }}>
-              {lanes.map((l) => (
+              {lanes.filter((l) => l.configured).map((l) => (
                 <span key={l.source} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
                   <span
                     style={{
                       width: 9, height: 9, borderRadius: 99,
-                      background: l.configured ? laneColor(l.source) : "transparent",
-                      border: `1px solid ${l.configured ? laneColor(l.source) : "var(--text-muted)"}`,
+                      background: laneColor(l.source),
+                      border: `1px solid ${laneColor(l.source)}`,
                     }}
                   />
-                  <span style={{ color: l.configured ? "var(--text-secondary)" : "var(--text-muted)" }}>
-                    {l.label}
-                  </span>
-                  <span style={{ ...num, color: "var(--text-muted)" }}>
-                    {l.configured ? l.count : "not connected"}
-                  </span>
+                  <span style={{ color: "var(--text-secondary)" }}>{l.label}</span>
+                  <span style={{ ...num, color: "var(--text-muted)" }}>{l.count}</span>
                 </span>
               ))}
               {!data && !err ? <span style={{ fontSize: 12, color: "var(--text-muted)" }}>Loading…</span> : null}
             </div>
-            {missingCreds.map((l) => (
-              <p key={l.source} style={{ margin: 0, fontSize: 12, color: "var(--text-muted)" }}>
-                {l.label} is not connected. Missing: <code style={{ color: "var(--orange)" }}>{l.missing}</code>
+            {/* Everything not connected collapses to one quiet line. The exact
+                missing credential still shows, just without a row per lane. */}
+            {unconfigured.length ? (
+              <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)" }}>
+                Not connected:{" "}
+                {unconfigured.map((l, i) => (
+                  <span key={l.source}>
+                    {i > 0 ? ", " : ""}
+                    {l.label}
+                    {l.missing ? (
+                      <> (needs <code style={{ color: "var(--orange)" }}>{l.missing}</code>)</>
+                    ) : null}
+                  </span>
+                ))}
               </p>
-            ))}
+            ) : null}
             {lanes.filter((l) => l.note).map((l) => (
               <p key={`n-${l.source}`} style={{ margin: 0, fontSize: 12, color: "var(--text-muted)" }}>
                 {l.note}
@@ -632,14 +648,32 @@ function BlockForm({
           End
           <input type="time" value={draft.end_time} onChange={(e) => set({ end_time: e.target.value })} style={input} />
         </label>
-        <label style={label}>
-          Category
-          <select value={draft.category} onChange={(e) => set({ category: e.target.value })} style={input}>
-            {BLOCK_CATEGORIES.map((c) => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
-        </label>
+      </div>
+      {/* One-tap category chips instead of a dropdown. */}
+      <div style={{ display: "grid", gap: 4 }}>
+        <span style={{ ...label, flex: "none" }}>Category</span>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {BLOCK_CATEGORIES.map((c) => {
+            const active = draft.category === c;
+            return (
+              <button
+                key={c}
+                type="button"
+                onClick={() => set({ category: c })}
+                aria-pressed={active}
+                style={{
+                  ...btn,
+                  padding: "6px 12px",
+                  borderColor: active ? "var(--accent)" : "var(--border)",
+                  color: active ? "var(--accent)" : "var(--text-secondary)",
+                  background: active ? "var(--accent-glow)" : "var(--bg-card)",
+                }}
+              >
+                {c}
+              </button>
+            );
+          })}
+        </div>
       </div>
       <label style={{ ...label, width: "100%" }}>
         Notes (optional)

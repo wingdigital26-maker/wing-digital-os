@@ -150,58 +150,7 @@ export default function TodayDashboard() {
         </p>
       </div>
 
-      {/* today's numbers */}
-      <section>
-        <h2 style={h2}>Today&rsquo;s numbers</h2>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 10 }}>
-          <div style={card}>
-            <p style={statNum}>{d.today.calls}</p>
-            <p style={statLabel}>calls logged today</p>
-          </div>
-          <div style={card}>
-            <p style={{ ...statNum, color: d.today.booked > 0 ? "#4ade80" : "var(--text-primary)" }}>
-              {d.today.booked}
-            </p>
-            <p style={statLabel}>booked today</p>
-          </div>
-        </div>
-        {d.today.calls === 0 ? (
-          <p style={{ ...muted, marginTop: 10 }}>
-            Nobody has logged a call today. The first dial of the day is on the list below.
-          </p>
-        ) : d.today.people.length > 1 ? (
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
-            {d.today.people.map((p) => (
-              <span key={p.email} style={{ ...pillSoft }}>
-                {p.email} — {p.calls} {p.calls === 1 ? "call" : "calls"}
-                {p.booked > 0 ? `, ${p.booked} booked` : ""}
-              </span>
-            ))}
-          </div>
-        ) : null}
-      </section>
-
-      {/* funnel */}
-      <section>
-        <h2 style={h2}>Where the pipeline stands</h2>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 10 }}>
-          {STAGES.map((s) => {
-            const n = d.funnel[s.key] ?? 0;
-            return (
-              <div key={s.key} style={{ ...card, borderColor: n > 0 ? `${s.tone}55` : "var(--border)" }}>
-                <p style={{ ...statNum, fontSize: 24, color: n > 0 ? s.tone : "var(--text-muted)" }}>{n}</p>
-                <p style={statLabel}>{s.label}</p>
-              </div>
-            );
-          })}
-        </div>
-        <p style={{ ...muted, marginTop: 8 }}>
-          Counted across the {totalDial} leads that passed the quality audit. Excluded leads are
-          never counted here.
-        </p>
-      </section>
-
-      {/* callbacks due */}
+      {/* callbacks due — the most urgent "call this now" */}
       <section>
         <div style={sectionHead}>
           <h2 style={{ ...h2, marginBottom: 0 }}>Owed a call back right now</h2>
@@ -258,13 +207,13 @@ export default function TodayDashboard() {
       {/* do these next */}
       <section>
         <div style={sectionHead}>
-          <h2 style={{ ...h2, marginBottom: 0 }}>Do these next</h2>
+          <h2 style={{ ...h2, marginBottom: 0 }}>Call these next</h2>
           <a href="/calls/list" style={btnGhost}>Open the dial list</a>
         </div>
         {d.next.length === 0 ? (
           <div style={{ ...card, color: "var(--text-muted)", fontSize: 13 }}>
             Every dialable lead has been called at least once. Nothing is waiting for a first
-            attempt — work the callbacks, or load more leads.
+            attempt. Work the callbacks, or load more leads.
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -309,12 +258,63 @@ export default function TodayDashboard() {
         )}
       </section>
 
+      {/* today's numbers */}
+      <section>
+        <h2 style={h2}>Today&rsquo;s numbers</h2>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 10 }}>
+          <div style={card}>
+            <p style={statNum}>{d.today.calls}</p>
+            <p style={statLabel}>calls logged today</p>
+          </div>
+          <div style={card}>
+            <p style={{ ...statNum, color: d.today.booked > 0 ? "#4ade80" : "var(--text-primary)" }}>
+              {d.today.booked}
+            </p>
+            <p style={statLabel}>booked today</p>
+          </div>
+        </div>
+        {d.today.calls === 0 ? (
+          <p style={{ ...muted, marginTop: 10 }}>
+            Nobody has logged a call today. The first dial of the day is on the list below.
+          </p>
+        ) : d.today.people.length > 1 ? (
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+            {d.today.people.map((p) => (
+              <span key={p.email} style={{ ...pillSoft }}>
+                {p.email}: {p.calls} {p.calls === 1 ? "call" : "calls"}
+                {p.booked > 0 ? `, ${p.booked} booked` : ""}
+              </span>
+            ))}
+          </div>
+        ) : null}
+      </section>
+
+      {/* funnel */}
+      <section>
+        <h2 style={h2}>Where the pipeline stands</h2>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 10 }}>
+          {STAGES.map((s) => {
+            const n = d.funnel[s.key] ?? 0;
+            return (
+              <div key={s.key} style={{ ...card, borderColor: n > 0 ? `${s.tone}55` : "var(--border)" }}>
+                <p style={{ ...statNum, fontSize: 24, color: n > 0 ? s.tone : "var(--text-muted)" }}>{n}</p>
+                <p style={statLabel}>{s.label}</p>
+              </div>
+            );
+          })}
+        </div>
+        <p style={{ ...muted, marginTop: 8 }}>
+          Counted across the {totalDial} leads that passed the quality audit. Excluded leads are
+          never counted here.
+        </p>
+      </section>
+
       {/* recent activity */}
       <section>
         <h2 style={h2}>What the team just did</h2>
         {d.activity.length === 0 ? (
           <div style={{ ...card, color: "var(--text-muted)", fontSize: 13 }}>
-            No calls have been logged yet — this fills in the moment someone dispositions a lead.
+            No calls have been logged yet. This fills in the moment someone logs an outcome.
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -403,7 +403,11 @@ const pillSoft: React.CSSProperties = {
   color: "var(--text-primary)",
 };
 const btnPrimary: React.CSSProperties = {
-  padding: "9px 16px",
+  padding: "12px 18px",
+  minHeight: 44,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
   borderRadius: 10,
   border: "none",
   background: "linear-gradient(135deg,#22d3ee,#0e7490)",

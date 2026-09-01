@@ -63,6 +63,18 @@ type Payload = {
   texts: { exists: boolean; note: string };
 };
 
+/** Internal prospect statuses in plain English. The raw word stays available
+ *  on hover, but "enriching" and friends never render bare to a human. */
+function statusPlain(status: string | null): string {
+  switch (status) {
+    case "new": return "waiting for its first email";
+    case "enriching": return "waiting for its first email (research still filling in)";
+    case "qa_failed": return "held back by copy QA";
+    case "bad_email": return "held back, address looks bad";
+    default: return status ? `in an unusual state ("${status}")` : "no status recorded";
+  }
+}
+
 function when(iso: string | null): string {
   if (!iso) return "no date recorded";
   const t = Date.parse(iso);
@@ -229,8 +241,9 @@ export default function MessagingBoard() {
         )}
         {queue.available && queue.items.length === 0 && (
           <div style={{ fontSize: 12.5, color: "var(--text-muted)" }}>
-            The eligible pool is empty: no row matches the sender&rsquo;s gate
-            (wired vertical, status new/enriching, email present) right now.
+            Nobody is waiting to be emailed right now. To qualify, a prospect needs an
+            email address, must not have been contacted yet, and must be in an industry
+            the engine is wired for. No one meets all three at the moment.
           </div>
         )}
         <div style={{ display: "grid", gap: 8 }}>
@@ -254,8 +267,11 @@ export default function MessagingBoard() {
                   <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
                     {it.person ? `${it.person} · ` : ""}{it.email}
                   </span>
-                  <span style={{ fontSize: 11.5, color: "var(--text-muted)" }}>
-                    {it.city || "no city"} · {it.trade} · status {it.status}
+                  <span
+                    title={it.status ? `internal status: ${it.status}` : undefined}
+                    style={{ fontSize: 11.5, color: "var(--text-muted)" }}
+                  >
+                    {it.city || "no city"} · {it.trade} · {statusPlain(it.status)}
                   </span>
                   <span style={{ marginLeft: "auto", fontSize: 11.5, color: "var(--text-muted)" }}>
                     {isOpen ? "close" : "read the messages"}
@@ -334,7 +350,7 @@ export default function MessagingBoard() {
         )}
         {sent.available && sent.items.length === 0 && (
           <div style={{ fontSize: 12.5, color: "var(--text-muted)" }}>
-            No prospect row carries an emailed_at stamp. The engine has not sent from this pool.
+            No prospect is marked as emailed yet. The engine has not sent from this pool.
           </div>
         )}
         <div style={{ display: "grid", gap: 4 }}>

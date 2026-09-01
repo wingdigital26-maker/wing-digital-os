@@ -56,6 +56,15 @@ function needColor(n: number | null): string {
   return "var(--green, #4ade80)";
 }
 
+// The raw need score (0-1) means nothing at a glance, so every card also says
+// it in plain English. The number stays visible underneath for sorting sanity.
+function needLabel(n: number | null): string {
+  if (n == null) return "not scored";
+  if (n >= 0.7) return "Needs help badly";
+  if (n >= 0.5) return "Could use help";
+  return "Doing okay";
+}
+
 export default function SonarBoard() {
   const [data, setData] = useState<Payload | null>(null);
   const [err, setErr] = useState("");
@@ -152,10 +161,10 @@ export default function SonarBoard() {
         {t && ([
           ["Prospects found", t.total, null],
           ["Awaiting review", t.awaiting, null],
-          ["High need (0.7+)", t.highNeed, "var(--red,#fb7185)"],
+          ["Need help most", t.highNeed, "var(--red,#fb7185)"],
           ["Have a phone", t.withPhone, null],
           ["Approved", t.approved, "var(--green,#4ade80)"],
-          ["Not yet audited", t.unaudited, t.unaudited > 200 ? "var(--orange,#fbbf24)" : null],
+          ["Not checked yet", t.unaudited, t.unaudited > 200 ? "var(--orange,#fbbf24)" : null],
         ] as [string, number, string | null][]).map(([label, value, color]) => (
           <div key={label} style={{
             border: "1px solid var(--line,#26313a)", borderRadius: 14, padding: "12px 14px",
@@ -180,10 +189,15 @@ export default function SonarBoard() {
           </select>
         </label>
         <label style={{ fontSize: 12, color: "var(--muted,#94a3b8)" }}>
-          Min need{" "}
+          Show{" "}
           <select value={minNeed} onChange={(e) => setMinNeed(e.target.value)}
             style={{ background: "var(--card,#121a20)", color: "inherit", border: "1px solid var(--line,#26313a)", borderRadius: 8, padding: "5px 8px", fontSize: 12.5 }}>
-            {["0.7", "0.6", "0.5", "0"].map((v) => <option key={v} value={v}>{v}</option>)}
+            {([
+              ["0.7", "Only the neediest"],
+              ["0.6", "Worth a look"],
+              ["0.5", "Could use help"],
+              ["0", "Everyone"],
+            ] as [string, string][]).map(([v, label]) => <option key={v} value={v}>{label}</option>)}
           </select>
         </label>
         <button onClick={load} style={{
@@ -221,14 +235,23 @@ export default function SonarBoard() {
                     </div>
                   </div>
                   <div style={{ textAlign: "right", flex: "none" }}>
-                    <div style={{ fontSize: 17, fontWeight: 700, color: needColor(l.need_score), fontVariantNumeric: "tabular-nums" }}>
-                      {l.need_score?.toFixed(2) ?? "—"}
+                    <div style={{ fontSize: 12.5, fontWeight: 700, color: needColor(l.need_score) }}>
+                      {needLabel(l.need_score)}
                     </div>
-                    <div style={{ fontSize: 10, color: "var(--muted,#94a3b8)" }}>need</div>
+                    <div style={{ fontSize: 10, color: "var(--muted,#94a3b8)", fontVariantNumeric: "tabular-nums" }}>
+                      need score {l.need_score?.toFixed(2) ?? "n/a"}
+                    </div>
                   </div>
                 </div>
 
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", fontSize: 11 }}>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", fontSize: 11, alignItems: "center" }}>
+                  {/* The best use of today: high need + a real phone number. */}
+                  {l.phone && (l.need_score ?? 0) >= 0.7 && (
+                    <span style={{
+                      fontSize: 10, fontWeight: 700, color: "var(--red,#fb7185)",
+                      border: "1px solid rgba(251,113,133,.4)", borderRadius: 20, padding: "1px 8px",
+                    }}>call first</span>
+                  )}
                   {l.phone && <a href={`tel:${l.phone.replace(/\D/g, "")}`} style={{ color: "var(--green,#4ade80)", textDecoration: "none", fontVariantNumeric: "tabular-nums" }}>{l.phone}</a>}
                   {l.seo_rank != null && <span style={{ color: "var(--muted,#94a3b8)" }}>ranks #{l.seo_rank}</span>}
                   {l.gmb_rating != null && <span style={{ color: "var(--muted,#94a3b8)" }}>{l.gmb_rating}★ {l.gmb_reviews ?? "?"} reviews</span>}

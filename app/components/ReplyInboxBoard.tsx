@@ -410,6 +410,34 @@ export default function ReplyInboxBoard() {
     setData((d) => d && { ...d, items: d.items.map((it) => (it.id === r.id ? r : it)) });
   }, []);
 
+  // One-tap "Mark handled" straight from the list, so triaging a pile does not
+  // need opening every reply. Same PATCH the detail pane uses; a failure is
+  // shown on the row, never swallowed.
+  const [quickBusy, setQuickBusy] = useState<number | null>(null);
+  const [quickErr, setQuickErr] = useState<Record<number, string>>({});
+  const quickHandle = useCallback(async (r: Reply) => {
+    if (quickBusy) return;
+    setQuickBusy(r.id);
+    setQuickErr((m) => { const n = { ...m }; delete n[r.id]; return n; });
+    try {
+      const res = await fetch("/api/replies", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: r.id, action: "handled", draft: r.draft ?? "" }),
+      });
+      const j = (await res.json().catch(() => ({}))) as { ok?: boolean; row?: Reply; message?: string };
+      if (!res.ok || !j.ok || !j.row) throw new Error(j.message || `HTTP ${res.status}`);
+      applyChange({ ...r, ...j.row, messages: r.messages, crm_contacts: r.crm_contacts });
+    } catch (e) {
+      setQuickErr((m) => ({
+        ...m,
+        [r.id]: `${e instanceof Error ? e.message : String(e)}. The reply was NOT changed.`,
+      }));
+    } finally {
+      setQuickBusy(null);
+    }
+  }, [quickBusy, applyChange]);
+
   if (loading && !data) {
     return <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Reading the reply inbox…</div>;
   }
@@ -523,13 +551,12 @@ export default function ReplyInboxBoard() {
           </div>
         )}
 
+      {/* Flex, not a fixed two-column grid, so on a phone the list and the
+          detail stack instead of squeezing side by side. */}
       {data.items.length > 0 && (
-        <div style={{
-          display: "grid", gap: 14, alignItems: "start",
-          gridTemplateColumns: "minmax(240px, 330px) minmax(0, 1fr)",
-        }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 14, alignItems: "flex-start" }}>
           {/* Left: grouped list */}
-          <div ref={listRef} style={{ display: "grid", gap: 10, minWidth: 0 }}>
+          <div ref={listRef} style={{ display: "grid", gap: 10, minWidth: 0, flex: "1 1 260px", maxWidth: "100%" }}>
             {GROUPS.map((g) => {
               const rows = visible.filter((r) => r.classification === g.key);
               const total = data.items.filter((r) => r.classification === g.key).length;
@@ -583,7 +610,29 @@ export default function ReplyInboxBoard() {
                           }}>
                             {r.messages?.body || "(no message text recorded)"}
                           </span>
+                          {attn && (
+                            <button
+                              type="button"
+                              disabled={quickBusy === r.id}
+                              title="Marks this reply dealt with in the database. Nothing is sent."
+                              onClick={(e) => { e.stopPropagation(); void quickHandle(r); }}
+                              style={{
+                                fontSize: 10.5, fontWeight: 700, padding: "2px 9px", borderRadius: 999,
+                                border: "1px solid var(--green)", color: "var(--green)",
+                                background: "transparent", whiteSpace: "nowrap",
+                                cursor: quickBusy === r.id ? "default" : "pointer",
+                                opacity: quickBusy === r.id ? 0.6 : 1,
+                              }}
+                            >
+                              {quickBusy === r.id ? "Saving" : "Mark handled"}
+                            </button>
+                          )}
                         </div>
+                        {quickErr[r.id] && (
+                          <div style={{ fontSize: 11, color: "var(--red)", lineHeight: 1.5 }}>
+                            {quickErr[r.id]}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -601,6 +650,7 @@ export default function ReplyInboxBoard() {
           <div style={{
             border: "1px solid var(--border)", borderRadius: 12,
             background: "var(--bg-secondary)", padding: "14px 16px", minWidth: 0,
+            flex: "3 1 340px", maxWidth: "100%",
           }}>
             {selectedReply ? (
               <ReplyDetail key={selectedReply.id} reply={selectedReply} onChanged={applyChange} />

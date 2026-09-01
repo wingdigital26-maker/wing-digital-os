@@ -186,22 +186,16 @@ export default function CallRoom() {
   const shown = useMemo(() => leads, [leads]);
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--bg-primary)", color: "var(--text-primary)" }}>
-      <div style={{ maxWidth: 1180, margin: "0 auto", padding: "28px 20px 80px" }}>
-        {/* header */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-          <div>
-            <h1 style={{ fontSize: 26, fontWeight: 800, letterSpacing: -0.5 }}>Cold Call Room</h1>
-            <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>
-              {me ? `Signed in as ${me.email}` : "Shared leads. Claim one, dial it, log what happened."}
-            </p>
-          </div>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            {me?.isAdmin && (
-              <a href="/calls/team" style={btnGhost}>Manage callers</a>
-            )}
-            <a href="/api/logout" style={btnGhost}>Sign out</a>
-          </div>
+    <>
+      <div>
+        {/* header — sign-out and admin links live in the shared nav above */}
+        <div>
+          <h1 style={{ fontSize: 26, fontWeight: 800, letterSpacing: -0.5 }}>Dial list</h1>
+          <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>
+            {me
+              ? `Signed in as ${me.email}. Tap Call on a lead, dial it, log what happened.`
+              : "Shared leads. Tap Call on one, dial it, log what happened."}
+          </p>
         </div>
 
         {flash && (
@@ -452,9 +446,9 @@ export default function CallRoom() {
                   disabled={busy}
                   onClick={() => disposition(o.key)}
                   style={{
-                    padding: "11px 12px", borderRadius: 10, cursor: busy ? "wait" : "pointer",
+                    padding: "14px 12px", minHeight: 48, borderRadius: 10, cursor: busy ? "wait" : "pointer",
                     border: `1px solid ${o.tone}55`, background: `${o.tone}18`,
-                    color: o.tone, fontSize: 13, fontWeight: 700, opacity: busy ? 0.6 : 1,
+                    color: o.tone, fontSize: 14, fontWeight: 700, opacity: busy ? 0.6 : 1,
                   }}
                 >
                   {o.label}
@@ -468,7 +462,7 @@ export default function CallRoom() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
 
@@ -484,7 +478,9 @@ const pill: React.CSSProperties = {
   textTransform: "uppercase", letterSpacing: 0.4,
 };
 const btnPrimary: React.CSSProperties = {
-  padding: "9px 16px", borderRadius: 10, border: "none",
+  padding: "12px 18px", minHeight: 44,
+  display: "inline-flex", alignItems: "center", justifyContent: "center",
+  borderRadius: 10, border: "none",
   background: "linear-gradient(135deg,#22d3ee,#0e7490)", color: "#fff",
   fontSize: 13, fontWeight: 700, cursor: "pointer",
 };

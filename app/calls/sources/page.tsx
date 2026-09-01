@@ -125,7 +125,7 @@ export default function SourcesPage() {
     <div>
       <h1 style={h1}>Where the leads come from</h1>
       <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 5, lineHeight: 1.55, maxWidth: 720 }}>
-        Every lead in the call room, traced back to the import that put it here — and every
+        Every lead in the call room, traced back to the import that put it here, plus every
         lead the quality audit cut, with the reason it was cut.
       </p>
 
@@ -209,7 +209,7 @@ export default function SourcesPage() {
       {/* the important part */}
       <Section
         title="Why we are not calling some of them"
-        sub={`${t.excluded} ${t.excluded === 1 ? "lead was" : "leads were"} excluded by the quality audit. Grouped by the reason recorded on the row — click a reason to see which companies.`}
+        sub={`${t.excluded} ${t.excluded === 1 ? "lead was" : "leads were"} excluded by the quality audit. Grouped by the reason recorded on the row. Tap a reason to see which companies.`}
       >
         {data.rejectionGroups.length === 0 && (
           <Empty>Nothing has been excluded. Every lead in the room is dialable.</Empty>
@@ -256,7 +256,7 @@ export default function SourcesPage() {
       {/* coverage */}
       <Section
         title="Coverage of the dialable leads"
-        sub="Counts of the leads we can actually call. These are head counts of rows in the database — not an estimate of how big each trade or city really is."
+        sub="Counts of the leads we can actually call. These are head counts of rows in the database, not an estimate of how big each trade or city really is."
       >
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: 12 }}>
           <div style={card}>

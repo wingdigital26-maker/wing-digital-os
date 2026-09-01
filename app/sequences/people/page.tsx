@@ -110,7 +110,7 @@ function PeopleInner() {
             <a href="/sequences/people" style={{ color: "inherit" }}>Show everyone</a>
           </>
         ) : (
-          "Who is enrolled where, which email they get next, and when."
+          "Who is on which sequence, which email they get next, and when."
         )}
       </div>
 
@@ -153,22 +153,22 @@ function PeopleInner() {
           </button>
         </div>
         <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 8 }}>
-          Adding someone schedules their first email; nothing is sent from this dashboard. Enrollment is manual
-          for now. Auto-enrolling from prospect lists is a later step.
+          Adding someone schedules their first email; nothing is sent from this dashboard. Adding people is
+          manual for now. Pulling people in from prospect lists automatically is a later step.
         </div>
       </div>
 
       {notice && <div style={{ ...card, borderColor: "var(--orange)", marginBottom: 14, fontSize: 13 }}>{notice}</div>}
       {error && (
         <div style={{ ...card, borderColor: "var(--red)", marginBottom: 14, fontSize: 13 }}>
-          Could not load enrollments: {error}
+          Could not load people: {error}
         </div>
       )}
       {rows === null && !error && <div style={{ color: "var(--text-muted)", fontSize: 13 }}>Loading...</div>}
 
       {rows?.length === 0 && (
         <div style={{ ...card, textAlign: "center", padding: 40, color: "var(--text-secondary)", fontSize: 14 }}>
-          Nobody is enrolled on {filterName ? "this sequence" : "any sequence"} yet. Add someone above.
+          Nobody is on {filterName ? "this sequence" : "any sequence"} yet. Add someone above.
         </div>
       )}
 
@@ -185,7 +185,7 @@ function PeopleInner() {
               </div>
             </div>
             <div style={{ fontSize: 12.5, color: "var(--text-secondary)", flex: "1 1 220px" }}>
-              {describeState(r)}
+              {describeState(r, seqs.find((s) => s.id === r.sequence_id)?.stepCount)}
             </div>
             <StatusPill status={r.status} />
             {r.status === "active" && (
@@ -212,14 +212,32 @@ export default function PeoplePage() {
   );
 }
 
-function describeState(r: Enrollment): string {
-  if (r.status === "completed") return `Finished every email (got ${r.current_step}).`;
-  if (r.status !== "active" && r.status !== "paused") return `Stopped (${r.status}) after ${r.current_step} email${r.current_step === 1 ? "" : "s"}.`;
+// "Email 2 of 3 goes out Thursday" — friendly, no timestamps unless needed.
+function friendlyWhen(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "on an unknown date";
+  const now = new Date();
+  const startOfDay = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const days = Math.round((startOfDay(d) - startOfDay(now)) / 86400000);
+  if (days <= 0) return "the next time the sender runs";
+  if (days === 1) return "tomorrow";
+  if (days < 7) return d.toLocaleDateString(undefined, { weekday: "long" });
+  return `on ${d.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
+}
+
+function describeState(r: Enrollment, totalSteps?: number): string {
+  const ofTotal = totalSteps ? ` of ${totalSteps}` : "";
+  if (r.status === "completed") return `Got every email. All done.`;
+  if (r.status === "replied") return `Replied after email ${r.current_step}${ofTotal}, so the rest are stopped.`;
+  if (r.status === "unsubscribed") return `Unsubscribed after email ${r.current_step}${ofTotal}. No more emails.`;
+  if (r.status === "bounced") return `Their address bounced. No more emails.`;
+  if (r.status !== "active" && r.status !== "paused")
+    return `Stopped (${r.status}) after ${r.current_step} email${r.current_step === 1 ? "" : "s"}.`;
   const nextNum = r.current_step + 1;
-  const when = r.next_send_at ? new Date(r.next_send_at).toLocaleString() : "no date set";
-  const held = r.sequences?.status !== "active" ? " (held: sequence not active)" : "";
-  if (r.status === "paused") return `Paused before email ${nextNum}.`;
-  return `Email ${nextNum} goes out ${when}${held}.`;
+  if (r.status === "paused") return `Paused before email ${nextNum}${ofTotal}. Resume to continue.`;
+  const when = r.next_send_at ? friendlyWhen(r.next_send_at) : "once a send date is set";
+  const held = r.sequences?.status !== "active" ? " Held for now because the sequence is not active." : "";
+  return `Email ${nextNum}${ofTotal} goes out ${when}.${held}`;
 }
 
 function StatusPill({ status }: { status: string }) {
@@ -228,9 +246,17 @@ function StatusPill({ status }: { status: string }) {
     : status === "paused" ? "var(--orange)"
     : status === "completed" ? "var(--text-muted)"
     : "var(--red)";
+  const label =
+    status === "active" ? "Getting emails"
+    : status === "paused" ? "Paused"
+    : status === "completed" ? "Finished"
+    : status === "replied" ? "Replied"
+    : status === "unsubscribed" ? "Unsubscribed"
+    : status === "bounced" ? "Bounced"
+    : status;
   return (
     <span style={{ fontSize: 12, fontWeight: 700, color, border: `1px solid ${color}`, borderRadius: 999, padding: "3px 10px" }}>
-      {status}
+      {label}
     </span>
   );
 }

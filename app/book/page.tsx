@@ -66,6 +66,14 @@ export default function BookPage() {
   );
   const openDay = days.find((d) => d.date === pickedDay) ?? null;
 
+  // One less tap on a phone: the first day with an open slot starts selected.
+  useEffect(() => {
+    if (pickedDay || days.length === 0) return;
+    const first = days.find((d) => d.slots.some((s) => s.available));
+    if (first) setPickedDay(first.date);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [days]);
+
   async function confirm() {
     if (!pickedSlot) return;
     setSending(true);
@@ -133,7 +141,7 @@ export default function BookPage() {
               {dayLabel(done.date).dow}, {dayLabel(done.date).date} at {done.label} Central Time.
             </p>
             <p style={{ margin: 0, fontSize: 13, color: "var(--text-muted)" }}>
-              A confirmation is on record for {email}. If you need to change the time, reply to any message from us.
+              Your spot is saved under {email}. We will reach out before the call. Need a different time? Reply to any message from us and we will move it.
             </p>
           </section>
         ) : (

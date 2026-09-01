@@ -73,6 +73,21 @@ function statusTone(status: string, error: string | null): string {
   return "var(--text-muted)";
 }
 
+/** Delivery status in plain English. Twilio invents words; an unrecognized one
+ *  renders as itself (never dressed up as healthy), raw word on hover always. */
+function statusPlainWord(status: string, error: string | null): string {
+  if (error) return "failed";
+  switch (status) {
+    case "delivered": return "delivered";
+    case "failed": return "failed";
+    case "undelivered": return "not delivered";
+    case "queued": return "waiting to send";
+    case "sent": return "sent, delivery unconfirmed";
+    case "received": return "received";
+    default: return status;
+  }
+}
+
 function Note({ text, tone = "var(--orange)" }: { text: string; tone?: string }) {
   return (
     <div style={{
@@ -89,9 +104,9 @@ const label: React.CSSProperties = {
   color: "var(--text-muted)", fontWeight: 700,
 };
 
-function Chip({ text, tone, solid }: { text: string; tone: string; solid?: boolean }) {
+function Chip({ text, tone, solid, title }: { text: string; tone: string; solid?: boolean; title?: string }) {
   return (
-    <span style={{
+    <span title={title} style={{
       fontSize: 10.5, fontWeight: 700, borderRadius: 6, padding: "1px 8px",
       color: solid ? "var(--bg-card)" : tone,
       background: solid ? tone : "transparent",
@@ -428,7 +443,7 @@ export default function MessagesBoard() {
         <span style={{ fontSize: 10.5, fontWeight: 700, color: "var(--text-muted)" }}>
           {m.direction === "inbound" ? "received" : "sent by Wing"}
         </span>
-        <Chip tone={statusTone(m.status, m.error)} text={m.status} />
+        <Chip tone={statusTone(m.status, m.error)} text={statusPlainWord(m.status, m.error)} title={`provider status: ${m.status}`} />
         {m.client_slug && <span style={{ fontSize: 10.5, color: "var(--text-muted)" }}>for {m.client_slug}</span>}
         <span style={{ fontSize: 10.5, color: "var(--text-muted)" }}>{when(m.created_at)}</span>
         {m.status_updated_at && (
@@ -596,7 +611,7 @@ export default function MessagesBoard() {
                     {/* Collapsed: last message preview. Open: the whole thread + reply box. */}
                     {!isOpen && (
                       <div style={{ display: "flex", gap: 8, alignItems: "baseline", minWidth: 0 }}>
-                        <Chip tone={statusTone(t.last.status, t.last.error)} text={t.last.status} />
+                        <Chip tone={statusTone(t.last.status, t.last.error)} text={statusPlainWord(t.last.status, t.last.error)} title={`provider status: ${t.last.status}`} />
                         <span style={{
                           fontSize: 12.5, color: "var(--text-secondary)", overflow: "hidden",
                           textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0,

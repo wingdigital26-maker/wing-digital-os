@@ -45,12 +45,15 @@ const StormBoard = dynamic(() => import("./components/StormBoard"), { ssr: false
 
 type NavGroup = {
   id: string; label: string; icon: IconType;
+  // Plain-English one-liner shown as the hover tooltip on the sidebar button.
+  hint: string;
   subs: { id: string; label: string }[];
 };
 
 const NAV: NavGroup[] = [
   {
     id: "command", label: "Command Center", icon: Bolt,
+    hint: "Today's numbers, briefing, and quick actions",
     subs: [
       { id: "command", label: "Overview" },
       { id: "personal", label: "Personal" },
@@ -58,6 +61,7 @@ const NAV: NavGroup[] = [
   },
   {
     id: "clients", label: "Clients", icon: Users,
+    hint: "Your clients, new leads, and storm alerts",
     subs: [
       { id: "clients", label: "Clients" },
       { id: "sonar", label: "Sonar Leads" },
@@ -74,6 +78,7 @@ const NAV: NavGroup[] = [
     // Pipeline's data (Wing's own book of business, the GoHighLevel
     // replacement) is folded in as a category, never deleted.
     id: "crm", label: "CRM", icon: Note,
+    hint: "Contacts, outreach emails, replies, and email health",
     subs: [
       { id: "crm", label: "Everything" },
       // The automated-sending QA board (2026-08-31): who the cold-email engine
@@ -98,20 +103,24 @@ const NAV: NavGroup[] = [
     // One sub only. The section owns its own Calendar/Invoices tabs, so listing
     // them here too showed everything twice.
     id: "calendar", label: "Calendar", icon: Calendar,
+    hint: "Your schedule, plus invoices one tab over",
     subs: [{ id: "calendar", label: "Calendar" }],
   },
   {
     // Backpack, not Bulb: Intel already owns Bulb and the two read as the same
     // section in the rail.
     id: "school", label: "School", icon: Backpack,
+    hint: "Your class schedule",
     subs: [{ id: "school", label: "Class Schedule" }],
   },
   {
     id: "agent", label: "Agents", icon: Cpu,
+    hint: "What the automated agents are doing right now",
     subs: [{ id: "agent", label: "Mission Control" }],
   },
   {
     id: "intel", label: "Intel", icon: Bulb,
+    hint: "Saved notes, competitor research, and activity history",
     subs: [
       { id: "knowledge", label: "Knowledge Base" },
       { id: "competitors", label: "Competitor Intel" },
@@ -328,7 +337,11 @@ export default function Home() {
                 sfx.play("nav");
                 setActive(item.subs[0].id);
                 if (item.id === "command") setNewLeadCount(0);
-              }} style={{
+              }}
+              // Plain-English hover hint; doubly useful when the rail is
+              // collapsed to icons only.
+              title={item.hint}
+              style={{
                 display: "flex", alignItems: "center", gap: 10,
                 padding: "10px 10px", borderRadius: 8, border: "none",
                 background: isActive ? "var(--accent-glow)" : "transparent",
@@ -866,9 +879,11 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
                 </p>
               )}
             </div>
-            <div>
+            {/* No live reply COUNT feed, but the Reply Inbox view exists, so the
+                stat clicks through to it instead of being a dead end. */}
+            <div style={{ cursor: "pointer" }} onClick={() => { sfx.play("nav"); window.dispatchEvent(new CustomEvent("os:navigate", { detail: "replies" })); }}>
               <p style={{ fontSize: 22, fontWeight: 700, color: "var(--text-muted)", lineHeight: 1.4, fontFamily: "'Space Grotesk', sans-serif" }}>no data</p>
-              <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>replies · no data source since GHL retired</p>
+              <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>replies · no live count, open Reply Inbox</p>
             </div>
             <div style={{ cursor: "pointer" }} onClick={() => goToCalendar()}>
               <p style={{ fontSize: 22, fontWeight: 700, color: "var(--text-muted)", lineHeight: 1.4, fontFamily: "'Space Grotesk', sans-serif" }}>no data</p>

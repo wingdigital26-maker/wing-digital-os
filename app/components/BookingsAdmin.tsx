@@ -112,9 +112,18 @@ export default function BookingsAdmin() {
         <button
           type="button"
           onClick={copyLink}
-          style={{ ...btn, marginLeft: "auto", borderColor: "var(--accent)", color: "var(--accent)" }}
+          style={{
+            ...btn,
+            marginLeft: "auto",
+            border: "1px solid var(--accent)",
+            background: copied ? "var(--green)" : "var(--accent)",
+            borderColor: copied ? "var(--green)" : "var(--accent)",
+            color: "#fff",
+            fontWeight: 600,
+            padding: "7px 14px",
+          }}
         >
-          {copied ? "Copied" : "Copy public link (/book)"}
+          {copied ? "Link copied" : "Copy booking link"}
         </button>
       </div>
 
@@ -124,7 +133,7 @@ export default function BookingsAdmin() {
       ) : null}
       {rows && rows.length === 0 ? (
         <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)" }}>
-          No upcoming bookings yet. Share the public link to get the first one.
+          No bookings yet. Tap "Copy booking link" above and send it to someone; their booking shows up here.
         </p>
       ) : null}
 
@@ -171,7 +180,7 @@ export default function BookingsAdmin() {
                   onClick={() => setStatus(b.id, "completed")}
                   style={{ ...btn, borderColor: "var(--green)", color: "var(--green)" }}
                 >
-                  Completed
+                  Done
                 </button>
               ) : null}
               {b.status !== "no_show" ? (

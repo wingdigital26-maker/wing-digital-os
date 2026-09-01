@@ -84,7 +84,7 @@ export default function ClientsBoard() {
 
       {/* Active (paying) clients */}
       <p style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-        Active Clients
+        Paying Clients
       </p>
       {paying.length === 0 && (
         <p style={{ fontSize: 13, color: "var(--text-muted)" }}>No paying clients yet.</p>
@@ -154,7 +154,7 @@ export default function ClientsBoard() {
             display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", cursor: "pointer",
             fontSize: 11, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", padding: 0,
           }}>
-            Not counted in MRR ({notPaying.length}) <span>{showPipeline ? "▲" : "▼"}</span>
+            Not paying yet ({notPaying.length}) <span>{showPipeline ? "▲" : "▼"}</span>
           </button>
           {showPipeline && (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10, marginTop: 12, opacity: 0.75 }}>

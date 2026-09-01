@@ -36,8 +36,8 @@ export default function Login() {
 
   return (
     <div style={{
-      height: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
-      background: "var(--bg-primary)",
+      minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
+      background: "var(--bg-primary)", padding: 16,
     }}>
       <div style={{
         width: "min(380px, 90vw)",
@@ -60,7 +60,7 @@ export default function Login() {
           type="email" value={email} autoFocus autoComplete="username"
           onChange={e => { setEmail(e.target.value); setError(false); }}
           onKeyDown={e => e.key === "Enter" && submit()}
-          placeholder="Email (leave blank for password-only)"
+          placeholder="Email (skip this if you only have a password)"
           style={{
             background: "var(--bg-hover)", border: `1px solid ${error ? "var(--red)" : "var(--border)"}`,
             borderRadius: 10, padding: "12px 14px", color: "var(--text-primary)",
@@ -78,7 +78,11 @@ export default function Login() {
             fontSize: 14, outline: "none", textAlign: "center",
           }}
         />
-        {error && <p style={{ fontSize: 12, color: "var(--red)" }}>Wrong email or password</p>}
+        {error && (
+          <p style={{ fontSize: 12.5, color: "var(--red)", lineHeight: 1.5 }}>
+            That email and password did not match. Check for typos and try again.
+          </p>
+        )}
         <button onClick={submit} disabled={loading || !pw} style={{
           padding: "12px 0", borderRadius: 10, border: "none", cursor: "pointer",
           background: "linear-gradient(135deg, #22d3ee, #0e7490)", color: "#fff",

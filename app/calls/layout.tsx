@@ -117,8 +117,8 @@ export default function CallsLayout({ children }: { children: React.ReactNode })
                 key={t.href}
                 href={t.href}
                 style={{
-                  padding: "9px 14px 11px",
-                  fontSize: 13.5,
+                  padding: "12px 16px 13px",
+                  fontSize: 14,
                   fontWeight: on ? 700 : 500,
                   color: on ? "var(--text-primary)" : "var(--text-muted)",
                   textDecoration: "none",

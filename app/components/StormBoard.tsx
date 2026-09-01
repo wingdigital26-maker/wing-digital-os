@@ -295,6 +295,25 @@ function EventCard({
   const drafts = [...(ev.storm_drafts || [])].sort((a, b) =>
     (KIND_LABEL[a.kind] || a.kind).localeCompare(KIND_LABEL[b.kind] || b.kind)
   );
+  // Collapsed by default: the draft cards are long, and nesting three of them
+  // inside every event made the whole board one awkward scroll. The header
+  // always shows the headline, hail size, and ZIP count; expanding shows the
+  // full draft cards. Remembered per event so a reload keeps your place.
+  const [open, setOpen] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(`storm-open-${ev.id}`) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const toggle = () => {
+    setOpen((v) => {
+      try {
+        localStorage.setItem(`storm-open-${ev.id}`, v ? "0" : "1");
+      } catch {}
+      return !v;
+    });
+  };
   return (
     <div
       style={{
@@ -304,10 +323,28 @@ function EventCard({
         background: "var(--bg-card)",
         display: "flex",
         flexDirection: "column",
-        gap: 12,
+        gap: open ? 12 : 0,
       }}
     >
-      <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+      <button
+        onClick={toggle}
+        aria-expanded={open}
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          flexWrap: "wrap",
+          gap: 8,
+          background: "none",
+          border: "none",
+          padding: 0,
+          cursor: "pointer",
+          textAlign: "left",
+          width: "100%",
+          color: "inherit",
+          font: "inherit",
+        }}
+      >
         <div>
           <div style={{ fontSize: 20, fontWeight: 800, color: "var(--text-primary)" }}>
             {hailSize(ev.size_in)}
@@ -317,10 +354,28 @@ function EventCard({
               .filter(Boolean)
               .join(", ") || "Location not reported"}
           </div>
+          {!open ? (
+            <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>
+              {affected.length
+                ? `${affected.length} ZIP code${affected.length === 1 ? "" : "s"} affected`
+                : "No ZIP codes mapped"}
+              {" · "}
+              {drafts.length
+                ? `${drafts.length} draft${drafts.length === 1 ? "" : "s"} ready`
+                : "no drafts yet"}
+            </div>
+          ) : null}
         </div>
-        <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{centralTime(ev.event_time)}</div>
-      </div>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{centralTime(ev.event_time)}</span>
+          <span style={{ fontSize: 11, color: "var(--accent)", fontWeight: 600, whiteSpace: "nowrap" }}>
+            {open ? "Hide drafts ▲" : "Show drafts ▼"}
+          </span>
+        </div>
+      </button>
 
+      {!open ? null : (
+        <>
       {affected.length ? (
         <div>
           <div style={{ ...labelStyle, marginBottom: 6 }}>Affected areas</div>
@@ -355,6 +410,8 @@ function EventCard({
         <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
           No drafts written for this event yet. The watcher writes them when it processes the event.
         </div>
+      )}
+        </>
       )}
     </div>
   );

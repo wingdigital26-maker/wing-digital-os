@@ -73,12 +73,14 @@ export default function TeamSchedule() {
   const [busy, setBusy] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
 
-  // Add form
+  // Add form. Defaults: today, starting at the next full hour, one hour long,
+  // so the common case ("block off the next hour") is zero edits.
+  const nextHour = () => Math.min(new Date().getHours() + 1, 23);
   const [title, setTitle] = useState("");
   const [person, setPerson] = useState("");
   const [day, setDay] = useState(ymd(new Date()));
-  const [start, setStart] = useState("09:00");
-  const [end, setEnd] = useState("10:00");
+  const [start, setStart] = useState(() => `${String(nextHour()).padStart(2, "0")}:00`);
+  const [end, setEnd] = useState(() => `${String(Math.min(nextHour() + 1, 23)).padStart(2, "0")}:00`);
   const [weekly, setWeekly] = useState(false);
   const [category, setCategory] = useState("work");
 
@@ -163,7 +165,7 @@ export default function TeamSchedule() {
   async function removeBlock(e: Ev) {
     if (!e.blockId) return;
     const msg = e.weekly
-      ? `Delete "${e.title}"? It repeats weekly — this removes every week of it.`
+      ? `Delete "${e.title}"? It repeats weekly, so this removes every week of it.`
       : `Delete "${e.title}"?`;
     if (!window.confirm(msg)) return;
     setBusy(true);
@@ -334,7 +336,8 @@ export default function TeamSchedule() {
                         borderRadius: 8,
                         padding: "5px 7px",
                         marginBottom: 5,
-                        background: `color-mix(in srgb, ${tone} ${isCall ? 16 : 9}%, transparent)`,
+                        background: `color-mix(in srgb, ${tone} ${isCall ? 26 : 9}%, transparent)`,
+                        boxShadow: isCall ? `0 0 0 1px ${tone}` : undefined,
                         fontSize: 12,
                       }}
                     >
@@ -362,7 +365,9 @@ export default function TeamSchedule() {
                         {e.weekly ? " · weekly" : ""}
                       </div>
                       {e.detail && (
-                        <div style={{ color: "var(--text-muted)", fontSize: 10.5, overflowWrap: "anywhere" }}>{e.detail}</div>
+                        <div style={{ color: "var(--text-muted)", fontSize: 10.5, overflowWrap: "anywhere" }}>
+                          {e.detail === "trio-import" ? "class schedule" : e.detail.replace(/^added by /, "added by ")}
+                        </div>
                       )}
                     </div>
                   );
@@ -374,8 +379,8 @@ export default function TeamSchedule() {
       )}
 
       <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 16 }}>
-        Everyone on the team sees the same board. Booked sales calls appear here on their own —
-        no need to text call times. Click ✕ on a block to delete it.
+        Everyone on the team sees the same board. Booked sales calls appear here on their own,
+        no need to text call times. Tap ✕ on a block to delete it.
       </p>
     </div>
   );

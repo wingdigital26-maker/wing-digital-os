@@ -280,6 +280,34 @@ export default function DeliverabilityBoard() {
         </button>
       </div>
 
+      {/* One-line verdict, above everything: can a non-technical reader tell in
+          five seconds whether anything needs action? Computed from the same
+          section statuses the cards below show, so it can never disagree. */}
+      {data && (() => {
+        const broken = data.sections.filter((s) => s.status === "red");
+        const worry = data.sections.filter((s) => s.status === "yellow");
+        const n = broken.length + worry.length;
+        const tone = broken.length ? "var(--red)" : worry.length ? "var(--orange)" : "var(--green)";
+        return (
+          <div style={{
+            border: `1px solid ${tone}`, borderRadius: 12, padding: "12px 16px",
+            background: "var(--bg-card)", display: "grid", gap: 3,
+          }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: tone }}>
+              {n === 0
+                ? "Everything checked is healthy. Nothing needs you."
+                : `${n} thing${n === 1 ? "" : "s"} need${n === 1 ? "s" : ""} attention.`}
+            </div>
+            {n > 0 && (
+              <div style={{ fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.55 }}>
+                {[...broken, ...worry].map((s) => s.label).join(", ")}. The cards below say what
+                each one means and what to do.
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       <div style={{ color: "var(--text-secondary)", fontSize: 13 }}>
         Whether Wing's outbound email can actually reach inboxes: domain records, warmup pacing, the
         do-not-contact list, and what happened in the last week. Gray means there is honestly nothing

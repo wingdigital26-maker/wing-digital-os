@@ -206,7 +206,7 @@ export default function CallRoom() {
 
         {flash && (
           <div style={{ ...banner, background: "rgba(34,197,94,0.12)", borderColor: "rgba(34,197,94,0.4)", color: "#4ade80" }}>
-            Logged — {flash}
+            Logged: {flash}
           </div>
         )}
         {error && (

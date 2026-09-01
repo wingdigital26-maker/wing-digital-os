@@ -97,7 +97,7 @@ export default function Team() {
     const d = await r.json().catch(() => ({}));
     if (!r.ok && r.status !== 207) { setError(d.error ?? "Could not create that account"); return; }
     if (r.status === 207) setError(d.error);
-    setOk(`${email.trim()} can now sign in at /login with the password you set. Give it to them now — it is not stored anywhere you can read it back.`);
+    setOk(`${email.trim()} can now sign in at /login with the password you set. Give it to them now. It is not stored anywhere you can read it back.`);
     setEmail(""); setName(""); setPw("");
     load();
   }
@@ -172,7 +172,7 @@ export default function Team() {
             {busy ? "Creating…" : "Create caller login"}
           </button>
           <p style={{ fontSize: 11.5, color: "var(--text-muted)", marginTop: 10, lineHeight: 1.5 }}>
-            The account works immediately — no confirmation email. Copy the password before you
+            The account works immediately, no confirmation email. Copy the password before you
             leave this page; it is hashed on save and cannot be shown again.
           </p>
         </div>

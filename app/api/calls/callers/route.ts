@@ -60,11 +60,29 @@ async function activityFeed(who: string) {
     "call_activity",
     `select=outcome,created_at&${filter}&limit=10000`
   );
+  // Day and week boundaries in America/Chicago, not server time. Vercel runs
+  // UTC, so server-local math would roll "today" over at 6-7pm Central and
+  // push Sunday-evening calls into the next week's counts.
+  const CT = "America/Chicago";
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: CT, year: "numeric", month: "2-digit", day: "2-digit",
+  });
+  const ctMidnightUtc = (d: Date): number => {
+    // Timestamp of local-CT midnight for the CT calendar date containing d.
+    const ymd = fmt.format(d); // YYYY-MM-DD in CT
+    // CT midnight is 05:00 or 06:00 UTC depending on DST; probe both.
+    for (const off of [5, 6]) {
+      const t = Date.parse(`${ymd}T0${off}:00:00Z`);
+      if (fmt.format(new Date(t)) === ymd && fmt.format(new Date(t - 1)) !== ymd) return t;
+    }
+    return Date.parse(`${ymd}T06:00:00Z`);
+  };
   const now = new Date();
-  const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  // Week starts Monday 00:00 server time.
-  const dow = (now.getDay() + 6) % 7;
-  const weekStart = dayStart - dow * 86_400_000;
+  const dayStart = ctMidnightUtc(now);
+  // Week starts Monday 00:00 Central.
+  const dowName = new Intl.DateTimeFormat("en-US", { timeZone: CT, weekday: "short" }).format(now);
+  const dow = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].indexOf(dowName);
+  const weekStart = ctMidnightUtc(new Date(now.getTime() - (dow < 0 ? 0 : dow) * 86_400_000));
   let dialsToday = 0, dialsWeek = 0, bookedWeek = 0;
   for (const a of all ?? []) {
     const t = Date.parse(a.created_at);

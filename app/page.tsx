@@ -41,6 +41,7 @@ const CalendarSection = dynamic(() => import("./components/CalendarBoard"), { ss
 const CompetitorIntel = dynamic(() => import("./components/CompetitorIntel"), { ssr: false });
 const ReplyInboxBoard = dynamic(() => import("./components/ReplyInboxBoard"), { ssr: false });
 const DeliverabilityBoard = dynamic(() => import("./components/DeliverabilityBoard"), { ssr: false });
+const StormBoard = dynamic(() => import("./components/StormBoard"), { ssr: false });
 
 type NavGroup = {
   id: string; label: string; icon: IconType;
@@ -60,6 +61,10 @@ const NAV: NavGroup[] = [
     subs: [
       { id: "clients", label: "Clients" },
       { id: "sonar", label: "Sonar Leads" },
+      // Storm Response (2026-09-01): SPC hail events near DFW with the drafts
+      // Wing WOULD fire (FB post, ad plan, Nextdoor). Demo build: draft-only,
+      // nothing posts, nothing spends.
+      { id: "storms", label: "Storm Response" },
     ],
   },
   {
@@ -449,6 +454,7 @@ export default function Home() {
           {visited.has("messaging") && <div className="app-view" style={{ display: active === "messaging" ? "block" : "none" }}><MessagingBoard /></div>}
           {visited.has("messages") && <div className="app-view" style={{ display: active === "messages" ? "block" : "none" }}><MessagesBoard /></div>}
           {visited.has("replies") && <div className="app-view" style={{ display: active === "replies" ? "block" : "none" }}><ReplyInboxBoard /></div>}
+          {visited.has("storms") && <div className="app-view" style={{ display: active === "storms" ? "block" : "none" }}><StormBoard /></div>}
           {visited.has("deliverability") && <div className="app-view" style={{ display: active === "deliverability" ? "block" : "none" }}><DeliverabilityBoard /></div>}
           {visited.has("calendar") && <div className="app-view" style={{ display: active === "calendar" ? "block" : "none" }}><CalendarSection /></div>}
           {visited.has("competitors") && <div className="app-view" style={{ display: active === "competitors" ? "block" : "none" }}><CompetitorIntel onSendToAI={sendToAI} /></div>}

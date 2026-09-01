@@ -59,6 +59,11 @@ export default function SequencesLayout({ children }: { children: React.ReactNod
           </a>
 
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+            {/* Sequences is a full page, not an in-shell view; without this
+                button the only way home was knowing to tap the W logo. */}
+            <a href="/" style={{ ...navBtn, border: "1px solid var(--accent)", color: "var(--accent)" }}>
+              &larr; Back to the OS
+            </a>
             <a href="/api/logout" style={navBtn}>
               Sign out
             </a>

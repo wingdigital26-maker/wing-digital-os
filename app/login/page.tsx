@@ -35,7 +35,7 @@ export default function Login() {
   }
 
   return (
-    <div style={{
+    <div className="page-scroll" style={{
       minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
       background: "var(--bg-primary)", padding: 16,
     }}>

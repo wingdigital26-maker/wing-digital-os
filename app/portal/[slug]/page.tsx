@@ -62,7 +62,7 @@ function scoreColor(n: number | undefined): string {
 
 function NotAuthorized({ reason }: { reason: string }) {
   return (
-    <div style={{ minHeight: "100vh", background: "var(--bg-primary)", color: "var(--text-primary)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+    <div className="page-scroll" style={{ minHeight: "100vh", background: "var(--bg-primary)", color: "var(--text-primary)", display: "flex", alignItems: "center", justifyContent: "center" }}>
       <div style={{ textAlign: "center", maxWidth: 420, padding: 32 }}>
         <div style={{ fontSize: 40, marginBottom: 12 }}>🔒</div>
         <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Not authorized</h1>
@@ -145,7 +145,7 @@ export default async function PortalPage({ params }: { params: Promise<{ slug: s
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--bg-primary)", color: "var(--text-primary)" }}>
+    <div className="page-scroll" style={{ minHeight: "100vh", background: "var(--bg-primary)", color: "var(--text-primary)" }}>
       <header style={{ padding: "20px 28px", borderBottom: "1px solid var(--border)", background: "var(--bg-secondary)" }}>
         <p style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.1em" }}>Client Portal</p>
         <h1 style={{ fontSize: 22, fontWeight: 800, marginTop: 4 }}>{client.name}</h1>

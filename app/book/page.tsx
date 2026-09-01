@@ -112,6 +112,7 @@ export default function BookPage() {
 
   return (
     <main
+      className="page-scroll"
       style={{
         minHeight: "100vh",
         background: "var(--bg-primary, #0d0e12)",

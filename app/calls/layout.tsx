@@ -43,7 +43,7 @@ export default function CallsLayout({ children }: { children: React.ReactNode })
     t.exact ? pathname === t.href : pathname.startsWith(t.href);
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--bg-primary)", color: "var(--text-primary)" }}>
+    <div className="page-scroll" style={{ minHeight: "100vh", background: "var(--bg-primary)", color: "var(--text-primary)" }}>
       <header
         style={{
           position: "sticky",

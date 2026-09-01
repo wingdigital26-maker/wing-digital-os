@@ -44,7 +44,7 @@ export default async function PortalIndexPage() {
   if (isStaff) redirect("/");
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--bg-primary)", color: "var(--text-primary)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+    <div className="page-scroll" style={{ minHeight: "100vh", background: "var(--bg-primary)", color: "var(--text-primary)", display: "flex", alignItems: "center", justifyContent: "center" }}>
       <div style={{ textAlign: "center", maxWidth: 440, padding: 32 }}>
         <div style={{ fontSize: 40, marginBottom: 12 }}>🔗</div>
         <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>

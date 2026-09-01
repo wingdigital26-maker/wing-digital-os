@@ -53,6 +53,16 @@ body {
   position: relative;
 }
 
+/* Routed pages OUTSIDE the app shell (Call Room, Sequences, /book, portal,
+   login). The body above is height-locked so the shell can own its scroll;
+   these standalone pages must therefore be their own scroll containers or
+   they cannot scroll at all (found live on Maddox's phone, 2026-09-01). */
+.page-scroll {
+  height: 100vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 /* ── Lock the app shell like a native app ─────────────────────────────
    Block pinch-zoom and rubber-band distortion of the whole page. Panning
    (vertical scroll) is still allowed; the ops map and vault graph opt back

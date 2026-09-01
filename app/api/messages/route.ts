@@ -50,6 +50,19 @@ async function pg(path: string, exact = false): Promise<{ rows: unknown[]; total
 
 const LIMIT_DEFAULT = 400;
 
+/** Last 10 digits of a phone-ish string, or the lowercased string for emails.
+ *  Used ONLY for display-name matching, never for sending. */
+function normAddr(a: string | null | undefined): string | null {
+  if (!a) return null;
+  const s = a.trim();
+  if (!s) return null;
+  if (s.includes("@")) return s.toLowerCase();
+  const digits = s.replace(/\D/g, "");
+  return digits.length >= 7 ? digits.slice(-10) : null;
+}
+
+type ContactLite = { id: number; business_name: string | null; contact_name: string | null; phone: string | null; email: string | null };
+
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const client = (searchParams.get("client") ?? "").trim();
@@ -75,12 +88,51 @@ export async function GET(req: Request) {
 
   const rows = r.rows as Row[];
 
-  // Distinct client slugs across the whole table (for the filter strip), read
-  // separately so filtering to one client does not hide the others.
-  const slugR = await pg("messages?select=client_slug&limit=1000");
-  const clientSlugs = Array.from(
-    new Set((slugR.rows as { client_slug: string | null }[]).map((x) => x.client_slug).filter(Boolean))
-  ).sort() as string[];
+  // Distinct client slugs + per-client message counts across the whole table
+  // (for the filter strip), read separately so filtering to one client does
+  // not hide the others. Counts come from the same read; if the table ever
+  // outgrows the 10k page the strip says so instead of undercounting quietly.
+  const slugR = await pg("messages?select=client_slug&limit=10000", true);
+  const slugRows = slugR.rows as { client_slug: string | null }[];
+  const clientCounts: Record<string, number> = {};
+  for (const x of slugRows) {
+    if (x.client_slug) clientCounts[x.client_slug] = (clientCounts[x.client_slug] ?? 0) + 1;
+  }
+  const clientSlugs = Object.keys(clientCounts).sort();
+  const clientCountsExact = slugR.error == null && (slugR.total == null || slugR.total <= slugRows.length);
+
+  // Resolve contact identities so the board can show a real name instead of a
+  // bare phone number. Two passes: rows that carry contact_id, then a match of
+  // the counterpart address (last-10-digits phone / lowercased email) against
+  // the CRM directory. Display-only — sending never uses this.
+  const byId = new Map<number, ContactLite>();
+  const byAddr = new Map<string, ContactLite>();
+  let contactNote: string | null = null;
+  if (rows.length) {
+    const dirR = await pg("crm_contacts?select=id,business_name,contact_name,phone,email&limit=5000");
+    if (dirR.error) {
+      contactNote = `Names could not be resolved from crm_contacts: ${dirR.error}. Threads fall back to raw addresses.`;
+    } else {
+      for (const c of dirR.rows as ContactLite[]) {
+        byId.set(c.id, c);
+        const p = normAddr(c.phone); if (p && !byAddr.has(p)) byAddr.set(p, c);
+        const e = normAddr(c.email); if (e && !byAddr.has(e)) byAddr.set(e, c);
+      }
+    }
+  }
+  const items = rows.map((m) => {
+    const counterpartAddr = m.direction === "inbound" ? m.from_addr : m.to_addr;
+    const c = (m.contact_id != null ? byId.get(m.contact_id) : undefined) ?? (() => {
+      const k = normAddr(counterpartAddr);
+      return k ? byAddr.get(k) : undefined;
+    })();
+    return {
+      ...m,
+      contact_name: c?.contact_name ?? null,
+      contact_company: c?.business_name ?? null,
+      resolved_contact_id: c?.id ?? m.contact_id ?? null,
+    };
+  });
 
   // Unread inbound across the WHOLE table, unaffected by the current filters,
   // so the badge never lies because of a filter.
@@ -99,8 +151,11 @@ export async function GET(req: Request) {
     total: r.total,
     returned: rows.length,
     truncated: r.total != null && r.total > rows.length,
-    items: rows,
+    items,
     clientSlugs,
+    clientCounts,
+    clientCountsExact,
+    contactNote,
     unreadInbound: unreadR.error ? null : unreadR.total,
     unreadNote: unreadR.error ? `Unread count unavailable: ${unreadR.error}` : null,
     emptyNote:

@@ -372,7 +372,7 @@ const ghlContactsUrl = (loc: string) =>
 // Live-site domains the OS is allowed to link to as publish targets. Links are
 // only ever rendered when a real URL on one of these hosts appears in the
 // vault text (or, for Jackson, when a real WP post id is logged).
-const LIVE_HOSTS = ["jacksonroofingco.com", "renewalhealth.life"];
+const LIVE_HOSTS = ["jacksonroofingco.com", "renewalhealth.life", "herosjunkremovaltx.com"];
 
 interface PublishItem { date: string; title: string; url: string | null; note: string | null; client: string | null }
 
@@ -386,6 +386,7 @@ function clientFromUrl(url: string | null): string | null {
   catch { return null; }
   if (host.includes("jacksonroofingco.com")) return "Jackson Roofing";
   if (host.includes("renewalhealth.life") || host.includes("renewalhealth")) return "Renewal Health";
+  if (host.includes("herosjunkremovaltx.com")) return "Hero's Junk Removal";
   // Registrable domain: last two labels (good enough for the common .com case).
   const parts = host.split(".").filter(Boolean);
   return parts.length >= 2 ? parts.slice(-2).join(".") : host;

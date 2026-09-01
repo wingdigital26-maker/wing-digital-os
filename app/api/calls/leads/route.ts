@@ -26,6 +26,8 @@ type Lead = {
   last_called_at: string | null;
   call_count: number;
   next_action_at: string | null;
+  assigned_to: string | null;
+  assigned_to_email: string | null;
 };
 
 // GET /api/calls/leads
@@ -58,6 +60,17 @@ export async function GET(req: Request) {
   if (!includeExcluded) parts.push("excluded=is.false");
 
   if (status && status !== "all") parts.push(`status=eq.${encodeURIComponent(status)}`);
+
+  // Assignment filter. Everyone can still see everything -- this narrows the
+  // view, it never walls anything off. "unassigned" means no email on the row.
+  const assigned = url.searchParams.get("assigned");
+  if (assigned && assigned !== "all") {
+    parts.push(
+      assigned === "unassigned"
+        ? "assigned_to_email=is.null"
+        : `assigned_to_email=eq.${encodeURIComponent(assigned.toLowerCase())}`
+    );
+  }
   if (q) {
     const safe = q.replace(/[(),*]/g, " ").trim();
     if (safe) {
@@ -90,10 +103,21 @@ export async function GET(req: Request) {
   const counts: Record<string, number> = {};
   for (const l of rows) counts[l.status] = (counts[l.status] ?? 0) + 1;
 
+  // Distinct sheet owners present in the room, queried unfiltered so the pills
+  // do not vanish when a filter is active. Never hardcoded names.
+  const assignedRows = await sbGet<{ assigned_to_email: string | null }>(
+    "call_leads",
+    "select=assigned_to_email&assigned_to_email=not.is.null&excluded=is.false&limit=2000"
+  );
+  const assignedEmails = Array.from(
+    new Set((assignedRows ?? []).map((r) => (r.assigned_to_email ?? "").toLowerCase()).filter(Boolean))
+  ).sort();
+
   return NextResponse.json({
     leads,
     counts,
     total: rows.length,
+    assignedEmails,
     me: { email: user.email, role: user.role, isAdmin: user.isAdmin },
   });
 }

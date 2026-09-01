@@ -15,6 +15,7 @@ const TABS = [
   { href: "/calls/list", label: "Dial list" },
   { href: "/calls/callbacks", label: "Callbacks" },
   { href: "/calls/booked", label: "Booked" },
+  { href: "/calls/schedule", label: "Schedule" },
   { href: "/calls/sources", label: "Sources" },
 ];
 

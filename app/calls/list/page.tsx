@@ -25,6 +25,14 @@ type Lead = {
   next_action_at: string | null;
   excluded: boolean | null;
   excluded_reason: string | null;
+  assigned_to_email: string | null;
+};
+
+// "maddox@wingdigital.co" -> "Maddox's sheet". Names come from the data, never
+// a hardcoded list.
+const sheetLabel = (email: string) => {
+  const n = email.split("@")[0] || email;
+  return `${n.charAt(0).toUpperCase()}${n.slice(1)}'s sheet`;
 };
 
 type Activity = {
@@ -61,6 +69,8 @@ export default function CallRoom() {
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [me, setMe] = useState<{ email: string; role: string; isAdmin: boolean } | null>(null);
   const [filter, setFilter] = useState("new");
+  const [assigned, setAssigned] = useState("all");
+  const [assignedEmails, setAssignedEmails] = useState<string[]>([]);
   const [q, setQ] = useState("");
   const [active, setActive] = useState<Lead | null>(null);
   const [history, setHistory] = useState<Activity[]>([]);
@@ -73,6 +83,7 @@ export default function CallRoom() {
 
   const load = useCallback(async () => {
     const p = new URLSearchParams({ status: filter });
+    if (assigned !== "all") p.set("assigned", assigned);
     if (q.trim()) p.set("q", q.trim());
     const r = await fetch(`/api/calls/leads?${p}`, { cache: "no-store" });
     if (!r.ok) {
@@ -89,10 +100,11 @@ export default function CallRoom() {
     const rows: Lead[] = d.leads ?? [];
     setLeads(rows);
     setCounts(d.counts ?? {});
+    setAssignedEmails(d.assignedEmails ?? []);
     setMe(d.me ?? null);
     setError(null);
     setLoading(false);
-  }, [filter, q]);
+  }, [filter, assigned, q]);
 
   useEffect(() => {
     load();
@@ -231,6 +243,34 @@ export default function CallRoom() {
             }}
           />
         </div>
+
+        {/* assignment filter -- only shown once at least one lead carries an
+            assigned sheet. A view narrower, never a wall: everyone can pick any pill. */}
+        {assignedEmails.length > 0 && (
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10, alignItems: "center" }}>
+            <span style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: "var(--text-muted)", fontWeight: 700 }}>
+              Sheet
+            </span>
+            {[
+              { key: "all", label: "All" },
+              ...assignedEmails.map((e) => ({ key: e, label: sheetLabel(e) })),
+              { key: "unassigned", label: "Unassigned" },
+            ].map((f) => {
+              const on = assigned === f.key;
+              return (
+                <button key={f.key} onClick={() => setAssigned(f.key)} title={f.key !== "all" && f.key !== "unassigned" ? f.key : undefined} style={{
+                  ...chip,
+                  background: on ? "linear-gradient(135deg,#a78bfa,#6d28d9)" : "var(--bg-card)",
+                  borderColor: on ? "transparent" : "var(--border)",
+                  color: on ? "#fff" : "var(--text-muted)",
+                  fontWeight: on ? 700 : 500,
+                }}>
+                  {f.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* list */}
         <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 10 }}>

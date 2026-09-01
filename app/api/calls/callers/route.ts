@@ -25,10 +25,81 @@ async function adminOnly() {
   return { user };
 }
 
+type ActivityRow = {
+  id: number;
+  lead_id: string;
+  user_email: string | null;
+  outcome: string;
+  notes: string | null;
+  duration_sec: number | null;
+  next_action_at: string | null;
+  created_at: string;
+  call_leads: { company: string; phone: string | null; status: string } | null;
+};
+
+// Per-person activity feed: the most recent 100 calls someone made, joined to
+// the lead so the UI can show which company each dial hit, plus honest summary
+// counts. Answers "what did Maddox actually do" without anyone asking him.
+async function activityFeed(who: string) {
+  // Accept either a profiles/auth uuid or an email address.
+  const filter = /^[0-9a-f-]{36}$/i.test(who)
+    ? `user_id=eq.${who}`
+    : `user_email=eq.${encodeURIComponent(who.toLowerCase())}`;
+
+  const recent = await sbGet<ActivityRow>(
+    "call_activity",
+    `select=id,lead_id,user_email,outcome,notes,duration_sec,next_action_at,created_at,` +
+      `call_leads(company,phone,status)&${filter}&order=created_at.desc&limit=100`
+  );
+  if (recent === null) {
+    return NextResponse.json({ error: "could not read call activity" }, { status: 502 });
+  }
+
+  // Summary counts over the whole log for this person (not just the 100 shown).
+  const all = await sbGet<{ outcome: string; created_at: string }>(
+    "call_activity",
+    `select=outcome,created_at&${filter}&limit=10000`
+  );
+  const now = new Date();
+  const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  // Week starts Monday 00:00 server time.
+  const dow = (now.getDay() + 6) % 7;
+  const weekStart = dayStart - dow * 86_400_000;
+  let dialsToday = 0, dialsWeek = 0, bookedWeek = 0;
+  for (const a of all ?? []) {
+    const t = Date.parse(a.created_at);
+    if (t >= dayStart) dialsToday += 1;
+    if (t >= weekStart) {
+      dialsWeek += 1;
+      if (a.outcome === "booked") bookedWeek += 1;
+    }
+  }
+
+  return NextResponse.json({
+    activity: recent.map((a) => ({
+      id: a.id,
+      lead_id: a.lead_id,
+      company: a.call_leads?.company ?? "Unknown lead",
+      phone: a.call_leads?.phone ?? null,
+      lead_status: a.call_leads?.status ?? null,
+      outcome: a.outcome,
+      notes: a.notes,
+      duration_sec: a.duration_sec,
+      next_action_at: a.next_action_at,
+      created_at: a.created_at,
+    })),
+    summary: { dialsToday, dialsWeek, bookedWeek },
+  });
+}
+
 // GET -- list everyone who can enter the call room, with their dial counts.
-export async function GET() {
+// With ?activity=<email or uuid>, returns that person's recent call feed instead.
+export async function GET(req: Request) {
   const g = await adminOnly();
   if (g.err) return g.err;
+
+  const who = new URL(req.url).searchParams.get("activity")?.trim();
+  if (who) return activityFeed(who);
 
   const profiles = await sbGet<Profile>(
     "profiles",

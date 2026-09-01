@@ -25,6 +25,10 @@ const CrmWorkspace = dynamic(() => import("./components/CrmWorkspace"), { ssr: f
 // per-recipient previews. Lives beside the CRM because it is the same
 // "double-check before it goes out" workflow, on the automated lane.
 const MessagingBoard = dynamic(() => import("./components/MessagingBoard"), { ssr: false });
+// Unified sent-message tracking (2026-08-31): every SMS + email the OS logged,
+// threaded per contact, with delivery-status chips. Backed by the `messages`
+// ledger (migration 0014) via /api/messages. Read-only; nothing sends.
+const MessagesBoard = dynamic(() => import("./components/MessagesBoard"), { ssr: false });
 // CrmBoard / ClientInbox / PipelineBoard are no longer mounted here. The files
 // are kept on disk as a fallback if the merged view ever needs to be backed out.
 // InvoicesBoard is mounted by CalendarSection as its second tab, not directly.
@@ -69,6 +73,9 @@ const NAV: NavGroup[] = [
       // will contact next, the exact rendered message each would get, and the
       // guardrail counts. Read-only against the sender's own Supabase.
       { id: "messaging", label: "Automated messaging" },
+      // The unified sent-message ledger (2026-08-31): SMS + email, both
+      // directions, threaded per contact with carrier delivery statuses.
+      { id: "messages", label: "Messages" },
     ],
   },
   {
@@ -389,6 +396,7 @@ export default function Home() {
           {visited.has("sonar") && <div className="app-view" style={{ display: active === "sonar" ? "block" : "none" }}><SonarBoard /></div>}
           {visited.has("crm") && <div className="app-view" style={{ display: active === "crm" ? "block" : "none" }}><CrmWorkspace /></div>}
           {visited.has("messaging") && <div className="app-view" style={{ display: active === "messaging" ? "block" : "none" }}><MessagingBoard /></div>}
+          {visited.has("messages") && <div className="app-view" style={{ display: active === "messages" ? "block" : "none" }}><MessagesBoard /></div>}
           {visited.has("calendar") && <div className="app-view" style={{ display: active === "calendar" ? "block" : "none" }}><CalendarSection /></div>}
           {visited.has("competitors") && <div className="app-view" style={{ display: active === "competitors" ? "block" : "none" }}><CompetitorIntel onSendToAI={sendToAI} /></div>}
           {visited.has("knowledge") && <div className="app-view" style={{ display: active === "knowledge" ? "block" : "none" }}><KnowledgeBase initialPath={openNotePath} onSendToAI={sendToAI} /></div>}

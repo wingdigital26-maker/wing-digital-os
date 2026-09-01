@@ -40,6 +40,17 @@ function isPublicPath(pathname: string): boolean {
     pathname === "/api/cron/watchdog" ||
     pathname === "/api/push/schedule" ||
     pathname === "/api/lecture/summarize" ||
+    // Twilio webhooks: incoming SMS and delivery-status callbacks. Both verify
+    // the X-Twilio-Signature inside the route with TWILIO_AUTH_TOKEN and fail
+    // closed (503 when Twilio is unconfigured, 403 on a bad signature).
+    pathname === "/api/sms/inbound" ||
+    pathname === "/api/sms/status" ||
+    // SMS send + message-ledger ingest: machine endpoints. /api/sms/send
+    // accepts x-heartbeat-key OR a staff session and fails closed; nothing
+    // calls it automatically. /api/messages/log is the email senders' ledger
+    // ingest, x-heartbeat-key gated like /api/notify.
+    pathname === "/api/sms/send" ||
+    pathname === "/api/messages/log" ||
     pathname.startsWith("/demo-freshco") ||
     pathname.startsWith("/demo-roofing") ||
     pathname.startsWith("/demo-clearhaul") ||

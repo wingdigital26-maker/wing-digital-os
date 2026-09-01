@@ -51,6 +51,14 @@ function isPublicPath(pathname: string): boolean {
     // ingest, x-heartbeat-key gated like /api/notify.
     pathname === "/api/sms/send" ||
     pathname === "/api/messages/log" ||
+    // Public self-serve booking link (GHL calendar replacement). The page is
+    // public by design; /api/booking validates and rate-limits inside the
+    // route, and its staff-only modes (?admin=1, PATCH) re-check auth there.
+    pathname === "/book" ||
+    pathname === "/api/booking" ||
+    // Sequence-engine feed for the external sender. Bearer OUTBOUND_EXPORT_KEY
+    // verified inside the route, fails closed, same contract as outbound/export.
+    pathname === "/api/sequences/due" ||
     pathname.startsWith("/demo-freshco") ||
     pathname.startsWith("/demo-roofing") ||
     pathname.startsWith("/demo-clearhaul") ||

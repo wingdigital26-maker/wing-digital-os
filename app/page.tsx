@@ -39,6 +39,8 @@ const SchoolSection = dynamic(() => import("./components/SchoolBoard"), { ssr: f
 // billing data is one click away rather than gone.
 const CalendarSection = dynamic(() => import("./components/CalendarBoard"), { ssr: false });
 const CompetitorIntel = dynamic(() => import("./components/CompetitorIntel"), { ssr: false });
+const ReplyInboxBoard = dynamic(() => import("./components/ReplyInboxBoard"), { ssr: false });
+const DeliverabilityBoard = dynamic(() => import("./components/DeliverabilityBoard"), { ssr: false });
 
 type NavGroup = {
   id: string; label: string; icon: IconType;
@@ -76,6 +78,15 @@ const NAV: NavGroup[] = [
       // The unified sent-message ledger (2026-08-31): SMS + email, both
       // directions, threaded per contact with carrier delivery statuses.
       { id: "messages", label: "Messages" },
+      // Reply Inbox (2026-09-01): every inbound cold-email reply, hot first,
+      // with the thread and an editable draft. Read/draft only; never sends.
+      { id: "replies", label: "Reply Inbox" },
+      // Sequences (2026-09-01): the GHL-workflow replacement. Routed section
+      // (/sequences), not an in-shell view — see EXTERNAL_SUB_LINKS.
+      { id: "sequences", label: "Sequences" },
+      // Email Health (2026-09-01): SPF/DKIM/DMARC, warmup caps, suppression,
+      // send outcomes as green/yellow/red cards. Report-only surface.
+      { id: "deliverability", label: "Email Health" },
     ],
   },
   {
@@ -112,6 +123,12 @@ const LEGACY_VIEW_ALIAS: Record<string, string> = {
   pipeline: "crm",
   money: "calendar",
   invoices: "calendar",
+};
+
+// Sub-tabs that are real routed pages rather than in-shell views. Clicking one
+// navigates instead of switching the mounted view.
+const EXTERNAL_SUB_LINKS: Record<string, string> = {
+  sequences: "/sequences",
 };
 
 // which group owns a given view id
@@ -386,7 +403,12 @@ export default function Home() {
             background: "var(--bg-primary)", flexShrink: 0, flexWrap: "wrap",
           }}>
             {subs.map(sub => (
-              <button key={sub.id} onClick={() => { sfx.play("nav"); setActive(sub.id); }} style={{
+              <button key={sub.id} onClick={() => {
+                sfx.play("nav");
+                const href = EXTERNAL_SUB_LINKS[sub.id];
+                if (href) { window.location.href = href; return; }
+                setActive(sub.id);
+              }} style={{
                 padding: "7px 16px", borderRadius: 999, fontSize: 12.5, cursor: "pointer",
                 fontWeight: active === sub.id ? 700 : 500,
                 border: active === sub.id ? "1px solid var(--accent)" : "1px solid var(--border)",
@@ -426,6 +448,8 @@ export default function Home() {
           {visited.has("crm") && <div className="app-view" style={{ display: active === "crm" ? "block" : "none" }}><CrmWorkspace /></div>}
           {visited.has("messaging") && <div className="app-view" style={{ display: active === "messaging" ? "block" : "none" }}><MessagingBoard /></div>}
           {visited.has("messages") && <div className="app-view" style={{ display: active === "messages" ? "block" : "none" }}><MessagesBoard /></div>}
+          {visited.has("replies") && <div className="app-view" style={{ display: active === "replies" ? "block" : "none" }}><ReplyInboxBoard /></div>}
+          {visited.has("deliverability") && <div className="app-view" style={{ display: active === "deliverability" ? "block" : "none" }}><DeliverabilityBoard /></div>}
           {visited.has("calendar") && <div className="app-view" style={{ display: active === "calendar" ? "block" : "none" }}><CalendarSection /></div>}
           {visited.has("competitors") && <div className="app-view" style={{ display: active === "competitors" ? "block" : "none" }}><CompetitorIntel onSendToAI={sendToAI} /></div>}
           {visited.has("knowledge") && <div className="app-view" style={{ display: active === "knowledge" ? "block" : "none" }}><KnowledgeBase initialPath={openNotePath} onSendToAI={sendToAI} /></div>}

@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import WeekCalendar, { SOURCE_COLOR, toLocal, type Appointment } from "./WeekCalendar";
 
 const InvoicesBoard = dynamic(() => import("./InvoicesBoard"), { ssr: false });
+const BookingsAdmin = dynamic(() => import("./BookingsAdmin"), { ssr: false });
 
 // ───────────────────────────────────────────────────────────────────────────
 // Calendar — the section's primary surface.
@@ -21,7 +22,13 @@ const InvoicesBoard = dynamic(() => import("./InvoicesBoard"), { ssr: false });
 // total and payment calendar they had before.
 // ───────────────────────────────────────────────────────────────────────────
 
-type CalendarSource = "google" | "callbacks" | "payments" | "school" | "blocks" | "stripe";
+type CalendarSource = "google" | "callbacks" | "payments" | "school" | "blocks" | "stripe" | "bookings";
+
+// Lane-strip colour for sources WeekCalendar's SOURCE_COLOR does not know yet.
+// Bookings events carry their own explicit color token from the API.
+function laneColor(source: CalendarSource): string {
+  return SOURCE_COLOR[source] ?? "var(--accent-2)";
+}
 
 // One row of Jack's own calendar_blocks table, carried on each block event so
 // the UI can open it straight into the edit form.
@@ -311,8 +318,8 @@ export default function CalendarSection({
                   <span
                     style={{
                       width: 9, height: 9, borderRadius: 99,
-                      background: l.configured ? SOURCE_COLOR[l.source] : "transparent",
-                      border: `1px solid ${l.configured ? SOURCE_COLOR[l.source] : "var(--text-muted)"}`,
+                      background: l.configured ? laneColor(l.source) : "transparent",
+                      border: `1px solid ${l.configured ? laneColor(l.source) : "var(--text-muted)"}`,
                     }}
                   />
                   <span style={{ color: l.configured ? "var(--text-secondary)" : "var(--text-muted)" }}>
@@ -571,6 +578,10 @@ export default function CalendarSection({
               ) : null}
             </section>
           )}
+
+          {/* Bookings from the public /book link, managed right where they
+              appear on the calendar. */}
+          <BookingsAdmin />
         </>
       )}
     </div>

@@ -5,24 +5,66 @@
 // configured" result, never a crash and never a silent success.
 //
 // Env var names (values live in Vercel/local env only, never in code or vault):
-//   TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER
+//   TWILIO_ACCOUNT_SID, TWILIO_FROM_NUMBER, and EITHER an API key pair
+//   (TWILIO_API_KEY_SID + TWILIO_API_KEY_SECRET, preferred) OR the account
+//   TWILIO_AUTH_TOKEN. TWILIO_WEBHOOK_KEY gates the inbound/status webhooks
+//   when no auth token is available for signature validation (see below).
 import crypto from "node:crypto";
 import { sbUrl, sbService } from "./osSupabase";
 
-export type TwilioCreds = { sid: string; token: string; from: string };
+export type TwilioCreds = {
+  /** The AC... account SID — always in the REST URL path. */
+  accountSid: string;
+  /** Basic-auth username: the SK... API key SID when set, else the account SID. */
+  user: string;
+  /** Basic-auth password: the API key secret, else the auth token. */
+  secret: string;
+  from: string;
+  /** The account auth token, ONLY if TWILIO_AUTH_TOKEN is set. This is the
+   *  single credential that can validate X-Twilio-Signature; API keys cannot.
+   *  null => webhooks must fall back to the TWILIO_WEBHOOK_KEY URL gate. */
+  authToken: string | null;
+};
 
-/** null when any of the three env vars is missing — the caller must say so. */
+/** null when the required env vars are missing — the caller must say so.
+ *  Prefers API-key auth (TWILIO_API_KEY_SID/SECRET), falls back to
+ *  TWILIO_ACCOUNT_SID + TWILIO_AUTH_TOKEN. */
 export function twilioCreds(): TwilioCreds | null {
-  const sid = process.env.TWILIO_ACCOUNT_SID;
-  const token = process.env.TWILIO_AUTH_TOKEN;
+  const accountSid = process.env.TWILIO_ACCOUNT_SID;
   const from = process.env.TWILIO_FROM_NUMBER;
-  if (!sid || !token || !from) return null;
-  return { sid, token, from };
+  const keySid = process.env.TWILIO_API_KEY_SID;
+  const keySecret = process.env.TWILIO_API_KEY_SECRET;
+  const authToken = process.env.TWILIO_AUTH_TOKEN ?? null;
+  if (!accountSid || !from) return null;
+  if (keySid && keySecret) {
+    return { accountSid, user: keySid, secret: keySecret, from, authToken };
+  }
+  if (authToken) {
+    return { accountSid, user: accountSid, secret: authToken, from, authToken };
+  }
+  return null;
+}
+
+/** The shared secret that gates the inbound/status webhooks via ?k=. */
+export function webhookKey(): string | null {
+  return process.env.TWILIO_WEBHOOK_KEY || null;
+}
+
+/** Constant-time check of the ?k= webhook gate. False on any missing piece. */
+export function validWebhookKey(req: Request): boolean {
+  const expected = webhookKey();
+  if (!expected) return false;
+  const got = new URL(req.url).searchParams.get("k");
+  if (!got) return false;
+  const a = crypto.createHash("sha256").update(expected).digest();
+  const b = crypto.createHash("sha256").update(got).digest();
+  return crypto.timingSafeEqual(a, b);
 }
 
 export const TWILIO_NOT_CONFIGURED =
-  "Twilio not configured: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN and " +
-  "TWILIO_FROM_NUMBER must all be set on this deployment. Nothing was sent.";
+  "Twilio not configured: TWILIO_ACCOUNT_SID, TWILIO_FROM_NUMBER and either " +
+  "TWILIO_API_KEY_SID+TWILIO_API_KEY_SECRET or TWILIO_AUTH_TOKEN must be set " +
+  "on this deployment. Nothing was sent.";
 
 export type TwilioSendResult =
   | { ok: true; sid: string; status: string }
@@ -39,12 +81,12 @@ export async function twilioSend(
   if (statusCallback) form.set("StatusCallback", statusCallback);
   try {
     const r = await fetch(
-      `https://api.twilio.com/2010-04-01/Accounts/${creds.sid}/Messages.json`,
+      `https://api.twilio.com/2010-04-01/Accounts/${creds.accountSid}/Messages.json`,
       {
         method: "POST",
         headers: {
           Authorization:
-            "Basic " + Buffer.from(`${creds.sid}:${creds.token}`).toString("base64"),
+            "Basic " + Buffer.from(`${creds.user}:${creds.secret}`).toString("base64"),
           "Content-Type": "application/x-www-form-urlencoded",
         },
         body: form.toString(),

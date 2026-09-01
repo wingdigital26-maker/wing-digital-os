@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { twilioCreds } from "@/lib/sms";
+import { twilioCreds, webhookKey } from "@/lib/sms";
 
 // ───────────────────────────────────────────────────────────────────────────
 // GET /api/sms/health — "what is going on with Twilio", honestly.
@@ -23,12 +23,17 @@ type Check =
   | { ok: true; detail: string }
   | { ok: false; detail: string };
 
-async function twilioGet(sid: string, token: string, path: string): Promise<
+async function twilioGet(
+  accountSid: string,
+  user: string,
+  secret: string,
+  path: string
+): Promise<
   { ok: true; json: Record<string, unknown> } | { ok: false; error: string }
 > {
   try {
-    const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}${path}`, {
-      headers: { Authorization: "Basic " + Buffer.from(`${sid}:${token}`).toString("base64") },
+    const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}${path}`, {
+      headers: { Authorization: "Basic " + Buffer.from(`${user}:${secret}`).toString("base64") },
       cache: "no-store",
     });
     const j = (await r.json().catch(() => ({}))) as Record<string, unknown>;
@@ -45,10 +50,30 @@ async function twilioGet(sid: string, token: string, path: string): Promise<
 export async function GET() {
   const env = {
     TWILIO_ACCOUNT_SID: Boolean(process.env.TWILIO_ACCOUNT_SID),
+    TWILIO_API_KEY_SID: Boolean(process.env.TWILIO_API_KEY_SID),
+    TWILIO_API_KEY_SECRET: Boolean(process.env.TWILIO_API_KEY_SECRET),
     TWILIO_AUTH_TOKEN: Boolean(process.env.TWILIO_AUTH_TOKEN),
     TWILIO_FROM_NUMBER: Boolean(process.env.TWILIO_FROM_NUMBER),
+    TWILIO_WEBHOOK_KEY: Boolean(process.env.TWILIO_WEBHOOK_KEY),
   };
   const creds = twilioCreds();
+
+  // How the webhooks authenticate: signature validation needs the auth token;
+  // with API-key-only config the ?k=TWILIO_WEBHOOK_KEY URL gate stands in.
+  const webhookAuth: Check = creds?.authToken
+    ? { ok: true, detail: "Webhooks validate X-Twilio-Signature with the auth token." }
+    : webhookKey()
+      ? {
+          ok: true,
+          detail:
+            "API-key-only config: webhooks are gated by the ?k=TWILIO_WEBHOOK_KEY shared secret " +
+            "(X-Twilio-Signature validation requires the auth token and upgrades in automatically once TWILIO_AUTH_TOKEN is set).",
+        }
+      : {
+          ok: false,
+          detail:
+            "No TWILIO_AUTH_TOKEN and no TWILIO_WEBHOOK_KEY — inbound/status webhooks fail closed and will reject everything.",
+        };
 
   if (!creds) {
     return NextResponse.json({
@@ -57,6 +82,7 @@ export async function GET() {
       fromNumber: process.env.TWILIO_FROM_NUMBER ?? null,
       account: null,
       webhook: null,
+      webhookAuth,
       note:
         "Twilio is not configured on this deployment, so the SMS pipe can neither send nor receive. " +
         "No Twilio API call was made.",
@@ -66,10 +92,11 @@ export async function GET() {
   // Live checks — both may fail independently and each failure is reported as
   // itself, never folded into the other.
   const [acct, nums] = await Promise.all([
-    twilioGet(creds.sid, creds.token, ".json"),
+    twilioGet(creds.accountSid, creds.user, creds.secret, ".json"),
     twilioGet(
-      creds.sid,
-      creds.token,
+      creds.accountSid,
+      creds.user,
+      creds.secret,
       `/IncomingPhoneNumbers.json?PhoneNumber=${encodeURIComponent(creds.from)}`
     ),
   ]);
@@ -97,7 +124,8 @@ export async function GET() {
         detail: `Twilio does not list ${creds.from} as a number owned by this account. Replies to it cannot reach the OS.`,
       };
     } else {
-      const smsUrl = String(list[0].sms_url ?? "");
+      // Mask the ?k= webhook key before reporting the URL anywhere.
+      const smsUrl = String(list[0].sms_url ?? "").replace(/([?&]k=)[^&]+/, "$1***");
       const pointsHere = smsUrl.includes("/api/sms/inbound");
       webhook = pointsHere
         ? { ok: true, detail: `${creds.from} inbound webhook points at ${smsUrl} — replies will land in the ledger.` }
@@ -118,6 +146,7 @@ export async function GET() {
     fromNumber: creds.from,
     account,
     webhook,
+    webhookAuth,
     note: "Env vars are set. The account and webhook results above are live from the Twilio API, checked just now.",
   });
 }

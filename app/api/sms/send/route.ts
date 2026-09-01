@@ -6,6 +6,7 @@ import {
   logMessage,
   patchMessages,
   publicUrl,
+  webhookKey,
   TWILIO_NOT_CONFIGURED,
 } from "@/lib/sms";
 
@@ -87,7 +88,12 @@ export async function POST(req: NextRequest) {
   }
 
   // 2) Send, with delivery-status callbacks pointed at /api/sms/status.
-  const statusCallback = publicUrl(req).replace(/\/api\/sms\/send.*$/, "/api/sms/status");
+  // The status callback carries the ?k= webhook gate so /api/sms/status can
+  // authenticate the callback even with API-key-only config (no auth token).
+  const wk = webhookKey();
+  const statusCallback =
+    publicUrl(req).replace(/\/api\/sms\/send.*$/, "/api/sms/status") +
+    (wk ? `?k=${encodeURIComponent(wk)}` : "");
   const sent = await twilioSend(creds, to, text, statusCallback);
 
   // 3) Record the outcome on the same row.

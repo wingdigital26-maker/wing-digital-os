@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   twilioCreds,
   validTwilioSignature,
+  validWebhookKey,
   publicUrl,
   patchMessages,
 } from "@/lib/sms";
@@ -30,15 +31,19 @@ export async function POST(req: NextRequest) {
   const params: Record<string, string> = {};
   for (const [k, v] of new URLSearchParams(raw)) params[k] = v;
 
-  if (
-    !validTwilioSignature(
-      creds.token,
-      publicUrl(req),
-      params,
-      req.headers.get("x-twilio-signature")
-    )
-  ) {
-    return NextResponse.json({ error: "invalid signature" }, { status: 403 });
+  // Same dual auth as /api/sms/inbound: signature validation when the auth
+  // token exists, else the ?k=TWILIO_WEBHOOK_KEY shared-secret gate (API keys
+  // cannot validate X-Twilio-Signature). Fail closed either way.
+  const authorized = creds.authToken
+    ? validTwilioSignature(
+        creds.authToken,
+        publicUrl(req),
+        params,
+        req.headers.get("x-twilio-signature")
+      )
+    : validWebhookKey(req);
+  if (!authorized) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 403 });
   }
 
   const sid = params.MessageSid ?? params.SmsSid ?? "";

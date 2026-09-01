@@ -3,6 +3,7 @@ import { sbSelect } from "@/lib/osSupabase";
 import {
   twilioCreds,
   validTwilioSignature,
+  validWebhookKey,
   publicUrl,
   logMessage,
 } from "@/lib/sms";
@@ -70,7 +71,6 @@ async function writeConsent(row: Record<string, unknown>): Promise<void> {
 export async function POST(req: NextRequest) {
   const creds = twilioCreds();
   if (!creds) {
-    // Cannot validate a signature without the auth token: fail closed.
     return NextResponse.json({ error: "Twilio not configured" }, { status: 503 });
   }
 
@@ -78,15 +78,21 @@ export async function POST(req: NextRequest) {
   const params: Record<string, string> = {};
   for (const [k, v] of new URLSearchParams(raw)) params[k] = v;
 
-  if (
-    !validTwilioSignature(
-      creds.token,
-      publicUrl(req),
-      params,
-      req.headers.get("x-twilio-signature")
-    )
-  ) {
-    return NextResponse.json({ error: "invalid signature" }, { status: 403 });
+  // Auth, fail closed. With an auth token: full X-Twilio-Signature validation.
+  // With API-key-only config (no auth token — API keys CANNOT validate
+  // Twilio's signature), the gate is the shared-secret ?k=TWILIO_WEBHOOK_KEY
+  // in the webhook URL, constant-time compared. When an auth token is added
+  // later, signature validation automatically takes over.
+  const authorized = creds.authToken
+    ? validTwilioSignature(
+        creds.authToken,
+        publicUrl(req),
+        params,
+        req.headers.get("x-twilio-signature")
+      )
+    : validWebhookKey(req);
+  if (!authorized) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 403 });
   }
 
   const from = params.From ?? "";

@@ -71,12 +71,14 @@ Suppression is NOT checked by this endpoint; your sender must check it.
 After each successful send, POST (same auth):
 
 ```json
-{ "enrollment_id": "uuid", "sent_at": "2026-09-01T15:02:11Z" }
+{ "enrollment_id": "uuid", "step_order": 2, "sent_at": "2026-09-01T15:02:11Z" }
 ```
 
-`sent_at` is optional (defaults to now). The OS then:
+`step_order` is REQUIRED: pass the `step_order` from the GET item you just
+sent. It is what makes retries safe (see below). `sent_at` is optional
+(defaults to now). The OS then:
 
-1. increments `current_step` (the step you just sent is now completed),
+1. sets `current_step = step_order` (the step you just sent is now completed),
 2. if a next step exists, sets `next_send_at = sent_at + next step's wait_days`,
 3. otherwise marks the enrollment `completed` and clears `next_send_at`.
 
@@ -86,14 +88,29 @@ Response echoes the new state:
 { "enrollment_id": "uuid", "current_step": 2, "status": "active", "next_send_at": "2026-09-03T15:02:11Z", "done": false }
 ```
 
+Idempotency: if `step_order` equals the enrollment's current `current_step`,
+that exact ack already landed (e.g. you retried after a timeout and the first
+POST had actually gone through). Nothing changes and you get 200 with
+`"already_recorded": true` plus the current state — treat it as success. Any
+other `step_order` that is not `current_step + 1` is a 409 and nothing is
+advanced.
+
 Rules:
 
 - POST once per send, only after the mail actually left. If you did not send,
   do not POST — the row simply stays due and comes back on the next GET.
 - A non-`active` enrollment (someone paused it between your GET and your
   POST) returns 400 and is not advanced. Respect that: the pause won the race.
-- POSTing an anomaly's `enrollment_id` (due with no step) marks it
-  `completed`, which is the sanctioned way to retire those rows.
+- An enrollment that is not actually due (`next_send_at` null or in the
+  future) returns 409, and so does one whose parent sequence is not `active`
+  (paused or draft). Only rows the GET would have handed you can be acked.
+- POSTing an anomaly's `enrollment_id` (due with no step) with
+  `step_order = current_step + 1` advances past the missing step. If the
+  sequence also has no step after that one, the enrollment is marked
+  `completed`; if a later step DOES exist, the enrollment advances to it and
+  it is scheduled — the gap is skipped, not the whole sequence retired. To
+  truly retire such a row, fix or delete the remaining steps first, or pause
+  the enrollment from the dashboard.
 
 ## Worked example (3 steps, waits 0 / 2 / 4)
 

@@ -106,38 +106,90 @@ const DKIM_SELECTORS = [
   "selector1", "selector2", "dkim", "s1", "s2", "mandrill", "mg",
 ];
 
-async function txt(name: string): Promise<string[]> {
+// One lookup gets at most this long before we stop waiting on it.
+const PER_LOOKUP_TIMEOUT_MS = 3000;
+// All DNS work for one request shares this budget, so one blackholed domain
+// cannot stall the whole board into a gateway timeout.
+const TOTAL_DNS_BUDGET_MS = 10000;
+
+type TxtResult = {
+  records: string[];
+  // true when the answer is "we could not ask", not "the record is absent":
+  // a lookup timeout, SERVFAIL, network trouble, or the request-wide budget
+  // running out. Only ENOTFOUND/ENODATA count as a confirmed-absent record.
+  unreachable: boolean;
+};
+
+async function txt(name: string, deadline: number): Promise<TxtResult> {
+  const remaining = deadline - Date.now();
+  if (remaining <= 0) return { records: [], unreachable: true };
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    const recs = await resolveTxt(name);
-    return recs.map((chunks) => chunks.join(""));
-  } catch {
-    return []; // NXDOMAIN / no record / DNS failure all mean "nothing published"
+    const recs = await Promise.race([
+      resolveTxt(name),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(Object.assign(new Error("DNS lookup timed out"), { code: "ETIMEOUT" })),
+          Math.min(PER_LOOKUP_TIMEOUT_MS, remaining)
+        );
+      }),
+    ]);
+    return { records: recs.map((chunks) => chunks.join("")), unreachable: false };
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException | null)?.code;
+    // ENOTFOUND / ENODATA: the DNS system answered and said "no such record".
+    // Anything else (timeout, SERVFAIL, refused, network down) means we simply
+    // could not check, and must not be reported as a missing record.
+    if (code === "ENOTFOUND" || code === "ENODATA") {
+      return { records: [], unreachable: false };
+    }
+    return { records: [], unreachable: true };
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
   }
 }
 
-async function checkDomain(domain: string): Promise<Check[]> {
+function unreachableCheck(name: string, domain: string): Check {
+  return {
+    name,
+    status: "gray",
+    summary: "Could not check DNS right now, try again in a few minutes.",
+    meaning:
+      `The DNS lookup for ${domain} did not answer in time or errored. That says nothing about whether the record exists, so this is not marked as failing.`,
+    action: "Hit Re-check in a few minutes. If this stays gray for hours, the DNS resolver on the deployment may be having trouble.",
+    link: null,
+    detail: "Lookup timed out or the resolver returned a server error. Not counted as a missing record.",
+  };
+}
+
+async function checkDomain(domain: string, deadline: number): Promise<Check[]> {
   const dnsLink = `https://dnschecker.org/all-dns-records-of-domain.php?query=${encodeURIComponent(domain)}`;
 
-  const [rootTxt, dmarcTxt, dkimHits] = await Promise.all([
-    txt(domain),
-    txt(`_dmarc.${domain}`),
+  const [rootTxt, dmarcTxt, dkimResults] = await Promise.all([
+    txt(domain, deadline),
+    txt(`_dmarc.${domain}`, deadline),
     Promise.all(
       DKIM_SELECTORS.map(async (sel) => {
-        const recs = await txt(`${sel}._domainkey.${domain}`);
-        const hit = recs.find((r) => /v=dkim1|p=/i.test(r));
-        return hit ? { sel, rec: hit } : null;
+        const res = await txt(`${sel}._domainkey.${domain}`, deadline);
+        const hit = res.records.find((r) => /v=dkim1|p=/i.test(r));
+        return { sel, hit: hit ?? null, unreachable: res.unreachable };
       })
     ),
   ]);
 
-  const spf = rootTxt.find((r) => r.toLowerCase().startsWith("v=spf1")) ?? null;
-  const dmarc = dmarcTxt.find((r) => r.toLowerCase().startsWith("v=dmarc1")) ?? null;
-  const dkim = dkimHits.find(Boolean) as { sel: string; rec: string } | undefined;
+  const spf = rootTxt.records.find((r) => r.toLowerCase().startsWith("v=spf1")) ?? null;
+  const dmarc = dmarcTxt.records.find((r) => r.toLowerCase().startsWith("v=dmarc1")) ?? null;
+  const dkim = dkimResults.find((r) => r.hit) as { sel: string; hit: string } | undefined;
+  // If no selector answered with a key AND at least one lookup could not be
+  // completed, the honest answer is "unknown", not "missing".
+  const dkimUnreachable = !dkim && dkimResults.some((r) => r.unreachable);
 
   const checks: Check[] = [];
 
   checks.push(
-    spf
+    !spf && rootTxt.unreachable
+      ? unreachableCheck(`SPF for ${domain}`, domain)
+      : spf
       ? {
           name: `SPF for ${domain}`,
           status: "green",
@@ -154,18 +206,20 @@ async function checkDomain(domain: string): Promise<Check[]> {
           action:
             `Add a TXT record on ${domain} starting with "v=spf1" that includes your email provider, at your domain registrar's DNS panel. Do not send cold email until this is green.`,
           link: dnsLink,
-          detail: rootTxt.length ? `TXT records found: ${rootTxt.join(" | ")}` : "No TXT records found at the domain root.",
+          detail: rootTxt.records.length ? `TXT records found: ${rootTxt.records.join(" | ")}` : "No TXT records found at the domain root.",
         }
   );
 
   checks.push(
-    dkim
+    dkimUnreachable
+      ? unreachableCheck(`DKIM for ${domain}`, domain)
+      : dkim
       ? {
           name: `DKIM for ${domain}`,
           status: "green",
           summary: `${domain} has a DKIM signature key published (selector "${dkim.sel}"), so inboxes can confirm your mail was not tampered with.`,
           meaning: null, action: null, link: null,
-          detail: dkim.rec.length > 200 ? `${dkim.rec.slice(0, 200)}...` : dkim.rec,
+          detail: dkim.hit.length > 200 ? `${dkim.hit.slice(0, 200)}...` : dkim.hit,
         }
       : {
           name: `DKIM for ${domain}`,
@@ -209,6 +263,8 @@ async function checkDomain(domain: string): Promise<Check[]> {
             detail: dmarc,
           }
     );
+  } else if (dmarcTxt.unreachable) {
+    checks.push(unreachableCheck(`DMARC for ${domain}`, domain));
   } else {
     checks.push({
       name: `DMARC for ${domain}`,
@@ -239,12 +295,16 @@ async function dnsSection(): Promise<Section> {
   // outreach_state, smtp_state, smtp_mailboxes, sending_domains all absent),
   // and the local smtp store on Jack's PC is unreachable from Vercel.
   const raw = process.env.DELIVERABILITY_DOMAINS || "";
-  const domains = raw
+  const rawEntries = raw
     .split(",")
-    .map((d) => d.trim().toLowerCase())
-    .filter((d) => /^[a-z0-9.-]+\.[a-z]{2,}$/.test(d));
+    .map((d) => d.trim())
+    .filter(Boolean);
+  const domainOk = (d: string) => /^[a-z0-9.-]+\.[a-z]{2,}$/.test(d);
+  const domains = rawEntries.map((d) => d.toLowerCase()).filter(domainOk);
+  const rejected = rawEntries.filter((d) => !domainOk(d.toLowerCase()));
 
-  if (!domains.length) {
+  if (!rawEntries.length) {
+    // The env var is genuinely unset (or empty): nothing was configured.
     return {
       id: "dns",
       label: "Domain setup (SPF / DKIM / DMARC)",
@@ -258,22 +318,65 @@ async function dnsSection(): Promise<Section> {
     };
   }
 
+  // Show a rejected entry exactly as written, with the characters that made it
+  // invalid called out. The env var holds only domain names, never a secret.
+  const rejectedChecks: Check[] = rejected.map((entry) => {
+    const badChars = [...new Set(entry.toLowerCase().replace(/[a-z0-9.-]/g, ""))];
+    return {
+      name: `Rejected entry: "${entry}"`,
+      status: "yellow",
+      summary: badChars.length
+        ? `"${entry}" is not a valid domain name. Invalid character${badChars.length === 1 ? "" : "s"}: ${badChars.map((c) => `"${c}"`).join(" ")}.`
+        : `"${entry}" is not a valid domain name. It should look like "example.com" with a dot and an ending like .com.`,
+      meaning:
+        "This entry in DELIVERABILITY_DOMAINS could not be read as a domain, so it is not being checked. A typo here silently turns off DNS monitoring for that domain.",
+      action:
+        "Fix the entry in the DELIVERABILITY_DOMAINS environment variable on the deployment. Use bare domains separated by commas, like \"example.com,other.com\", with no http:// and no spaces inside a name.",
+      link: null,
+      detail: `Raw entry as configured: ${JSON.stringify(entry)}`,
+    };
+  });
+
+  if (!domains.length) {
+    // The env var IS set, but nothing in it parses. Saying "no domain
+    // configured yet" here would hide a real misconfiguration.
+    return {
+      id: "dns",
+      label: "Domain setup (SPF / DKIM / DMARC)",
+      configured: true,
+      status: "yellow",
+      summary:
+        "DELIVERABILITY_DOMAINS is set but no valid domain could be read from it. Check for typos.",
+      missing: null,
+      error: null,
+      checks: rejectedChecks,
+    };
+  }
+
   try {
-    const perDomain = await Promise.all(domains.map(checkDomain));
-    const checks = perDomain.flat();
+    const deadline = Date.now() + TOTAL_DNS_BUDGET_MS;
+    const perDomain = await Promise.all(domains.map((d) => checkDomain(d, deadline)));
+    const checks = [...perDomain.flat(), ...rejectedChecks];
     const status = worst(checks);
     const reds = checks.filter((c) => c.status === "red").length;
+    const unchecked = checks.filter((c) => c.status === "gray").length;
+    const truncatedNote =
+      unchecked > 0
+        ? ` ${unchecked} check${unchecked === 1 ? "" : "s"} could not be completed right now (DNS was slow or unreachable) and ${unchecked === 1 ? "is" : "are"} shown gray, not failed.`
+        : "";
     return {
       id: "dns",
       label: "Domain setup (SPF / DKIM / DMARC)",
       configured: true,
       status,
       summary:
-        status === "green"
+        (status === "gray"
+          ? "Could not check DNS right now, try again in a few minutes. No record is being reported as missing."
+          : status === "green"
           ? `All ${checks.length} DNS checks pass across ${domains.length === 1 ? domains[0] : `${domains.length} domains`}. Inboxes can verify your mail.`
           : status === "yellow"
-          ? "The basics are in place, but at least one record should be tightened. See below."
-          : `${reds} DNS check${reds === 1 ? "" : "s"} failing. Fix these before sending any cold email, or it will land in spam.`,
+          ? "The basics are in place, but at least one item below should be looked at."
+          : `${reds} DNS check${reds === 1 ? "" : "s"} failing. Fix these before sending any cold email, or it will land in spam.`) + truncatedNote,
       missing: null,
       error: null,
       checks,
@@ -369,17 +472,31 @@ async function suppressionSection(): Promise<Section> {
     const parsed = Number((res.headers.get("content-range") || "").split("/").pop());
     const total = Number.isFinite(parsed) ? parsed : rows.length;
 
+    // Known suppression reason codes, translated to plain English. Anything
+    // not listed falls through to a generic line that still makes clear the
+    // address IS excluded from sending.
+    const REASON_TRANSLATIONS: Record<string, string> = {
+      "role-junk-localpart":
+        "Generic mailbox like info@ or sales@, skipped because those rarely reach a person",
+    };
     const checks: Check[] = rows.map((r) => {
       const reason = (r.reason || "").toLowerCase();
+      const known = REASON_TRANSLATIONS[reason.trim()];
       const label = reason.includes("unsub")
         ? "asked to be left alone (unsubscribe)"
         : reason.includes("bounce")
         ? "address bounced (undeliverable)"
-        : r.reason || "reason not recorded";
+        : known
+        ? known
+        : r.reason
+        ? null // unknown code: use the generic wording below instead
+        : "reason not recorded";
       return {
         name: r.email,
         status: "green", // a populated suppression list working as intended is healthy
-        summary: `Suppressed: ${label}.`,
+        summary: label
+          ? `Suppressed: ${label}.`
+          : `Excluded from sending. Reason code: ${r.reason}.`,
         meaning: null,
         action: null,
         link: null,
@@ -392,7 +509,7 @@ async function suppressionSection(): Promise<Section> {
       status: "green",
       summary:
         total === 0
-          ? "The do-not-contact list is connected and empty. No one has unsubscribed or bounced yet — that is a real zero, the list was read successfully."
+          ? "The do-not-contact list is connected and empty. No one has unsubscribed or bounced yet. That is a real zero: the list was read successfully."
           : `${total} address${total === 1 ? " is" : "es are"} on the do-not-contact list and will never be emailed again. The 10 most recent are below.`,
       checks,
       extra: { total },

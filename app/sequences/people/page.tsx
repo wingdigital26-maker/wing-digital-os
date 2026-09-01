@@ -154,7 +154,7 @@ function PeopleInner() {
         </div>
         <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 8 }}>
           Adding someone schedules their first email; nothing is sent from this dashboard. Enrollment is manual
-          for now — auto-enrolling from prospect lists is a later step.
+          for now. Auto-enrolling from prospect lists is a later step.
         </div>
       </div>
 

@@ -275,7 +275,7 @@ export default function SequenceEditorPage() {
       </div>
 
       <div style={{ ...card, marginTop: 20, fontSize: 12.5, color: "var(--text-secondary)" }}>
-        <strong>Personalization tags</strong> — type these anywhere in a subject or body and they fill in per
+        <strong>Personalization tags:</strong> type these anywhere in a subject or body and they fill in per
         person when the email goes out: <code>{"{{first_name}}"}</code> (their first name, falls back to
         &quot;there&quot;), <code>{"{{company}}"}</code> (their company), <code>{"{{city}}"}</code> (their city).
         If a person is missing the data for a tag, that email is held instead of going out half-filled.

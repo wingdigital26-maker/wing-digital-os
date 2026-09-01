@@ -16,6 +16,7 @@ import {
   requireStaff,
   isAuthFailure,
   sbGet,
+  sbGetPaged,
   sbPatch,
   errorResponse,
   badRequest,
@@ -87,11 +88,14 @@ export async function GET(req: NextRequest) {
     try {
       const addr = esc(thread);
       const chanFilter = channel ? `&channel=eq.${esc(channel)}` : "";
+      // Newest 200 first so long threads keep their most recent messages,
+      // then reversed so the UI still renders oldest-to-newest.
       const rows = await sbGet(
         "messages",
         "id,channel,direction,to_addr,from_addr,body,status,error,created_at",
-        `or=(to_addr.eq.${addr},from_addr.eq.${addr})${chanFilter}&order=created_at.asc&limit=200`
+        `or=(to_addr.eq.${addr},from_addr.eq.${addr})${chanFilter}&order=created_at.desc&limit=200`
       );
+      rows.reverse();
       return NextResponse.json({ items: rows });
     } catch (e) {
       return errorResponse(e);
@@ -103,18 +107,66 @@ export async function GET(req: NextRequest) {
   const client = nullableText(p.get("client"));
   const classification = nullableText(p.get("classification"));
 
-  const filters: string[] = [`order=triaged_at.desc`, `limit=${limit}`];
-  if (client) filters.push(`client_slug=eq.${esc(client)}`);
-  if (classification && (CLASS_ORDER as readonly string[]).includes(classification)) {
-    filters.push(`classification=eq.${classification}`);
-  }
+  const classFilter =
+    classification && (CLASS_ORDER as readonly string[]).includes(classification)
+      ? (classification as Classification)
+      : null;
+
+  // Filters shared by every triage query (everything except classification).
+  const baseFilters: string[] = [];
+  if (client) baseFilters.push(`client_slug=eq.${esc(client)}`);
+  const base = baseFilters.length ? `&${baseFilters.join("&")}` : "";
+
+  const SELECT =
+    "*,messages(id,channel,direction,to_addr,from_addr,body,status,created_at,read_at),crm_contacts(business_name,contact_name,email)";
 
   try {
-    const rows = await sbGet<TriageRow>(
-      "reply_triage",
-      "*,messages(id,channel,direction,to_addr,from_addr,body,status,created_at,read_at),crm_contacts(business_name,contact_name,email)",
-      filters.join("&")
-    );
+    // Hot rows are never dropped by the recency cap: they get their own query
+    // with a far higher ceiling, and the recency cap only applies to the rest.
+    const wantsHot = !classFilter || classFilter === "hot";
+    const wantsRest = classFilter !== "hot";
+    const restClass = classFilter ? `&classification=eq.${classFilter}` : `&classification=neq.hot`;
+
+    const [hotRows, restRows, counted, allSlugRows] = await Promise.all([
+      wantsHot
+        ? sbGet<TriageRow>(
+            "reply_triage",
+            SELECT,
+            `classification=eq.hot${base}&order=triaged_at.desc&limit=5000`
+          )
+        : Promise.resolve([] as TriageRow[]),
+      wantsRest
+        ? sbGet<TriageRow>(
+            "reply_triage",
+            SELECT,
+            `order=triaged_at.desc&limit=${limit}${base}${restClass}`
+          )
+        : Promise.resolve([] as TriageRow[]),
+      // Authoritative total for the current filters, so the board can say
+      // "showing N of M" honestly instead of implying the page is everything.
+      sbGetPaged<{ id: number }>(
+        "reply_triage",
+        "id",
+        `${baseFilters.join("&")}${classFilter ? `${baseFilters.length ? "&" : ""}classification=eq.${classFilter}` : ""}`,
+        0,
+        1
+      ),
+      // Client pills come from an unfiltered lightweight query so filtering to
+      // one client never makes the other pills disappear.
+      sbGet<{ client_slug: string | null }>(
+        "reply_triage",
+        "client_slug",
+        "limit=5000"
+      ),
+    ]);
+
+    // Merge and dedupe (a row can only appear in one query, but stay safe).
+    const seen = new Set<number>();
+    const rows = [...hotRows, ...restRows].filter((r) => {
+      if (seen.has(r.id)) return false;
+      seen.add(r.id);
+      return true;
+    });
     // Hot first, then warm/cold/other; newest first inside each group.
     rows.sort(
       (a, b) =>
@@ -126,9 +178,11 @@ export async function GET(req: NextRequest) {
       tableMissing: false,
       reason: null,
       items: rows,
+      shownCount: rows.length,
+      totalCount: counted.total,
       clientSlugs: Array.from(
-        new Set(rows.map((r) => r.client_slug).filter(Boolean))
-      ) as string[],
+        new Set(allSlugRows.map((r) => r.client_slug).filter(Boolean))
+      ).sort() as string[],
     });
   } catch (e) {
     if (tableMissing(e)) {
@@ -140,6 +194,8 @@ export async function GET(req: NextRequest) {
         reason:
           "The reply_triage table does not exist in the OS database yet. Run migration supabase/migrations/0016_reply_triage.sql, then replies will appear here.",
         items: [],
+        shownCount: 0,
+        totalCount: 0,
         clientSlugs: [],
       });
     }

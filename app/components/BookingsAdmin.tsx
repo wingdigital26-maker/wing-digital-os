@@ -130,6 +130,7 @@ export default function BookingsAdmin() {
 
       {(rows ?? []).map((b) => {
         const color = STATUS_COLOR[b.status] ?? "var(--text-muted)";
+        const cancelled = b.status === "cancelled";
         return (
           <div
             key={b.id}
@@ -143,6 +144,8 @@ export default function BookingsAdmin() {
               alignItems: "center",
               flexWrap: "wrap",
               background: "var(--bg-secondary)",
+              // Cancelled rows stay visible (so Restore works) but dimmed.
+              opacity: cancelled ? 0.55 : 1,
             }}
           >
             <div style={{ display: "grid", gap: 2, minWidth: 160 }}>

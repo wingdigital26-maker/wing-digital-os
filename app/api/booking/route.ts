@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { sbUrl, sbService, sbInsert } from "@/lib/osSupabase";
+import { sbUrl, sbService } from "@/lib/osSupabase";
 import { requireStaff, isAuthFailure } from "../pipeline/_lib";
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -121,12 +121,16 @@ type BookingRow = {
   created_at: string;
 };
 
-async function activeBookingsBetween(fromIso: string, toIso: string): Promise<BookingRow[] | null> {
+async function bookingsBetween(
+  fromIso: string,
+  toIso: string,
+  opts: { includeCancelled?: boolean } = {}
+): Promise<BookingRow[] | null> {
   const url = sbUrl();
   const key = sbService();
   if (!url || !key) return null;
   const qs =
-    `select=*&status=neq.cancelled` +
+    `select=*${opts.includeCancelled ? "" : "&status=neq.cancelled"}` +
     `&starts_at=lt.${encodeURIComponent(toIso)}` +
     `&ends_at=gt.${encodeURIComponent(fromIso)}` +
     `&order=starts_at.asc&limit=2000`;
@@ -148,22 +152,31 @@ function overlaps(slotStart: string, slotEnd: string, rows: BookingRow[]): boole
 
 // ── Rate limit: naive in-memory, per IP. Good enough for one Vercel instance;
 // a determined abuser is stopped by validation and honest failure, not this.
+// Two buckets: valid booking attempts (small cap, runs AFTER validation so a
+// typo never burns an attempt) and total POSTs (larger abuse backstop).
 const RATE_WINDOW_MS = 60 * 60 * 1000;
-const RATE_MAX = 6; // bookings per IP per hour
+const RATE_MAX = 6; // valid booking attempts per IP per hour
+const POST_MAX = 20; // total POSTs per IP per hour, abuse backstop
 const hits = new Map<string, number[]>();
+const postHits = new Map<string, number[]>();
 
-function rateLimited(ip: string): boolean {
+function bucketLimited(map: Map<string, number[]>, ip: string, max: number): boolean {
   const now = Date.now();
-  const list = (hits.get(ip) ?? []).filter((t) => now - t < RATE_WINDOW_MS);
-  if (list.length >= RATE_MAX) {
-    hits.set(ip, list);
+  const list = (map.get(ip) ?? []).filter((t) => now - t < RATE_WINDOW_MS);
+  if (list.length >= max) {
+    map.set(ip, list);
     return true;
   }
   list.push(now);
-  hits.set(ip, list);
+  map.set(ip, list);
   return false;
 }
 
+// Trust note: we read only the FIRST x-forwarded-for entry. On Vercel the
+// platform overwrites this header with the real client IP, so it cannot be
+// spoofed in production. Anywhere without a trusted proxy in front, treat this
+// as best-effort only; the small rate caps are a convenience, not a security
+// boundary.
 function clientIp(req: NextRequest): string {
   return (
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
@@ -179,9 +192,11 @@ export async function GET(req: NextRequest) {
   if (sp.get("admin") === "1") {
     const auth = await requireStaff();
     if (isAuthFailure(auth)) return auth;
-    const nowIso = new Date().toISOString();
+    // Window starts 7 days back so staff can still mark just-ended bookings
+    // Completed or No show, and includes cancelled rows so Restore works.
+    const fromIso = new Date(Date.now() - 7 * 86_400_000).toISOString();
     const farIso = new Date(Date.now() + 90 * 86_400_000).toISOString();
-    const rows = await activeBookingsBetween(nowIso, farIso);
+    const rows = await bookingsBetween(fromIso, farIso, { includeCancelled: true });
     if (rows === null) {
       return NextResponse.json(
         { error: "unavailable", message: "Bookings database is not configured or unreachable." },
@@ -221,7 +236,7 @@ export async function GET(req: NextRequest) {
   const [ly, lmo, ld] = lastDay.split("-").map(Number);
   const windowEnd = chicagoToUtc(ly, lmo, ld, 23, 59).toISOString();
 
-  const existing = await activeBookingsBetween(windowStart, windowEnd);
+  const existing = await bookingsBetween(windowStart, windowEnd);
   if (existing === null) {
     return NextResponse.json(
       { error: "unavailable", message: "The booking calendar is not connected to its database right now. Please try again later." },
@@ -244,7 +259,11 @@ export async function GET(req: NextRequest) {
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 export async function POST(req: NextRequest) {
-  if (rateLimited(clientIp(req))) {
+  const ip = clientIp(req);
+
+  // Abuse backstop: cap TOTAL posts per hour. The real booking cap runs after
+  // validation below, so a handful of typos never locks a visitor out.
+  if (bucketLimited(postHits, ip, POST_MAX)) {
     return NextResponse.json(
       { error: "rate_limited", message: "Too many booking attempts from this connection. Please wait a bit and try again." },
       { status: 429 }
@@ -301,13 +320,22 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Validation passed: this is a real booking attempt, so it counts toward
+  // the (smaller) booking rate limit.
+  if (bucketLimited(hits, ip, RATE_MAX)) {
+    return NextResponse.json(
+      { error: "rate_limited", message: "Too many booking attempts from this connection. Please wait a bit and try again." },
+      { status: 429 }
+    );
+  }
+
   const slotStart = start.toISOString();
   const slotEnd = new Date(start.getTime() + SLOT_MINUTES * 60_000).toISOString();
 
-  // Still free? Re-check right before insert. (No unique constraint on the
-  // slot, so a photo-finish double booking is possible in theory; this check
-  // plus a 30-minute grid makes it vanishingly rare.)
-  const existing = await activeBookingsBetween(slotStart, slotEnd);
+  // Still free? Re-check right before insert. This is the friendly fast path;
+  // the bookings_slot_unique index on the table is the real guarantee, and the
+  // insert below handles its 409 with the same friendly message.
+  const existing = await bookingsBetween(slotStart, slotEnd);
   if (existing === null) {
     return NextResponse.json(
       { error: "unavailable", message: "The booking calendar is not connected to its database right now. Please try again later." },
@@ -321,24 +349,68 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const created = await sbInsert<BookingRow>("bookings", {
-    name,
-    email,
-    phone,
-    starts_at: slotStart,
-    ends_at: slotEnd,
-    status: "confirmed",
-    source: "public_link",
-    client_slug: clientSlug,
-    notes,
-  });
-  if (!created) {
+  // Insert with a direct PostgREST fetch (same URL/service-key pattern as the
+  // shared sbInsert helper) so we can see the real status code instead of a
+  // swallowed null. A photo-finish race hits the bookings_slot_unique index
+  // and PostgREST answers 409 / code 23505; that loser gets the same friendly
+  // slot-taken message as the pre-check above.
+  const url = sbUrl();
+  const key = sbService();
+  if (!url || !key) {
+    return NextResponse.json(
+      { error: "unavailable", message: "The booking calendar is not connected to its database right now. Please try again later." },
+      { status: 503 }
+    );
+  }
+  try {
+    const r = await fetch(`${url}/rest/v1/bookings`, {
+      method: "POST",
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+        Prefer: "return=representation",
+      },
+      body: JSON.stringify({
+        name,
+        email,
+        phone,
+        starts_at: slotStart,
+        ends_at: slotEnd,
+        status: "confirmed",
+        source: "public_link",
+        client_slug: clientSlug,
+        notes,
+      }),
+    });
+    if (!r.ok) {
+      const errBody: any = await r.json().catch(() => ({}));
+      if (r.status === 409 || errBody?.code === "23505") {
+        return NextResponse.json(
+          { error: "slot_taken", message: "Sorry, that slot was just taken. Please pick another time." },
+          { status: 409 }
+        );
+      }
+      return NextResponse.json(
+        { error: "insert_failed", message: "The booking could not be saved. Please try again." },
+        { status: 502 }
+      );
+    }
+    const rows = (await r.json()) as BookingRow[];
+    const created = rows?.[0] ?? null;
+    if (!created) {
+      return NextResponse.json(
+        { error: "insert_failed", message: "The booking could not be saved. Please try again." },
+        { status: 502 }
+      );
+    }
+    return NextResponse.json({ ok: true, booking: created }, { status: 201 });
+  } catch {
     return NextResponse.json(
       { error: "insert_failed", message: "The booking could not be saved. Please try again." },
       { status: 502 }
     );
   }
-  return NextResponse.json({ ok: true, booking: created }, { status: 201 });
 }
 
 // ── PATCH: staff status change ─────────────────────────────────────────────

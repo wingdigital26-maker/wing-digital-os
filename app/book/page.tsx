@@ -85,8 +85,10 @@ export default function BookPage() {
       const out = await r.json().catch(() => ({}));
       if (!r.ok) {
         setFormErr(out?.message || `Booking failed (HTTP ${r.status}).`);
-        if (r.status === 409) {
-          // Slot was taken between load and confirm: refresh and re-pick.
+        if (r.status === 409 || r.status >= 500) {
+          // Slot taken (409) or the save failed on the server (5xx, which can
+          // also mean someone else won the slot): refresh availability and
+          // have them re-pick so nobody keeps retrying a dead slot.
           setPickedSlot(null);
           await load();
         }

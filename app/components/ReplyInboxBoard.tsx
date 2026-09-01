@@ -47,6 +47,8 @@ type Payload = {
   tableMissing: boolean;
   reason: string | null;
   items: Reply[];
+  shownCount?: number;
+  totalCount?: number | null;
   clientSlugs: string[];
 };
 
@@ -196,7 +198,7 @@ function ReplyDetail({ reply, onChanged }: { reply: Reply; onChanged: (r: Reply)
         ok: true,
         msg:
           action === "save_draft"
-            ? "Draft saved. Nothing was sent — the OS never sends."
+            ? "Draft saved. Nothing was sent, the OS never sends."
             : action === "handled"
             ? "Marked handled. Nothing was sent from here; sending happens in the outreach pipe."
             : "Dismissed. It stays in the list under Handled if you need it back.",
@@ -354,6 +356,7 @@ export default function ReplyInboxBoard() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterKey>("attention");
   const [client, setClient] = useState("");
+  const [lastLoadedAt, setLastLoadedAt] = useState<Date | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
 
@@ -366,6 +369,7 @@ export default function ReplyInboxBoard() {
       const j = (await res.json().catch(() => ({}))) as Payload & { message?: string };
       if (!res.ok) throw new Error(j.message || `HTTP ${res.status}`);
       setData(j);
+      setLastLoadedAt(new Date());
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
@@ -413,7 +417,7 @@ export default function ReplyInboxBoard() {
     return (
       <Note
         tone="var(--red)"
-        text={`The reply inbox could not be read: ${err}. Nothing below is available — this is a failure, not an empty inbox.`}
+        text={`The reply inbox could not be read: ${err}. Nothing below is available. This is a failure, not an empty inbox.`}
       />
     );
   }
@@ -443,6 +447,31 @@ export default function ReplyInboxBoard() {
           {loading ? "Loading" : "Refresh"}
         </button>
       </div>
+
+      {/* Refresh failed but old rows exist: say so loudly instead of quietly
+          showing stale data as if it were current. */}
+      {err && (
+        <div style={{
+          display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap",
+          border: "1px solid var(--red)", borderRadius: 10, padding: "9px 12px",
+          background: "var(--bg-card)", fontSize: 12, lineHeight: 1.55, color: "var(--red)",
+        }}>
+          <span>
+            Could not refresh. Showing data from{" "}
+            {lastLoadedAt ? lastLoadedAt.toLocaleTimeString() : "an earlier load"}. ({err})
+          </span>
+          <button
+            type="button" onClick={() => { void load(); }}
+            style={{
+              padding: "3px 11px", borderRadius: 999, fontSize: 11.5, fontWeight: 600,
+              cursor: "pointer", background: "transparent",
+              border: "1px solid var(--red)", color: "var(--red)",
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
       {/* Setup honesty */}
       {!data.available && data.reason && (
@@ -478,10 +507,21 @@ export default function ReplyInboxBoard() {
 
       {data.available && data.items.length === 0 && (
         <div style={{ fontSize: 12.5, color: "var(--text-muted)", lineHeight: 1.6 }}>
-          No replies yet. Replies land here when the triage agent syncs inbound messages
-          (ghl-cli smtp_replies) into the reply_triage table — the table exists and is simply empty.
+          {client
+            ? `No replies for this client (${client}). Other clients may still have replies. Pick "all" above to see everything.`
+            : "No replies yet. Replies land here when the triage agent syncs inbound messages (ghl-cli smtp_replies) into the reply_triage table. The table exists and is simply empty."}
         </div>
       )}
+
+      {/* Honest paging note: the recency cap can leave older non-hot rows out. */}
+      {data.available &&
+        typeof data.totalCount === "number" &&
+        data.totalCount > data.items.length && (
+          <div style={{ fontSize: 11.5, color: "var(--text-muted)", lineHeight: 1.5 }}>
+            Showing {data.items.length} of {data.totalCount} replies. Every hot reply is
+            included; the oldest warm, cold, and other replies past the cap are not shown.
+          </div>
+        )}
 
       {data.items.length > 0 && (
         <div style={{
@@ -552,7 +592,7 @@ export default function ReplyInboxBoard() {
             })}
             {visible.length === 0 && data.items.length > 0 && (
               <div style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.55 }}>
-                Nothing matches this filter. The replies are still there — switch the filter above to see them.
+                Nothing matches this filter. The replies are still there. Switch the filter above to see them.
               </div>
             )}
           </div>

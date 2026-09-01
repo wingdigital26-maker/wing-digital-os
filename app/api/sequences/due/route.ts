@@ -27,10 +27,16 @@ import {
 //   * enrollment.next_send_at <= now
 //   * the parent sequence.status = 'active'  (paused/draft sequences export nothing)
 //
-// POST { enrollment_id, sent_at? } advances the state machine:
-//   current_step += 1
+// POST { enrollment_id, step_order, sent_at? } advances the state machine:
+//   current_step = step_order (the step the sender just sent)
 //   next step exists  → next_send_at = sent_at + that step's wait_days
 //   no next step      → status = 'completed', next_send_at = null
+//
+// step_order makes retries safe: it must equal current_step + 1 to advance.
+// If it equals current_step, this exact ack already landed (double POST after
+// a timeout) and we return 200 { already_recorded: true } without touching
+// anything. Any other value is a 409. The POST also refuses when the row is
+// not actually due or the parent sequence is not active.
 // ───────────────────────────────────────────────────────────────────────────
 
 export const runtime = "nodejs";
@@ -117,6 +123,20 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => null);
     const id = nullableText(body?.enrollment_id);
     if (!id) return badRequest("Missing enrollment_id.");
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+      return badRequest("enrollment_id is not a valid id. Use the enrollment_id exactly as GET /api/sequences/due returned it.");
+    }
+    const stepOrderRaw = body?.step_order;
+    if (
+      stepOrderRaw === undefined ||
+      stepOrderRaw === null ||
+      typeof stepOrderRaw !== "number" ||
+      !Number.isInteger(stepOrderRaw) ||
+      stepOrderRaw < 1
+    ) {
+      return badRequest("Missing or invalid step_order. Send the step_order from the GET item you just sent, as a whole number.");
+    }
+    const stepOrder = stepOrderRaw;
     const sentAtRaw = nullableText(body?.sent_at);
     const sentAt = sentAtRaw ? new Date(sentAtRaw) : new Date();
     if (Number.isNaN(sentAt.getTime())) return badRequest("sent_at is not a valid timestamp.");
@@ -124,8 +144,61 @@ export async function POST(req: Request) {
     const found = await sbGet<EnrollmentRow>("sequence_enrollments", "*", `id=eq.${encodeURIComponent(id)}`);
     const en = found[0];
     if (!en) return NextResponse.json({ error: "not_found" }, { status: 404 });
+
+    // Duplicate ack (sender retried after a timeout): this exact step is
+    // already recorded. No-op, and tell the sender it can treat this as done.
+    if (stepOrder === en.current_step) {
+      return NextResponse.json({
+        already_recorded: true,
+        enrollment_id: en.id,
+        current_step: en.current_step,
+        status: en.status,
+        next_send_at: en.next_send_at,
+        done: en.status === "completed",
+      });
+    }
+    if (stepOrder !== en.current_step + 1) {
+      return NextResponse.json(
+        {
+          error: `step_order ${stepOrder} does not match this enrollment. It has completed step ${en.current_step}, so the only step that can be recorded now is ${en.current_step + 1}.`,
+        },
+        { status: 409 }
+      );
+    }
+
     if (en.status !== "active") {
       return badRequest(`This enrollment is ${en.status}, not active; refusing to advance it.`);
+    }
+
+    // Only acks for a step that is actually due are accepted.
+    if (!en.next_send_at) {
+      return NextResponse.json(
+        { error: "This enrollment has no next_send_at, so nothing is due on it; refusing to advance it." },
+        { status: 409 }
+      );
+    }
+    if (new Date(en.next_send_at).getTime() > Date.now()) {
+      return NextResponse.json(
+        { error: `This enrollment is not due yet (next_send_at is ${en.next_send_at}, in the future); refusing to advance it.` },
+        { status: 409 }
+      );
+    }
+
+    // The parent sequence must be active. Paused or draft sequences export
+    // nothing from GET, so an ack against one means the sender is off-script.
+    const seqRows = await sbGet<{ id: string; status: string }>(
+      "sequences",
+      "id,status",
+      `id=eq.${en.sequence_id}`
+    );
+    const seq = seqRows[0];
+    if (!seq || seq.status !== "active") {
+      return NextResponse.json(
+        {
+          error: `The parent sequence is ${seq ? seq.status : "missing"}, not active; refusing to advance this enrollment.`,
+        },
+        { status: 409 }
+      );
     }
 
     const completedStep = en.current_step + 1;

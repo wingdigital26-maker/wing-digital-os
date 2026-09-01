@@ -89,7 +89,11 @@ export async function PATCH(req: Request) {
         `sequence_id=eq.${step.sequence_id}&step_order=eq.${targetOrder}`
       );
       const other = neighbors[0];
-      if (!other) return badRequest("That step is already at the end.");
+      if (!other) {
+        return badRequest(
+          move === "up" ? "That step is already first." : "That step is already last."
+        );
+      }
       // Three-hop swap so the UNIQUE (sequence_id, step_order) never collides.
       await sbPatch("sequence_steps", `id=eq.${step.id}`, { step_order: -1 });
       await sbPatch("sequence_steps", `id=eq.${other.id}`, { step_order: step.step_order });

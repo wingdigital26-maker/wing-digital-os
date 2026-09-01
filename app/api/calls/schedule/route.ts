@@ -289,6 +289,19 @@ export async function DELETE(req: Request) {
   if (!url || !key)
     return NextResponse.json({ error: "Supabase is not configured." }, { status: 503 });
   try {
+    // Callers may only delete blocks they created (tagged in notes at POST
+    // time). Staff and admin can delete anything, including trio imports.
+    const isStaff = user.isAdmin || ["admin", "owner", "staff"].includes(user.role ?? "");
+    if (!isStaff) {
+      const rows = await sbGet<{ notes: string | null }>("calendar_blocks", `id=eq.${id}&select=notes`);
+      if (!rows?.length)
+        return NextResponse.json({ error: "No block with that id." }, { status: 404 });
+      if (rows[0].notes !== `added by ${user.email}`)
+        return NextResponse.json(
+          { error: "You can only remove blocks you added. Ask Jack or Grant to remove this one." },
+          { status: 403 },
+        );
+    }
     const r = await fetch(`${url}/rest/v1/calendar_blocks?id=eq.${id}`, {
       method: "DELETE",
       headers: { apikey: key, Authorization: `Bearer ${key}`, Prefer: "return=representation" },

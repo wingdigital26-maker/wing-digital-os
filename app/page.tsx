@@ -135,6 +135,35 @@ export default function Home() {
   // "new leads" counter. Kept at 0 so the nav badge simply never shows.
   const [newLeadCount, setNewLeadCount] = useState(0);
 
+  // ── Per-user nav (2026-09-01) ────────────────────────────────────────────
+  // The OS now has a second real user (Grant, role 'staff'). Jack's personal
+  // surfaces — the School section and the Personal tab — are his alone, so
+  // they only render for full-access sessions: role admin/owner, or the legacy
+  // OS_PASSWORD cookie (which is Jack himself). Until /api/me answers, the
+  // shell fails CLOSED: personal surfaces stay hidden rather than flashing at
+  // a staff user. This is presentation-layer gating; the personal data behind
+  // it is localStorage/read-only, not a server secret.
+  const [role, setRole] = useState<string | null>(null);
+  useEffect(() => {
+    fetch("/api/me", { cache: "no-store" })
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => setRole(d?.role ?? "staff"))
+      .catch(() => setRole("staff"));
+  }, []);
+  const fullAccess = role === "legacy" || role === "admin" || role === "owner";
+  const hiddenViews: Set<string> = fullAccess ? new Set() : new Set(["personal", "school"]);
+  // Nav with Jack-only entries filtered out; a group with no visible subs
+  // (School) disappears entirely.
+  const nav = NAV
+    .map(g => ({ ...g, subs: g.subs.filter(s => !hiddenViews.has(s.id)) }))
+    .filter(g => g.subs.length > 0);
+  // If the active view just became hidden (role resolved to staff while a
+  // personal view was open via deep link), land on Command instead.
+  useEffect(() => {
+    if (hiddenViews.has(active)) setActive("command");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [role, active]);
+
   // Phone flag: on mobile the secondary Intel views (Competitor Intel, Activity
   // Log) are dropped from the sub-tab strip so the Vault tab opens straight to
   // the graph. Desktop keeps the full set.
@@ -269,7 +298,7 @@ export default function Home() {
         </div>
 
         <nav style={{ flex: 1, padding: "12px 8px", display: "flex", flexDirection: "column", gap: 2 }}>
-          {NAV.map(item => {
+          {nav.map(item => {
             const isActive = groupOf(active).id === item.id;
             const hasBadge = item.id === "command" && newLeadCount > 0;
             return (
@@ -350,7 +379,7 @@ export default function Home() {
 
         {/* Sub-tabs for the active group (phone drops the secondary Intel views) */}
         {(() => {
-          const subs = groupOf(active).subs.filter(s => !(isPhone && MOBILE_HIDDEN_SUBS.has(s.id)));
+          const subs = groupOf(active).subs.filter(s => !hiddenViews.has(s.id) && !(isPhone && MOBILE_HIDDEN_SUBS.has(s.id)));
           return subs.length > 1 && (
           <div style={{
             display: "flex", gap: 6, padding: "10px 24px 0 24px",
@@ -402,8 +431,10 @@ export default function Home() {
           {visited.has("knowledge") && <div className="app-view" style={{ display: active === "knowledge" ? "block" : "none" }}><KnowledgeBase initialPath={openNotePath} onSendToAI={sendToAI} /></div>}
           {visited.has("agent") && <div className="app-view" style={{ display: active === "agent" ? "block" : "none" }}><MissionOps /></div>}
           {visited.has("log") && <div className="app-view" style={{ display: active === "log" ? "block" : "none" }}><ActivityLog /></div>}
-          {visited.has("school") && <div className="app-view" style={{ display: active === "school" ? "block" : "none" }}><SchoolSection /></div>}
-          {visited.has("personal") && <div className="app-view" style={{ display: active === "personal" ? "block" : "none" }}><PersonalSection /></div>}
+          {/* Jack-only views never mount for a restricted session, even when a
+              stale `visited` entry exists from before the role resolved. */}
+          {fullAccess && visited.has("school") && <div className="app-view" style={{ display: active === "school" ? "block" : "none" }}><SchoolSection /></div>}
+          {fullAccess && visited.has("personal") && <div className="app-view" style={{ display: active === "personal" ? "block" : "none" }}><PersonalSection /></div>}
         </div>
       </main>
 
@@ -1531,16 +1562,14 @@ function KnowledgeBase({ initialPath, onSendToAI }: { initialPath?: string; onSe
 function PersonalSection() {
   const LS_TASKS = "wingos_tasks";
   const LS_GOALS = "wingos_goals";
-  const LS_CLEP = "wingos_clep";
+  // The CLEP Bio study tracker that lived here was removed 2026-09-01: the
+  // exam is done. Its localStorage key ("wingos_clep") is simply orphaned.
 
   const [tasks, setTasks] = useState<{ id: string; text: string; done: boolean }[]>(() => {
     try { return JSON.parse(localStorage.getItem(LS_TASKS) ?? "[]"); } catch { return []; }
   });
   const [goals, setGoals] = useState<{ id: string; text: string; done: boolean }[]>(() => {
     try { return JSON.parse(localStorage.getItem(LS_GOALS) ?? "[]"); } catch { return []; }
-  });
-  const [clep, setClep] = useState<{ studied: number; target: number; exam: string }>(() => {
-    try { return JSON.parse(localStorage.getItem(LS_CLEP) ?? '{"studied":0,"target":60,"exam":"2026-08-01"}'); } catch { return { studied: 0, target: 60, exam: "2026-08-01" }; }
   });
   const [newTask, setNewTask] = useState("");
   const [newGoal, setNewGoal] = useState("");
@@ -1570,14 +1599,6 @@ function PersonalSection() {
     const next = goals.map(g => g.id === id ? { ...g, done: !g.done } : g);
     setGoals(next); save(LS_GOALS, next);
   }
-
-  function updateClep(field: string, val: string | number) {
-    const next = { ...clep, [field]: val };
-    setClep(next); save(LS_CLEP, next);
-  }
-
-  const clepPct = Math.min(100, Math.round((clep.studied / clep.target) * 100));
-  const daysLeft = Math.max(0, Math.ceil((new Date(clep.exam).getTime() - Date.now()) / 86400000));
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24, maxWidth: 900 }}>
@@ -1631,49 +1652,6 @@ function PersonalSection() {
             ))}
           </div>
         </div>
-      </div>
-
-      {/* CLEP Bio Tracker */}
-      <div style={{ background: "linear-gradient(180deg, var(--bg-card), var(--bg-card))", border: "1px solid var(--border)", borderRadius: 16, padding: 20, boxShadow: "0 8px 24px var(--bg-hover), inset 0 1px 0 var(--border)" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <p style={{ fontSize: 13, fontWeight: 700 }}>📚 CLEP Bio Study Tracker</p>
-          <span style={{ fontSize: 12, color: daysLeft < 14 ? "var(--red)" : "var(--text-muted)" }}>{daysLeft} days until exam</span>
-        </div>
-        <div style={{ display: "flex", gap: 16, marginBottom: 16, flexWrap: "wrap" }}>
-          <div style={{ flex: 1, minWidth: 140 }}>
-            <label style={{ fontSize: 11, color: "var(--text-muted)", display: "block", marginBottom: 4 }}>Hours studied</label>
-            <input type="number" value={clep.studied} onChange={e => updateClep("studied", Number(e.target.value))} min={0}
-              style={{ width: "100%", background: "var(--bg-hover)", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 12px", color: "var(--text-primary)", fontSize: 16, fontWeight: 700, outline: "none" }} />
-          </div>
-          <div style={{ flex: 1, minWidth: 140 }}>
-            <label style={{ fontSize: 11, color: "var(--text-muted)", display: "block", marginBottom: 4 }}>Target hours</label>
-            <input type="number" value={clep.target} onChange={e => updateClep("target", Number(e.target.value))} min={1}
-              style={{ width: "100%", background: "var(--bg-hover)", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 12px", color: "var(--text-primary)", fontSize: 16, fontWeight: 700, outline: "none" }} />
-          </div>
-          <div style={{ flex: 1, minWidth: 140 }}>
-            <label style={{ fontSize: 11, color: "var(--text-muted)", display: "block", marginBottom: 4 }}>Exam date</label>
-            <input type="date" value={clep.exam} onChange={e => updateClep("exam", e.target.value)}
-              style={{ width: "100%", background: "var(--bg-hover)", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 12px", color: "var(--text-primary)", fontSize: 13, outline: "none" }} />
-          </div>
-        </div>
-        {/* Progress bar */}
-        <div style={{ background: "var(--bg-hover)", borderRadius: 20, height: 12, overflow: "hidden", border: "1px solid var(--border)" }}>
-          <div style={{
-            height: "100%", width: `${clepPct}%`,
-            background: clepPct >= 100 ? "linear-gradient(90deg, #34d399, #22d3ee)" : "linear-gradient(90deg, #22d3ee, #a78bfa)",
-            borderRadius: 20, transition: "width 0.4s ease",
-            boxShadow: "0 0 12px rgba(34,211,238,0.5)",
-          }} />
-        </div>
-        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6 }}>
-          <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{clep.studied}h / {clep.target}h</span>
-          <span style={{ fontSize: 11, fontWeight: 700, color: clepPct >= 100 ? "var(--green)" : "var(--accent)" }}>{clepPct}% complete</span>
-        </div>
-        {daysLeft > 0 && clep.studied < clep.target && (
-          <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 8 }}>
-            Need ~{Math.ceil((clep.target - clep.studied) / daysLeft * 10) / 10}h/day to hit your target by exam day.
-          </p>
-        )}
       </div>
 
     </div>

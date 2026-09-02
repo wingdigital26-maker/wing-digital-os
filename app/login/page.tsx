@@ -40,7 +40,9 @@ export default function Login() {
       background: "var(--bg-primary)", padding: 16,
     }}>
       <div style={{
-        width: "min(380px, 90vw)",
+        width: "100%",
+        maxWidth: 380,
+        margin: "0 auto",
         background: "var(--bg-card)",
         border: "1px solid var(--border)", borderRadius: 20, padding: 32,
         boxShadow: "0 24px 60px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05)",
@@ -60,13 +62,16 @@ export default function Login() {
           type="email" value={email} autoFocus autoComplete="username"
           onChange={e => { setEmail(e.target.value); setError(false); }}
           onKeyDown={e => e.key === "Enter" && submit()}
-          placeholder="Email (skip this if you only have a password)"
+          placeholder="Email"
           style={{
             background: "var(--bg-hover)", border: `1px solid ${error ? "var(--red)" : "var(--border)"}`,
             borderRadius: 10, padding: "12px 14px", color: "var(--text-primary)",
             fontSize: 14, outline: "none", textAlign: "center",
           }}
         />
+        <p style={{ fontSize: 11.5, color: "var(--text-muted)", marginTop: -12, lineHeight: 1.4 }}>
+          Only have a password? Leave email blank.
+        </p>
         <input
           type="password" value={pw} autoComplete="current-password"
           onChange={e => { setPw(e.target.value); setError(false); }}

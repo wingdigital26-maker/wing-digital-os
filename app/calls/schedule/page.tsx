@@ -72,6 +72,24 @@ export default function TeamSchedule() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
+  const [isStaff, setIsStaff] = useState(false);
+
+  // The server only lets a caller delete blocks they created (staff can delete
+  // anything), so the X only renders where the delete would actually work.
+  // Staff status comes from the leads API's `me`, same as the layout uses.
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/calls/leads?status=all&limit=1", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!alive || !d?.me) return;
+        setIsStaff(Boolean(d.me.isAdmin) || ["admin", "owner", "staff"].includes(d.me.role ?? ""));
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   // Add form. Defaults: today, starting at the next full hour, one hour long,
   // so the common case ("block off the next hour") is zero edits.
@@ -345,14 +363,17 @@ export default function TeamSchedule() {
                         <span style={{ fontWeight: isCall ? 800 : 700, flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>
                           {e.title}
                         </span>
-                        {e.blockId && (
+                        {e.blockId && (isStaff || (feed?.me?.email && e.detail === `added by ${feed.me.email}`)) && (
                           <button
                             onClick={() => removeBlock(e)}
                             disabled={busy}
                             title="Delete this block"
                             style={{
                               border: "none", background: "transparent", color: "var(--text-muted)",
-                              cursor: "pointer", fontSize: 12, lineHeight: 1, padding: 2,
+                              cursor: "pointer", fontSize: 14, lineHeight: 1,
+                              minWidth: 32, minHeight: 32, marginTop: -6, marginRight: -6,
+                              display: "inline-flex", alignItems: "center", justifyContent: "center",
+                              flexShrink: 0,
                             }}
                           >
                             ✕
@@ -380,7 +401,7 @@ export default function TeamSchedule() {
 
       <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 16 }}>
         Everyone on the team sees the same board. Booked sales calls appear here on their own,
-        no need to text call times. Tap ✕ on a block to delete it.
+        no need to text call times. Tap ✕ to delete a block; the ✕ only shows on blocks you can actually remove.
       </p>
     </div>
   );

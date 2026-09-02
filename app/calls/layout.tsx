@@ -100,37 +100,55 @@ export default function CallsLayout({ children }: { children: React.ReactNode })
           </div>
         </div>
 
-        <nav
-          style={{
-            maxWidth: 1180,
-            margin: "0 auto",
-            padding: "10px 20px 0",
-            display: "flex",
-            gap: 4,
-            overflowX: "auto",
-          }}
-        >
-          {TABS.map((t) => {
-            const on = active(t);
-            return (
-              <a
-                key={t.href}
-                href={t.href}
-                style={{
-                  padding: "12px 16px 13px",
-                  fontSize: 14,
-                  fontWeight: on ? 700 : 500,
-                  color: on ? "var(--text-primary)" : "var(--text-muted)",
-                  textDecoration: "none",
-                  borderBottom: `2px solid ${on ? "#22d3ee" : "transparent"}`,
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {t.label}
-              </a>
-            );
-          })}
-        </nav>
+        <style>{`
+          .calls-tabs-wrap { position: relative; }
+          .calls-tabs {
+            max-width: 1180px;
+            margin: 0 auto;
+            padding: 10px 20px 0;
+            display: flex;
+            gap: 4px;
+            overflow-x: auto;
+            scrollbar-width: none;
+          }
+          .calls-tabs::-webkit-scrollbar { display: none; }
+          .calls-tab { padding: 12px 16px 13px; }
+          .calls-tabs-wrap::after {
+            content: "";
+            position: absolute;
+            top: 0; right: 0; bottom: 0;
+            width: 34px;
+            pointer-events: none;
+            background: linear-gradient(to left, var(--bg-primary), transparent);
+          }
+          @media (max-width: 480px) {
+            .calls-tab { padding: 11px 10px 12px; font-size: 13px !important; }
+          }
+        `}</style>
+        <div className="calls-tabs-wrap">
+          <nav className="calls-tabs">
+            {TABS.map((t) => {
+              const on = active(t);
+              return (
+                <a
+                  key={t.href}
+                  href={t.href}
+                  className="calls-tab"
+                  style={{
+                    fontSize: 14,
+                    fontWeight: on ? 700 : 500,
+                    color: on ? "var(--text-primary)" : "var(--text-muted)",
+                    textDecoration: "none",
+                    borderBottom: `2px solid ${on ? "#22d3ee" : "transparent"}`,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {t.label}
+                </a>
+              );
+            })}
+          </nav>
+        </div>
       </header>
 
       <main style={{ maxWidth: 1180, margin: "0 auto", padding: "24px 20px 80px" }}>{children}</main>

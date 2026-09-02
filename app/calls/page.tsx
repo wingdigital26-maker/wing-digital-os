@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import SignalLinks from "./SignalLinks";
 
 // The Today screen: the first thing anyone sees when they open Outbound. Its
 // only job is to answer "what do I do right now" with real numbers. Every
@@ -19,6 +20,7 @@ type Lead = {
   vertical: string | null;
   score: number | null;
   signals: string | null;
+  website?: string | null;
   status: string;
   next_action_at: string | null;
   claimed_by_email: string | null;
@@ -87,6 +89,43 @@ function ago(iso: string) {
   const h = Math.round(m / 60);
   if (h < 24) return `${h}h ago`;
   return new Date(iso).toLocaleDateString();
+}
+
+// Some rows carry internal research dumps in the title field ("[factcheck ...]"
+// walls of text). Those are notes, not a job title, so they come off the
+// contact line and go behind a collapsed toggle instead.
+function isResearchDump(title: string | null): title is string {
+  return Boolean(title && (title.length > 80 || title.trimStart().startsWith("[")));
+}
+
+function displayTitle(title: string | null): string | null {
+  return isResearchDump(title) ? null : title;
+}
+
+// Signals starting with "src:" are provenance tags for the importer, not
+// evidence a caller can use. They stay in the data but not on screen.
+function displaySignals(signals: string | null): string {
+  if (!signals) return "";
+  return signals
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s && !s.toLowerCase().startsWith("src:"))
+    .join(", ");
+}
+
+function ResearchNotes({ notes }: { notes: string }) {
+  return (
+    <details style={{ marginTop: 5 }}>
+      <summary
+        style={{ fontSize: 11.5, color: "var(--text-muted)", cursor: "pointer", userSelect: "none" }}
+      >
+        Research notes
+      </summary>
+      <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4, lineHeight: 1.5, overflowWrap: "anywhere" }}>
+        {notes}
+      </p>
+    </details>
+  );
 }
 
 function due(iso: string) {
@@ -190,8 +229,9 @@ export default function TodayDashboard() {
                     </span>
                   </div>
                   <p style={{ ...muted, marginTop: 4 }}>
-                    {[l.contact_name, l.title, l.city].filter(Boolean).join(" · ") || "No named contact"}
+                    {[l.contact_name, displayTitle(l.title), l.city].filter(Boolean).join(" · ") || "No named contact"}
                   </p>
+                  {isResearchDump(l.title) && <ResearchNotes notes={l.title} />}
                 </div>
                 {l.phone && (
                   <a href={`tel:${l.phone.replace(/[^+\d]/g, "")}`} style={btnPrimary}>
@@ -233,12 +273,18 @@ export default function TodayDashboard() {
                 <div style={{ flex: "1 1 260px", minWidth: 0 }}>
                   <span style={{ fontSize: 15, fontWeight: 700 }}>{l.company}</span>
                   <p style={{ ...muted, marginTop: 4 }}>
-                    {[l.contact_name, l.title, l.city, l.vertical].filter(Boolean).join(" · ") ||
+                    {[l.contact_name, displayTitle(l.title), l.city, l.vertical].filter(Boolean).join(" · ") ||
                       "No named contact"}
                   </p>
-                  {l.signals && (
+                  {isResearchDump(l.title) && <ResearchNotes notes={l.title} />}
+                  {displaySignals(l.signals) && (
                     <p style={{ fontSize: 12, color: "#7dd3fc", marginTop: 5, lineHeight: 1.45 }}>
-                      {l.signals}
+                      <SignalLinks
+                        signals={displaySignals(l.signals)}
+                        company={l.company}
+                        city={l.city ?? null}
+                        website={l.website ?? null}
+                      />
                     </p>
                   )}
                 </div>

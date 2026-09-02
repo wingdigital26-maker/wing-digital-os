@@ -1,5 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import SignalLinks from "../SignalLinks";
+import { displayName } from "../names";
 
 type Lead = {
   id: string;
@@ -30,9 +32,27 @@ type Lead = {
 
 // "maddox@wingdigital.co" -> "Maddox's sheet". Names come from the data, never
 // a hardcoded list.
-const sheetLabel = (email: string) => {
-  const n = email.split("@")[0] || email;
-  return `${n.charAt(0).toUpperCase()}${n.slice(1)}'s sheet`;
+const sheetLabel = (email: string) => `${displayName(email)}'s sheet`;
+
+// How many leads render at once. More arrive via the "Show 50 more" button --
+// a phone cannot hold 500 full cards in the DOM without freezing.
+const PAGE = 50;
+
+// Some rows carry internal research dumps in the `title` field ("[factcheck
+// 2026-08-22] ..."). Those are for the caller's eyes on demand, not the
+// contact line. Anything long or bracket-prefixed is treated as notes.
+const isResearchDump = (t: string | null): t is string =>
+  !!t && (t.trim().startsWith("[") || t.length > 80);
+
+// Strip machine tokens ("src:maps-scrape") out of the signals string before it
+// is shown or linked. Returns null when nothing displayable remains.
+const displaySignals = (signals: string | null): string | null => {
+  if (!signals) return null;
+  const parts = signals
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s && !s.toLowerCase().startsWith("src:"));
+  return parts.length ? parts.join(", ") : null;
 };
 
 type Activity = {
@@ -80,9 +100,18 @@ export default function CallRoom() {
   const [error, setError] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [total, setTotal] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [pageSize, setPageSize] = useState(PAGE);
+
+  // Filters and search stay server-driven; changing any of them starts back at
+  // the first page.
+  useEffect(() => {
+    setPageSize(PAGE);
+  }, [filter, assigned, q]);
 
   const load = useCallback(async () => {
-    const p = new URLSearchParams({ status: filter });
+    const p = new URLSearchParams({ status: filter, limit: String(pageSize), offset: "0" });
     if (assigned !== "all") p.set("assigned", assigned);
     if (q.trim()) p.set("q", q.trim());
     const r = await fetch(`/api/calls/leads?${p}`, { cache: "no-store" });
@@ -100,11 +129,13 @@ export default function CallRoom() {
     const rows: Lead[] = d.leads ?? [];
     setLeads(rows);
     setCounts(d.counts ?? {});
+    setTotal(typeof d.total === "number" ? d.total : rows.length);
+    setHasMore(Boolean(d.hasMore));
     setAssignedEmails(d.assignedEmails ?? []);
     setMe(d.me ?? null);
     setError(null);
     setLoading(false);
-  }, [filter, assigned, q]);
+  }, [filter, assigned, q, pageSize]);
 
   useEffect(() => {
     load();
@@ -157,6 +188,11 @@ export default function CallRoom() {
 
   async function disposition(outcome: string) {
     if (!active) return;
+    // A callback with no date lands in "No date set" and reminds nobody.
+    // Gentle check, not a wall.
+    if (outcome === "callback" && !callbackAt) {
+      if (!window.confirm("Log without a date? It will not remind anyone.")) return;
+    }
     setBusy(true);
     setError(null);
     const r = await fetch("/api/calls/disposition", {
@@ -281,12 +317,14 @@ export default function CallRoom() {
           )}
           {shown.map((l) => (
             <div key={l.id} style={{ ...card, display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap" }}>
-              <div style={{
-                width: 44, height: 44, borderRadius: 11, flexShrink: 0,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                background: "var(--bg-hover)", border: "1px solid var(--border)",
-                fontSize: 14, fontWeight: 800, color: (l.score ?? 0) >= 65 ? "#4ade80" : "var(--text-muted)",
-              }}>{l.score ?? 0}</div>
+              <div
+                title="Lead score: higher = more worth calling. Green from 65 up."
+                style={{
+                  width: 44, height: 44, borderRadius: 11, flexShrink: 0,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  background: "var(--bg-hover)", border: "1px solid var(--border)",
+                  fontSize: 14, fontWeight: 800, color: (l.score ?? 0) >= 65 ? "#4ade80" : "var(--text-muted)",
+                }}>{l.score ?? 0}</div>
 
               <div style={{ flex: "1 1 260px", minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -296,16 +334,28 @@ export default function CallRoom() {
                   </span>
                   {l.claim === "taken" && (
                     <span style={{ ...pill, borderColor: "#f97316", color: "#f97316" }}>
-                      on a call with {l.claimed_by_email ?? "someone"}
+                      on a call with {l.claimed_by_email ? displayName(l.claimed_by_email) : "someone"}
                     </span>
                   )}
                 </div>
                 <p style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 4 }}>
-                  {[l.contact_name, l.title, l.city, l.vertical, l.employees ? `${l.employees} emp` : null]
+                  {[l.contact_name, isResearchDump(l.title) ? null : l.title, l.city, l.vertical, l.employees ? `${l.employees} emp` : null]
                     .filter(Boolean).join(" · ")}
                 </p>
-                {l.signals && (
-                  <p style={{ fontSize: 12, color: "#7dd3fc", marginTop: 5, lineHeight: 1.45 }}>{l.signals}</p>
+                {isResearchDump(l.title) && (
+                  <details style={{ marginTop: 5 }}>
+                    <summary style={{ fontSize: 12, color: "var(--text-muted)", cursor: "pointer" }}>
+                      Research notes
+                    </summary>
+                    <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4, lineHeight: 1.45, whiteSpace: "pre-wrap" }}>
+                      {l.title}
+                    </p>
+                  </details>
+                )}
+                {displaySignals(l.signals) && (
+                  <p style={{ fontSize: 12, color: "#7dd3fc", marginTop: 5, lineHeight: 1.45 }}>
+                    <SignalLinks signals={displaySignals(l.signals)!} company={l.company} city={l.city} website={l.website} />
+                  </p>
                 )}
                 {l.call_count > 0 && (
                   <p style={{ fontSize: 11.5, color: "var(--text-muted)", marginTop: 4 }}>
@@ -337,6 +387,24 @@ export default function CallRoom() {
               </div>
             </div>
           ))}
+
+          {!loading && hasMore && (
+            <button
+              onClick={() => setPageSize((s) => s + PAGE)}
+              style={{
+                ...btnPrimary, width: "100%", minHeight: 52, marginTop: 4,
+                background: "var(--bg-card)", border: "1px solid var(--border)",
+                color: "var(--text-primary)", fontSize: 14,
+              }}
+            >
+              Show {Math.min(PAGE, total - shown.length)} more ({total - shown.length} left)
+            </button>
+          )}
+          {!loading && shown.length > 0 && (
+            <p style={{ fontSize: 12, color: "var(--text-muted)", textAlign: "center", marginTop: 4 }}>
+              Showing {shown.length} of {total}
+            </p>
+          )}
         </div>
       </div>
 
@@ -360,13 +428,25 @@ export default function CallRoom() {
               <div>
                 <h2 style={{ fontSize: 20, fontWeight: 800 }}>{active.company}</h2>
                 <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 3 }}>
-                  {[active.contact_name, active.title].filter(Boolean).join(" · ") || "No named contact"}
+                  {[active.contact_name, isResearchDump(active.title) ? null : active.title]
+                    .filter(Boolean).join(" · ") || "No named contact"}
                 </p>
               </div>
               <button onClick={() => closeLead()} style={btnGhost}>Close</button>
             </div>
 
-            {active.signals && (
+            {isResearchDump(active.title) && (
+              <details style={{ marginTop: 10 }}>
+                <summary style={{ fontSize: 12.5, color: "var(--text-muted)", cursor: "pointer", fontWeight: 600 }}>
+                  Research notes
+                </summary>
+                <p style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 5, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
+                  {active.title}
+                </p>
+              </details>
+            )}
+
+            {displaySignals(active.signals) && (
               <div style={{
                 marginTop: 14, padding: 12, borderRadius: 10,
                 background: "rgba(56,189,248,0.08)", border: "1px solid rgba(56,189,248,0.25)",
@@ -374,7 +454,9 @@ export default function CallRoom() {
                 <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: "#7dd3fc", fontWeight: 700 }}>
                   Why they are worth calling
                 </p>
-                <p style={{ fontSize: 13, marginTop: 5, lineHeight: 1.5 }}>{active.signals}</p>
+                <p style={{ fontSize: 13, marginTop: 5, lineHeight: 1.5 }}>
+                  <SignalLinks signals={displaySignals(active.signals)!} company={active.company} city={active.city} website={active.website} />
+                </p>
               </div>
             )}
 
@@ -401,7 +483,7 @@ export default function CallRoom() {
                         {OUTCOMES.find((o) => o.key === h.outcome)?.label ?? h.outcome}
                       </span>
                       <span style={{ color: "var(--text-muted)" }}>
-                        {" "}· {h.user_email ?? "unknown"} · {new Date(h.created_at).toLocaleString()}
+                        {" "}· {displayName(h.user_email)} · {new Date(h.created_at).toLocaleString()}
                       </span>
                       {h.notes && <p style={{ marginTop: 4, lineHeight: 1.45 }}>{h.notes}</p>}
                     </div>
@@ -456,8 +538,10 @@ export default function CallRoom() {
               ))}
             </div>
             <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 12, lineHeight: 1.5 }}>
-              This lead is held for you for 20 minutes so nobody double-dials it. Logging an
-              outcome releases it automatically.
+              This lead is held for you for 20 minutes so nobody double-dials it. Logging any
+              outcome, including No answer, releases the hold right away. The one exception is
+              Call back later, which keeps the hold for the rest of the 20 minutes so you can
+              finish scheduling.
             </p>
           </div>
         </div>

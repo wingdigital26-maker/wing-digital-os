@@ -66,9 +66,10 @@ export async function POST(req: Request) {
 
   // "no_answer" is a real event but not a real status change -- a business you
   // could not reach is still a business to call. Everything else advances the
-  // lead. A finished lead releases its claim so the room does not silently fill
-  // up with locks nobody is working.
-  const releases = outcome !== "callback" && outcome !== "no_answer";
+  // lead. Every outcome releases the claim except "callback": the caller who
+  // made the promise keeps the hold so they can finish scheduling. No answer
+  // releases immediately -- the UI promises exactly that.
+  const releases = outcome !== "callback";
   const patch: Record<string, unknown> = {
     last_outcome: outcome,
     last_called_at: new Date().toISOString(),

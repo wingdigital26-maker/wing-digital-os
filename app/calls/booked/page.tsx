@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { displayName } from "../names";
 
 // The wins board. Every lead at status='booked', most recent booking first,
 // with the notes from the call that booked it.
@@ -42,7 +43,7 @@ export default function Booked() {
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const r = await fetch("/api/calls/leads?status=booked", { cache: "no-store" });
+    const r = await fetch("/api/calls/leads?status=booked&limit=500", { cache: "no-store" });
     if (!r.ok) {
       const d = await r.json().catch(() => ({}));
       setError(d.error ?? "Could not load booked calls");
@@ -142,7 +143,7 @@ export default function Booked() {
 
               <p style={{ fontSize: 12.5, color: "#4ade80", marginTop: 6, fontWeight: 600 }}>
                 {booking
-                  ? `Booked by ${booking.user_email ?? "unknown"} · ${new Date(booking.created_at).toLocaleString()}`
+                  ? `Booked by ${displayName(booking.user_email)} · ${new Date(booking.created_at).toLocaleString()}`
                   : lead.last_called_at
                     ? `Marked booked ${new Date(lead.last_called_at).toLocaleString()} · caller not recorded`
                     : "No booking activity recorded"}

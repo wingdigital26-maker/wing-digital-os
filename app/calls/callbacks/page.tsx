@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { displayName } from "../names";
 
 // The follow-up queue. Every lead sitting at status='callback', soonest first,
 // bucketed by how urgent it is. A caller can work the queue right here: same
@@ -105,7 +106,7 @@ export default function Callbacks() {
   const [now, setNow] = useState(() => new Date());
 
   const load = useCallback(async () => {
-    const r = await fetch("/api/calls/leads?status=callback", { cache: "no-store" });
+    const r = await fetch("/api/calls/leads?status=callback&limit=500", { cache: "no-store" });
     if (!r.ok) {
       const d = await r.json().catch(() => ({}));
       setError(d.error ?? "Could not load callbacks");
@@ -297,7 +298,7 @@ export default function Callbacks() {
                         </span>
                         {l.claim === "taken" && (
                           <span style={{ ...pill, borderColor: "#f97316", color: "#f97316" }}>
-                            on a call with {l.claimed_by_email ?? "someone"}
+                            on a call with {l.claimed_by_email ? displayName(l.claimed_by_email) : "someone"}
                           </span>
                         )}
                       </div>
@@ -319,7 +320,7 @@ export default function Callbacks() {
                           background: "var(--bg-hover)", border: "1px solid var(--border)",
                         }}>
                           <p style={{ fontSize: 11.5, color: "var(--text-muted)" }}>
-                            Set by {last.user_email ?? "unknown"} ·{" "}
+                            Set by {displayName(last.user_email)} ·{" "}
                             {new Date(last.created_at).toLocaleString()}
                           </p>
                           {last.notes ? (
@@ -429,7 +430,7 @@ export default function Callbacks() {
                         {OUTCOMES.find((o) => o.key === h.outcome)?.label ?? h.outcome}
                       </span>
                       <span style={{ color: "var(--text-muted)" }}>
-                        {" "}· {h.user_email ?? "unknown"} · {new Date(h.created_at).toLocaleString()}
+                        {" "}· {displayName(h.user_email)} · {new Date(h.created_at).toLocaleString()}
                       </span>
                       {h.notes && <p style={{ marginTop: 4, lineHeight: 1.45 }}>{h.notes}</p>}
                     </div>
@@ -484,8 +485,9 @@ export default function Callbacks() {
               ))}
             </div>
             <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 12, lineHeight: 1.5 }}>
-              This lead is held for you for 20 minutes so nobody double-dials it. Logging an
-              outcome releases it automatically.
+              This lead is held for you for 20 minutes so nobody double-dials it. Logging any
+              outcome releases the hold right away, except Call back later, which keeps the
+              hold for the rest of the 20 minutes.
             </p>
           </div>
         </div>

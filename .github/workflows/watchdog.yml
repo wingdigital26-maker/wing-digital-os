@@ -16,9 +16,10 @@ jobs:
       - name: Site uptime checks
         run: |
           fails=""
+          # jacksonroofingco.com was removed 2026-09-02: Jackson Roofing stopped
+          # being a client on 2026-09-01, so their uptime is no longer Wing's alarm.
           for url in \
             "https://wing-digital-os.vercel.app/manifest.json" \
-            "https://jacksonroofingco.com" \
             "https://herosjunkremovaltx.com" \
             "https://renewalhealth.life"; do
             code=$(curl -s -o /dev/null -w '%{http_code}' -m 20 "$url" || echo 000)

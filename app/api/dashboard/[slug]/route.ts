@@ -26,6 +26,19 @@ type Item = { date: string; type: string; title: string; status: string; url: st
 
 const UA = { "User-Agent": "WingDigital-Dashboard/1.0 (+https://wingdigital.co)" };
 
+/**
+ * Unauthenticated api.github.com allows 60 calls an hour per IP, and dating one
+ * client's pages costs roughly one call each. Measured 2026-09-03: a throttled
+ * run quietly returned 26 of 30 published posts, because a failed date lookup
+ * dropped the page entirely. A client watching their own total shrink is the
+ * worst possible failure mode for this page, so the token is used when present
+ * and a partial run is now REPORTED rather than rendered as a smaller number.
+ */
+const GH_AUTH: Record<string, string> = process.env.GITHUB_TOKEN
+  ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` }
+  : {};
+
+
 function stripTags(s: string): string {
   return s
     .replace(/<[^>]+>/g, "")
@@ -66,11 +79,13 @@ async function fromWpApi(src: ContentSource): Promise<Item[]> {
  * back to the oldest commit touching the path, which is what we want -- a later
  * edit must never masquerade as a new publish.
  */
-async function fromGithub(src: ContentSource): Promise<Item[]> {
+async function fromGithub(src: ContentSource): Promise<{ items: Item[]; missed: number }> {
   const out: Item[] = [];
+  let missed = 0;
+  const H = { ...UA, ...GH_AUTH };
   for (const g of src.globs || []) {
     const listUrl = `https://api.github.com/repos/${src.repo}/contents/${g.dir}`;
-    const r = await fetch(listUrl, { headers: UA, next: { revalidate } });
+    const r = await fetch(listUrl, { headers: H, next: { revalidate } });
     if (!r.ok) continue;
     const files = (await r.json()) as Array<{ name: string; path: string }>;
     const wanted = files.filter(
@@ -86,7 +101,7 @@ async function fromGithub(src: ContentSource): Promise<Item[]> {
         // take the full (small) commit list for this path and use its last entry.
         const cr = await fetch(
           `https://api.github.com/repos/${src.repo}/commits?path=${encodeURIComponent(f.path)}&per_page=100`,
-          { headers: UA, next: { revalidate } }
+          { headers: H, next: { revalidate } }
         );
         if (!cr.ok) return null;
         const commits = (await cr.json()) as Array<{ commit: { author: { date: string } } }>;
@@ -102,9 +117,12 @@ async function fromGithub(src: ContentSource): Promise<Item[]> {
         } as Item;
       })
     );
-    for (const it of results) if (it) out.push(it);
+    for (const it of results) {
+      if (it) out.push(it);
+      else missed++;   // found on the site, could not be dated -- never silently dropped
+    }
   }
-  return out;
+  return { items: out, missed };
 }
 
 function titleFromSlug(name: string): string {
@@ -221,11 +239,16 @@ async function fetchCloudflare(cfg: ClientConfig) {
 async function collect(cfg: ClientConfig) {
   const items: Item[] = [];
   const failed: string[] = [];
+  let missed = 0;
   for (const src of cfg.sources) {
     try {
       let got: Item[] = [];
       if (src.kind === "wp_api") got = await fromWpApi(src);
-      else if (src.kind === "github_repo") got = await fromGithub(src);
+      else if (src.kind === "github_repo") {
+        const gh = await fromGithub(src);
+        got = gh.items;
+        missed += gh.missed;
+      }
       else if (src.kind === "sitemap") got = await fromSitemap(src);
       items.push(...got);
     } catch {
@@ -242,7 +265,7 @@ async function collect(cfg: ClientConfig) {
     if (!prev || (it.url && !prev.url)) merged.set(k, it);
   }
   const list = [...merged.values()].sort((a, b) => b.date.localeCompare(a.date));
-  return { items: list, failed };
+  return { items: list, failed, missed };
 }
 
 export async function GET(
@@ -256,7 +279,7 @@ export async function GET(
     return NextResponse.json({ error: `unknown client '${slug}'` }, { status: 404 });
   }
 
-  const [{ items, failed }, traffic] = await Promise.all([
+  const [{ items, failed, missed }, traffic] = await Promise.all([
     collect(cfg),
     fetchCloudflare(cfg),
   ]);
@@ -270,7 +293,15 @@ export async function GET(
       generated: today,
       dataThrough: items.length ? today : null,
       live: true,
+      // The page needs its own slug to call the sibling health endpoint. The
+      // static build has no slug and no server, which is exactly how that build
+      // knows to hide the live site-check section instead of fetching nothing.
+      slug,
       sourcesFailed: failed,
+      // Pages we can see on the site but could not date this run. Non-zero means
+      // the totals below are an UNDERCOUNT, and the page says so rather than
+      // showing a smaller number as if work disappeared.
+      undated: missed,
       brand: cfg.brand,
       // Theme rides in the payload: one hosted HTML file has to repaint itself
       // in each client's own brand colours at runtime.

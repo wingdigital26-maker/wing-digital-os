@@ -53,7 +53,7 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 .hdr-in{max-width:920px;margin:0 auto;padding:16px 24px;display:flex;align-items:center;gap:13px}
 /* The badge takes the brand's own dark tile and letter colour rather than the
    accent. Painting white on the accent breaks the moment a brand's accent is a
-   light one -- Jackson's cyan in dark mode is unreadable under white text. */
+   light one -- a cyan accent in dark mode is unreadable under white text. */
 .mark{width:38px;height:38px;border-radius:11px;flex:0 0 auto;display:grid;place-items:center;
   font-weight:700;font-size:.85rem;letter-spacing:.01em;
   /* var() with the build-time value as fallback: the static build has no
@@ -193,6 +193,26 @@ section{padding:44px 0 0}
 .pn{font-size:.88rem;font-weight:600}
 .pw{font-size:.8rem;color:var(--t2);margin-top:3px;max-width:60ch}
 
+/* live site check -- measured against the real site at page load */
+.hstats{display:grid;grid-template-columns:repeat(auto-fit,minmax(178px,1fr));gap:14px;margin-bottom:18px}
+.hstat{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
+  padding:17px 19px;box-shadow:var(--shadow)}
+.hstat-v{font-family:var(--display);font-size:1.75rem;font-weight:700;letter-spacing:-.028em;
+  line-height:1;font-variant-numeric:tabular-nums}
+.hstat-v small{font-size:.9rem;font-weight:600;color:var(--t3);font-family:var(--font);
+  letter-spacing:0;margin-left:2px}
+.hstat-l{margin-top:8px;font-size:.79rem;color:var(--t2);line-height:1.45}
+.hstat.pend .hstat-v{font-size:1rem;font-family:var(--font);font-weight:650;color:var(--t3);
+  letter-spacing:0;line-height:1.4}
+.hgood{display:flex;gap:10px;align-items:baseline;font-size:.88rem;color:var(--t2);line-height:1.55}
+.hgood i{width:9px;height:9px;border-radius:50%;background:var(--ok);flex:0 0 auto;
+  transform:translateY(1px)}
+.hprob{margin-top:6px;font-size:.8rem;color:var(--t2);line-height:1.6}
+.hprob li{margin-left:17px}
+.hwarn{margin-bottom:16px;padding:14px 17px;border-radius:var(--r);
+  border:1px solid var(--accent);background:var(--accent-bg);font-size:.86rem;line-height:1.55}
+.hstamp{margin-top:15px;font-size:.78rem;color:var(--t3)}
+
 .stale{margin-top:20px;padding:14px 17px;border-radius:var(--r);
   border:1px solid var(--accent);background:var(--accent-bg);
   font-size:.86rem;line-height:1.55}
@@ -238,6 +258,13 @@ section{padding:44px 0 0}
 </section>
 
 <main class="wrap">
+
+  <section id="health-sec" hidden>
+    <div class="sh"><h2>Your site, checked just now</h2><span class="n" id="healthn"></span></div>
+    <div class="sd">We opened every page on your site as this loaded and checked the things Google
+      looks at. These are live readings, not a report saved earlier.</div>
+    <div id="health"></div>
+  </section>
 
   <section>
     <div class="sh"><h2>Published by month</h2></div>
@@ -340,6 +367,13 @@ const DATA = __DATA__;
   if (staleDays > 10) {
     $('#stale').innerHTML = '<div class="stale">This record stops on <b>'+esc(fmt(through))+
       '</b>. Anything published after that date is not in here yet.</div>';
+  } else if (DATA.undated > 0) {
+    // A page we can see but could not date is missing from the counts below.
+    // Saying so beats letting a client watch their own total shrink between
+    // two loads of the same link.
+    $('#stale').innerHTML = '<div class="stale">'+DATA.undated+' more page'+
+      (DATA.undated===1?' is':'s are')+' live on your site that we could not date on this load, '+
+      'so the counts below are running low by that much. Refresh in a minute and they will fill in.</div>';
   }
 
   /* three stats */
@@ -595,6 +629,124 @@ const DATA = __DATA__;
   $('#pending').innerHTML = (DATA.pendingMetrics||[]).map(p =>
     '<div class="prow"><span class="pd"></span><div><div class="pn">'+esc(p.name)+'</div>'+
     '<div class="pw">'+esc(p.why)+'</div></div></div>').join('');
+
+  /* ── the live site check ─────────────────────────────────────
+     Every OUTCOME metric a client wants (search clicks, calls, form leads) sits
+     behind access we may not have. This section needs none of it: it loads the
+     real site and reports what it finds. Only rendered in live mode -- a saved
+     file has no server to ask, and a stale "checked just now" would be a lie. */
+  const hsec = $('#health-sec');
+  if (DATA.live && DATA.slug) {
+    hsec.hidden = false;
+    $('#health').innerHTML = '<div class="empty">Opening your pages and checking them…</div>';
+    fetch('/api/dashboard/' + encodeURIComponent(DATA.slug) + '/health', { cache:'no-store' })
+      .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
+      .then(renderHealth)
+      .catch(() => {
+        // A failed check must never render as a site with zero healthy pages.
+        $('#health').innerHTML = '<div class="empty">The live check did not finish this time. '+
+          'Nothing is wrong with your website — refresh in a moment to run it again.</div>';
+      });
+  }
+
+  function tile(v, l, pending){
+    return '<div class="hstat'+(pending?' pend':'')+'"><div class="hstat-v">'+v+'</div>'+
+           '<div class="hstat-l">'+esc(l)+'</div></div>';
+  }
+
+  function renderHealth(h){
+    const p = h.pages || {};
+    const tiles = [];
+
+    // Google's own grade, only when their API actually answers. A throttled call
+    // is not a score, and a permanent "still measuring" tile is just clutter.
+    if (h.speed && typeof h.speed.score === 'number') {
+      tiles.push(tile(h.speed.score+'<small>/100</small>',
+        'Google’s speed score for your site on a phone' +
+        (h.speed.lcp ? ' · main content in ' + h.speed.lcp : '')));
+    }
+
+    if (p.checked) {
+      tiles.push(tile(p.clean + '<small> of ' + p.checked + '</small>',
+        'Pages that pass every on-page check we run'));
+    }
+    if (typeof h.homepageMs === 'number') {
+      tiles.push(tile(h.homepageMs.toLocaleString()+'<small>ms</small>',
+        'How fast your homepage answered when we asked for it just now'));
+    }
+    if (h.sitemap && h.sitemap.found) {
+      tiles.push(tile(h.sitemap.urls.toLocaleString(),
+        'Pages your sitemap hands to Google'));
+    }
+
+    let html = '<div class="hstats">' + tiles.join('') + '</div>';
+
+    if (h.robotsBlocking) {
+      html += '<div class="hwarn"><b>Your site is currently telling search engines not to index it.</b> '+
+        'That is a one-line fix in robots.txt and we are on it.</div>';
+    }
+    if (!h.sitemap || !h.sitemap.found) {
+      html += '<div class="hwarn">No sitemap was found at your domain, so Google has to discover '+
+        'pages on its own. We are adding one.</div>';
+    }
+
+    const issues = h.issues || [];
+    const impr = h.improvements || [];
+
+    function pageRows(rows, key){
+      return rows.map(function(it){
+        const name = esc(it.title || it.url);
+        return '<div class="prow"><span class="pd"></span><div><div class="pn">'+
+          '<a href="'+esc(it.url)+'" target="_blank" rel="noopener">'+name+'</a></div>'+
+          '<ul class="hprob">'+it[key].map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+
+          '</ul></div></div>';
+      }).join('');
+    }
+
+    html += '<div class="card">';
+    if (!p.checked) {
+      html += '<div class="empty">We could not reach the site to check it this time.</div>';
+    } else if (!issues.length) {
+      html += '<div class="hgood"><i></i><div>Every page we checked is working: it loads, it has a '+
+        'title and a description, a main heading, and it is open to Google.</div></div>';
+    } else {
+      html += '<div class="mgroup" style="margin-top:0"><div class="mlabel">'+
+        issues.length+' page'+(issues.length===1?'':'s')+' with something wrong</div></div>';
+      html += pageRows(issues, 'problems');
+    }
+
+    // Working pages with upside left. Kept visually separate from breakage so a
+    // long list here reads as a plan, which is what it is. Collapsed past six so
+    // the queue cannot become the longest thing on the page.
+    if (impr.length) {
+      const HEAD = 6;
+      html += '<div class="mgroup"><div class="mlabel">'+impr.length+' page'+
+        (impr.length===1?'':'s')+' we have queued for improvement</div></div>' +
+        pageRows(impr.slice(0, HEAD), 'notes');
+      if (impr.length > HEAD) {
+        html += '<div id="impr-rest" hidden>'+pageRows(impr.slice(HEAD), 'notes')+'</div>'+
+          '<button class="more" id="impr-more">Show the other '+(impr.length-HEAD)+'</button>';
+      }
+    }
+
+    // Say plainly what the check did and did not cover.
+    const notes = [];
+    if (p.checked) notes.push('Checked ' + p.checked + ' of ' + p.listed + ' pages');
+    if (p.capped) notes.push('the largest sites are checked in batches');
+    if (p.unreachable) notes.push(p.unreachable + ' page' + (p.unreachable===1?'':'s') + ' did not respond');
+    const when = h.checkedAt ? new Date(h.checkedAt) : null;
+    if (when && !isNaN(when)) notes.push('run ' + when.toLocaleString('en-US',
+      { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' }));
+    if (notes.length) html += '<div class="hstamp">'+esc(notes.join(' · '))+'.</div>';
+    html += '</div>';
+
+    $('#health').innerHTML = html;
+    const imore = $('#impr-more');
+    if (imore) imore.addEventListener('click', function(){
+      $('#impr-rest').hidden = false; imore.remove();
+    });
+    if (p.checked) $('#healthn').textContent = p.checked + ' pages checked';
+  }
 })();
 </script>
 </body>

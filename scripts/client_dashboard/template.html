@@ -303,7 +303,7 @@ section{padding:44px 0 0}
     <div id="pages"></div>
   </section>
 
-  <section>
+  <section id="pending-sec">
     <div class="sh"><h2>Not connected yet</h2></div>
     <div class="sd">We only show a number once it comes from a real source. These are blank on purpose, not zero.</div>
     <div class="card" id="pending"></div>
@@ -626,7 +626,12 @@ const DATA = __DATA__;
   }
 
   /* ── what is not wired up ────────────────────────────────── */
-  $('#pending').innerHTML = (DATA.pendingMetrics||[]).map(p =>
+  // A client can be configured with no pending list at all. Drop the whole
+  // section rather than leaving an empty "Not connected yet" card, which reads
+  // worse than not raising the subject.
+  const PEND = DATA.pendingMetrics || [];
+  if (!PEND.length) $('#pending-sec').hidden = true;
+  $('#pending').innerHTML = PEND.map(p =>
     '<div class="prow"><span class="pd"></span><div><div class="pn">'+esc(p.name)+'</div>'+
     '<div class="pw">'+esc(p.why)+'</div></div></div>').join('');
 

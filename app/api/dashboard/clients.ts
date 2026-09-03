@@ -110,10 +110,12 @@ export const CLIENTS: Record<string, ClientConfig> = {
           note: "No review request system is wired up yet. This is the fastest lever once the Google profile is connected." },
       ],
     },
-    pendingMetrics: [
-      { name: "Website visits", why: "Cloudflare Web Analytics needs to be switched on for this site. Once it is, visits appear here automatically", state: "needs access" },
-      { name: "Google Search clicks and impressions", why: "Needs Search Console access for herosjunkremovaltx.com", state: "needs access" },
-      { name: "Calls and form leads", why: "The contact form does not report back to us yet, so no lead count here would be trustworthy", state: "not connected" },
-    ],
+    // Jack's call 2026-09-03: no "Not connected yet" section for this client. An
+    // empty list hides the whole section rather than printing an empty card.
+    // What is still unmeasured for Hero's -- Cloudflare Web Analytics, Search
+    // Console, and calls/form leads -- is tracked in the vault, not on the page
+    // the client reads. Other clients keep theirs; this is per-client, not a
+    // change to the engine.
+    pendingMetrics: [],
   },
 };

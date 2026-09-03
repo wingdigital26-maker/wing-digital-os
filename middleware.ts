@@ -32,6 +32,9 @@ function isPublicPath(pathname: string): boolean {
     pathname === "/api/heartbeat" ||
     pathname === "/api/notify" ||
     pathname === "/api/cron/watchdog" ||
+    // Automation engine catch-up (GitHub Actions every 10 min, same key
+    // contract as the watchdog: Bearer CRON_SECRET or x-heartbeat-key).
+    pathname === "/api/cron/automations" ||
     pathname === "/api/push/schedule" ||
     pathname === "/api/lecture/summarize" ||
     // Twilio webhooks: incoming SMS and delivery-status callbacks. Both verify

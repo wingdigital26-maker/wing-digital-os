@@ -1,7 +1,0 @@
-Photo sources (free license, no attribution required)
-
-Pexels (api.pexels.com, pulled 2026-07-21):
-- hero-crew.jpg  - Pexels photo 38028508 (roofers installing shingles, Fort Worth TX), 1600x900
-- cta-roof.jpg   - Pexels photo 33404080 (synthetic slate roof install on brick house, Fort Worth TX), 1600x900
-
-Earlier pulls (Pexels/Unsplash free license): hero-roofer.jpg, shingle-work.jpg, roof-tools.jpg, tile-roof.jpg, crew.jpg, gutter.jpg, metal-roof.jpg, commercial-roof.jpg, house-exterior.jpg

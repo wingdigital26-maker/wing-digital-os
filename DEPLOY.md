@@ -28,7 +28,6 @@ live in `C:\Users\wjack\ghl-cli\.env` and `wing-digital-os\.env.local` on the la
 | `OS_SUPABASE_URL` | `.env.local` → `OS_SUPABASE_URL` | Supabase project URL for OS auth and portal data. |
 | `OS_SUPABASE_ANON_KEY` | `.env.local` → `OS_SUPABASE_ANON_KEY` | Supabase anon key (email/password sign-in). |
 | `OS_SUPABASE_SERVICE_KEY` | `.env.local` → `OS_SUPABASE_SERVICE_KEY` | Supabase service key (server-side role and portal-slug lookups). |
-| `GHL_JACKSON_ROOFING_PIT` | `ghl-cli/.env` → `GHL_JACKSON_ROOFING_PIT` | Jackson Roofing GHL Private Integration Token. **Powers Chris's dashboard** — set this and Jackson works fully in the cloud. |
 | `GHL_API_KEY` | `.env.local` → `GHL_API_KEY` | Wing's main GHL API key (contacts/opportunities routes). |
 | `GHL_LOCATION_ID` | `.env.local` → `GHL_LOCATION_ID` | Wing's GHL sub-account location id. |
 | `ANTHROPIC_API_KEY` | `.env.local` → `ANTHROPIC_API_KEY` | Claude chat routes (`/api/chat/claude`). |
@@ -38,8 +37,9 @@ live in `C:\Users\wjack\ghl-cli\.env` and `wing-digital-os\.env.local` on the la
 | `NEXT_PUBLIC_BASE_URL` | (optional) | Absolute base URL if any client code needs it. Set to your Vercel URL. |
 
 Per-client GHL dashboards (`/api/clients/ghl?slug=...`) read a token named
-`GHL_<SLUG>_PIT` (e.g. `jackson-roofing` → `GHL_JACKSON_ROOFING_PIT`). Add one Vercel
-env var per client you want live in the cloud.
+`GHL_<SLUG>_PIT` (e.g. `heros-junk` → `GHL_HEROS_JUNK_PIT`). Add one Vercel
+env var per client you want live in the cloud. (GoHighLevel was retired 2026-08-22,
+so this path is historical.)
 
 > Not needed on Vercel: `CLAUDE_CLI_PATH` (local Claude CLI), `USERPROFILE` (Windows).
 
@@ -63,8 +63,8 @@ env var per client you want live in the cloud.
    also add them after and hit Redeploy.)
 6. **Deploy.** Vercel builds and gives you a free URL like
    `https://wing-digital-os.vercel.app`.
-7. **Open on your phone.** Log in with `OS_PASSWORD`. Chris's Jackson dashboard is at
-   `/jackson` (or `public/jackson-dashboard.html`).
+7. **Open on your phone.** Log in with `OS_PASSWORD`. Client dashboards live at
+   `/dashboards/live.html?c=<slug>` (public by design, no login).
 
 To ship future changes: `git push` → Vercel auto-redeploys.
 
@@ -87,19 +87,14 @@ the Obsidian vault on disk.
 libSQL) and point those routes at it via an env var connection string. Vault/agent
 routes would need the vault + agent logs hosted somewhere the cloud can reach. Until
 then, run the OS locally for those panels; the cloud deploy is for the always-on,
-phone-viewable, GHL-API-backed dashboards.
+phone-viewable dashboards.
 
 ---
 
-## (d) Chris's Jackson dashboard — the immediate win
+## (d) Client dashboards
 
-The Jackson dashboard is **fully cloud-safe** and is the reason to deploy now:
-
-- `/api/jackson` talks **only** to Jackson Roofing's GHL sub-account over the public
-  GHL API (`https://services.leadconnectorhq.com`) using `fetch` — no local files, no DB.
-- It reads its token from `process.env.GHL_JACKSON_ROOFING_PIT` first (falling back to
-  the local `.env` only on the laptop), so setting that one Vercel env var makes it work.
-- The token is read server-side and **never** sent to the browser; the location id is
-  hard-pinned to Jackson's account and the route is read-only.
-- Result: a live, always-on, **phone-viewable** URL you can hand to Chris — it keeps
-  working even when your laptop is off.
+Client dashboards are served from `public/dashboards/live.html?c=<slug>` and read
+`/api/dashboard/<slug>`, which is built only from public sources (the client's own
+site, repo and sitemap). No secret passes through them, so they are safe to hand to
+a client as an always-on, phone-viewable link. One client = one entry in
+`app/api/dashboard/clients.ts`.

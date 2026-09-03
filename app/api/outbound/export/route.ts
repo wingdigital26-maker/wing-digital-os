@@ -19,11 +19,10 @@ import { NextResponse } from "next/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Fail-closed key check, same shape as app/lib/dashboardKey.ts's
-// dashboardKeyOk() (used by /api/jackson-content): if the secret is unset, no
-// request is authorized, ever. A distinct env var because this guards a
-// different, higher-stakes surface (an unsent send queue, not dashboard
-// stats) and must not be able to piggyback on a key issued for something else.
+// Fail-closed key check: if the secret is unset, no request is authorized,
+// ever. Its own env var because this guards a high-stakes surface (an unsent
+// send queue) and must not be able to piggyback on a key issued for
+// something else.
 // Accepts either `Authorization: Bearer <key>` (the header documented in
 // SENDING-CONTRACT.md) or `?k=<key>` (matches the existing dashboard-link
 // pattern), so a browser spot-check and a scripted client both work the

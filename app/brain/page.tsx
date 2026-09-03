@@ -189,7 +189,7 @@ export default function BrainPage() {
                 Ask the brain anything about Wing Digital.
               </p>
               <p style={{ fontSize: 13 }}>
-                It reads your vault to answer. Try &ldquo;What is our current focus?&rdquo; or &ldquo;Summarize Jackson Roofing.&rdquo;
+                It reads your vault to answer. Try &ldquo;What is our current focus?&rdquo; or &ldquo;Summarize Hero&rsquo;s Junk Removal.&rdquo;
               </p>
             </div>
           )}

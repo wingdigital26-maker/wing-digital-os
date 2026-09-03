@@ -689,7 +689,7 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
       .then(r => r.json())
       .then(d => {
         // only the 4 keeper agents remain in the system; filter out any dead
-        // scheduled tasks (guardian, radar, tempest, hound, scribe, jackson-outreach)
+        // scheduled tasks (guardian, radar, tempest, hound, scribe, per-client outreach)
         const KEEPERS = new Set(["dispatch", "prospector", "outreach", "chronicler"]);
         if (Array.isArray(d.agents)) setAgentHealth(d.agents.filter((a: any) => KEEPERS.has((a.name || "").toLowerCase())));
       })

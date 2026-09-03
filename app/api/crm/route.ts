@@ -590,9 +590,9 @@ export type ContentFeed = {
   available: boolean; source: string | null; reason: string | null; items: ContentItem[];
 };
 
-const CONTENT_STATE_FILES: Record<string, string> = {
-  "jackson-roofing": "jackson-content-state.json",
-};
+// Slug -> state file overrides for clients whose content engine writes a
+// differently-named file. Empty today: every engine uses <slug>-content-state.json.
+const CONTENT_STATE_FILES: Record<string, string> = {};
 
 function logDirs(): string[] {
   return [
@@ -628,7 +628,7 @@ async function contentFor(slug: string | null, name: string): Promise<ContentFee
     }
     return none(
       `No content engine has ever written a publish record for ${name}. Expected ` +
-      `outreach_logs/${fileName}; it does not exist. Only Jackson Roofing's content engine writes one today.`
+      `outreach_logs/${fileName}; it does not exist.`
     );
   }
   let parsed: unknown;

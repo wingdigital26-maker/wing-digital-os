@@ -16,8 +16,8 @@ jobs:
       - name: Site uptime checks
         run: |
           fails=""
-          # jacksonroofingco.com was removed 2026-09-02: Jackson Roofing stopped
-          # being a client on 2026-09-01, so their uptime is no longer Wing's alarm.
+          # Only active client sites are listed. A dropped client's site is not
+          # Wing's alarm; remove it here the day they leave.
           for url in \
             "https://wing-digital-os.vercel.app/manifest.json" \
             "https://herosjunkremovaltx.com" \

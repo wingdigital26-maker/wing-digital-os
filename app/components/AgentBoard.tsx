@@ -2,7 +2,8 @@
 import { useState, useEffect, useCallback } from "react";
 
 // The 4 keeper agents. Six others (guardian, radar, tempest, hound, scribe,
-// jackson-outreach) were removed from the system — do not surface them here.
+// and a per-client outreach agent) were removed from the system — do not
+// surface them here.
 const AGENTS = [
   { id: "dispatch",   name: "Dispatch",   icon: "🌅", job: "Morning briefing + dial list", schedule: "Daily 6:30am" },
   { id: "prospector", name: "Prospector", icon: "🔭", job: "Lead scan + staged enrichment", schedule: "Sunday night" },

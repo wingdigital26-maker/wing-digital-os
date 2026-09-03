@@ -22,7 +22,6 @@ const EXPECTED: { agent: string; staleMin: number; windowed: boolean; label: str
   { agent: "b2b-prospector-daily", staleMin: 26 * 60, windowed: false, label: "B2B prospector" },
   { agent: "state-sync-daily", staleMin: 26 * 60, windowed: false, label: "State sync" },
   { agent: "chronicler-end-of-day", staleMin: 26 * 60, windowed: false, label: "Chronicler" },
-  { agent: "content-engine-weekly", staleMin: 8 * 24 * 60, windowed: false, label: "Jackson content engine" },
   { agent: "renewal-content-weekly", staleMin: 8 * 24 * 60, windowed: false, label: "Renewal content engine" },
 ];
 

@@ -4,7 +4,6 @@ GoHighLevel is retired (2026-08-22, API dead), but every sequence Wing sent
 through it survives as local files in ghl-cli. This pulls them into the
 sequences engine as DRAFTS:
 
-  - Jackson Roofing D1/D3/D7   from clients/templates/jackson.json
   - Wing Pest Control D1/D3/D7 from templates/wing-pest-sequence.md
   - Wing Plumbing D1/D3/D7     from templates/wing-plumbing-sequence.md
 
@@ -74,23 +73,7 @@ def parse_sequence_md(path):
     return steps
 
 
-def jackson_steps():
-    d = json.load(open(os.path.join(GHL, "clients", "templates", "jackson.json"), encoding="utf-8"))
-    subs, bodies = d["subjects"], d["bodies"]
-    out = []
-    for day in (1, 3, 7):
-        s, b = subs.get(f"s{day}"), bodies.get(f"d{day}")
-        if not b:
-            print(f"  jackson: no body for day {day}, skipping that step")
-            continue
-        out.append({"day": day, "subject": tags(s) if s else None, "body": tags(b)})
-    return out
-
-
 SEQUENCES = [
-    ("Jackson Roofing D1/D3/D7", "jackson",
-     "Rescued from the GHL-era Jackson sequence (clients/templates/jackson.json). Chris Jackson's voice.",
-     jackson_steps),
     ("Wing Pest Control Cold Outreach", None,
      "Rescued from templates/wing-pest-sequence.md. Independent operators only, never franchise branches.",
      lambda: parse_sequence_md(os.path.join(GHL, "templates", "wing-pest-sequence.md"))),

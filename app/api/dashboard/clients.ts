@@ -87,8 +87,8 @@ export const CLIENTS: Record<string, ClientConfig> = {
     ],
     // Hero's DNS runs on Cloudflare nameservers, so the zone is in Wing's own
     // Cloudflare account and its analytics are readable with a scoped token.
-    // (Jackson is NOT comparable: his nameservers are GoDaddy's, so the
-    // Cloudflare in front of that site is GoDaddy's CDN, not a zone we hold.)
+    // (A site fronted by a registrar's CDN is not comparable: that is not a
+    // zone we hold, so this source only works for zones in Wing's account.)
     analytics: { kind: "cloudflare", tokenEnv: "CLOUDFLARE_API_TOKEN" },
     pageGroups: [
       { group: "Blog posts live on your site", types: ["blog"] },
@@ -114,66 +114,6 @@ export const CLIENTS: Record<string, ClientConfig> = {
       { name: "Website visits", why: "Cloudflare Web Analytics needs to be switched on for this site. Once it is, visits appear here automatically", state: "needs access" },
       { name: "Google Search clicks and impressions", why: "Needs Search Console access for herosjunkremovaltx.com", state: "needs access" },
       { name: "Calls and form leads", why: "The contact form does not report back to us yet, so no lead count here would be trustworthy", state: "not connected" },
-    ],
-  },
-
-  "jackson-roofing": {
-    brand: {
-      name: "Jackson Roofing",
-      initials: "JR",
-      site: "https://jacksonroofingco.com",
-      kicker: "Marketing dashboard",
-      headline: "Everything Wing Digital is building for Jackson Roofing",
-      subhead: "A live record of the content, pages and search work running on your site. Click anything to open it.",
-    },
-    // Real brand read off the live site 2026-08-27: near-black + electric blue.
-    // The blue is too light for text on white, so light mode uses the darker tone.
-    theme: {
-      accent: "#1bc0ff", accent2: "#7ddcff",
-      accent_bg: "rgba(27,192,255,.12)", accent_glow: "rgba(27,192,255,.20)",
-      accent_light: "#0b7fa6", accent2_light: "#1bc0ff",
-      accent_bg_light: "rgba(11,127,166,.09)", accent_glow_light: "rgba(11,127,166,.13)",
-      mark_bg: "#0a0a0a", mark_fg: "#1bc0ff",
-    },
-    types: {
-      blog: { label: "Blog post", color: "#1bc0ff" },
-      service: { label: "Service page", color: "#8b7cf6" },
-      city: { label: "City page", color: "#5b8def" },
-      gbp: { label: "Google post", color: "#2fbf8f" },
-      other: { label: "Other", color: "#7b8794" },
-    },
-    // WordPress REST replaces the old local state file. That file was only as
-    // fresh as the last script run on Jack's PC and had gone 18 days stale; this
-    // reads the site itself, so the dashboard can never drift from reality.
-    sources: [
-      {
-        kind: "wp_api",
-        site: "https://jacksonroofingco.com",
-        postType: "blog",
-        pageType: "service",
-      },
-    ],
-    pageGroups: [
-      { group: "Blog posts live on your site", types: ["blog"] },
-      { group: "Service and city pages", types: ["service", "city"] },
-    ],
-    outreach: {
-      intro: "Everything we send out under your name, and what is not running yet.",
-      channels: [
-        { name: "Google Business posts", icon: "star", types: ["gbp"], state: "not_connected",
-          note: "Google Business posting is not connected to this dashboard yet. It needs manager access to your profile." },
-        { name: "Review requests", icon: "chat", types: [], state: "not_connected",
-          note: "Review requests went out through the old CRM, which was retired on 2026-08-22. Nothing is sending until a replacement is chosen." },
-        { name: "Email campaigns", icon: "mail", types: [], state: "not_connected",
-          note: "No email is being sent for you right now. This needs a CRM to replace the retired one before anything goes out." },
-        { name: "Facebook and Instagram", icon: "share", types: [], state: "needs_access",
-          note: "Not connected. We would need manager access to your pages before we could post or report on them." },
-      ],
-    },
-    pendingMetrics: [
-      { name: "Website visits", why: "A Facebook Pixel is running on the site but no visit-analytics source is connected to this dashboard yet", state: "needs access" },
-      { name: "Google Search clicks and impressions", why: "Needs Search Console access for jacksonroofingco.com", state: "needs access" },
-      { name: "Calls and form leads", why: "The old CRM was retired on 2026-08-22. No lead source is connected to this dashboard yet", state: "not connected" },
     ],
   },
 };

@@ -47,13 +47,13 @@ const WATCHDOG_REL = "wiki/state/watchdog.md";
 const SCHEDULED_DIR = "C:\\Users\\wjack\\.claude\\scheduled-tasks";
 
 // Only these hosts are ever fetched. Live-client domains + Jack's own OS host.
-const ALLOWED_URL_HOSTS = ["jacksonroofingco.com", "renewalhealth.life"];
+const ALLOWED_URL_HOSTS = ["renewalhealth.life"];
 
 // Build-note / scaffolding leak markers. If a fetched page body still contains
 // ANY of these, it is reachable but NOT fixed — it can never count as a green.
-// This is the honesty guard for "2xx AND clean": we scan for the exact Jackson
-// leak paragraph plus the generic build-note/placeholder markers it was built
-// from. Erring toward "still leaking" is the safe direction — it can only keep
+// This is the honesty guard for "2xx AND clean": we scan for the exact leak
+// paragraph a past build shipped plus the generic build-note/placeholder
+// markers it was built from. Erring toward "still leaking" is the safe direction — it can only keep
 // a page red, never falsely green it.
 const BUILD_NOTE_MARKERS: RegExp[] = [
   /image_todo/i, // the literal leaked ledger key

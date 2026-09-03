@@ -98,7 +98,8 @@ function nextEvery30(): Date {
 const SCHEDULED: ScheduledMeta[] = [
   { key: "sentinel-daily", name: "Sentinel", role: "Per-client health monitor, 5-pillar daily checkup", schedule: "Daily 7:00am", enabled: true, match: /\bsentinel\b/i, next: () => nextDaily(7, 0) },
   { key: "chronicler-end-of-day", name: "Chronicler", role: "End-of-day vault historian, digests chats into the brain", schedule: "Daily 9:52pm", enabled: true, match: /\bchronicler\b/i, next: () => nextDaily(21, 52) },
-  { key: "content-engine-weekly", name: "Content Engine", role: "Jackson Roofing weekly SEO content producer", schedule: "Mon 7:10am", enabled: true, match: /content[- ]engine|jackson.*(blog|content|post)/i, next: () => nextWeekly(1, 7, 10) },
+  // content-engine-weekly (a former client's content producer) was removed
+  // 2026-09-02 when that client left.
   { key: "renewal-content-weekly", name: "Renewal Engine", role: "Renewal Health weekly content, health-gated publishing", schedule: "Mon 7:44am", enabled: true, match: /\brenewal\b/i, next: () => nextWeekly(1, 7, 44) },
   { key: "b2b-outreach-engine", name: "Outreach", role: "B2B cold email sender, LIVE since 8/6 — window + cap check, dry-run, then live send", schedule: "Every 30 min, 8am-8pm", enabled: true, match: /outreach|cold email|b2b/i, next: nextEvery30 },
   { key: "b2b-prospector-daily", name: "Prospector", role: "Daily B2B lead scout — refills the pipeline so outreach never runs dry", schedule: "Daily 6:15am", enabled: true, match: /prospector|lead scan|lead-find|b2b lead/i, next: () => nextDaily(6, 15) },
@@ -366,8 +367,8 @@ function watchdogStateFor(wd: Watchdog, key: string, name: string): string | nul
 
 // Live-site domains the OS is allowed to link to as publish targets. Links are
 // only ever rendered when a real URL on one of these hosts appears in the
-// vault text (or, for Jackson, when a real WP post id is logged).
-const LIVE_HOSTS = ["jacksonroofingco.com", "renewalhealth.life", "herosjunkremovaltx.com"];
+// vault text.
+const LIVE_HOSTS = ["renewalhealth.life", "herosjunkremovaltx.com"];
 
 interface PublishItem { date: string; title: string; url: string | null; note: string | null; client: string | null }
 
@@ -379,7 +380,6 @@ function clientFromUrl(url: string | null): string | null {
   let host: string;
   try { host = new URL(url).hostname.toLowerCase().replace(/^www\./, ""); }
   catch { return null; }
-  if (host.includes("jacksonroofingco.com")) return "Jackson Roofing";
   if (host.includes("renewalhealth.life") || host.includes("renewalhealth")) return "Renewal Health";
   if (host.includes("herosjunkremovaltx.com")) return "Hero's Junk Removal";
   // Registrable domain: last two labels (good enough for the common .com case).
@@ -462,22 +462,6 @@ function parsePublishes(feed: FeedEntry[], healthRaw: string | null): {
     // A noise line with no URL is pure agent-activity — drop it entirely so the
     // panel never shows a Sentinel/Watchdog sentence with "no link logged".
     if (noise) continue;
-    // Jackson WP posts logged by id only: ?p=<id> is WordPress's canonical
-    // query permalink, built from the real post id in the publish line itself.
-    if (/jackson/i.test(text)) {
-      const ids = [...text.matchAll(/\bpublish\w*\b[^\n]{0,120}?\bposts?\s+(\d{4,6})(?:\s+and\s+(\d{4,6}))?/gi)]
-        .flatMap((m) => [m[1], m[2]])
-        .filter(Boolean) as string[];
-      if (ids.length) {
-        for (const id of [...new Set(ids)]) {
-          const url = `https://jacksonroofingco.com/?p=${id}`;
-          if (seen.has(url)) continue;
-          seen.add(url);
-          items.push({ date: e.date, title: `${clean(redact(e.title))} (post ${id})`, url, note: null, client: clientFromUrl(url) });
-        }
-        continue;
-      }
-    }
     items.push({ date: e.date, title: clean(redact(e.title)), url: null, note: "no link logged", client: null });
   }
 
@@ -802,12 +786,6 @@ const AGENT_SYSTEMS: Record<string, Wire[]> = {
     { id: "vault", label: "VAULT", direction: "writes" },
     { id: "scheduler", label: "SCHEDULER", direction: "reads" },
   ],
-  "content-engine-weekly": [
-    { id: "vault", label: "VAULT", direction: "both" },
-    { id: "website", label: "WEB/SEO", direction: "writes" },
-    { id: "clients", label: "CLIENTS", direction: "writes" },
-    { id: "scheduler", label: "SCHEDULER", direction: "reads" },
-  ],
   "renewal-content-weekly": [
     { id: "vault", label: "VAULT", direction: "both" },
     { id: "website", label: "WEB/SEO", direction: "writes" },
@@ -875,7 +853,6 @@ const ARTIFACTS: ArtifactMeta[] = [
   { id: "health-board", label: "Health board", system: "clients", producedBy: "sentinel-daily", path: "wiki/state/health-board.md", blurb: "Sentinel's master per-client health table with red flags." },
   { id: "business-snapshot", label: "Biz snapshot", system: "vault", producedBy: "dispatch", path: "wiki/state/business-snapshot.md", blurb: "The live business state: MRR, active clients, pipeline." },
   { id: "outreach-snapshot", label: "Outreach snapshot", system: "email", producedBy: "b2b-outreach-engine", path: "wiki/state/outreach-snapshot.md", blurb: "Cold-email pipeline counts and send totals." },
-  { id: "content-calendar", label: "Content calendar", system: "website", producedBy: "content-engine-weekly", path: "wiki/campaigns/jackson-social-calendar.md", blurb: "Jackson Roofing's rolling content and social calendar." },
   { id: "prospects-db", label: "prospects.db", system: "ghl-wing", producedBy: "b2b-prospector-daily", path: "wiki/automations/prospects-db.md", blurb: "The self-refilling prospect database behind outreach (Supabase + local prospects.db)." },
   { id: "replies-inbox", label: "Replies inbox", system: "ghl-wing", producedBy: "reply-triage", path: "wiki/state/replies-inbox.md", blurb: "Triage page of inbound replies, HOT flagged loudly." },
 ];
@@ -962,7 +939,6 @@ async function artifactDetail(id: string) {
 const CRON_HUMAN: Record<string, string> = {
   "sentinel-daily": "Runs every day at 7:00 in the morning, right after Dispatch.",
   "chronicler-end-of-day": "Runs every day at 9:52 at night, after the workday ends.",
-  "content-engine-weekly": "Runs every Monday morning at 7:10.",
   "renewal-content-weekly": "Runs every Monday morning at 7:44.",
   "b2b-outreach-engine": "Runs every 30 minutes from 8 in the morning to 8 at night, every day. Each run checks the send window and daily cap, dry-runs, then fires for real if clean.",
   "b2b-prospector-daily": "Runs every day at 6:15 in the morning, before the outreach window opens, to refill the lead pipeline.",
@@ -977,10 +953,8 @@ const ROLE_LONG: Record<string, string> = {
     "Per-client health monitor. Every day it runs a fixed 5-pillar checklist per client (SEO foundation, content quality and brand safety, website health, CRM/outreach, onboarding completeness), scores each pillar green/yellow/red, writes one condensed health page per client plus the master health board, and surfaces red flags loudly. Report-only: it checks and recommends, never fixes.",
   "chronicler-end-of-day":
     "End-of-day vault historian. Reads new Claude Code conversation content since its last run, sorts it into facts and ideas, scrubs secrets, appends a digest to the vault inbox, files ideas onto the idea backlog, and updates log.md and hot.md for high-confidence facts.",
-  "content-engine-weekly":
-    "Jackson Roofing weekly SEO content producer. Refreshes the live content calendar, writes the week's 2 blog drafts plus the Google Business post copy and the Wednesday rotation outline. Never produces insurance content.",
   "renewal-content-weekly":
-    "Renewal Health (Lynette Wing) weekly content engine. Mirror of Jackson's content engine adapted for her static site and health/YMYL rules: 2 blog posts and a service page, Pexels images, health-claim gate, then publishes via the static-site publisher. No diagnose/treat/cure claims, ever.",
+    "Renewal Health (Lynette Wing) weekly content engine, built for her static site and health/YMYL rules: 2 blog posts and a service page, Pexels images, health-claim gate, then publishes via the static-site publisher. No diagnose/treat/cure claims, ever.",
   "b2b-outreach-engine":
     "Wing Digital's live B2B cold-email campaign, approved live by Jack on 2026-08-06. Every 30 minutes between 8am and 8pm it checks the send window and daily cap, dry-runs the outreach script, and only fires real sends when the dry run is clean. Never exceeds the daily cap, never touches client accounts, and stops loudly if anything looks broken.",
   "b2b-prospector-daily":
@@ -1185,48 +1159,13 @@ function countVaultFilesToday(): { count: number; source: "git" | "mtime" } | nu
   return null;
 }
 
-// ── Scheduled content posts (from the content calendar cadence) ─────────────
-// The Jackson social calendar documents a real recurring cadence, e.g.
-// "Facebook 3x/week (Mon/Wed/Fri), Nextdoor 2x/week (Tue/Sat), Google Business
-// Profile 1x/week (Thu)". We surface that documented cadence as recurring
-// content-calendar entries so the scheduler shows planned posts alongside agent
-// task fires. Days are Monday-based indices (0=Mon..6=Sun). Never fabricated:
-// if the cadence line is absent, no content entries are returned.
-const DAY_TOKEN: Record<string, number> = {
-  mon: 0, tue: 1, tues: 1, wed: 2, weds: 2, thu: 3, thur: 3, thurs: 3,
-  fri: 4, sat: 5, sun: 6,
-};
-const PLATFORM_COLOR: Record<string, string> = {
-  facebook: "#60a5fa", nextdoor: "#34d399", "google business": "#fbbf24",
-  "google business profile": "#fbbf24", instagram: "#f472b6",
-};
+// ── Scheduled content posts ────────────────────────────────────────────────
+// The scheduler calendar accepts recurring content-post entries (client,
+// platform, days). The only documented cadence that fed this belonged to a
+// former client and was removed 2026-09-02 when they left. No current client
+// documents a cadence, so this is an empty list
+// rather than an invented one; the response shape is unchanged.
 interface ContentCalItem { client: string; platform: string; color: string; days: number[]; note: string }
-
-function parseContentSchedule(calendarRaw: string | null): ContentCalItem[] {
-  if (!calendarRaw) return [];
-  const cadence = calendarRaw.match(/Cadence baseline:\s*([^\n]+)/i)?.[1];
-  if (!cadence) return [];
-  const items: ContentCalItem[] = [];
-  // Match "Facebook 3x/week (Mon/Wed/Fri)" style groups.
-  const re = /([A-Za-z][A-Za-z ]*?)\s*\d*\s*x?\s*\/\s*week\s*\(([^)]+)\)/gi;
-  for (const m of cadence.matchAll(re)) {
-    const platform = m[1].trim().replace(/\s+/g, " ");
-    const days = m[2]
-      .split(/[\/,]/)
-      .map((d) => DAY_TOKEN[d.trim().toLowerCase().slice(0, 5)] ?? DAY_TOKEN[d.trim().toLowerCase().slice(0, 4)] ?? DAY_TOKEN[d.trim().toLowerCase().slice(0, 3)])
-      .filter((n) => n !== undefined) as number[];
-    if (!days.length) continue;
-    const key = platform.toLowerCase();
-    items.push({
-      client: "Jackson Roofing",
-      platform,
-      color: PLATFORM_COLOR[key] ?? "#a78bfa",
-      days: [...new Set(days)],
-      note: redact(cadence.trim()).slice(0, 200),
-    });
-  }
-  return items;
-}
 
 // ── agent feed (os_feed) ───────────────────────────────────────────────────
 // What the scheduled agents reported through /api/notify. Read here with the
@@ -1320,7 +1259,7 @@ export async function GET(req: NextRequest) {
 
   const cloud = isGithubVault();
 
-  const [logRaw, hotRaw, healthRaw, bizRaw, outreachRaw, repliesRaw, watchdogRaw, contentCalRaw, live] = await Promise.all([
+  const [logRaw, hotRaw, healthRaw, bizRaw, outreachRaw, repliesRaw, watchdogRaw, live] = await Promise.all([
     readVaultFile("wiki/log.md"),
     readVaultFile("wiki/hot.md"),
     readVaultFile("wiki/state/health-board.md"),
@@ -1328,7 +1267,6 @@ export async function GET(req: NextRequest) {
     readVaultFile("wiki/state/outreach-snapshot.md"),
     readVaultFile("wiki/state/replies-inbox.md"),
     readVaultFile("wiki/state/watchdog.md"),
-    readVaultFile("wiki/campaigns/jackson-social-calendar.md"),
     readOutreachLive(),
   ]);
 
@@ -1338,7 +1276,7 @@ export async function GET(req: NextRequest) {
 
   // Vault activity today (git-first, mtime fallback) + scheduled content posts.
   const vaultToday = countVaultFilesToday();
-  const scheduledContent = parseContentSchedule(contentCalRaw);
+  const scheduledContent: ContentCalItem[] = [];
 
   const watchdog = parseWatchdog(watchdogRaw);
 

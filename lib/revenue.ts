@@ -10,7 +10,7 @@
 // Before this module the same business fact was computed six different ways and
 // disagreed with itself on every screen:
 //   1. /api/ghl          summed `mrr:` frontmatter over every wiki/clients/*.md
-//                        -> $3,200, and hardcoded a $700 "Jackson Roofing"
+//                        -> $3,200, and hardcoded a $700 single-client
 //                        fallback whenever the vault hiccuped.
 //   2. /api/clients      summed the same field over a DIFFERENT set of rows
 //                        (all pages, including the ones it had just flagged as

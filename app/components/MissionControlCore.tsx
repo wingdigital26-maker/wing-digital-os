@@ -168,7 +168,7 @@ export const SYSTEMS = [
   { id: "ghl-clients", label: "CLIENT CRM", color: "var(--orange)", blurb: "Client records in the OS CRM (Supabase): contacts, pipelines, conversations. Replaced the retired GoHighLevel client subaccounts." },
   { id: "ghl-wing", label: "OS CRM", color: "var(--orange)", blurb: "Wing Digital's own outreach CRM in the OS (Supabase + prospects.db): prospect pipeline, reply inbox, cloud send lanes. Replaced the retired GoHighLevel account." },
   { id: "email", label: "EMAIL", color: "var(--accent)", blurb: "The cold-email path: the autonomous outreach sender and the inbox it feeds." },
-  { id: "clients", label: "CLIENTS", color: "var(--green)", blurb: "Live client deliverables: Jackson Roofing, Renewal Health, and the health board that watches them." },
+  { id: "clients", label: "CLIENTS", color: "var(--green)", blurb: "Live client deliverables: Hero's Junk Removal, Renewal Health, and the health board that watches them." },
   { id: "scheduler", label: "SCHEDULER", color: "var(--accent)", blurb: "The scheduled-tasks runner on Jack's PC that fires the daily and weekly agents." },
   { id: "website", label: "WEB/SEO", color: "#f472b6", blurb: "The published websites and SEO layer: blog posts, service pages, calendars, rankings." },
 ];
@@ -179,7 +179,6 @@ export const ARTIFACTS = [
   { id: "health-board", label: "health board", system: "clients", producedBy: "sentinel-daily" },
   { id: "business-snapshot", label: "biz snapshot", system: "vault", producedBy: "dispatch" },
   { id: "outreach-snapshot", label: "outreach snap", system: "email", producedBy: "outreach" },
-  { id: "content-calendar", label: "content cal", system: "website", producedBy: "content-engine-weekly" },
   { id: "prospects-db", label: "prospects.db", system: "ghl-wing", producedBy: "b2b-prospector-daily" },
   { id: "replies-inbox", label: "replies inbox", system: "ghl-wing", producedBy: "reply-triage" },
 ];
@@ -187,7 +186,6 @@ export const ARTIFACTS = [
 export const AGENT_WIRES: Record<string, string[]> = {
   "sentinel-daily": ["vault", "clients", "website", "scheduler"],
   "chronicler-end-of-day": ["vault", "scheduler"],
-  "content-engine-weekly": ["vault", "clients", "website", "scheduler"],
   "renewal-content-weekly": ["vault", "clients", "website", "scheduler"],
   "b2b-outreach-engine": ["email", "ghl-wing", "scheduler"],
   "b2b-prospector-daily": ["vault", "ghl-wing", "scheduler"],
@@ -204,7 +202,6 @@ export const AGENT_WIRES: Record<string, string[]> = {
 export const AGENT_MATCH: Record<string, RegExp> = {
   "sentinel-daily": /\bsentinel\b/i,
   "chronicler-end-of-day": /\bchronicler\b/i,
-  "content-engine-weekly": /content[- ]engine|jackson.*(blog|content|post)/i,
   "renewal-content-weekly": /\brenewal\b/i,
   "b2b-outreach-engine": /outreach|cold email|b2b/i,
   "b2b-prospector-daily": /prospector|lead scan|lead-find|b2b lead/i,
@@ -221,7 +218,6 @@ export const AGENT_MATCH: Record<string, RegExp> = {
 export const RUN_PHRASE: Record<string, string> = {
   "sentinel-daily": "run sentinel",
   "chronicler-end-of-day": "run chronicler",
-  "content-engine-weekly": "run content-engine",
   "renewal-content-weekly": "run renewal-content-engine",
   "b2b-outreach-engine": "run outreach",
   "b2b-prospector-daily": "find B2B leads",
@@ -263,16 +259,13 @@ export const STATUS_COLOR: Record<string, string> = {
 // Add a key here to move an agent out of Agents and into client-delivery land.
 // Keys must match AgentCard.key (see SCHEDULED / CREW in app/api/mission/route.ts).
 export const CLIENT_DELIVERY_AGENTS = new Set<string>([
-  // Jackson Roofing weekly SEO blog + Google Business posts — client deliverable.
-  "content-engine-weekly",
   // Renewal Health (Lynette Wing) weekly blogs/service pages — client deliverable.
   "renewal-content-weekly",
   // Hero's Junk Removal weekly content. Not currently emitted by /api/mission,
   // listed defensively so it never leaks in if the roster gains it later.
   "heros-content-weekly",
   "heros-content-engine",
-  // Per-client blog/service publishing, if these keys ever appear.
-  "jackson-blog-publish",
+  // Per-client reporting, if this key ever appears.
   "client-report-weekly",
 ]);
 
@@ -2092,7 +2085,6 @@ const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
 const CAL_ENTRIES: CalEntry[] = [
   { key: "b2b-prospector-daily", label: "Prospector", color: "var(--orange)", days: ALL_DAYS, time: "06:15" },
   { key: "sentinel-daily", label: "Sentinel", color: "var(--green)", days: ALL_DAYS, time: "07:00" },
-  { key: "content-engine-weekly", label: "Content Engine", color: "#f472b6", days: [0], time: "07:00" },
   { key: "renewal-content-weekly", label: "Renewal Content", color: "var(--accent-2)", days: [0], time: "07:40" },
   { key: "chronicler-end-of-day", label: "Chronicler", color: "var(--accent)", days: ALL_DAYS, time: "21:47" },
   { key: "b2b-outreach-engine", label: "Outreach", color: "var(--accent)", days: ALL_DAYS, band: { start: "08:00", end: "20:00", every: "every 30 min", everyMin: 30 } },

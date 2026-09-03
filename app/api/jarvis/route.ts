@@ -70,7 +70,7 @@ const TOOLS = [
   {
     name: "read_vault_file",
     description:
-      "Read a single file from Jack's Obsidian vault (Jacks Ai Brain 2.0). Read-only. Provide a path relative to the vault root, e.g. 'wiki/clients/jackson-roofing.md'.",
+      "Read a single file from Jack's Obsidian vault (Jacks Ai Brain 2.0). Read-only. Provide a path relative to the vault root, e.g. 'wiki/clients/heros-junk-removal.md'.",
     input_schema: {
       type: "object",
       properties: {
@@ -234,8 +234,8 @@ async function toolQueryGhl(): Promise<string> {
   // Revenue + client count come from lib/revenue.ts, the single source of truth.
   //
   // This block previously re-implemented the sum over wiki/clients/*.md AND, in its
-  // catch, assigned `mrr = 700; activeClients = 1;` with a literal "Jackson Roofing
-  // ($700/mo)" string. That meant that whenever the vault read failed, the assistant
+  // catch, assigned `mrr = 700; activeClients = 1;` with a literal client-name
+  // string. That meant that whenever the vault read failed, the assistant
   // stated a specific client and a specific dollar figure as fact with no data
   // behind either. An assistant inventing revenue is worse than one saying it does
   // not know, so there is no fallback constant now — an unreachable source yields
@@ -819,7 +819,7 @@ async function buildOsContext(): Promise<string> {
     "- Outreach (b2b-outreach-engine): SCHEDULED, every 30 minutes from 8am to 8pm daily. Each run checks the send window and daily cap, dry-runs, then sends live if clean. Live since 2026-08-06.\n" +
     "- Prospector (b2b-prospector-daily): SCHEDULED, daily at 6:15am. Refills prospects.db with fresh DFW B2B leads via free scrapers. Finds and stages only, never sends.\n" +
     "- Sentinel: daily 7:00am (client health). Chronicler: daily 9:52pm (vault historian).\n" +
-    "- Content Engine (Jackson): Mondays 7:10am. Renewal Engine (Lynette): Mondays 7:44am.\n" +
+    "- Renewal Engine (Lynette): Mondays 7:44am.\n" +
     "- Dispatch, Reply-Triage, and Builder run on demand when Jack asks.\n" +
     "- The old wing-digital-daily-outreach and wing-audit-roofing-batch tasks are retired Apollo-era relics, superseded by the two live B2B tasks above. Never present them as current."
   );

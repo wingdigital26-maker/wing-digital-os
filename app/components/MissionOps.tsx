@@ -3,8 +3,7 @@
 // MISSION OPS — the OS "Agents" view.
 //
 // Scope: Wing Digital's OWN internal agents only. Client-delivery work
-// (Renewal Health content, Hero's Junk content, Jackson blog publishing,
-// per-client outreach) lives in the CRM section instead — the boundary is the
+// (Renewal Health content, Hero's Junk content, per-client outreach) lives in the CRM section instead — the boundary is the
 // CLIENT_DELIVERY_AGENTS set in MissionControlCore.tsx.
 //
 // Layout, top to bottom: watchdog banner, header, next-up strip, the OPS MAP

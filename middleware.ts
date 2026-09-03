@@ -15,9 +15,6 @@ function isPublicPath(pathname: string): boolean {
     pathname === "/icon.svg" ||
     pathname.startsWith("/icon-") ||
     pathname === "/apple-touch-icon.png" ||
-    // Client-facing dashboards: the HTML shell is public, but the DATA endpoints
-    // (/api/jackson*) are separately guarded by JACKSON_DASHBOARD_KEY.
-    pathname === "/jackson-dashboard.html" ||
     // Interactive client dashboards (scripts/client_dashboard/build.py). Each file
     // is self-contained: the client's own published content, no secrets, no API
     // calls. Public by design so a client can open the link without a login.
@@ -26,9 +23,6 @@ function isPublicPath(pathname: string): boolean {
     // content, assembled from sources anyone can already read (their WordPress
     // REST feed, their public repo, their sitemap). No secret passes through it.
     pathname.startsWith("/api/dashboard/") ||
-    pathname === "/jackson" ||
-    pathname === "/jackson-v2" ||
-    pathname.startsWith("/api/jackson") ||
     // Machine endpoints: heartbeat ingest (PC posts with x-heartbeat-key), the
     // agent notification pipe (same key), the Vercel cron watchdog (Bearer
     // CRON_SECRET), and the schedule app's due-tomorrow push trigger (Bearer
@@ -45,6 +39,12 @@ function isPublicPath(pathname: string): boolean {
     // closed (503 when Twilio is unconfigured, 403 on a bad signature).
     pathname === "/api/sms/inbound" ||
     pathname === "/api/sms/status" ||
+    // SMS send + message-ledger ingest: machine endpoints. /api/sms/send
+    // accepts x-heartbeat-key OR a staff session and fails closed; nothing
+    // calls it automatically. /api/messages/log is the email senders' ledger
+    // ingest, x-heartbeat-key gated like /api/notify.
+    pathname === "/api/sms/send" ||
+    pathname === "/api/messages/log" ||
     // Public lead-capture endpoint client sites POST to: /api/forms/<slug>.
     // The route looks the slug up, rate-limits per IP, drops honeypot hits,
     // and answers 404/410 for unknown or paused forms. The bare /api/forms
@@ -55,12 +55,6 @@ function isPublicPath(pathname: string): boolean {
     // TWILIO_AUTH_TOKEN, else the ?k=TWILIO_WEBHOOK_KEY gate) inside the route.
     pathname === "/api/voice/inbound" ||
     pathname === "/api/voice/status" ||
-    // SMS send + message-ledger ingest: machine endpoints. /api/sms/send
-    // accepts x-heartbeat-key OR a staff session and fails closed; nothing
-    // calls it automatically. /api/messages/log is the email senders' ledger
-    // ingest, x-heartbeat-key gated like /api/notify.
-    pathname === "/api/sms/send" ||
-    pathname === "/api/messages/log" ||
     // Public self-serve booking link (GHL calendar replacement). The page is
     // public by design; /api/booking validates and rate-limits inside the
     // route, and its staff-only modes (?admin=1, PATCH) re-check auth there.
@@ -71,8 +65,7 @@ function isPublicPath(pathname: string): boolean {
     pathname === "/api/sequences/due" ||
     pathname.startsWith("/demo-freshco") ||
     pathname.startsWith("/demo-roofing") ||
-    pathname.startsWith("/demo-clearhaul") ||
-    pathname.startsWith("/jackson-site")
+    pathname.startsWith("/demo-clearhaul")
   );
 }
 
@@ -96,12 +89,6 @@ export async function middleware(req: NextRequest) {
     url.pathname = "/demo-clearhaul/index.html";
     return NextResponse.redirect(url);
   }
-  if (pathname === "/jackson-site" || pathname === "/jackson-site/") {
-    const url = req.nextUrl.clone();
-    url.pathname = "/jackson-site/index.html";
-    return NextResponse.redirect(url);
-  }
-
   if (isPublicPath(pathname)) return NextResponse.next();
 
   // NEW (additive): a valid Supabase-auth session cookie grants access. Returns

@@ -75,9 +75,26 @@ async function sitemapUrls(site: string): Promise<{ urls: string[]; found: boole
   return { urls, found: true };
 }
 
+/**
+ * Entities are decoded before anything reads the value. Skipping this puts
+ * "Donate Furniture &amp; Goods" in front of a client, and it also inflates the
+ * title-length check by four characters per ampersand -- so the decode is a
+ * correctness fix, not only a display one.
+ */
+function decode(s: string): string {
+  return s
+    .replace(/&#(\d+);/g, (_, d) => String.fromCharCode(Number(d)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCharCode(parseInt(h, 16)))
+    .replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"').replace(/&rsquo;|&#0?39;/gi, "'")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&");   // last, so &amp;lt; does not become a tag
+}
+
 function firstMatch(html: string, rx: RegExp): string | null {
   const m = html.match(rx);
-  return m ? m[1].replace(/\s+/g, " ").trim() : null;
+  if (!m) return null;
+  return decode(m[1].replace(/<[^>]+>/g, "")).replace(/\s+/g, " ").trim() || null;
 }
 
 /**

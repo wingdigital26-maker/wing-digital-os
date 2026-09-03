@@ -754,8 +754,26 @@ function bootDashboard(){
 // file stays current for every client with no rebuild on Jack's PC.
 (function(){
   var slug = new URLSearchParams(location.search).get('c') || 'heros-junk';
-  fetch('/api/dashboard/' + encodeURIComponent(slug), {cache:'no-store'})
-    .then(function(r){ if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+
+  // Every word on this page is injected by JS after the payload lands, so until
+  // then the reader is looking at an empty shell with a theme toggle in it. On a
+  // cold serverless start that is several seconds of a page that reads as broken,
+  // and on a failure it never resolves into anything. Say what is happening.
+  var hd = document.getElementById('headline');
+  var sh = document.getElementById('subhead');
+  var ey = document.getElementById('eyebrow');
+  if (ey) ey.textContent = 'Loading';
+  if (hd) hd.textContent = 'Getting your dashboard…';
+  if (sh) sh.textContent = 'Reading the live record straight off your website. This takes a moment.';
+
+  // A hung request must fail loudly rather than sitting on the loading line.
+  var ac = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+  var killed = false;
+  var timer = setTimeout(function(){ killed = true; if (ac) ac.abort(); }, 25000);
+
+  fetch('/api/dashboard/' + encodeURIComponent(slug),
+        ac ? {cache:'no-store', signal: ac.signal} : {cache:'no-store'})
+    .then(function(r){ clearTimeout(timer); if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
     .then(function(d){
       if (d.theme) {
         var root = document.documentElement;
@@ -769,13 +787,17 @@ function bootDashboard(){
       bootDashboard();
     })
     .catch(function(e){
+      clearTimeout(timer);
       // Never render a confident-looking empty dashboard on a failed fetch: a
       // client reads zeros as "you did nothing for me this month".
+      var why = killed ? 'it took too long to answer' : String(e && e.message || e);
       document.body.innerHTML = '<div style="max-width:640px;margin:80px auto;padding:0 24px;'+
         'font-family:ui-sans-serif,system-ui,sans-serif;color:#1c1a17">'+
         '<h1 style="font-size:1.3rem;margin-bottom:10px">Dashboard temporarily unavailable</h1>'+
         '<p style="color:#666;line-height:1.6">We could not load this dashboard just now ('+
-        String(e.message)+'). Nothing is wrong with your website. Please refresh in a moment.</p></div>';
+        why+'). Nothing is wrong with your website. Please refresh in a moment.</p>'+
+        '<p style="color:#666;line-height:1.6;margin-top:14px">'+
+        '<a href="'+location.href+'" style="color:#b22234">Try again</a></p></div>';
     });
 })();
 

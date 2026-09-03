@@ -22,6 +22,7 @@ import {
   nullableCents,
   esc,
 } from "../_lib";
+import { emitEvent } from "@/lib/automations/emit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -256,6 +257,23 @@ export async function PATCH(req: Request) {
         activityLogged = true;
       } catch (e) {
         activityError = String(e).slice(0, 300);
+      }
+
+      // Automation hook: the stage is written, so the engine hears about it.
+      // Wrapped so a failed emit never changes the response.
+      try {
+        await emitEvent({
+          type: "deal.stage_changed",
+          contact_id: before.contact_id,
+          payload: {
+            deal_id: id,
+            stage_key: toStage.key,
+            from_stage_key: fromStage?.key ?? null,
+            title: (patch.title as string | undefined) ?? before.title,
+          },
+        });
+      } catch {
+        // The deal moved; the timeline row above is the record.
       }
     }
 

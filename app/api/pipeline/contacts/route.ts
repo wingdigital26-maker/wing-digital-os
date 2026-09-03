@@ -21,6 +21,7 @@ import {
   clampInt,
   esc,
 } from "../_lib";
+import { emitEvent } from "@/lib/automations/emit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -141,7 +142,18 @@ export async function POST(req: Request) {
   };
 
   try {
-    const created = await sbPost("crm_contacts", row);
+    const created = await sbPost<{ id: number }>("crm_contacts", row);
+    // Automation hook: a hand-entered contact is still a new contact. Wrapped
+    // so a failed emit never changes the 201.
+    try {
+      await emitEvent({
+        type: "contact.created",
+        contact_id: created.id,
+        payload: { source: "os-ui" },
+      });
+    } catch {
+      // The contact exists; nothing else depends on this.
+    }
     return NextResponse.json({ ok: true, contact: created }, { status: 201 });
   } catch (e) {
     return errorResponse(e);

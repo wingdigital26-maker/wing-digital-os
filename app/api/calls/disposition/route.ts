@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { requireCallUser, sbConfigured, sbPatch, sbPost, OUTCOMES } from "../_guard";
+import { requireCallUser, sbConfigured, sbPatch, sbPost, sbGet, OUTCOMES } from "../_guard";
+import { emitEvent } from "@/lib/automations/emit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -62,6 +63,38 @@ export async function POST(req: Request) {
   });
   if (logged === null) {
     return NextResponse.json({ error: "could not record the call" }, { status: 502 });
+  }
+
+  // Automation hook: the call is recorded, so tell the engine what was said
+  // and who it was about. client_slug is null on purpose: the Call Room dials
+  // Wing's own leads. Wrapped so a failed read or emit never changes the
+  // response the caller is about to get.
+  try {
+    const leadRows = await sbGet<{
+      company: string;
+      contact_name: string | null;
+      phone: string | null;
+      email: string | null;
+      city: string | null;
+    }>("call_leads", `select=company,contact_name,phone,email,city&id=eq.${leadId}&limit=1`);
+    const lead = leadRows?.[0];
+    await emitEvent({
+      type: "call.logged",
+      client_slug: null,
+      payload: {
+        outcome,
+        notes,
+        next_action_at: nextActionAt,
+        lead_id: leadId,
+        business_name: lead?.company ?? null,
+        phone: lead?.phone ?? null,
+        email: lead?.email ?? null,
+        name: lead?.contact_name ?? null,
+        city: lead?.city ?? null,
+      },
+    });
+  } catch {
+    // The activity row is the record; the engine's cron can still see it.
   }
 
   // "no_answer" is a real event but not a real status change -- a business you

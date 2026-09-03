@@ -7,6 +7,7 @@ import {
   publicUrl,
   logMessage,
 } from "@/lib/sms";
+import { emitEventAsync } from "@/lib/automations/emit";
 
 // ───────────────────────────────────────────────────────────────────────────
 // POST /api/sms/inbound — the Twilio incoming-message webhook.
@@ -156,5 +157,18 @@ export async function POST(req: NextRequest) {
 
   // A real reply: stored and left for a human in the Messages board. No auto
   // response — nothing on this pipe talks to a person on its own.
+  //
+  // Automation hook: hand the reply to the engine as sms.received. Only real
+  // replies reach here (STOP/START/HELP returned above). Async so Twilio gets
+  // its TwiML promptly, and wrapped so a failed emit never changes the reply.
+  try {
+    await emitEventAsync({
+      type: "sms.received",
+      contact_id: contactId,
+      payload: { phone: from, to, body, message_sid: sid },
+    });
+  } catch {
+    // The inbound row is already in the ledger; nothing else depends on this.
+  }
   return twiml();
 }

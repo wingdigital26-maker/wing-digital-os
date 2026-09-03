@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Contact form example</title>
+<style>
+  /* Minimal styling on purpose: paste the <form> into any site and restyle it
+     with that site's own CSS. Nothing here depends on a framework. */
+  .wing-form { max-width: 480px; font: 16px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; color: #1a1a1a; }
+  .wing-form label { display: block; margin: 0 0 14px; font-weight: 600; }
+  .wing-form input, .wing-form textarea { display: block; width: 100%; box-sizing: border-box; margin-top: 4px; padding: 10px 12px; font: inherit; border: 1px solid #c9c9c9; border-radius: 6px; }
+  .wing-form textarea { min-height: 120px; resize: vertical; }
+  .wing-form .consent { display: flex; gap: 10px; align-items: flex-start; font-weight: 400; font-size: 14px; }
+  .wing-form .consent input { width: auto; margin: 4px 0 0; }
+  .wing-form button { padding: 12px 20px; font: inherit; font-weight: 600; color: #fff; background: #1a1a1a; border: 0; border-radius: 6px; cursor: pointer; }
+  .wing-form button[disabled] { opacity: .6; cursor: default; }
+  .wing-form .status { margin-top: 12px; font-size: 15px; }
+  .wing-form .status.error { color: #b00020; }
+  .wing-form .status.ok { color: #0a6b2e; }
+  /* The honeypot is hidden from people. Bots that fill it are dropped server-side. */
+  .wing-form .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+</style>
+</head>
+<body>
+
+<!--
+  Wing Digital OS lead form.
+  1. Change the action URL to your form's slug: https://wing-digital-os.vercel.app/api/forms/<slug>
+  2. Paste the <form> (and the <script>) into the page.
+  The form also works with JavaScript off: the browser posts it normally and
+  the OS redirects to the form's redirect_url if one is set.
+-->
+<form class="wing-form" id="wing-contact" method="post" action="/api/forms/contact" novalidate>
+  <label>Name
+    <input type="text" name="name" autocomplete="name" required>
+  </label>
+  <label>Email
+    <input type="email" name="email" autocomplete="email">
+  </label>
+  <label>Phone
+    <input type="tel" name="phone" autocomplete="tel">
+  </label>
+  <label>How can we help?
+    <textarea name="message"></textarea>
+  </label>
+  <label class="consent">
+    <input type="checkbox" name="sms_consent" value="1">
+    <span>You can text me about my request. Message and data rates may apply. Reply STOP to opt out.</span>
+  </label>
+
+  <!-- Honeypot: leave empty. Hidden from people, filled by bots. -->
+  <div class="hp" aria-hidden="true">
+    <label>Leave this field empty <input type="text" name="_hp" tabindex="-1" autocomplete="off"></label>
+  </div>
+  <!-- Which page the lead came from; filled in by the script below. -->
+  <input type="hidden" name="source_url" value="">
+
+  <button type="submit">Send</button>
+  <div class="status" role="status" aria-live="polite"></div>
+</form>
+
+<script>
+(function () {
+  var form = document.getElementById("wing-contact");
+  if (!form) return;
+  var status = form.querySelector(".status");
+  var button = form.querySelector("button[type=submit]");
+  var source = form.querySelector("input[name=source_url]");
+  if (source) source.value = window.location.href;
+
+  form.addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    status.textContent = "";
+    status.className = "status";
+
+    var data = {};
+    new FormData(form).forEach(function (value, key) { data[key] = value; });
+    if (!data.email && !data.phone) {
+      status.textContent = "Please enter an email or a phone number.";
+      status.className = "status error";
+      return;
+    }
+
+    button.disabled = true;
+    fetch(form.action, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+    })
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+      .then(function (res) {
+        if (res.ok && res.body && res.body.ok) {
+          form.reset();
+          if (source) source.value = window.location.href;
+          status.textContent = "Thanks. We got your message and will be in touch shortly.";
+          status.className = "status ok";
+        } else {
+          status.textContent = (res.body && res.body.message) || "Something went wrong. Please try again.";
+          status.className = "status error";
+        }
+      })
+      .catch(function () {
+        status.textContent = "Could not reach the server. Please check your connection and try again.";
+        status.className = "status error";
+      })
+      .then(function () { button.disabled = false; });
+  });
+})();
+</script>
+
+</body>
+</html>

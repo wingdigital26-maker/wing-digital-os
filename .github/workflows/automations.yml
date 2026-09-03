@@ -1,0 +1,24 @@
+# Automation engine tick. Vercel Hobby caps crons at once/day, so GitHub
+# Actions drives the engine every 10 minutes instead (same pattern as
+# watchdog.yml). The route drains unprocessed events, runs every active
+# workflow that matches, and returns a JSON summary; anything but a 200
+# fails the job so it shows up in the cloud-jobs self-check.
+name: automations
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Run the automation engine
+        run: |
+          code=$(curl -s -o /tmp/out -w '%{http_code}' -m 120 \
+            -H "x-heartbeat-key: ${{ secrets.HEARTBEAT_KEY }}" \
+            https://wing-digital-os.vercel.app/api/cron/automations)
+          cat /tmp/out
+          echo
+          [ "$code" = "200" ] || { echo "automations returned $code"; exit 1; }

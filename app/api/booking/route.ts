@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { sbUrl, sbService } from "@/lib/osSupabase";
 import { requireStaff, isAuthFailure } from "../pipeline/_lib";
+import { emitEvent } from "@/lib/automations/emit";
 
 // ───────────────────────────────────────────────────────────────────────────
 // Booking API — the GHL calendar replacement's engine room.
@@ -403,6 +404,25 @@ export async function POST(req: NextRequest) {
         { error: "insert_failed", message: "The booking could not be saved. Please try again." },
         { status: 502 }
       );
+    }
+    // Automation hook: the booking is saved, now tell the engine. Wrapped so a
+    // failed emit can never change the 201 the visitor already earned.
+    try {
+      await emitEvent({
+        type: "booking.created",
+        client_slug: clientSlug,
+        payload: {
+          email,
+          phone,
+          name,
+          starts_at: created.starts_at,
+          ends_at: created.ends_at,
+          client_slug: clientSlug,
+          booking_id: created.id,
+        },
+      });
+    } catch {
+      // The booking exists; the engine's cron can still find it.
     }
     return NextResponse.json({ ok: true, booking: created }, { status: 201 });
   } catch {

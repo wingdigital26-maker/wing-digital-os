@@ -45,6 +45,16 @@ function isPublicPath(pathname: string): boolean {
     // closed (503 when Twilio is unconfigured, 403 on a bad signature).
     pathname === "/api/sms/inbound" ||
     pathname === "/api/sms/status" ||
+    // Public lead-capture endpoint client sites POST to: /api/forms/<slug>.
+    // The route looks the slug up, rate-limits per IP, drops honeypot hits,
+    // and answers 404/410 for unknown or paused forms. The bare /api/forms
+    // list and /api/forms/submissions are the staff admin side and stay gated.
+    (pathname.startsWith("/api/forms/") && !pathname.startsWith("/api/forms/submissions")) ||
+    // Twilio Voice webhooks: the inbound-call handler and the <Dial> outcome
+    // callback. Same fail-closed auth as the SMS webhooks (signature with
+    // TWILIO_AUTH_TOKEN, else the ?k=TWILIO_WEBHOOK_KEY gate) inside the route.
+    pathname === "/api/voice/inbound" ||
+    pathname === "/api/voice/status" ||
     // SMS send + message-ledger ingest: machine endpoints. /api/sms/send
     // accepts x-heartbeat-key OR a staff session and fails closed; nothing
     // calls it automatically. /api/messages/log is the email senders' ledger

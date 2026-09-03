@@ -70,7 +70,7 @@ const NAV: NavGroup[] = [
     // Pipeline's data (Wing's own book of business, the GoHighLevel
     // replacement) is folded in as a category, never deleted.
     id: "crm", label: "CRM", icon: Note,
-    hint: "Contacts, outreach emails, replies, and email health",
+    hint: "Contacts, outreach emails, replies, automations, and email health",
     subs: [
       { id: "crm", label: "Everything" },
       // Reply Inbox (2026-09-01): every inbound cold-email reply, hot first,
@@ -79,6 +79,10 @@ const NAV: NavGroup[] = [
       // Sequences (2026-09-01): the GHL-workflow replacement. Routed section
       // (/sequences), not an in-shell view — see EXTERNAL_SUB_LINKS.
       { id: "sequences", label: "Sequences" },
+      // Automations + Forms (2026-09-02): the trigger-to-action layer, the
+      // part of GHL that was actually GHL. Routed section (/automations).
+      { id: "automations", label: "Automations" },
+      { id: "forms", label: "Forms" },
       // Email (2026-09-01, Jack: "too many tabs"): one tab wrapping the
       // automated-send queue, the sent-message ledger, and email health as
       // internal pills. See EmailHub.tsx; old ids alias here.
@@ -131,6 +135,8 @@ const LEGACY_VIEW_ALIAS: Record<string, string> = {
 // navigates instead of switching the mounted view.
 const EXTERNAL_SUB_LINKS: Record<string, string> = {
   sequences: "/sequences",
+  automations: "/automations",
+  forms: "/automations/forms",
 };
 
 // which group owns a given view id

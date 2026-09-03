@@ -166,6 +166,16 @@ export async function sbPatch<T = any>(
   return (await r.json()) as T[];
 }
 
+// Delete rows matching a filter. Returns the deleted rows so the caller can
+// tell "deleted one" from "matched nothing" instead of guessing.
+export async function sbDelete<T = any>(table: string, query: string): Promise<T[]> {
+  const r = await sbFetch(`${table}?${query}`, {
+    method: "DELETE",
+    headers: { Prefer: "return=representation" },
+  });
+  return (await r.json()) as T[];
+}
+
 // ── Error rendering ────────────────────────────────────────────────────────
 // One shape for every failure so the UI can always show what actually broke
 // instead of rendering a plausible-looking empty board.

@@ -170,6 +170,48 @@ section{padding:44px 0 0}
 .more:hover{color:var(--t1);border-color:var(--border-hi)}
 .empty{padding:28px 4px;font-size:.87rem;color:var(--t3)}
 
+/* referral partners -- the "who sends you work" section. Reuses the page's
+   surface/border/text tokens so it reads as part of the dashboard rather than
+   a bolted-on table. */
+.lstats{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));
+  gap:9px;margin-bottom:18px}
+.lstat{background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--r-sm);padding:11px 13px}
+.lstat b{display:block;font-size:1.28rem;letter-spacing:-.02em;
+  font-variant-numeric:tabular-nums;color:var(--t1)}
+.lstat span{font-size:.75rem;color:var(--t3)}
+.lbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.lbar input,.lbar select{padding:8px 11px;border:1px solid var(--border);
+  border-radius:var(--r-sm);background:var(--surface);color:var(--t1);
+  font:inherit;font-size:.85rem}
+.lbar input{flex:1;min-width:180px}
+.lpills{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.lpill{padding:5px 11px;border:1px solid var(--border);border-radius:999px;
+  background:var(--surface);cursor:pointer;font-size:.79rem;color:var(--t2);
+  white-space:nowrap}
+.lpill:hover{border-color:var(--border-hi);color:var(--t1)}
+.lpill.on{background:var(--t1);color:var(--surface);border-color:var(--t1)}
+.lpill i{font-style:normal;opacity:.6;margin-left:4px}
+.lwhy{font-size:.83rem;color:var(--t2);margin-bottom:14px;max-width:74ch;
+  line-height:1.55}
+.lrow{background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--r-sm);padding:13px 15px;margin-bottom:8px}
+.lrow-t{display:flex;justify-content:space-between;gap:14px;align-items:flex-start}
+.lnm{font-weight:640;font-size:.94rem;color:var(--t1);letter-spacing:-.005em}
+.lmt{font-size:.79rem;color:var(--t3);margin-top:2px}
+.lrk{font-size:.76rem;color:var(--t3);text-align:right;white-space:nowrap;
+  font-variant-numeric:tabular-nums}
+.lrk b{color:var(--t2)}
+.lcts{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+.lct{font-size:.79rem;padding:5px 10px;border:1px solid var(--border);
+  border-radius:var(--r-sm);text-decoration:none;color:var(--t2)}
+.lct:hover{color:var(--t1);border-color:var(--border-hi)}
+.lct.pri{color:var(--accent);border-color:transparent;background:var(--accent-bg)}
+.lct.lmail{color:var(--t3);border-style:dashed;cursor:default}
+.ltag{font-size:.7rem;padding:3px 8px;border-radius:999px;
+  border:1px solid var(--border);color:var(--t3)}
+@media(max-width:560px){.lrow-t{flex-direction:column}.lrk{text-align:left}}
+
 /* channels */
 .chans{display:grid;grid-template-columns:repeat(auto-fit,minmax(232px,1fr));gap:14px}
 .chan{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
@@ -295,6 +337,37 @@ section{padding:44px 0 0}
     <div class="sd" id="out-sd"></div>
     <div class="chans" id="chans"></div>
     <div id="outlist"></div>
+  </section>
+
+  <!-- Referral partners. Hidden unless the link carries the access key: the
+       rest of this dashboard shows the client's own already-public website
+       content, but this section is a few thousand enriched B2B contacts and
+       must not sit on a guessable URL. -->
+  <section id="leads-sec" hidden>
+    <div class="sh"><h2>Who sends you work</h2><span class="n" id="leadn"></span></div>
+    <div class="sd" id="leadsd"></div>
+    <div class="lstats" id="lstats"></div>
+    <div class="lbar">
+      <input id="lq" type="search" placeholder="Search name, city, phone or email" aria-label="Search referral partners">
+      <select id="lsort" aria-label="Sort">
+        <!-- Default order is the real ranking score, but it is never labelled
+             as a ranking: naming it invites debate about the ranking instead
+             of a phone call, and makes the tail look like rejects. -->
+        <option value="rank">Suggested</option>
+        <option value="reviews">Most reviews</option>
+        <option value="name">Name A-Z</option>
+        <option value="city">City</option>
+      </select>
+      <select id="lhas" aria-label="Filter by contact">
+        <option value="all">Everyone</option>
+        <option value="email">Has email</option>
+        <option value="phone">Has phone</option>
+      </select>
+    </div>
+    <div class="lpills" id="lpills"></div>
+    <div class="lwhy" id="lwhy"></div>
+    <div id="leads"></div>
+    <button class="more" id="leadmore" hidden></button>
   </section>
 
   <section id="pages-sec">
@@ -752,6 +825,142 @@ function bootDashboard(){
     });
     if (p.checked) $('#healthn').textContent = p.checked + ' pages checked';
   }
+
+  // ── Referral partners ──────────────────────────────────────────────────────
+  // Fetched separately from the dashboard payload and only when the link
+  // carries ?k=. No key means the section never appears and no request is even
+  // made, so the client's normal dashboard link stays safe to forward.
+  (function leadsSection(){
+    var P = new URLSearchParams(location.search);
+    var key = P.get('k');
+    var slug = P.get('c') || 'heros-junk';
+    if (!key) return;
+
+    var LD = null, LCAT = 'all', LSHOWN = 40;
+
+    fetch('/api/leads/' + encodeURIComponent(slug) + '?k=' + encodeURIComponent(key),
+          {cache:'no-store'})
+      .then(function(r){ if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function(d){ LD = d; initLeads(); })
+      .catch(function(){ /* a bad key must fail silently: the rest of the
+                            dashboard is still perfectly valid without it */ });
+
+    function n(x){ return (x||0).toLocaleString('en-US'); }
+
+    function initLeads(){
+      var L = LD.leads || [];
+      if (!L.length) return;
+      $('#leads-sec').hidden = false;
+      $('#leadn').textContent = n(L.length) + ' businesses';
+      $('#leadsd').textContent = LD.note || '';
+
+      $('#lstats').innerHTML =
+        '<div class="lstat"><b>' + n(L.length) + '</b><span>businesses</span></div>' +
+        '<div class="lstat"><b>' + n(L.filter(function(x){return x.phone}).length) +
+          '</b><span>with a phone</span></div>' +
+        '<div class="lstat"><b>' + n(L.filter(function(x){return x.email}).length) +
+          '</b><span>with an email</span></div>' +
+        '<div class="lstat"><b>' + n(LD.cities||0) + '</b><span>cities</span></div>' +
+        '<div class="lstat"><b>' + n((LD.categories||[]).length) +
+          '</b><span>partner types</span></div>';
+
+      var counts = {};
+      L.forEach(function(x){ counts[x.category] = (counts[x.category]||0) + 1; });
+      var cats = (LD.categories||[]).filter(function(c){ return counts[c.key]; });
+      $('#lpills').innerHTML =
+        '<span class="lpill on" data-c="all">Everyone <i>' + L.length + '</i></span>' +
+        cats.map(function(c){
+          return '<span class="lpill" data-c="' + esc(c.key) + '">' + esc(c.label) +
+                 ' <i>' + counts[c.key] + '</i></span>';
+        }).join('');
+
+      $('#lpills').addEventListener('click', function(e){
+        var p = e.target.closest('.lpill'); if (!p) return;
+        Array.prototype.forEach.call(document.querySelectorAll('.lpill'),
+          function(x){ x.classList.remove('on'); });
+        p.classList.add('on'); LCAT = p.dataset.c; LSHOWN = 40; drawLeads();
+      });
+      ['#lq','#lsort','#lhas'].forEach(function(s){
+        $(s).addEventListener('input', function(){ LSHOWN = 40; drawLeads(); });
+      });
+      $('#leadmore').addEventListener('click', function(){ LSHOWN += 40; drawLeads(); });
+      drawLeads();
+    }
+
+    function drawLeads(){
+      var q = ($('#lq').value||'').toLowerCase().trim();
+      var sort = $('#lsort').value, has = $('#lhas').value;
+      var cm = {}; (LD.categories||[]).forEach(function(c){ cm[c.key] = c; });
+
+      var rows = (LD.leads||[]).filter(function(x){
+        if (LCAT !== 'all' && x.category !== LCAT) return false;
+        if (has === 'email' && !x.email) return false;
+        if (has === 'phone' && !x.phone) return false;
+        if (!q) return true;
+        return ((x.name||'') + ' ' + (x.city||'') + ' ' + (x.phone||'') + ' ' +
+                (x.email||'')).toLowerCase().indexOf(q) > -1;
+      });
+
+      rows.sort(function(a,b){
+        if (sort === 'name')    return (a.name||'').localeCompare(b.name||'');
+        if (sort === 'city')    return (a.city||'').localeCompare(b.city||'') ||
+                                       (b.reviews||0) - (a.reviews||0);
+        if (sort === 'reviews') return (b.reviews||0) - (a.reviews||0);
+        return (b.score||0) - (a.score||0);
+      });
+
+      // The list is capped at LSHOWN rows, so filtering from 3,188 down to 71
+      // still renders 40 cards and looks like nothing happened. Always state
+      // how many matched.
+      $('#leadn').textContent = (rows.length === (LD.leads||[]).length)
+        ? n(rows.length) + ' businesses'
+        : n(rows.length) + ' of ' + n((LD.leads||[]).length);
+
+      $('#lwhy').textContent =
+        (LCAT !== 'all' && cm[LCAT]) ? (cm[LCAT].why || '') : '';
+
+      if (!rows.length){
+        $('#leads').innerHTML = '<div class="empty">Nothing matches that.</div>';
+        $('#leadmore').hidden = true;
+        return;
+      }
+
+      $('#leads').innerHTML = rows.slice(0, LSHOWN).map(function(x){
+        var bits = [esc((cm[x.category]||{}).label || x.category || '')];
+        if (x.city) bits.push(esc(x.city));
+        if (x.address) bits.push(esc(x.address));
+
+        var cts = [];
+        if (x.phone) cts.push('<a class="lct pri" href="tel:' +
+          esc(String(x.phone).replace(/\D/g,'')) + '">Call ' + esc(x.phone) + '</a>');
+        // Email shown as plain text, never a mailto link. Outreach to these
+        // partners is sent by Wing, not by the client, and a clickable
+        // compose window is an invitation to double-send into the same
+        // inbox. (Jack's call, 2026-09-04)
+        if (x.email) cts.push('<span class="lct lmail">' + esc(x.email) + '</span>');
+        if (x.website) cts.push('<a class="lct" href="' + esc(x.website) +
+          '" target="_blank" rel="noopener noreferrer">Website</a>');
+        if (x.maps) cts.push('<a class="lct" href="' + esc(x.maps) +
+          '" target="_blank" rel="noopener noreferrer">Map</a>');
+        if (x.email_status === 'risky') cts.push('<span class="ltag">shared inbox</span>');
+
+        var rk = x.reviews ? ('<b>' + x.reviews + '</b> reviews' +
+                              (x.rating ? '<br>' + x.rating + '★' : ''))
+                           : (x.rating ? x.rating + '★' : '');
+
+        return '<div class="lrow"><div class="lrow-t"><div>' +
+          '<div class="lnm">' + esc(x.name) + '</div>' +
+          '<div class="lmt">' + bits.join(' &middot; ') + '</div></div>' +
+          '<div class="lrk">' + rk + '</div></div>' +
+          '<div class="lcts">' + cts.join('') + '</div></div>';
+      }).join('');
+
+      var m = $('#leadmore');
+      m.hidden = rows.length <= LSHOWN;
+      if (!m.hidden) m.textContent = 'Show ' +
+        Math.min(40, rows.length - LSHOWN) + ' more of ' + n(rows.length);
+    }
+  })();
 }
 
 // ── LIVE MODE ────────────────────────────────────────────────────────────────

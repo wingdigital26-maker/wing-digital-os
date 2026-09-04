@@ -23,6 +23,13 @@ function isPublicPath(pathname: string): boolean {
     // content, assembled from sources anyone can already read (their WordPress
     // REST feed, their public repo, their sitemap). No secret passes through it.
     pathname.startsWith("/api/dashboard/") ||
+    // Referral-partner lead lists for a client dashboard. NOT public: the route
+    // carries its own fail-closed key check (LEADS_DASHBOARD_KEY) because this
+    // is enriched B2B contact data, not the client's published content. It is
+    // listed here only so the OS login gate does not shadow that check -- a
+    // client has no OS account, so without this the middleware 401s every
+    // request and the route never runs.
+    pathname.startsWith("/api/leads/") ||
     // Machine endpoints: heartbeat ingest (PC posts with x-heartbeat-key), the
     // agent notification pipe (same key), the Vercel cron watchdog (Bearer
     // CRON_SECRET), and the schedule app's due-tomorrow push trigger (Bearer

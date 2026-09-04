@@ -20,6 +20,13 @@
 // repo and is read here server-side through readVaultFile(), the same path the
 // OS already uses for vault markdown: local disk on Jack's PC, GitHub REST with
 // GH_VAULT_TOKEN in the cloud. Nothing sensitive enters this repo.
+//
+// SIZE: this lead list is already ~954 KB and only grows. The GitHub Contents
+// API stops inlining content above 1 MB and returns 200 with an EMPTY body
+// rather than an error, which would make this route answer "no lead list yet"
+// with nothing looking broken anywhere. readVaultFile() now handles that
+// internally by falling back to the Git Blobs API, so every vault reader gets
+// the fix, not just this one. See the ceiling comment in lib/vaultSource.ts.
 
 import { NextResponse } from "next/server";
 import { readVaultFile } from "../../../../lib/vaultSource";

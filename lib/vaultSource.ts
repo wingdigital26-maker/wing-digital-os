@@ -97,6 +97,33 @@ async function githubListFiles(): Promise<string[]> {
   return files;
 }
 
+// ── THE 1 MB CEILING (do not "simplify" this away) ───────────────────────────
+// The REST Contents API only inlines file content for blobs up to 1 MB. Past
+// that it still answers 200 with the metadata -- name, size, and crucially
+// `sha` -- but with `content: ""` and `encoding: "none"`. No error status, no
+// error body. A caller that just base64-decodes `content` gets nothing back and
+// reports "no data", or worse renders an empty list as a real empty result.
+//
+// This was NOT hypothetical: wiki/state/cloud/prospects.json (~3.9 MB) and
+// wiki/chronicler-inbox.md (~1.6 MB) were both returning null in cloud mode,
+// silently, for every route that read them. Found 2026-09-04.
+//
+// The fix: when the Contents API withholds content, refetch the same blob by
+// its sha through the Git Blobs API, which serves blobs up to 100 MB. The sha
+// is already in the truncated Contents response, so it costs no extra lookup.
+const CONTENTS_API_INLINE_LIMIT_BYTES = 1_048_576;
+
+function decodeB64(content: unknown): string | null {
+  if (typeof content !== "string" || content === "") return null;
+  try {
+    // GitHub wraps base64 at 60 chars; Buffer ignores the newlines.
+    const out = Buffer.from(content, "base64").toString("utf-8");
+    return out === "" ? null : out;
+  } catch {
+    return null;
+  }
+}
+
 async function githubReadFile(relPath: string): Promise<string | null> {
   const rel = relPath.replace(/\\/g, "/").replace(/^\/+/, "");
   const cached = fileCache.get(rel);
@@ -108,15 +135,44 @@ async function githubReadFile(relPath: string): Promise<string | null> {
       .map(encodeURIComponent)
       .join("/")}?ref=${GH_BRANCH}`
   );
+  if (!data || Array.isArray(data) || data.type === "dir") {
+    fileCache.set(rel, { value: null, at: Date.now() });
+    return null;
+  }
+
   let content: string | null = null;
-  if (data && typeof data.content === "string" && data.encoding === "base64") {
-    try {
-      content = Buffer.from(data.content, "base64").toString("utf-8");
-    } catch {
-      content = null;
+  if (data.encoding === "base64") content = decodeB64(data.content);
+
+  const size = typeof data.size === "number" ? data.size : null;
+
+  // Content withheld (over the ceiling, or empty for any other reason): go get
+  // the blob by sha.
+  if (content === null && size !== 0) {
+    const sha = typeof data.sha === "string" ? data.sha : null;
+    if (sha) {
+      const blob = await ghApi(
+        `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/git/blobs/${sha}`
+      );
+      // encoding !== base64 means >100 MB, where the Blobs API gives up too.
+      if (blob && blob.encoding === "base64") {
+        const out = decodeB64(blob.content);
+        // If GitHub told us the size, the decoded payload must match it. A
+        // mismatch means a truncated read, and serving a partial file is worse
+        // than serving nothing: callers cannot tell it is incomplete.
+        content =
+          out !== null && size !== null && Buffer.byteLength(out, "utf-8") !== size
+            ? null
+            : out;
+      }
     }
   }
-  fileCache.set(rel, { value: content, at: Date.now() });
+  if (content === null && size === 0) content = ""; // genuinely empty file
+
+  // Do not hold multi-MB payloads in the module cache across serverless
+  // invocations; a re-fetch is cheaper than the memory.
+  if (size === null || size <= CONTENTS_API_INLINE_LIMIT_BYTES) {
+    fileCache.set(rel, { value: content, at: Date.now() });
+  }
   return content;
 }
 

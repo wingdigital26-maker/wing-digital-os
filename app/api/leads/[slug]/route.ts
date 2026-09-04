@@ -34,14 +34,18 @@ export const dynamic = "force-dynamic";
  * something else.
  */
 function keyOk(req: Request): boolean {
-  const key = process.env.LEADS_DASHBOARD_KEY;
+  // Trim both sides. Piping a value into `vercel env add` stores the trailing
+  // newline, which makes a correct password fail with an indistinguishable
+  // 401 -- an afternoon of "the key is wrong" when the key was fine.
+  const key = (process.env.LEADS_DASHBOARD_KEY || "").trim();
   if (!key) return false;
   const auth = req.headers.get("authorization") || "";
   const bearer = auth.toLowerCase().startsWith("bearer ")
     ? auth.slice(7).trim()
     : "";
   if (bearer && bearer === key) return true;
-  return new URL(req.url).searchParams.get("k") === key;
+  const provided = (new URL(req.url).searchParams.get("k") || "").trim();
+  return provided !== "" && provided === key;
 }
 
 // Slug must be a plain identifier -- it is used to build a file path.

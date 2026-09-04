@@ -24,9 +24,9 @@ export default function ClientsBoard() {
       .catch(e => setErr(String(e)));
   }, []);
 
-  // Per-client GHL snapshots are gone: GHL was retired 2026-08-22 and no
-  // replacement CRM is connected, so cards show an honest "no data source"
-  // line instead of live contact/deal counts.
+  // Contacts and deals live in the OS CRM (crm_contacts, crm_deals). There is
+  // no per-client filter on that view yet, so each card links there generically
+  // instead of showing a count it cannot vouch for.
 
   if (err) return <p style={{ color: "var(--red)", fontSize: 13 }}>Clients error: {err}</p>;
   if (!data) return (
@@ -131,10 +131,14 @@ export default function ClientsBoard() {
                 )}
                 <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 9px", borderRadius: 999, color: "var(--green)", background: "rgba(52,211,153,0.1)" }}>active</span>
               </div>
+              {/* No per-client CRM filter exists yet, so this is one generic
+                  link into the CRM rather than a count that would be a guess. */}
               <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--border)" }}>
-                <p style={{ fontSize: 10.5, color: "var(--text-muted)" }}>
-                  No CRM data source connected (GHL retired, replacement pending)
-                </p>
+                <button type="button"
+                  onClick={(e) => { e.stopPropagation(); sfx.play("nav"); window.dispatchEvent(new CustomEvent("os:navigate", { detail: "crm" })); }}
+                  style={{ background: "none", border: "none", padding: 0, minHeight: 0, cursor: "pointer", fontSize: 11, color: "var(--accent)", textDecoration: "underline" }}>
+                  Contacts and deals live in the CRM
+                </button>
               </div>
               {(c.email || c.phone) && (
                 <div style={{ borderTop: "1px solid var(--border)", marginTop: 12, paddingTop: 10, display: "flex", flexDirection: "column", gap: 4 }}>

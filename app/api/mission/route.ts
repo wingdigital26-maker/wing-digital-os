@@ -557,24 +557,27 @@ function buildStats(
         ? `confirmed recurring · ${revenue.mrrClients.map((c) => c.name).join(", ")}`
         : "no confirmed recurring retainer on file",
     });
-    tiles.push({ ...base, label: "Active Clients", value: String(revenue.activeClients), sub: `roster: ${revenue.rosterSource}` });
+    tiles.push({ ...base, key: "active-clients", label: "Active Clients", value: String(revenue.activeClients), sub: "from the client roster" });
     // A fixed-term deal expiring is a thing Jack needs to see coming rather than
     // discover when the money stops.
     if (revenue.nextExpiry) {
       const e = revenue.nextExpiry;
       tiles.push({
         ...base,
+        key: "mrr-expiring",
         label: "MRR expiring",
         value: "$" + e.amount.toLocaleString() + "/mo",
-        sub: `${e.name} — ${e.monthsRemaining} month${e.monthsRemaining === 1 ? "" : "s"} left, ends ${e.end} unless renewed`,
+        sub: `${e.name}: ${e.monthsRemaining} month${e.monthsRemaining === 1 ? "" : "s"} left, ends ${e.end} unless renewed`,
       });
     }
     if (revenue.unconfirmedTotal > 0) {
-      tiles.push({ ...base, label: "Basis unconfirmed", value: "$" + revenue.unconfirmedTotal.toLocaleString(), sub: "no invoice evidence — held out of MRR until confirmed" });
+      tiles.push({ ...base, key: "basis-unconfirmed", label: "Basis unconfirmed", value: "$" + revenue.unconfirmedTotal.toLocaleString(), sub: "no invoice evidence, held out of MRR until confirmed" });
     }
-    // Pipeline sits beside the earned number, never inside it.
+    // Pipeline sits beside the earned number, never inside it. Its key must
+    // differ from the prospect-count "pipeline" tile below or React sees two
+    // tiles with the same key.
     if (revenue.pipelineTotal > 0) {
-      tiles.push({ ...base, label: "Pipeline", value: "$" + revenue.pipelineTotal.toLocaleString(), sub: "NOT earned — expected/probable only, never added to MRR" });
+      tiles.push({ ...base, key: "pipeline-value", label: "Pipeline", value: "$" + revenue.pipelineTotal.toLocaleString(), sub: "not earned, expected or probable only, never added to MRR" });
     }
     updated = revenue.asOf;
   } else if (biz) {
@@ -585,7 +588,7 @@ function buildStats(
     const bizStale = isStale(bizUpdated, STALE_HOURS.clients);
     const prov = provenanceLine({ source: "snapshot", asOf: bizUpdated, stale: bizStale });
     if (mrr) tiles.push({ key: "clients", label: "MRR", value: "$" + mrr[1] + "/mo", sub: "from snapshot — live roster unreachable", updated: bizUpdated, source: "snapshot", stale: bizStale, provenance: prov });
-    if (active) tiles.push({ key: "clients", label: "Active Clients", value: active[1], sub: "from snapshot — live roster unreachable", updated: bizUpdated, source: "snapshot", stale: bizStale, provenance: prov });
+    if (active) tiles.push({ key: "active-clients", label: "Active Clients", value: active[1], sub: "from snapshot, live roster unreachable", updated: bizUpdated, source: "snapshot", stale: bizStale, provenance: prov });
     updated = bizUpdated;
   }
 
@@ -596,9 +599,9 @@ function buildStats(
     // LIVE mode: pipeline / emailed / untouched come straight from the live
     // source (Supabase cloud, else local prospects.db) — labeled per live.source.
     const liveProv = provenanceLine({ source: live.source, asOf: live.asOf, stale: false });
-    tiles.push({ key: "pipeline", label: "Pipeline", value: String(live.pipeline), sub: "prospects", updated: live.asOf, source: live.source, stale: false, provenance: liveProv });
+    tiles.push({ key: "pipeline", label: "Prospects in the pipeline", value: String(live.pipeline), sub: "businesses being worked", updated: live.asOf, source: live.source, stale: false, provenance: liveProv });
     tiles.push({ key: "emails", label: "Emails Sent", value: String(live.emailed), sub: st.display, updated: live.asOf, source: live.source, stale: false, provenance: liveProv });
-    tiles.push({ key: "untouched", label: "Untouched Leads", value: String(live.untouched), sub: "new + enriching", updated: live.asOf, source: live.source, stale: false, provenance: liveProv });
+    tiles.push({ key: "untouched", label: "Untouched Leads", value: String(live.untouched), sub: "not yet contacted", updated: live.asOf, source: live.source, stale: false, provenance: liveProv });
   } else if (outreach) {
     // CLOUD / degraded: prospects.db unreachable — snapshot with real staleness.
     const outStale = isStale(outUpdated, STALE_HOURS.pipeline);
@@ -606,9 +609,9 @@ function buildStats(
     const pipeline = outreach.match(/\*\*Pipeline:\*\*\s*([\d,]+)/);
     const emailed = outreach.match(/\*\*Emailed:\*\*\s*([\d,]+)/);
     const remaining = outreach.match(/\*\*Remaining[^:]*:\*\*\s*([\d,]+)/);
-    if (pipeline) tiles.push({ key: "pipeline", label: "Pipeline", value: pipeline[1], sub: "prospects", updated: outUpdated, source: "snapshot", stale: outStale, provenance: outProv });
+    if (pipeline) tiles.push({ key: "pipeline", label: "Prospects in the pipeline", value: pipeline[1], sub: "businesses being worked", updated: outUpdated, source: "snapshot", stale: outStale, provenance: outProv });
     if (emailed) tiles.push({ key: "emails", label: "Emails Sent", value: emailed[1], sub: st.display, updated: st.asOf ?? outUpdated, source: "snapshot", stale: st.stale, provenance: st.stale ? provenanceLine({ source: "snapshot", asOf: st.asOf, stale: true }) : outProv });
-    if (remaining) tiles.push({ key: "untouched", label: "Untouched Leads", value: remaining[1], sub: "new + enriching", updated: outUpdated, source: "snapshot", stale: outStale, provenance: outProv });
+    if (remaining) tiles.push({ key: "untouched", label: "Untouched Leads", value: remaining[1], sub: "not yet contacted", updated: outUpdated, source: "snapshot", stale: outStale, provenance: outProv });
   }
   void nowIso;
   return { tiles, updated };
@@ -630,7 +633,10 @@ function parseEmailedRows(outreach: string): { company: string; city: string; wh
   return rows;
 }
 
-async function statDetail(id: string) {
+async function statDetail(rawId: string) {
+  // The revenue tiles carry distinct keys (so React never sees two tiles with
+  // one key) but share the one clients breakdown panel.
+  const id = ["active-clients", "mrr-expiring", "basis-unconfirmed", "pipeline-value"].includes(rawId) ? "clients" : rawId;
   const [biz, outreach, live, rev] = await Promise.all([
     readVaultFile("wiki/state/business-snapshot.md"),
     readVaultFile("wiki/state/outreach-snapshot.md"),

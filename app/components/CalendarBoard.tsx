@@ -337,20 +337,23 @@ export default function CalendarSection({
               ))}
               {!data && !err ? <span style={{ fontSize: 12, color: "var(--text-muted)" }}>Loading…</span> : null}
             </div>
-            {/* Everything not connected collapses to one quiet line. The exact
-                missing credential still shows, just without a row per lane. */}
+            {/* Everything not connected collapses to one quiet plain-English
+                line. The exact missing credential is kept off the screen and
+                lives in a hover tooltip on the lane name. */}
             {unconfigured.length ? (
               <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)" }}>
-                Not connected:{" "}
                 {unconfigured.map((l, i) => (
                   <span key={l.source}>
-                    {i > 0 ? ", " : ""}
-                    {l.label}
-                    {l.missing ? (
-                      <> (needs <code style={{ color: "var(--orange)" }}>{l.missing}</code>)</>
-                    ) : null}
+                    {i > 0 ? (i === unconfigured.length - 1 ? " and " : ", ") : ""}
+                    <span
+                      title={l.missing ? `Needs ${l.missing}` : undefined}
+                      style={l.missing ? { textDecoration: "underline dotted", textDecorationColor: "var(--border)" } : undefined}
+                    >
+                      {l.label}
+                    </span>
                   </span>
                 ))}
+                {unconfigured.length === 1 ? " is" : " are"} not connected yet.
               </p>
             ) : null}
             {lanes.filter((l) => l.note).map((l) => (
@@ -403,7 +406,7 @@ export default function CalendarSection({
               }}
               emptyNote={
                 missingCreds.length
-                  ? `nothing scheduled · missing ${missingCreds.map((l) => l.missing).join(", ")}`
+                  ? `nothing scheduled · ${missingCreds.map((l) => l.label).join(", ")} not connected yet`
                   : "nothing scheduled this week"
               }
             />

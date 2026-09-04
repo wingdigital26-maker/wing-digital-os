@@ -537,7 +537,7 @@ export default function ReplyInboxBoard() {
         <div style={{ fontSize: 12.5, color: "var(--text-muted)", lineHeight: 1.6 }}>
           {client
             ? `No replies for this client (${client}). Other clients may still have replies. Pick "all" above to see everything.`
-            : "No replies yet. Replies land here when the triage agent syncs inbound messages (ghl-cli smtp_replies) into the reply_triage table. The table exists and is simply empty."}
+            : "No replies yet. When someone answers a cold email it shows up here, hottest first. Text replies live under Email > Sent and received."}
         </div>
       )}
 

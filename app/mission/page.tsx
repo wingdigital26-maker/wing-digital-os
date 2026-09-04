@@ -15,6 +15,7 @@ import {
 import SfxMuteButton from "../components/SfxMuteButton";
 import PushToggle from "../components/PushToggle";
 import AlertsPanel from "../components/AlertsPanel";
+import { AgentUplinkState, UPLINK_TIMEOUT_MS, latestHeartbeat } from "../components/MissionOps";
 
 const STATUS_COLOR: Record<string, string> = {
   green: "var(--green)",
@@ -31,6 +32,8 @@ export default function MissionControl() {
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState<Date>(new Date());
   const [selection, setSelection] = useState<Selection>(null);
+  const [timedOut, setTimedOut] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   const aliveRef = useRef(true);
   const load = useCallback(async () => {
@@ -50,6 +53,17 @@ export default function MissionControl() {
     const poll = setInterval(load, 30_000);
     const clock = setInterval(() => setNow(new Date()), 1000);
     return () => { aliveRef.current = false; clearInterval(poll); clearInterval(clock); };
+  }, [load]);
+
+  // The PC being off makes /api/mission hang rather than fail; after the
+  // timeout the page says so instead of spinning forever.
+  useEffect(() => {
+    if (data) return;
+    const t = setTimeout(() => setTimedOut(true), UPLINK_TIMEOUT_MS);
+    return () => clearTimeout(t);
+  }, [data, attempt]);
+  const retry = useCallback(() => {
+    setTimedOut(false); setError(null); setAttempt((a) => a + 1); load();
   }, [load]);
 
   const overallColor = STATUS_COLOR[data?.overall ?? "green"];
@@ -91,8 +105,8 @@ export default function MissionControl() {
         </div>
       </header>
 
-      {!data && !error && (
-        <div style={{ color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace" }}>Establishing uplink...</div>
+      {!data && (
+        <AgentUplinkState error={error} timedOut={timedOut} lastHeartbeat={latestHeartbeat(data)} onRetry={retry} />
       )}
 
       {data && (

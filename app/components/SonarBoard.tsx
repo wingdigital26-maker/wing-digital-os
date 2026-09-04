@@ -73,6 +73,10 @@ export default function SonarBoard() {
   const [busy, setBusy] = useState<number | null>(null);
   const [copied, setCopied] = useState<number | null>(null);
   const [copyFailed, setCopyFailed] = useState<number | null>(null);
+  // A slow or unreachable /api/sonar used to leave the skeleton up forever.
+  // After 12 seconds with nothing back the board says so and offers a retry.
+  const [timedOut, setTimedOut] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   const load = useCallback(() => {
     const qs = new URLSearchParams({ minNeed, limit: "60" });
@@ -80,10 +84,16 @@ export default function SonarBoard() {
     fetch(`/api/sonar?${qs}`)
       .then((r) => r.json())
       .then((d: Payload) => { setData(d); setErr(d.error || ""); })
-      .catch((e) => setErr(String(e)));
+      .catch((e) => setErr(e instanceof Error ? e.message : String(e)));
   }, [city, minNeed]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (data) return;
+    const t = setTimeout(() => setTimedOut(true), 12_000);
+    return () => clearTimeout(t);
+  }, [data, attempt]);
+  const retry = () => { setTimedOut(false); setErr(""); setAttempt((a) => a + 1); load(); };
   // The engine writes on a schedule, so a slow refresh keeps this honest
   // without hammering Supabase.
   useEffect(() => {
@@ -119,8 +129,37 @@ export default function SonarBoard() {
     setTimeout(() => setCopied((c) => (c === l.id ? null : c)), 1500);
   }
 
-  if (err && !data?.leads?.length) {
-    return <p style={{ color: "var(--red)", fontSize: 13 }}>Sonar: {err}</p>;
+  // A real API error (d.error) or a request that never came back both render
+  // as text with a Retry, never as a skeleton.
+  if ((err && !data?.leads?.length) || (!data && timedOut)) {
+    return (
+      <div style={{
+        border: "1px solid var(--border)", borderRadius: 14, padding: 16,
+        background: "var(--bg-card)", display: "grid", gap: 10, maxWidth: 560,
+      }}>
+        <div style={{ fontSize: 14, fontWeight: 600 }}>Sonar leads could not be loaded</div>
+        {err ? (
+          <div style={{ fontSize: 13, color: "var(--red)", lineHeight: 1.5 }}>{err}</div>
+        ) : (
+          <div style={{ fontSize: 13, color: "var(--text-muted)", lineHeight: 1.5 }}>
+            Nothing came back after 12 seconds. The lead engine may be slow or unavailable right now.
+          </div>
+        )}
+        <div>
+          <button
+            type="button"
+            onClick={retry}
+            style={{
+              padding: "7px 14px", borderRadius: 9, cursor: "pointer",
+              border: "1px solid var(--accent)", background: "transparent",
+              color: "var(--accent)", fontSize: 13, fontWeight: 600,
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
   }
   if (!data) {
     return (
@@ -212,7 +251,7 @@ export default function SonarBoard() {
       {/* Leads */}
       {data.leads.length === 0 ? (
         <p style={{ fontSize: 13, color: "var(--muted,#94a3b8)" }}>
-          Nothing matches that filter. Lower the min need, or wait for tonight's run.
+          Nothing matches that filter. Lower the min need, or wait for tonight&apos;s run.
         </p>
       ) : (
         <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fill,minmax(330px,1fr))" }}>

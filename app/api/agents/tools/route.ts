@@ -15,7 +15,7 @@ export const runtime = "nodejs";
 export const TOOL_DEFINITIONS = [
   {
     name: "get_stats",
-    description: "Get current Wing Digital OS stats: MRR, active clients, pipeline (from the local revenue source of truth). No CRM contact counts are available: GHL was retired 2026-08-22 and no replacement is connected.",
+    description: "Get current Wing Digital OS stats: MRR, active clients, pipeline value (from the local revenue source of truth). CRM record counts are not in this tool; the CRM lives in the OS Supabase behind the pipeline and automations APIs.",
     input_schema: { type: "object", properties: {} },
   },
   {
@@ -50,9 +50,8 @@ export async function POST(req: NextRequest) {
     switch (tool) {
       case "get_stats": {
         // Revenue and the client count come from lib/revenue.ts, the single
-        // source of truth. Contact/opportunity counts used to come from GHL;
-        // GHL was retired 2026-08-22, so those figures no longer exist rather
-        // than being reported as zero.
+        // source of truth. CRM record counts live in the OS Supabase and are
+        // served by the pipeline and automations APIs, not here.
         const truth = await getRevenueTruth();
         return NextResponse.json({
           ok: true,
@@ -60,7 +59,7 @@ export async function POST(req: NextRequest) {
           mrr: truth.mrr,
           mrrBasis: truth.mrrBasisLine,
           pipelineValue: truth.pipelineTotal,
-          crm: "No CRM connected. GHL retired 2026-08-22, replacement pending.",
+          crm: "CRM lives in the OS Supabase: crm_contacts, crm_deals, tasks, messages, workflows. Ask for counts through the pipeline and automations APIs.",
         });
       }
 

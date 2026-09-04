@@ -2,7 +2,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
 import { motion, MotionConfig } from "motion/react";
-import { Bolt, Users, Cpu, Bulb, Calendar, Note, Sparkles } from "reicon-react";
+import { Bolt, Users, Cpu, Bulb, Calendar, Note, Sparkles, Home as HomeIcon, Call, Route, Radar, Logout, More } from "reicon-react";
+import StartHere, { TodayStrip } from "./components/StartHere";
 import { staggerContainer, riseItem, hoverSpring, cardHover, cardHoverPassive, cardTap } from "./components/motion";
 import { Sparkline, Delta, buildDailySeries } from "./components/Charts";
 import { StatTiles, MissionPanels, MissionStyles, Selection, StatTile, WatchdogBanner, WatchdogData, MissionData } from "./components/MissionControlCore";
@@ -82,7 +83,6 @@ const NAV: NavGroup[] = [
       // Automations + Forms (2026-09-02): the trigger-to-action layer, the
       // part of GHL that was actually GHL. Routed section (/automations).
       { id: "automations", label: "Automations" },
-      { id: "forms", label: "Forms" },
       // Email (2026-09-01, Jack: "too many tabs"): one tab wrapping the
       // automated-send queue, the sent-message ledger, and email health as
       // internal pills. See EmailHub.tsx; old ids alias here.
@@ -136,7 +136,6 @@ const LEGACY_VIEW_ALIAS: Record<string, string> = {
 const EXTERNAL_SUB_LINKS: Record<string, string> = {
   sequences: "/sequences",
   automations: "/automations",
-  forms: "/automations/forms",
 };
 
 // which group owns a given view id
@@ -152,7 +151,27 @@ export default function Home() {
   useEffect(() => {
     setVisited(v => (v.has(active) ? v : new Set(v).add(active)));
   }, [active]);
+  // Sidebar: open with labels by default on a wide screen so a first-time user
+  // sees names, not six bare icons. The user's own toggle wins once made and is
+  // remembered. Read on mount only, so server and client render the same tree.
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  useEffect(() => {
+    // Deferred one frame: the value comes from the browser (storage + width),
+    // which the server render cannot know, so it is applied after mount.
+    const id = window.requestAnimationFrame(() => {
+      let saved: string | null = null;
+      try { saved = window.localStorage.getItem("wingos.sidebarOpen"); } catch { /* storage blocked */ }
+      if (saved === "1" || saved === "0") setSidebarOpen(saved === "1");
+      else setSidebarOpen(window.innerWidth >= 1100);
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, []);
+  const toggleSidebar = () => {
+    const next = !sidebarOpen;
+    sfx.play(next ? "toggle-on" : "toggle-off");
+    setSidebarOpen(next);
+    try { window.localStorage.setItem("wingos.sidebarOpen", next ? "1" : "0"); } catch { /* storage blocked */ }
+  };
   const [revenueData, setRevenueData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [openNotePath, setOpenNotePath] = useState<string | undefined>();
@@ -169,10 +188,11 @@ export default function Home() {
   // a staff user. This is presentation-layer gating; the personal data behind
   // it is localStorage/read-only, not a server secret.
   const [role, setRole] = useState<string | null>(null);
+  const [meEmail, setMeEmail] = useState<string | null>(null);
   useEffect(() => {
     fetch("/api/me", { cache: "no-store" })
       .then(r => (r.ok ? r.json() : null))
-      .then(d => setRole(d?.role ?? "staff"))
+      .then(d => { setRole(d?.role ?? "staff"); setMeEmail(typeof d?.email === "string" ? d.email : null); })
       .catch(() => setRole("staff"));
   }, []);
   const fullAccess = role === "legacy" || role === "admin" || role === "owner";
@@ -369,7 +389,7 @@ export default function Home() {
             reached from exactly ONE place per screen: the FAB on desktop and the
             Jarvis tab in the bottom bar on phone. */}
 
-        <button onClick={() => { sfx.play(sidebarOpen ? "toggle-off" : "toggle-on"); setSidebarOpen(!sidebarOpen); }} style={{
+        <button onClick={toggleSidebar} title={sidebarOpen ? "Collapse the menu" : "Show menu names"} style={{
           margin: "8px", padding: "8px", borderRadius: 8, border: "none",
           background: "transparent", color: "var(--text-muted)",
           cursor: "pointer", fontSize: 16,
@@ -397,12 +417,7 @@ export default function Home() {
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <SfxMuteButton />
             <Search onOpenNote={handleSearchOpenNote} />
-            <div className="header-avatar" style={{
-              width: 34, height: 34, borderRadius: "50%",
-              background: "linear-gradient(135deg, #22d3ee, #0e7490)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 14, fontWeight: 700,
-            }}>J</div>
+            <AccountMenu role={role} email={meEmail} />
           </div>
         </header>
 
@@ -493,37 +508,123 @@ function MobileNav({ active, onNavigate, newLeadCount }: {
   active: string; onNavigate: (id: string) => void; newLeadCount: number;
 }) {
   const activeGroup = groupOf(active).id;
-  // The five essentials only. Agents = Mission Control, Vault = the knowledge
-  // graph (its folder tree lives INSIDE the vault view as a slide-in drawer, so
-  // there is no Competitor Intel / Activity Log / table-of-contents clutter in
-  // the bar). Jarvis is the merged assistant; tapping it opens the panel.
+  const [moreOpen, setMoreOpen] = useState(false);
+  // The bar carries the three most-used sections (Home, CRM, Calendar) plus
+  // Jarvis. Everything else is one tap away under More, so nothing in the OS
+  // is unreachable on a phone. Jarvis is the merged assistant; the floating
+  // FAB is hidden on phone (globals.css) so there is only ever one trigger.
   const tabs: { id: string; label: string; icon: IconType; group: string; badge?: number }[] = [
-    { id: "command", label: "Command", icon: Bolt, group: "command", badge: newLeadCount },
-    { id: "agent", label: "Agents", icon: Cpu, group: "agent" },
-    { id: "knowledge", label: "Vault", icon: Bulb, group: "intel" },
-    { id: "clients", label: "Clients", icon: Users, group: "clients" },
+    { id: "command", label: "Home", icon: HomeIcon, group: "command", badge: newLeadCount },
+    { id: "crm", label: "CRM", icon: Note, group: "crm" },
+    { id: "calendar", label: "Calendar", icon: Calendar, group: "calendar" },
   ];
+  // In-shell items switch the mounted view; routed ones are plain links.
+  const more: { label: string; hint: string; icon: IconType; view?: string; href?: string }[] = [
+    { label: "Clients", hint: "Who pays you and how their sites are doing", icon: Users, view: "clients" },
+    { label: "Sonar Leads", hint: "Businesses asking for help online", icon: Radar, view: "sonar" },
+    { label: "Agents", hint: "What the automated agents are doing", icon: Cpu, view: "agent" },
+    { label: "Vault", hint: "Saved notes and knowledge", icon: Bulb, view: "knowledge" },
+    { label: "Call Room", hint: "Dial the lead list and log what happened", icon: Call, href: "/calls" },
+    { label: "Sequences", hint: "Multi-step email follow-ups", icon: Note, href: "/sequences" },
+    { label: "Automations", hint: "When something happens, do these things", icon: Route, href: "/automations" },
+    { label: "Sign out", hint: "Log out of the OS", icon: Logout, href: "/api/logout" },
+  ];
+  const moreGroups = new Set(["clients", "agent", "intel"]);
   return (
-    <nav className="mobile-nav" aria-label="Primary">
-      {tabs.map(t => {
-        const on = activeGroup === t.group;
-        return (
-          <button key={t.id} className={`mobile-nav-btn${on ? " on" : ""}`} onClick={() => onNavigate(t.id)}>
-            <span className="mobile-nav-ico">
-              <t.icon size={21} />
-              {!!t.badge && t.badge > 0 && <span className="mobile-nav-badge">{t.badge}</span>}
-            </span>
-            <span>{t.label}</span>
-          </button>
-        );
-      })}
-      {/* Jarvis lives in the bar as the fifth essential; the floating FAB is
-          hidden on phone (globals.css) so there is only ever one Jarvis trigger. */}
-      <button className="mobile-nav-btn jarvis" onClick={() => { sfx.play("nav"); window.dispatchEvent(new CustomEvent("jarvis:open")); }}>
-        <span className="mobile-nav-ico"><Sparkles size={21} /></span>
-        <span>Jarvis</span>
-      </button>
-    </nav>
+    <>
+      <nav className="mobile-nav" aria-label="Primary">
+        {tabs.map(t => {
+          const on = activeGroup === t.group;
+          return (
+            <button key={t.id} className={`mobile-nav-btn${on ? " on" : ""}`} onClick={() => { setMoreOpen(false); onNavigate(t.id); }}>
+              <span className="mobile-nav-ico">
+                <t.icon size={21} />
+                {!!t.badge && t.badge > 0 && <span className="mobile-nav-badge">{t.badge}</span>}
+              </span>
+              <span>{t.label}</span>
+            </button>
+          );
+        })}
+        <button className="mobile-nav-btn jarvis" onClick={() => { setMoreOpen(false); sfx.play("nav"); window.dispatchEvent(new CustomEvent("jarvis:open")); }}>
+          <span className="mobile-nav-ico"><Sparkles size={21} /></span>
+          <span>Jarvis</span>
+        </button>
+        <button className={`mobile-nav-btn${moreOpen || moreGroups.has(activeGroup) ? " on" : ""}`} aria-expanded={moreOpen}
+          onClick={() => { sfx.play(moreOpen ? "toggle-off" : "toggle-on"); setMoreOpen(o => !o); }}>
+          <span className="mobile-nav-ico"><More size={21} /></span>
+          <span>More</span>
+        </button>
+      </nav>
+      {moreOpen && (
+        <div className="mobile-sheet-backdrop" onClick={() => setMoreOpen(false)}>
+          <div className="mobile-sheet" role="dialog" aria-label="More sections" onClick={e => e.stopPropagation()}>
+            <div className="mobile-sheet-grip" aria-hidden="true" />
+            {more.map(m => {
+              const inner = (
+                <>
+                  <span className="mobile-sheet-ico"><m.icon size={20} /></span>
+                  <span style={{ minWidth: 0 }}>
+                    <span className="mobile-sheet-label">{m.label}</span>
+                    <span className="mobile-sheet-hint">{m.hint}</span>
+                  </span>
+                </>
+              );
+              return m.href ? (
+                <a key={m.label} className="mobile-sheet-item" href={m.href}>{inner}</a>
+              ) : (
+                <button key={m.label} className="mobile-sheet-item" onClick={() => { setMoreOpen(false); onNavigate(m.view as string); }}>{inner}</button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+// Header avatar menu: who is signed in, and the one account action (sign out).
+// Reads role/email already fetched from /api/me; no new requests, no library.
+function AccountMenu({ role, email }: { role: string | null; email: string | null }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("mousedown", onDoc); document.removeEventListener("keydown", onKey); };
+  }, [open]);
+  const who = email ?? (role === "legacy" ? "Owner (shared password)" : role ? `Signed in as ${role}` : "Signed in");
+  const initial = (email?.[0] ?? (role === "legacy" ? "J" : "W")).toUpperCase();
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <button className="header-avatar" onClick={() => setOpen(o => !o)} aria-haspopup="menu" aria-expanded={open}
+        title="Account" style={{
+          width: 34, height: 34, borderRadius: "50%", border: "none", cursor: "pointer",
+          background: "linear-gradient(135deg, #22d3ee, #0e7490)", color: "#fff",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 14, fontWeight: 700, minHeight: 0, padding: 0,
+        }}>{initial}</button>
+      {open && (
+        <div role="menu" style={{
+          position: "absolute", right: 0, top: 42, minWidth: 220, zIndex: 600,
+          background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 12,
+          boxShadow: "0 12px 32px var(--bg-hover)", padding: 6,
+        }}>
+          <div style={{ padding: "8px 10px", fontSize: 12, color: "var(--text-secondary)", borderBottom: "1px solid var(--border)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {who}
+            {email && role && <span style={{ display: "block", fontSize: 10.5, color: "var(--text-muted)", marginTop: 2 }}>role: {role}</span>}
+          </div>
+          <a href="/api/logout" role="menuitem" style={{
+            display: "flex", alignItems: "center", gap: 8, padding: "9px 10px", borderRadius: 8,
+            fontSize: 13, color: "var(--text-primary)", textDecoration: "none",
+          }}>
+            <Logout size={15} /> Sign out
+          </a>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -710,8 +811,8 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
   }, []);
 
   // Stats row. MRR is the only figure with a real source (lib/revenue.ts).
-  // Opened emails and appointments have NO data source since GHL was retired
-  // 2026-08-22, so they render an explicit no-data state — never a 0 as fact.
+  // Opened emails and appointments-booked have no tracking installed, so they
+  // render an explicit no-data state, never a 0 as fact.
   // Condensed 2026-08-30: only figures with a real source get a tile. Two of the
   // three tiles here were permanently "no data" and were taking the best space on
   // the screen to say nothing. They are now one honest footnote line below.
@@ -750,7 +851,12 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
   return (
     <motion.div style={{ display: "flex", flexDirection: "column", gap: 24 }}
       variants={staggerContainer} initial="hidden" animate="show">
-      {/* Watchdog problems banner — always the very first thing on screen.
+      {/* Start here + Today: the map and the numbers that change what you do
+          next, before anything else. Built for someone who is not Jack. */}
+      <StartHere />
+      <TodayStrip />
+
+      {/* Watchdog banner: compact when all clear, loud when something is wrong.
           onRechecked broadcasts so the banner, chip and copy all re-pull together. */}
       {watchdog !== undefined && (
         <WatchdogBanner
@@ -763,17 +869,6 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
       {toast && (
         <div style={{ position: "fixed", bottom: 24, right: 24, background: "var(--green)", color: "#07080f", padding: "10px 18px", borderRadius: 10, fontWeight: 700, fontSize: 13, zIndex: 200 }}>
           {toast}
-        </div>
-      )}
-
-      {/* CRM amputated: GHL was retired 2026-08-22 and nothing replaced it.
-          Say so instead of rendering zeroed tiles as fact. */}
-      {!loading && (
-        <div style={{
-          border: "1px solid var(--border)", borderRadius: 12, padding: "12px 16px",
-          background: "var(--bg-card)", fontSize: 12.5, color: "var(--text-muted)",
-        }}>
-          No CRM data source connected. GHL retired 2026-08-22, replacement pending. Lead, pipeline, and appointment data is unavailable until a new CRM is wired in.
         </div>
       )}
 
@@ -870,17 +965,7 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
                 </p>
               )}
             </div>
-            {/* No live reply COUNT feed, but the Reply Inbox view exists, so the
-                stat clicks through to it instead of being a dead end. */}
-            <div style={{ cursor: "pointer" }} onClick={() => { sfx.play("nav"); window.dispatchEvent(new CustomEvent("os:navigate", { detail: "replies" })); }}>
-              <p style={{ fontSize: 22, fontWeight: 700, color: "var(--text-muted)", lineHeight: 1.4, fontFamily: "'Space Grotesk', sans-serif" }}>no data</p>
-              <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>replies · no live count, open Reply Inbox</p>
-            </div>
-            <div style={{ cursor: "pointer" }} onClick={() => goToCalendar()}>
-              <p style={{ fontSize: 22, fontWeight: 700, color: "var(--text-muted)", lineHeight: 1.4, fontFamily: "'Space Grotesk', sans-serif" }}>no data</p>
-              <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>appointments · no feed connected, open Calendar</p>
-            </div>
-            <button onClick={() => onSendToAI(`Today's Wing Digital briefing:\n- Emails sent today: ${sentToday ?? camp?.by_day?.[new Date().toLocaleDateString("en-CA")] ?? 0}\n- MRR: ${typeof data?.mrr === "number" ? `$${data.mrr}` : "unavailable"}\n- Replies and appointments: no data source (GHL retired, no CRM connected)\n\nWhat should I prioritize today to grow Wing Digital?`)}
+            <button onClick={() => onSendToAI(`Today's Wing Digital briefing:\n- Emails sent today: ${sentToday ?? camp?.by_day?.[new Date().toLocaleDateString("en-CA")] ?? 0}\n- MRR: ${typeof data?.mrr === "number" ? `$${data.mrr}` : "unavailable"}\n- Replies and appointments: see Reply Inbox and Calendar.\n\nWhat should I prioritize today to grow Wing Digital?`)}
               style={{
                 marginLeft: "auto", fontSize: 12, fontWeight: 600, color: "#fff",
                 background: "linear-gradient(135deg, #E8692A, #f59e0b)",
@@ -890,6 +975,20 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
               ✦ Ask Claude what to focus on
             </button>
           </div>
+          {/* No live reply or appointment COUNT feed; the views themselves
+              exist, so this line points at them instead of two dead cells. */}
+          <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 12 }}>
+            Replies and appointments: open the{" "}
+            <button type="button" onClick={() => { sfx.play("nav"); window.dispatchEvent(new CustomEvent("os:navigate", { detail: "replies" })); }}
+              style={{ background: "none", border: "none", padding: 0, minHeight: 0, cursor: "pointer", font: "inherit", color: "var(--accent)", textDecoration: "underline" }}>
+              Reply Inbox
+            </button>
+            {" "}or{" "}
+            <button type="button" onClick={goToCalendar}
+              style={{ background: "none", border: "none", padding: 0, minHeight: 0, cursor: "pointer", font: "inherit", color: "var(--accent)", textDecoration: "underline" }}>
+              Calendar
+            </button>
+          </p>
           {(() => {
             const upcoming = agentHealth
               .filter((a: any) => a.nextRun && new Date(a.nextRun).getTime() > Date.now())
@@ -916,7 +1015,7 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
           accounting detail is one click away rather than gone. Full Mission
           Control still shows every tile. */}
       {missionStats && missionStats.tiles.length > 0 && (() => {
-        const PRIMARY = ["MRR", "Active Clients", "Pipeline", "Untouched Leads"];
+        const PRIMARY = ["MRR", "Active Clients", "Pipeline", "Prospects in the pipeline", "Untouched Leads"];
         const primary = missionStats.tiles.filter(t => PRIMARY.includes(t.label));
         const rest = missionStats.tiles.filter(t => !PRIMARY.includes(t.label));
         const shown = showAllStats ? [...primary, ...rest] : primary;
@@ -930,7 +1029,7 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
                 fontSize: 11, fontWeight: 700, color: "var(--text-muted)",
                 letterSpacing: "0.04em", padding: "4px 2px",
               }}>
-                {showAllStats ? "show less" : `show ${rest.length} more`}
+                {showAllStats ? "Show fewer" : `Show ${rest.length} more number${rest.length === 1 ? "" : "s"}`}
               </button>
             )}
           </motion.div>
@@ -1095,7 +1194,7 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
 
       {/* The honest gap, in one line instead of two dead tiles. */}
       <p style={{ fontSize: 10.5, color: "var(--text-muted)", marginTop: -4 }}>
-        Not instrumented yet: {NOT_INSTRUMENTED.join(", ")}. No tracking is installed, so these have no number rather than a zero.
+        Not tracked yet: {NOT_INSTRUMENTED.join(", ").toLowerCase()}. No tracking is installed, so these show no number instead of a zero.
       </p>
 
       {/* Removed 2026-08-30: this was a SECOND calendar, permanently empty
@@ -1103,11 +1202,12 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
           calendar and carries real payments, call-backs and class schedule, so
           both the quick action and the tile below navigate there instead. */}
 
-      {/* Quick Actions — floating pill row. "Add Lead" is gone: there is no
-          CRM to add a lead to, and a form that can only fail is worse than none. */}
+      {/* Quick Actions, floating pill row. "Add contact" opens the CRM, which
+          is where contacts are created (the CRM lives in the OS Supabase). */}
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
         <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", marginRight: 4 }}>Quick</span>
         {[
+          { icon: Users, label: "Add contact", action: () => window.dispatchEvent(new CustomEvent("os:navigate", { detail: "crm" })), c: "var(--green)" },
           { icon: Calendar, label: "Calendar", action: goToCalendar, c: "var(--accent)" },
           { icon: Note, label: "New Note", action: () => setShowNewNote(true), c: "var(--accent-2)" },
           { icon: Sparkles, label: "Ask Claude", action: () => onSendToAI("What should I focus on today for Wing Digital?"), c: "#E8692A" },

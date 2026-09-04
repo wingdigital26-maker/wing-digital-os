@@ -93,9 +93,9 @@ export default function ActivityLog() {
   const [dateRange, setDateRange] = useState<DateRange>("week");
   const [refreshing, setRefreshing] = useState(false);
 
-  // No CRM event source: GHL was retired 2026-08-22 (this used to fetch
-  // /api/ghl for leads, appointments, and pipeline moves) and no replacement
-  // is connected yet. Cold call activity still comes from prospects.db.
+  // Sources: AI chats, vault edits, and cold calls (prospects.db). Automation
+  // events and runs live in the OS Supabase and are shown at /automations/runs,
+  // not merged here.
   async function fetchEvents() {
     setRefreshing(true);
     try {
@@ -158,7 +158,8 @@ export default function ActivityLog() {
         <div>
           <h2 style={{ fontSize: 16, fontWeight: 700 }}>Activity Log</h2>
           <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
-            {all.length} events across AI agents, vault, and cold calls. No CRM event source connected (GHL retired, replacement pending).
+            {all.length} events. Cold calls, agent runs and vault edits appear here. Automation activity is under{" "}
+            <a href="/automations/runs" style={{ color: "var(--accent)" }}>Automations &gt; Activity</a>.
           </p>
         </div>
         <button onClick={fetchEvents} disabled={refreshing} style={{
@@ -212,7 +213,8 @@ export default function ActivityLog() {
       {grouped.length === 0 ? (
         <div style={{ padding: "48px 0", textAlign: "center", color: "var(--text-muted)" }}>
           <p style={{ fontSize: 32, marginBottom: 8 }}>📋</p>
-          <p>No CRM event source connected. GHL retired, replacement pending. AI chats, vault edits, and cold call activity will appear here.</p>
+          <p>Nothing in this range yet. Cold calls, agent runs and vault edits appear here. Automation activity is under{" "}
+            <a href="/automations/runs" style={{ color: "var(--accent)" }}>Automations &gt; Activity</a>.</p>
         </div>
       ) : grouped.map(group => (
         <div key={group.label}>

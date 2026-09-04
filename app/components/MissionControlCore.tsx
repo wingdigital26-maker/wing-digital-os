@@ -1067,7 +1067,9 @@ export function RecheckButton({ onRechecked, compact }: { onRechecked?: () => vo
 // ── "Run Da Boss": one big finger-friendly tap = full patrol (target "all") ──
 // Surfaces the exact same POST /api/boss/recheck {target:"all"} the granular
 // RecheckButton runs, as a prominent control. Honest about persisted:false.
-export function RunDaBossButton({ onRechecked, block }: { onRechecked?: () => void; block?: boolean }) {
+// `small` renders the same action as a quiet "Check now" chip for the all-clear
+// banner. Wiring (endpoint, sounds, refresh broadcast) is identical.
+export function RunDaBossButton({ onRechecked, block, small }: { onRechecked?: () => void; block?: boolean; small?: boolean }) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<RecheckResult | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -1107,24 +1109,24 @@ export function RunDaBossButton({ onRechecked, block }: { onRechecked?: () => vo
       <button
         onClick={run}
         disabled={busy}
-        aria-label="Run Da Boss - full patrol now"
+        aria-label={small ? "Check now: run the full system check" : "Run Da Boss - full patrol now"}
         style={{
-          display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 9,
-          minHeight: 44, padding: "0 18px", width: block ? "100%" : undefined,
-          borderRadius: 12, cursor: busy ? "wait" : "pointer",
+          display: "inline-flex", alignItems: "center", justifyContent: "center", gap: small ? 6 : 9,
+          minHeight: small ? 32 : 44, padding: small ? "0 12px" : "0 18px", width: block ? "100%" : undefined,
+          borderRadius: small ? 999 : 12, cursor: busy ? "wait" : "pointer",
           border: "1px solid var(--accent, #22d3ee)",
-          background: busy ? "rgba(34,211,238,0.10)" : "linear-gradient(135deg, rgba(34,211,238,0.22), rgba(167,139,250,0.18))",
-          color: "var(--accent, #22d3ee)", fontFamily: mono, fontSize: 13, fontWeight: 700, letterSpacing: "0.06em",
-          boxShadow: busy ? "none" : "0 4px 18px rgba(34,211,238,0.18)",
+          background: busy || small ? "rgba(34,211,238,0.10)" : "linear-gradient(135deg, rgba(34,211,238,0.22), rgba(167,139,250,0.18))",
+          color: "var(--accent, #22d3ee)", fontFamily: small ? "inherit" : mono, fontSize: small ? 12 : 13, fontWeight: 700, letterSpacing: small ? 0 : "0.06em",
+          boxShadow: busy || small ? "none" : "0 4px 18px rgba(34,211,238,0.18)",
         }}>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+        <svg width={small ? 14 : 18} height={small ? 14 : 18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
           strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
           style={busy ? { animation: "recheckSpin 0.8s linear infinite" } : undefined}>
           {busy
             ? <><path d="M21 12a9 9 0 1 1-2.64-6.36" /><path d="M21 3v6h-6" /></>
             : <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />}
         </svg>
-        {busy ? "Da Boss is checking..." : "Run Da Boss"}
+        {small ? (busy ? "Checking..." : "Check now") : (busy ? "Da Boss is checking..." : "Run Da Boss")}
       </button>
       <style>{`@keyframes recheckSpin { to { transform: rotate(360deg); } }`}</style>
 
@@ -1162,20 +1164,25 @@ export function WatchdogBanner({ watchdog, onRechecked }: { watchdog?: WatchdogD
     display: "flex", flexDirection: "column", gap: 6,
   };
 
+  // Plain-English quiet states share one compact row: a dot, one sentence,
+  // and a small "Check now" on the right. The full-width run button is
+  // reserved for the problem state below, where it earns the space.
+  const quietRow = (color: string, text: string, copy?: boolean) => (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+      <Dot color={color} />
+      <span style={{ fontSize: 12.5, color: "var(--text-secondary, #9ca3af)", fontFamily: "inherit" }}>{text}</span>
+      <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 8 }}>
+        {copy && watchdog && <WatchdogCopyButton watchdog={watchdog} color={color} />}
+        <RunDaBossButton onRechecked={onRechecked} small />
+      </span>
+    </div>
+  );
+
   // Not reported yet (file missing): quiet neutral, never an error.
   if (!watchdog || !watchdog.available) {
     return (
-      <div style={{ ...base, border: "1px solid var(--border, var(--border))", background: "var(--bg-card, #0d1117)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <Dot color="#6b7280" />
-          <span style={{ fontSize: 11, letterSpacing: "0.1em", color: "var(--text-muted, #6b7280)" }}>
-            DA BOSS - has not reported yet
-          </span>
-          <span style={{ marginLeft: "auto" }}>
-            <RecheckButton onRechecked={onRechecked} compact />
-          </span>
-        </div>
-        <RunDaBossButton onRechecked={onRechecked} block />
+      <div style={{ ...base, fontFamily: "inherit", border: "1px solid var(--border, var(--border))", background: "var(--bg-card, #0d1117)" }}>
+        {quietRow("#6b7280", "System check: not checked yet today")}
       </div>
     );
   }
@@ -1186,21 +1193,12 @@ export function WatchdogBanner({ watchdog, onRechecked }: { watchdog?: WatchdogD
   const count = Math.max(watchdog.problemCount, problems.length);
   const hasProblems = watchdog.overall === "problems" || count > 0;
 
-  // All clear and fresh: green quiet strip.
+  // All clear and fresh: one calm line.
   if (!hasProblems && !stale) {
+    const when = ageMin === null ? "not checked yet today" : `checked ${relAge(ageMin)}`;
     return (
-      <div style={{ ...base, border: `1px solid rgba(${BOSS_CLEAR_RGB},0.35)`, background: `rgba(${BOSS_CLEAR_RGB},0.06)` }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <Dot color={BOSS_CLEAR} />
-          <span style={{ fontSize: 11, letterSpacing: "0.1em", color: BOSS_CLEAR }}>
-            ALL SYSTEMS REPORTING - Da Boss checked {relAge(ageMin)}
-          </span>
-          <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "flex-start", gap: 8 }}>
-            <RecheckButton onRechecked={onRechecked} compact />
-            <WatchdogCopyButton watchdog={watchdog} color={BOSS_CLEAR} />
-          </span>
-        </div>
-        <RunDaBossButton onRechecked={onRechecked} block />
+      <div style={{ ...base, fontFamily: "inherit", border: `1px solid rgba(${BOSS_CLEAR_RGB},0.35)`, background: `rgba(${BOSS_CLEAR_RGB},0.06)` }}>
+        {quietRow(BOSS_CLEAR, `System check: all clear · ${when}`, true)}
       </div>
     );
   }
@@ -1215,8 +1213,8 @@ export function WatchdogBanner({ watchdog, onRechecked }: { watchdog?: WatchdogD
     setExpanded(!isOpen);
   };
   const headline = hasProblems
-    ? `DA BOSS: ${count} PROBLEM${count === 1 ? "" : "S"} REPORTED`
-    : `DA BOSS ITSELF IS LATE (last report ${relAge(ageMin)})`;
+    ? `Something needs attention: ${count} problem${count === 1 ? "" : "s"} found`
+    : `The system check is overdue (last ran ${relAge(ageMin)})`;
 
   return (
     <div className="mo-click wd-banner" onClick={toggle} role="button" style={{
@@ -1230,7 +1228,7 @@ export function WatchdogBanner({ watchdog, onRechecked }: { watchdog?: WatchdogD
       `}</style>
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
         <Dot color={color} pulse />
-        <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.1em", color }}>{headline}</span>
+        <span style={{ fontSize: 13, fontWeight: 700, color, fontFamily: "inherit" }}>{headline}</span>
         {hasProblems && stale && (
           <span style={{ fontSize: 10, color: "var(--orange)", border: "1px solid #fb923c55", borderRadius: 99, padding: "1px 8px" }}>
             report is also late ({relAge(ageMin)})
@@ -1374,7 +1372,7 @@ export function StatTiles({ tiles, onSelect }: { tiles: StatTile[]; onSelect: (s
           // Stale snapshot values render muted/amber, never as a bright stat.
           const valueColor = t.stale ? "var(--orange)" : live ? "var(--text-primary)" : "var(--text-secondary, #9ca3af)";
           return (
-            <div key={t.label} className="mo-click" onClick={() => { sfx.play("ping"); onSelect({ type: "stat", key: t.key }); }}
+            <div key={t.key ?? t.label} className="mo-click" onClick={() => { sfx.play("ping"); onSelect({ type: "stat", key: t.key }); }}
               title={t.provenance || "Click for the breakdown"}
               style={{
                 background: "var(--bg-card, #0d1117)",

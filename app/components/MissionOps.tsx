@@ -210,10 +210,82 @@ function LegendChip({ color, label, dashed }: { color: string; label: string; da
   );
 }
 
+// Agent activity comes off Jack's PC through /api/mission. When the PC is off
+// the request can hang rather than fail, so a plain spinner sat there forever.
+// After this many ms the page says so and offers a retry instead.
+export const UPLINK_TIMEOUT_MS = 12_000;
+
+/** Newest timestamp any agent or the watchdog reported in a payload. */
+export function latestHeartbeat(d: MissionData | null): string | null {
+  if (!d) return null;
+  let best: string | null = null;
+  const consider = (s: string | null | undefined) => {
+    if (!s) return;
+    const t = Date.parse(s);
+    if (!Number.isFinite(t)) return;
+    if (best == null || t > Date.parse(best)) best = s;
+  };
+  for (const a of d.agents ?? []) consider(a.lastRunAt);
+  consider(d.watchdog?.updated);
+  return best;
+}
+
+/** "3 minutes ago" style, or "unknown" when there is nothing to go on. */
+export function relativeAge(iso: string | null): string {
+  if (!iso) return "unknown";
+  const ms = Date.now() - Date.parse(iso);
+  if (!Number.isFinite(ms) || ms < 0) return "unknown";
+  const min = Math.round(ms / 60_000);
+  if (min < 1) return "under a minute ago";
+  if (min < 60) return `${min} minute${min === 1 ? "" : "s"} ago`;
+  const hr = Math.round(min / 60);
+  if (hr < 48) return `${hr} hour${hr === 1 ? "" : "s"} ago`;
+  const day = Math.round(hr / 24);
+  return `${day} day${day === 1 ? "" : "s"} ago`;
+}
+
+/** Shared loading / not-checked-in state for the Agents view and /mission. */
+export function AgentUplinkState({ error, timedOut, lastHeartbeat, onRetry }: {
+  error: string | null; timedOut: boolean; lastHeartbeat: string | null; onRetry: () => void;
+}) {
+  if (!timedOut && !error) {
+    return <div style={{ color: "var(--text-muted)", fontSize: 13 }}>Loading agent activity...</div>;
+  }
+  return (
+    <div style={{
+      background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 12,
+      padding: 16, display: "grid", gap: 10, maxWidth: 560,
+    }}>
+      <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>
+        Agent activity is reported from Jack&apos;s PC and it has not checked in.
+      </div>
+      <div style={{ fontSize: 13, color: "var(--text-muted)", lineHeight: 1.5 }}>
+        Last heartbeat: {relativeAge(lastHeartbeat)}.
+        {error ? ` The last attempt failed: ${error}.` : ""}
+      </div>
+      <div>
+        <button
+          type="button"
+          onClick={onRetry}
+          style={{
+            padding: "7px 14px", borderRadius: 9, cursor: "pointer",
+            border: "1px solid var(--accent)", background: "transparent",
+            color: "var(--accent)", fontSize: 13, fontWeight: 600,
+          }}
+        >
+          Retry
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function MissionOps() {
   const [data, setData] = useState<MissionData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selection, setSelection] = useState<Selection>(null);
+  const [timedOut, setTimedOut] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   const aliveRef = useRef(true);
   const load = useCallback(async () => {
@@ -226,6 +298,16 @@ export default function MissionOps() {
       if (aliveRef.current) setError(e instanceof Error ? e.message : "fetch failed");
     }
   }, []);
+
+  // Until the first payload lands, count down to the "not checked in" card.
+  useEffect(() => {
+    if (data) return;
+    const t = setTimeout(() => setTimedOut(true), UPLINK_TIMEOUT_MS);
+    return () => clearTimeout(t);
+  }, [data, attempt]);
+  const retry = useCallback(() => {
+    setTimedOut(false); setError(null); setAttempt((a) => a + 1); load();
+  }, [load]);
 
   useEffect(() => {
     aliveRef.current = true;
@@ -309,8 +391,8 @@ export default function MissionOps() {
         </div>
       </header>
 
-      {!data && !error && (
-        <div style={{ color: "var(--text-muted)", fontFamily: MONO, fontSize: 12 }}>Establishing uplink…</div>
+      {!data && (
+        <AgentUplinkState error={error} timedOut={timedOut} lastHeartbeat={latestHeartbeat(data)} onRetry={retry} />
       )}
 
       {data && (

@@ -254,7 +254,7 @@ async function toolQueryGhl(): Promise<string> {
   return JSON.stringify(
     {
       crmStatus:
-        "No CRM connected. GHL retired 2026-08-22, replacement pending. Contact counts, pipeline opportunities, and appointments have no data source.",
+        "CRM lives in the OS Supabase: crm_contacts, crm_deals, tasks, messages, workflows. Ask for counts through the pipeline and automations APIs.",
       activeClients,
       activeClientList: clientNames,
       // Confirmed recurring retainers ONLY. One-time, expected and

@@ -1017,6 +1017,20 @@ export default function CrmWorkspace({
     return { st, ty, cl, ch, blockedN, clearN: rows.length - blockedN, readyN, stuckN, handoverN };
   }, [rows]);
 
+  // The "Needs your decision" bucket is the right place to open only when it
+  // has something in it. Opening on an empty bucket showed a new user "nothing
+  // matches" over thousands of records, which reads as an empty CRM. Once the
+  // first load lands, an empty bucket drops the view to Everything. Done once,
+  // so a filter Jack picks later is never overridden.
+  const [autoDefaulted, setAutoDefaulted] = useState(false);
+  useEffect(() => {
+    if (autoDefaulted || loading || rows.length === 0) return;
+    setAutoDefaulted(true);
+    if (initialStatus === "needs_decision" && status === "needs_decision" && !counts.st.needs_decision) {
+      setStatus("all");
+    }
+  }, [autoDefaulted, loading, rows.length, counts, status, initialStatus]);
+
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return rows.filter((r) => {
@@ -1439,9 +1453,26 @@ export default function CrmWorkspace({
           border: "1px dashed var(--border)", borderRadius: 12, padding: 18,
           fontSize: 13, color: "var(--text-muted)", lineHeight: 1.6,
         }}>
-          {rows.length === 0
-            ? "No CRM records were returned at all. That is not the same as an empty CRM: read the errors above before treating this as nothing to do."
-            : `No record matches these filters. ${rows.length} records exist behind them, so this is a filter, not an empty CRM.`}
+          {rows.length === 0 ? (
+            "No CRM records were returned at all. That is not the same as an empty CRM: read the errors above before treating this as nothing to do."
+          ) : (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <span>
+                Nothing matches these filters. Clear them to see all {rows.length.toLocaleString("en-US")} records.
+              </span>
+              <button
+                type="button"
+                onClick={clearAll}
+                style={{
+                  padding: "6px 12px", borderRadius: 8, cursor: "pointer",
+                  border: "1px solid var(--accent)", background: "transparent",
+                  color: "var(--accent)", fontSize: 12.5, fontWeight: 600,
+                }}
+              >
+                Clear filters
+              </button>
+            </span>
+          )}
         </div>
       ) : (
         <div style={{ display: "grid", gap: 8 }}>

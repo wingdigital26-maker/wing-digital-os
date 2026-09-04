@@ -4,6 +4,7 @@ import CrmRowDetail, {
   SourceLink, NoSourceLink,
   type DetailItem, type Evidence, type Review, type TierInfo,
 } from "./CrmRowDetail";
+import { ContactDetail } from "./pipeline/ContactsPanel";
 
 // ───────────────────────────────────────────────────────────────────────────
 // CrmWorkspace — the ONE CRM surface.
@@ -640,9 +641,12 @@ function BlockerCell({ blockers }: { blockers: Blocker[] }) {
 /** The pipeline record's own detail panel. Uses the same SourceLink /
  *  NoSourceLink pair as the outbound panel, so a missing link is just as loud
  *  on a contact as it is on a draft. */
-function PipelineDetail({ row, onClose }: { row: Row; onClose: () => void }) {
+function PipelineDetail({ row, onClose, onViewContact }: {
+  row: Row; onClose: () => void; onViewContact: (contactId: number) => void;
+}) {
   const c = row.contact;
   const d = row.deal;
+  const contactId = c?.id ?? d?.contactId ?? null;
   const site = c?.website ?? d?.website ?? null;
   const label: React.CSSProperties = {
     fontSize: 10.5, textTransform: "uppercase", letterSpacing: ".06em",
@@ -678,16 +682,30 @@ function PipelineDetail({ row, onClose }: { row: Row; onClose: () => void }) {
         }}>
           {c ? `Pipeline contact · #${c.id}` : `Deal · #${d?.id}`}
         </span>
-        <button
-          type="button"
-          onClick={onClose}
-          style={{
-            fontSize: 11.5, padding: "3px 10px", borderRadius: 8, cursor: "pointer",
-            border: "1px solid var(--border)", background: "transparent", color: "var(--text-secondary)",
-          }}
-        >
-          close
-        </button>
+        <div style={{ display: "flex", gap: 6 }}>
+          {contactId !== null && (
+            <button
+              type="button"
+              onClick={() => onViewContact(contactId)}
+              style={{
+                fontSize: 11.5, padding: "3px 10px", borderRadius: 8, cursor: "pointer",
+                border: "1px solid var(--accent)", background: "transparent", color: "var(--accent)",
+              }}
+            >
+              {c ? "Open full contact view" : "View contact"}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              fontSize: 11.5, padding: "3px 10px", borderRadius: 8, cursor: "pointer",
+              border: "1px solid var(--border)", background: "transparent", color: "var(--text-secondary)",
+            }}
+          >
+            close
+          </button>
+        </div>
       </div>
 
       <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))" }}>
@@ -794,6 +812,9 @@ export default function CrmWorkspace({
   const [blocked, setBlocked] = useState<"all" | "blocked" | "clear">("all");
   const [q, setQ] = useState("");
   const [open, setOpen] = useState<string | null>(null);
+  // The unified contact view (tags, tasks, deals, every message and
+  // automation run) opened from a pipeline row's detail.
+  const [contactView, setContactView] = useState<number | null>(null);
   const [shown, setShown] = useState(PAGE_SIZE);
   const [more, setMore] = useState(false);
 
@@ -1565,7 +1586,7 @@ export default function CrmWorkspace({
                         </div>
                       }
                     />
-                  : <PipelineDetail row={r} onClose={() => setOpen(null)} />)}
+                  : <PipelineDetail row={r} onClose={() => setOpen(null)} onViewContact={setContactView} />)}
               </div>
             );
           })}
@@ -1583,6 +1604,10 @@ export default function CrmWorkspace({
             </button>
           )}
         </div>
+      )}
+
+      {contactView !== null && (
+        <ContactDetail contactId={contactView} onClose={() => setContactView(null)} />
       )}
     </div>
   );

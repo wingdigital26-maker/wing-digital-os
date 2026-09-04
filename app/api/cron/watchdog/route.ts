@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { sbUrl, sbService, sbSelect } from "@/lib/osSupabase";
 import { pushToAll } from "@/lib/push";
@@ -35,12 +36,20 @@ type Beat = { agent: string; status: string; message: string | null; last_beat: 
 type Alert = { key: string; title: string; body: string };
 type AlertRow = { key: string; last_pushed: string | null; resolved_at: string | null };
 
+// Constant-time compare over sha256 digests so the length of the secret and
+// the position of the first mismatch leak nothing through timing.
+function sameSecret(got: string | null, expected: string | undefined): boolean {
+  if (!got || !expected) return false;
+  const a = crypto.createHash("sha256").update(got).digest();
+  const b = crypto.createHash("sha256").update(expected).digest();
+  return crypto.timingSafeEqual(a, b);
+}
+
 function authorized(req: NextRequest): boolean {
-  const secret = process.env.CRON_SECRET;
-  const hbKey = process.env.HEARTBEAT_KEY;
   const auth = req.headers.get("authorization");
-  if (secret && auth === `Bearer ${secret}`) return true;
-  if (hbKey && req.headers.get("x-heartbeat-key") === hbKey) return true; // manual trigger
+  const bearer = auth?.startsWith("Bearer ") ? auth.slice(7) : null;
+  if (sameSecret(bearer, process.env.CRON_SECRET)) return true;
+  if (sameSecret(req.headers.get("x-heartbeat-key"), process.env.HEARTBEAT_KEY)) return true; // manual trigger
   return false;
 }
 

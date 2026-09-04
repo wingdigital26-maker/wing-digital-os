@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import ContactsPanel from "./pipeline/ContactsPanel";
+import ContactsPanel, { ContactDetail } from "./pipeline/ContactsPanel";
 import DealDetail from "./pipeline/DealDetail";
 import {
   Deal, PipelinePayload, Stage, UNKNOWN_PERSON, countText, money, stageTotal,
@@ -31,6 +31,8 @@ export default function PipelineBoard() {
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<View>("board");
   const [openDeal, setOpenDeal] = useState<{ deal: Deal; stageId: number } | null>(null);
+  // The unified contact view, opened from a deal's "View contact" link.
+  const [openContact, setOpenContact] = useState<number | null>(null);
   const [moving, setMoving] = useState(false);
   const [moveError, setMoveError] = useState("");
 
@@ -151,6 +153,16 @@ export default function PipelineBoard() {
           moveError={moveError}
           onClose={() => setOpenDeal(null)}
           onMove={(stageId) => { void moveDeal(openDeal.deal.id, stageId); }}
+          onViewContact={(id) => { setOpenDeal(null); setOpenContact(id); }}
+        />
+      )}
+
+      {openContact !== null && (
+        <ContactDetail
+          contactId={openContact}
+          stages={stages ?? []}
+          onClose={() => setOpenContact(null)}
+          onDealCreated={() => { void load(); }}
         />
       )}
     </div>

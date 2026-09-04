@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sbSelect } from "@/lib/osSupabase";
 import {
   twilioCreds,
   validTwilioSignature,
@@ -8,6 +7,7 @@ import {
   logMessage,
 } from "@/lib/sms";
 import { emitEventAsync } from "@/lib/automations/emit";
+import { contactIdForPhone, numberOwner } from "../../voice/_lib";
 
 // ───────────────────────────────────────────────────────────────────────────
 // POST /api/sms/inbound — the Twilio incoming-message webhook.
@@ -43,15 +43,9 @@ function twiml(message?: string): NextResponse {
   return new NextResponse(xml, { headers: { "Content-Type": "text/xml" } });
 }
 
-async function contactIdForPhone(phone: string): Promise<number | null> {
-  const rows = await sbSelect<{ id: number }>({
-    table: "crm_contacts",
-    select: "id",
-    query: `phone=eq.${encodeURIComponent(phone)}&limit=1`,
-    service: true,
-  });
-  return rows[0]?.id ?? null;
-}
+// contactIdForPhone (E.164 or bare-10-digit match) and numberOwner (which
+// client owns the To number) are shared with the voice webhooks in
+// app/api/voice/_lib.ts.
 
 async function writeConsent(row: Record<string, unknown>): Promise<void> {
   const url = process.env.OS_SUPABASE_URL;
@@ -161,11 +155,16 @@ export async function POST(req: NextRequest) {
   // Automation hook: hand the reply to the engine as sms.received. Only real
   // replies reach here (STOP/START/HELP returned above). Async so Twilio gets
   // its TwiML promptly, and wrapped so a failed emit never changes the reply.
+  // client_slug comes from voice_numbers by the To number: null when the
+  // number is Wing's own or not registered (NULL means unknown; the engine's
+  // client scoping decides what that may fire).
   try {
+    const owner = await numberOwner(to);
     await emitEventAsync({
       type: "sms.received",
+      client_slug: owner.client_slug,
       contact_id: contactId,
-      payload: { phone: from, to, body, message_sid: sid },
+      payload: { phone: from, to, body, message_sid: sid, number_registered: owner.found },
     });
   } catch {
     // The inbound row is already in the ledger; nothing else depends on this.

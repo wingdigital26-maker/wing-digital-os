@@ -128,6 +128,7 @@ export function pillColor(status: string): string {
       return "var(--green)";
     case "paused":
     case "running":
+    case "waiting":
     case "skipped":
       return "var(--orange)";
     case "failed":
@@ -143,6 +144,7 @@ const PILL_LABELS: Record<string, string> = {
   active: "Active",
   paused: "Paused",
   running: "Running",
+  waiting: "Waiting",
   done: "Done",
   failed: "Failed",
   skipped: "Skipped",

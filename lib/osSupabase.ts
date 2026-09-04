@@ -3,6 +3,7 @@
 // style of app/api/login/route.ts. Node runtime only (uses next/headers cookies).
 import { cookies } from "next/headers";
 import { verifySession, type Session } from "../app/lib/session";
+import { authToken } from "../app/lib/authToken";
 
 export function sbUrl(): string | undefined {
   return process.env.OS_SUPABASE_URL;
@@ -22,11 +23,18 @@ export async function getOsSession(): Promise<Session | null> {
   return verifySession(jar.get("wingos_session")?.value);
 }
 
-// True when the request carries the legacy shared-password cookie. Used to let
-// staff-on-OS_PASSWORD still reach endpoints that don't strictly need a user id.
+// True when the request carries the legacy shared-password cookie AND it is
+// the real token derived from OS_PASSWORD (same check as middleware.ts). A
+// cookie with any other value is not auth. Used to let staff-on-OS_PASSWORD
+// still reach endpoints that don't strictly need a user id.
 export async function hasLegacyAuth(): Promise<boolean> {
   const jar = await cookies();
-  return Boolean(jar.get("wingos_auth")?.value);
+  const cookie = jar.get("wingos_auth")?.value;
+  if (!cookie) return false;
+  // authToken() derives from OS_PASSWORD; with no password set there is no
+  // legitimate legacy token, so refuse rather than compare against a default.
+  if (!process.env.OS_PASSWORD) return false;
+  return cookie === (await authToken());
 }
 
 type SbQuery = {

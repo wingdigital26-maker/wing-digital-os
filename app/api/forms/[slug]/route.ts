@@ -24,9 +24,11 @@ import type { FormRow } from "@/lib/automations/types";
 //   5. insert form_submissions (raw data minus honeypots), bump forms.submissions
 //   6. optional SMS consent row when sms_consent is truthy and the phone is E.164
 //   7. emitEvent("form.submitted"). The engine resolves or creates the CRM
-//      contact from the payload and emits contact.created ITSELF if it made
-//      one; this route deliberately does not, so a contact is never announced
-//      twice.
+//      contact from the payload. When it creates one it links this
+//      submission (form_submissions.contact_id) and inserts a contact.created
+//      events row directly, which the cron or the next engine pass processes;
+//      this route deliberately emits nothing else, so a contact is never
+//      announced twice.
 //   8. HTML form posts with a redirect_url get a 303 there; everything else
 //      gets JSON {ok, submission_id}.
 //
@@ -46,6 +48,20 @@ const CORS = {
 const SLUG_RE = /^[a-z0-9-]{2,60}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const HONEYPOT_FIELDS = ["_hp", "website_url_confirm"];
+const MAX_FIELDS = 60; // a lead form has a dozen fields; anything near this is not a form
+const MAX_BODY_BYTES = 32 * 1024; // serialized fields; the jsonb column is not a file store
+
+// A honeypot fires on ANY non-empty value of any type: "x", 1, true, [1],
+// {a:1}. Bots that post JSON fill it with whatever they have.
+function honeypotFilled(v: unknown): boolean {
+  if (v === undefined || v === null || v === false) return false;
+  if (typeof v === "string") return v.trim().length > 0;
+  if (typeof v === "number") return true; // 0 is still a filled field
+  if (typeof v === "boolean") return v;
+  if (Array.isArray(v)) return v.length > 0;
+  if (typeof v === "object") return Object.keys(v as object).length > 0;
+  return true;
+}
 
 function json(body: unknown, status = 200, extra: Record<string, string> = {}): NextResponse {
   return NextResponse.json(body, { status, headers: { ...CORS, ...extra } });
@@ -56,11 +72,22 @@ function json(body: unknown, status = 200, extra: Record<string, string> = {}): 
 const RATE_WINDOW_MS = 60 * 60 * 1000;
 const POST_MAX = 30; // total POSTs per IP per hour, abuse backstop
 const SUBMIT_MAX = 15; // valid submissions per IP per hour, checked AFTER validation
+const MAP_SWEEP_AT = 5000; // keys; above this, drop every IP whose hits are all outside the window
 const postHits = new Map<string, number[]>();
 const submitHits = new Map<string, number[]>();
 
+// Bound the maps: a scan from many source IPs would otherwise grow them for
+// the life of the instance. Sweeping only when large keeps the hot path cheap.
+function sweep(map: Map<string, number[]>, now: number): void {
+  if (map.size <= MAP_SWEEP_AT) return;
+  for (const [k, list] of map) {
+    if (!list.some((t) => now - t < RATE_WINDOW_MS)) map.delete(k);
+  }
+}
+
 function bucketLimited(map: Map<string, number[]>, ip: string, max: number): boolean {
   const now = Date.now();
+  sweep(map, now);
   const list = (map.get(ip) ?? []).filter((t) => now - t < RATE_WINDOW_MS);
   if (list.length >= max) {
     map.set(ip, list);
@@ -195,7 +222,22 @@ export async function POST(
   // like a success so the bot learns nothing, and we store NOTHING: no
   // submission row, no counter bump, no event.
   for (const hp of HONEYPOT_FIELDS) {
-    if (str(fields[hp])) return json({ ok: true });
+    if (hp in fields && honeypotFilled(fields[hp])) return json({ ok: true });
+  }
+
+  // Size caps, before any write. A real lead form never gets near these.
+  const fieldCount = Object.keys(fields).length;
+  if (fieldCount > MAX_FIELDS) {
+    return json({ error: "bad_request", message: `Too many fields (${fieldCount}; the limit is ${MAX_FIELDS}).` }, 400);
+  }
+  let serializedBytes = 0;
+  try {
+    serializedBytes = Buffer.byteLength(JSON.stringify(fields), "utf8");
+  } catch {
+    return json({ error: "bad_request", message: "Could not read the form. Please try again." }, 400);
+  }
+  if (serializedBytes > MAX_BODY_BYTES) {
+    return json({ error: "bad_request", message: `The submission is too large (${serializedBytes} bytes; the limit is ${MAX_BODY_BYTES}).` }, 400);
   }
 
   // ── Normalize the fields we understand; everything else is kept verbatim in data.

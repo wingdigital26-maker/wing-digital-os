@@ -20,9 +20,10 @@ export const dynamic = "force-dynamic";
 
 const CENTRAL = "America/Chicago";
 
-// Midnight at the start of TOMORROW in Central time, as a UTC instant. Built
-// from the wall clock rather than a fixed offset so DST is handled by Intl.
-function centralEndOfToday(now: Date): Date {
+// Midnight at the start of TODAY and of TOMORROW in Central time, as UTC
+// instants. Built from the wall clock rather than a fixed offset so DST is
+// handled by Intl.
+function centralDayBounds(now: Date): { start: Date; end: Date } {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: CENTRAL, hour12: false,
     year: "numeric", month: "2-digit", day: "2-digit",
@@ -33,8 +34,9 @@ function centralEndOfToday(now: Date): Date {
   const hour = get("hour") % 24;
   const wall = Date.UTC(get("year"), get("month") - 1, get("day"), hour, get("minute"), get("second"));
   const offsetMs = wall - now.getTime(); // Central wall clock minus real UTC
+  const midnightWall = Date.UTC(get("year"), get("month") - 1, get("day"), 0, 0, 0);
   const nextMidnightWall = Date.UTC(get("year"), get("month") - 1, get("day") + 1, 0, 0, 0);
-  return new Date(nextMidnightWall - offsetMs);
+  return { start: new Date(midnightWall - offsetMs), end: new Date(nextMidnightWall - offsetMs) };
 }
 
 // Exact row count via Content-Range, fetching a single id. null on any failure.
@@ -54,7 +56,7 @@ export async function GET() {
   if (isAuthFailure(auth)) return auth;
 
   const now = new Date();
-  const endOfToday = centralEndOfToday(now);
+  const today = centralDayBounds(now);
   const weekAgo = new Date(now.getTime() - 7 * 86400_000);
   const weekAhead = new Date(now.getTime() + 7 * 86400_000);
 
@@ -67,7 +69,9 @@ export async function GET() {
     automations_active,
     unread_texts,
   ] = await Promise.all([
-    count("tasks", `done_at=is.null&due_at=lt.${iso(endOfToday)}`),
+    // Due today = due at some point during today (Central). Overdue is the
+    // separate figure below; the two do not overlap once a task is past due.
+    count("tasks", `done_at=is.null&due_at=gte.${iso(today.start)}&due_at=lt.${iso(today.end)}`),
     count("tasks", `done_at=is.null&due_at=lt.${iso(now)}`),
     count("events", `type=in.(form.submitted,call.missed)&occurred_at=gte.${iso(weekAgo)}`),
     count("bookings", `status=eq.confirmed&starts_at=gte.${iso(now)}&starts_at=lt.${iso(weekAhead)}`),

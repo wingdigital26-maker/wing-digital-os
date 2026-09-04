@@ -28,6 +28,7 @@ export default function DealDetail({
   onMove,
   moveError,
   moving,
+  onViewContact,
 }: {
   deal: Deal;
   stages: Stage[];
@@ -36,6 +37,8 @@ export default function DealDetail({
   onMove: (stageId: number) => void;
   moveError: string;
   moving: boolean;
+  // Opens the unified contact view for this deal's contact.
+  onViewContact?: (contactId: number) => void;
 }) {
   const [reloadKey, setReloadKey] = useState(0);
   const c = deal.contact ?? null;
@@ -46,7 +49,7 @@ export default function DealDetail({
       role="dialog"
       aria-label={`Deal ${deal.title}`}
       style={{
-        position: "fixed", inset: 0, zIndex: 60,
+        position: "fixed", inset: 0, zIndex: 700,
         display: "flex", justifyContent: "flex-end",
         background: "var(--accent-glow)",
       }}
@@ -74,17 +77,32 @@ export default function DealDetail({
             </div>
             <div style={{ fontSize: 13, color: "var(--text-muted)" }}>{deal.title}</div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              border: "1px solid var(--border)", background: "transparent",
-              color: "var(--text-muted)", borderRadius: 8, padding: "4px 10px",
-              cursor: "pointer", height: 32,
-            }}
-          >
-            Close
-          </button>
+          <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+            {contactId !== null && onViewContact && (
+              <button
+                type="button"
+                onClick={() => onViewContact(contactId)}
+                style={{
+                  border: "1px solid var(--accent)", background: "transparent",
+                  color: "var(--accent)", borderRadius: 8, padding: "4px 10px",
+                  cursor: "pointer", height: 32, fontSize: 13,
+                }}
+              >
+                View contact
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                border: "1px solid var(--border)", background: "transparent",
+                color: "var(--text-muted)", borderRadius: 8, padding: "4px 10px",
+                cursor: "pointer", height: 32,
+              }}
+            >
+              Close
+            </button>
+          </div>
         </div>
 
         <div style={{

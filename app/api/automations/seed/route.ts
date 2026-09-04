@@ -9,11 +9,13 @@ import {
   type WorkflowRow,
 } from "../_workflows";
 
-// POST /api/automations/seed: the starter pack. Four workflows that cover
+// POST /api/automations/seed: the starter pack. Six workflows that cover
 // what GoHighLevel used to do for Wing on day one, created as DRAFTS so
 // nothing runs until a human reads them and presses Activate. Idempotent by
 // name: a workflow that already exists is skipped, never duplicated.
-// client_slug is null on all four: these are Wing's own.
+// client_slug is null on all of them: these are Wing's own. The last two use
+// wait steps (docs/AUTOMATIONS.md "Waits"), so they only finish when the
+// cron route runs.
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -81,6 +83,36 @@ const STARTER_PACK: Starter[] = [
       { action_type: "create_deal", config: { title: "Booked from cold call: {{business}}", stage_key: "booked" } },
       { action_type: "add_tag", config: { tag: "cold-call-booked" } },
       { action_type: "notify_push", config: { title: "Call booked", body: "{{business}} booked from the Call Room" } },
+    ],
+  },
+  {
+    name: "Appointment reminder",
+    description: "Someone books a call: wait until 24 hours before it starts, then text them a reminder. If the booking is less than a day away the text goes right away.",
+    trigger_type: "booking.created",
+    actions: [
+      { action_type: "wait_until", config: { field: "starts_at", offset_hours: -24 } },
+      {
+        action_type: "send_sms",
+        config: {
+          body: "Hi {{first_name}}, a reminder that your call with Wing Digital is tomorrow. Reply here if you need to move it.",
+        },
+      },
+    ],
+  },
+  {
+    name: "Ask for a review after a win",
+    description: "A deal lands in Won: wait a day, thank them by text and ask for a review, then set a task to check whether one came in.",
+    trigger_type: "deal.stage_changed",
+    trigger_filter: { stage_key: "won" },
+    actions: [
+      { action_type: "wait", config: { hours: 24 } },
+      {
+        action_type: "send_sms",
+        config: {
+          body: "Hi {{first_name}}, thank you for choosing {{business}}. If you have a minute, a quick review would mean a lot to us.",
+        },
+      },
+      { action_type: "create_task", config: { title: "Check whether {{business}} left a review", due_in_hours: 72 } },
     ],
   },
 ];

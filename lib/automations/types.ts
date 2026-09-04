@@ -56,6 +56,8 @@ export const ACTION_TYPES = [
   "notify_push",
   "create_task",
   "webhook",
+  "wait",
+  "wait_until",
 ] as const;
 export type ActionType = (typeof ACTION_TYPES)[number];
 
@@ -72,7 +74,25 @@ export const ACTION_DEFS: Record<ActionType, { label: string; hint: string; fiel
   notify_push: { label: "Push a notification to Jack's phone", hint: "", contacts_human: false, fields: [{ key: "title", label: "Title", kind: "text", required: true }, { key: "body", label: "Body", kind: "text" }] },
   create_task: { label: "Create a follow-up task", hint: "", contacts_human: false, fields: [{ key: "title", label: "Task", kind: "text", required: true }, { key: "due_in_hours", label: "Due in (hours)", kind: "number" }] },
   webhook: { label: "Call a webhook URL", hint: "POSTs the event and contact as JSON. https only.", contacts_human: false, fields: [{ key: "url", label: "URL", kind: "url", required: true }] },
+  // Waits pause the run (status 'waiting', see 0022_workflow_waits.sql). The
+  // cron's resumeWaitingRuns() continues from the step after the wait.
+  wait: { label: "Wait", hint: "Pause this automation, then continue with the next step", contacts_human: false, fields: [{ key: "hours", label: "Hours", kind: "number", required: true, hint: "How long to pause. Decimals are fine, for example 0.5 for thirty minutes" }] },
+  wait_until: {
+    label: "Wait until a time on the event",
+    hint: "For example: 24 hours before the booking starts",
+    contacts_human: false,
+    fields: [
+      { key: "field", label: "Which time on the event", kind: "text", required: true, hint: "which time on the event, e.g. starts_at" },
+      { key: "offset_hours", label: "Offset (hours)", kind: "number", hint: "negative = before, positive = after" },
+    ],
+  },
 };
+
+// Action types that pause the run instead of doing something right away.
+export const WAIT_ACTION_TYPES: readonly ActionType[] = ["wait", "wait_until"];
+export function isWaitAction(type: string): boolean {
+  return (WAIT_ACTION_TYPES as readonly string[]).includes(type);
+}
 
 export const MERGE_TAGS = ["{{first_name}}", "{{company}}", "{{business}}", "{{phone}}", "{{email}}", "{{city}}"] as const;
 
@@ -116,11 +136,23 @@ export type WorkflowRunRow = {
   workflow_id: string;
   event_id: number;
   contact_id: number | null;
-  status: "running" | "done" | "failed" | "skipped";
+  // 'waiting' = paused on a wait step until resume_at (0022_workflow_waits.sql)
+  status: "running" | "done" | "failed" | "skipped" | "waiting";
   log: WorkflowRunLogEntry[];
   error: string | null;
   started_at: string;
   finished_at: string | null;
+  // Set only while waiting. NULL otherwise (unknown / not applicable).
+  resume_at?: string | null;
+  next_step?: number | null;
+  context?: WorkflowRunContext;
+};
+
+// What a paused run carries into its resume: the event payload as it was when
+// the run paused, and the contact it was running for.
+export type WorkflowRunContext = {
+  payload?: Record<string, unknown>;
+  contact_id?: number | null;
 };
 
 export type FormRow = {

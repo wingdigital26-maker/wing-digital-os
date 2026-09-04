@@ -40,8 +40,27 @@ export async function POST(req: NextRequest) {
   const to = p.To ?? "";
   const callSid = p.CallSid ?? "";
 
-  const number = await voiceNumberFor(to);
+  const lookup = await voiceNumberFor(to);
 
+  if (!lookup.ok) {
+    // The database did not answer. That is an outage, not a missing setup,
+    // so the caller hears something neutral and the row (if it can be
+    // written at all) says failed with the reason. Nothing rings.
+    await insertCall({
+      provider_sid: callSid || null,
+      contact_id: null,
+      client_slug: null,
+      direction: "inbound",
+      from_number: from || null,
+      to_number: to || null,
+      status: "failed",
+      ended_at: new Date().toISOString(),
+      notes: `voice_numbers lookup failed: ${lookup.error}`.slice(0, 500),
+    });
+    return twiml("<Say>Sorry, we could not take your call right now.</Say><Hangup/>");
+  }
+
+  const number = lookup.row;
   if (!number) {
     // A number Twilio routed to us that nobody registered. Say so, hang up,
     // and leave evidence: the row is the only way anyone finds out.
@@ -81,9 +100,11 @@ export async function POST(req: NextRequest) {
       contactId,
       dialStatus: "no-forward",
     });
-    return twiml(
-      `${greeting}<Say>Sorry, nobody is available right now. We will text you shortly.</Say><Hangup/>`
-    );
+    const say =
+      process.env.AUTOMATION_SEND_ENABLED === "1"
+        ? "Sorry, nobody is available right now. We will text you shortly."
+        : "Sorry, nobody is available right now. Please try again shortly.";
+    return twiml(`${greeting}<Say>${escapeXml(say)}</Say><Hangup/>`);
   }
 
   const ring = Number.isFinite(number.ring_seconds) && number.ring_seconds > 0

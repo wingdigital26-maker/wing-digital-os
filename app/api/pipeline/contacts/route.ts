@@ -22,6 +22,7 @@ import {
   esc,
 } from "../_lib";
 import { emitEvent } from "@/lib/automations/emit";
+import { normalizePhone } from "@/lib/phone";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -118,12 +119,16 @@ export async function POST(req: Request) {
     return badRequest("business_name is required.");
   }
 
+  // email is stored lowercased and phone as E.164 when derivable (else as
+  // typed), so the automation engine's exact-match lookups find this row.
+  const emailRaw = nullableText(body.email);
+  const phoneNorm = normalizePhone(nullableText(body.phone));
   const row: Record<string, unknown> = {
     business_name,
     contact_name: nullableText(body.contact_name),
     title: nullableText(body.title),
-    email: nullableText(body.email),
-    phone: nullableText(body.phone),
+    email: emailRaw ? emailRaw.toLowerCase() : null,
+    phone: phoneNorm.e164 ?? phoneNorm.value,
     website: nullableText(body.website),
     city: nullableText(body.city),
     state: nullableText(body.state),

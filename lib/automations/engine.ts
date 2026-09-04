@@ -42,6 +42,17 @@
 //     events with NULL client_slug (Wing's own). There is no "all clients"
 //     wildcard, on purpose: a client's automation must never touch another
 //     client's leads.
+//
+// WAITS (0022_workflow_waits.sql)
+//   `wait` and `wait_until` are steps that pause the run instead of doing
+//   something. When one is reached the run row is patched to status
+//   'waiting' with resume_at, next_step (the step after the wait) and context
+//   (event payload snapshot + contact id), and execution stops. The cron
+//   calls resumeWaitingRuns(), which claims each due run by patching status
+//   from 'waiting' to 'running' WITH a status=eq.waiting filter; PostgREST
+//   returns the rows it changed, so zero rows back means another engine took
+//   it and this one moves on. Claimed runs continue from next_step with the
+//   same per-step logging and end done / failed / waiting again.
 // ───────────────────────────────────────────────────────────────────────────
 import {
   sbGet,
@@ -54,11 +65,14 @@ import {
 import { dueDateFrom, type StepRow } from "@/app/api/sequences/_lib";
 import { twilioCreds, twilioSend, logMessage, patchMessages, webhookKey } from "@/lib/sms";
 import { pushToAll } from "@/lib/push";
+import { phoneMatchFilter } from "@/lib/phone";
+import { isWaitAction } from "./types";
 import type {
   ContactLite,
   EventRow,
   WorkflowActionRow,
   WorkflowRow,
+  WorkflowRunContext,
   WorkflowRunLogEntry,
   WorkflowRunRow,
 } from "./types";
@@ -69,8 +83,21 @@ export type ProcessSummary = {
   done: number;
   failed: number;
   skipped: number;
+  waiting: number;
   errors: string[];
 };
+
+export type ResumeSummary = {
+  scanned: number; // waiting runs whose resume_at had passed
+  resumed: number; // runs this engine claimed
+  done: number;
+  failed: number;
+  skipped: number; // workflow no longer active, or claimed by another engine
+  waiting: number; // hit another wait and paused again
+  errors: string[];
+};
+
+const MAX_WAIT_HOURS = 24 * 60;
 
 export type ProcessOptions = { limit?: number; onlyEventId?: number };
 
@@ -172,11 +199,21 @@ async function resolveContact(event: EventRow): Promise<{ contact: ContactLite |
   const phone = toE164(p.phone);
 
   if (email) {
-    const rows = await sbGet<ContactLite>("crm_contacts", CONTACT_SELECT, `email=ilike.${esc(email)}&limit=1`);
+    // Exact match on the lowercased address. Emails are stored lowercased on
+    // every write path, so eq is enough; ilike would let % and _ in a
+    // visitor-supplied address match somebody else's row.
+    const rows = await sbGet<ContactLite>(
+      "crm_contacts",
+      CONTACT_SELECT,
+      `email=eq.${encodeURIComponent(email)}&limit=1`
+    );
     if (rows[0]) return { contact: rows[0], note: `contact #${rows[0].id} matched by email` };
   }
-  if (phone) {
-    const rows = await sbGet<ContactLite>("crm_contacts", CONTACT_SELECT, `phone=eq.${esc(phone)}&limit=1`);
+  const phoneFilter = phone ? phoneMatchFilter(phone) : null;
+  if (phoneFilter) {
+    // E.164 first, bare 10 digits second (rows written before phones were
+    // normalized on write). See lib/phone.ts.
+    const rows = await sbGet<ContactLite>("crm_contacts", CONTACT_SELECT, `${phoneFilter}&limit=1`);
     if (rows[0]) return { contact: rows[0], note: `contact #${rows[0].id} matched by phone` };
   }
 
@@ -190,13 +227,41 @@ async function resolveContact(event: EventRow): Promise<{ contact: ContactLite |
   const created = await sbPost<ContactLite>("crm_contacts", {
     business_name: businessName,
     contact_name: contactName,
-    email,
-    phone,
+    email, // already lowercased by lowerEmail
+    phone, // E.164 when derivable, else null (never the raw typed string)
     city: str(p.city),
     source: event.type,
     source_ref: `${event.type}:${event.id}`,
   });
-  return { contact: created, note: `created contact #${created.id} from payload` };
+  const notes: string[] = [`created contact #${created.id} from payload`];
+
+  // Link the raw submission to the contact it produced.
+  if (typeof p.submission_id === "number" && Number.isFinite(p.submission_id)) {
+    try {
+      await sbPatch("form_submissions", `id=eq.${Math.trunc(p.submission_id)}`, { contact_id: created.id });
+      notes.push(`linked form submission #${p.submission_id}`);
+    } catch (e) {
+      notes.push(`could not link form submission #${p.submission_id}: ${errMsg(e)}`);
+    }
+  }
+
+  // Announce the new contact as its own event. Inserted directly, NOT via
+  // emitEvent: no inline processing from inside a resolve, so a workflow on
+  // contact.created can never recurse into this one. The cron (or the next
+  // processEvents pass) picks it up.
+  try {
+    const ev = await sbPost<{ id: number }>("events", {
+      type: "contact.created",
+      client_slug: event.client_slug ?? null,
+      contact_id: created.id,
+      payload: { source: event.type, from_event_id: event.id },
+    });
+    notes.push(`queued contact.created event #${ev.id}`);
+  } catch (e) {
+    notes.push(`could not queue contact.created: ${errMsg(e)}`);
+  }
+
+  return { contact: created, note: notes.join("; ") };
 }
 
 // ── Workflow matching ──────────────────────────────────────────────────────
@@ -391,18 +456,34 @@ const enrollSequence: ActionFn = async (cfg, ctx) => {
   );
   if (!steps[0]) throw new Error(`enroll_sequence: sequence ${sequenceId} has no steps (or does not exist)`);
 
+  // Same gate shape as send_sms: an enrollment is only "active" (eligible for
+  // the external sender) when sending is switched on for this deployment and
+  // the address has not opted out of email. Otherwise it is created on hold.
+  let hold: string | null = null;
+  if (process.env.AUTOMATION_SEND_ENABLED !== "1") hold = "sending is switched off on this deployment";
+  else if (await emailRevoked(email, ctx.contact.id)) hold = "opted out of email";
+
   const r = await sbInsertOrConflict<{ id: string }>("sequence_enrollments", {
     sequence_id: sequenceId,
     email,
     name: ctx.contact.contact_name,
     company: ctx.contact.business_name,
     current_step: 0,
-    status: "active",
+    status: hold ? "paused" : "active",
     next_send_at: dueDateFrom(new Date(), steps[0].wait_days),
   });
   if (r.conflict) return skipped(`${email} is already on this sequence`);
+  if (hold) return { ok: true, note: `added ${email} on hold (enrollment ${r.row.id}): ${hold}` };
   return { ok: true, note: `enrolled ${email} (enrollment ${r.row.id}); nothing sent from here` };
 };
+
+async function emailRevoked(email: string, contactId: number | null): Promise<boolean> {
+  const or = contactId
+    ? `or=(address.eq.${encodeURIComponent(email)},contact_id.eq.${contactId})`
+    : `address=eq.${encodeURIComponent(email)}`;
+  const rows = await sbGet<{ id: number }>("consent", "id", `channel=eq.email&revoked_at=not.is.null&${or}&limit=1`);
+  return rows.length > 0;
+}
 
 async function smsRevoked(phone: string, contactId: number | null): Promise<boolean> {
   const or = contactId
@@ -580,47 +661,138 @@ const ACTIONS: Record<string, ActionFn> = {
   webhook,
 };
 
-// ── One run ────────────────────────────────────────────────────────────────
-async function executeRun(ctx: Ctx, actions: WorkflowActionRow[]): Promise<"done" | "failed"> {
-  const log: WorkflowRunLogEntry[] = [];
-  let error: string | null = null;
+// ── Waits ──────────────────────────────────────────────────────────────────
+// A wait is not an ActionFn: it does nothing to the world, it decides whether
+// the run stops here and when it should carry on. Returns resume_at (ISO) to
+// pause, or null to continue right away with a note saying why.
+type WaitDecision = { resumeAt: string | null; note: string };
 
-  if (!actions.length) {
-    log.push({ step_order: 0, action_type: "none", ok: true, note: "workflow has no actions", at: new Date().toISOString() });
+function parseInstant(v: unknown): Date | null {
+  if (v instanceof Date) return Number.isNaN(v.getTime()) ? null : v;
+  if (typeof v === "number" && Number.isFinite(v)) {
+    // seconds or milliseconds since the epoch; anything before 2001 in ms is treated as seconds
+    const d = new Date(v < 1e11 ? v * 1000 : v);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  const s = str(v);
+  if (!s) return null;
+  const d = new Date(s);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function fmtHours(h: number): string {
+  return `${Number(h.toFixed(3))}h`;
+}
+
+function decideWait(a: WorkflowActionRow, ctx: Ctx): WaitDecision {
+  const cfg = a.config || {};
+  const now = Date.now();
+
+  if (a.action_type === "wait") {
+    const hours = Number(cfg.hours);
+    if (!Number.isFinite(hours) || hours <= 0) throw new Error("wait: config.hours must be a number greater than zero");
+    if (hours > MAX_WAIT_HOURS) throw new Error(`wait: config.hours must be ${MAX_WAIT_HOURS} (60 days) or less`);
+    const resumeAt = new Date(now + hours * 60 * 60 * 1000).toISOString();
+    return { resumeAt, note: `paused for ${fmtHours(hours)}; continues at ${resumeAt}` };
   }
 
-  for (const a of actions) {
-    const fn = ACTIONS[a.action_type];
+  // wait_until
+  const field = str(cfg.field);
+  if (!field) throw new Error("wait_until: config.field is required");
+  const offsetRaw = cfg.offset_hours;
+  const offset = offsetRaw === undefined || offsetRaw === null || offsetRaw === "" ? 0 : Number(offsetRaw);
+  if (!Number.isFinite(offset)) throw new Error("wait_until: config.offset_hours must be a number");
+  const raw = (ctx.event.payload || {})[field];
+  const base = parseInstant(raw);
+  if (!base) {
+    const why = raw === undefined || raw === null ? `the event has no "${field}"` : `the event's "${field}" is not a time (${String(raw).slice(0, 60)})`;
+    return { resumeAt: null, note: `continued right away: ${why}` };
+  }
+  const target = new Date(base.getTime() + offset * 60 * 60 * 1000);
+  const when = `${field} ${offset === 0 ? "" : offset < 0 ? `minus ${fmtHours(-offset)} ` : `plus ${fmtHours(offset)} `}= ${target.toISOString()}`;
+  if (target.getTime() <= now) return { resumeAt: null, note: `continued right away: ${when} is already past` };
+  return { resumeAt: target.toISOString(), note: `paused until ${when}` };
+}
+
+// ── Running steps ──────────────────────────────────────────────────────────
+// Executes actions[startIndex..] in order, appending to the run log, and
+// finalizes the run row: done, failed (first failure stops it), or waiting
+// (a wait step was reached; resume_at / next_step / context are stored so
+// resumeWaitingRuns can carry on from the step after the wait).
+type RunOutcome = "done" | "failed" | "waiting";
+
+function errMsg(e: unknown): string {
+  return e instanceof SbError ? `${e.message}${e.detail ? ` ${e.detail}` : ""}` : e instanceof Error ? e.message : String(e);
+}
+
+async function runSteps(ctx: Ctx, actions: WorkflowActionRow[], startIndex: number, priorLog: WorkflowRunLogEntry[]): Promise<RunOutcome> {
+  const log: WorkflowRunLogEntry[] = Array.isArray(priorLog) ? [...priorLog] : [];
+  let error: string | null = null;
+  const at = () => new Date().toISOString();
+
+  if (!actions.length) {
+    log.push({ step_order: 0, action_type: "none", ok: true, note: "workflow has no actions", at: at() });
+  }
+
+  for (let i = Math.max(0, startIndex); i < actions.length; i++) {
+    const a = actions[i];
     try {
+      if (isWaitAction(a.action_type)) {
+        const d = decideWait(a, ctx);
+        log.push({ step_order: a.step_order, action_type: a.action_type, ok: true, note: d.note, at: at() });
+        if (d.resumeAt) {
+          const nextStep = actions[i + 1]?.step_order ?? a.step_order + 1;
+          const context: WorkflowRunContext = { payload: ctx.event.payload || {}, contact_id: ctx.contact?.id ?? null };
+          await sbPatch("workflow_runs", `id=eq.${ctx.run.id}`, {
+            status: "waiting",
+            log,
+            error: null,
+            resume_at: d.resumeAt,
+            next_step: nextStep,
+            context,
+            finished_at: null,
+          });
+          return "waiting";
+        }
+        continue;
+      }
+      const fn = ACTIONS[a.action_type];
       if (!fn) throw new Error(`unknown action type "${a.action_type}"`);
       const r = await fn(a.config || {}, ctx);
-      log.push({ step_order: a.step_order, action_type: a.action_type, ok: r.ok, note: r.note, at: new Date().toISOString() });
+      log.push({ step_order: a.step_order, action_type: a.action_type, ok: r.ok, note: r.note, at: at() });
       if (!r.ok) {
         error = `step ${a.step_order} (${a.action_type}): ${r.note}`;
         break;
       }
     } catch (e) {
-      const msg = e instanceof SbError ? `${e.message}${e.detail ? ` ${e.detail}` : ""}` : e instanceof Error ? e.message : String(e);
-      log.push({ step_order: a.step_order, action_type: a.action_type, ok: false, note: msg.slice(0, 600), at: new Date().toISOString() });
+      const msg = errMsg(e);
+      log.push({ step_order: a.step_order, action_type: a.action_type, ok: false, note: msg.slice(0, 600), at: at() });
       error = `step ${a.step_order} (${a.action_type}): ${msg}`.slice(0, 800);
       break; // stop on first failure; the log shows exactly how far it got
     }
   }
 
-  const status = error ? "failed" : "done";
+  const status: RunOutcome = error ? "failed" : "done";
   await sbPatch("workflow_runs", `id=eq.${ctx.run.id}`, {
     status,
     log,
     error,
+    resume_at: null,
+    next_step: null,
     finished_at: new Date().toISOString(),
   });
   return status;
 }
 
+// ── One run, from the top ──────────────────────────────────────────────────
+async function executeRun(ctx: Ctx, actions: WorkflowActionRow[]): Promise<RunOutcome> {
+  return runSteps(ctx, actions, 0, ctx.run.log || []);
+}
+
 // ── The loop ───────────────────────────────────────────────────────────────
 export async function processEvents(opts: ProcessOptions = {}): Promise<ProcessSummary> {
   const limit = Math.max(1, Math.min(200, opts.limit ?? 25));
-  const summary: ProcessSummary = { scanned: 0, matched_runs: 0, done: 0, failed: 0, skipped: 0, errors: [] };
+  const summary: ProcessSummary = { scanned: 0, matched_runs: 0, done: 0, failed: 0, skipped: 0, waiting: 0, errors: [] };
 
   const query = opts.onlyEventId
     ? `id=eq.${opts.onlyEventId}&processed_at=is.null&limit=1`
@@ -670,6 +842,7 @@ async function processOne(event: EventRow, summary: ProcessSummary): Promise<voi
     try {
       const status = await executeRun(ctx, actionsByWorkflow.get(workflow.id) || []);
       if (status === "done") summary.done++;
+      else if (status === "waiting") summary.waiting++;
       else summary.failed++;
     } catch (e) {
       // executeRun catches per-action errors itself; reaching here means the
@@ -688,8 +861,124 @@ async function processOne(event: EventRow, summary: ProcessSummary): Promise<voi
   await sbPatch("events", `id=eq.${event.id}`, { processed_at: new Date().toISOString() });
 }
 
+// ── Resuming paused runs ───────────────────────────────────────────────────
+// Called by the cron after processEvents. Finds runs whose wait is over and
+// continues each one from next_step.
+//
+// THE DOUBLE-RESUME GUARD: the claim is
+//   PATCH workflow_runs?id=eq.<id>&status=eq.waiting  { status: 'running' }
+// PostgREST returns the rows it actually updated. Zero rows back means the
+// row was no longer 'waiting' (another cron tick or an inline engine claimed
+// it first), so this engine skips it. There is no window where two engines
+// both believe they own the run.
+export async function resumeWaitingRuns(limit = 50): Promise<ResumeSummary> {
+  const cap = Math.max(1, Math.min(200, limit));
+  const summary: ResumeSummary = { scanned: 0, resumed: 0, done: 0, failed: 0, skipped: 0, waiting: 0, errors: [] };
+  const now = new Date().toISOString();
+  const due = await sbGet<WorkflowRunRow>(
+    "workflow_runs",
+    "*",
+    `status=eq.waiting&resume_at=lte.${encodeURIComponent(now)}&order=resume_at.asc&limit=${cap}`
+  );
+
+  for (const candidate of due) {
+    summary.scanned++;
+    let run: WorkflowRunRow | null = null;
+    try {
+      const claimed = await sbPatch<WorkflowRunRow>(
+        "workflow_runs",
+        `id=eq.${candidate.id}&status=eq.waiting`,
+        { status: "running", resume_at: null }
+      );
+      run = claimed[0] ?? null;
+      if (!run) {
+        summary.skipped++; // someone else took it between the read and the claim
+        continue;
+      }
+      summary.resumed++;
+      const outcome = await resumeOne(run);
+      if (outcome === "done") summary.done++;
+      else if (outcome === "waiting") summary.waiting++;
+      else if (outcome === "skipped") summary.skipped++;
+      else summary.failed++;
+    } catch (e) {
+      const msg = errMsg(e);
+      summary.errors.push(`run #${candidate.id}: ${msg}`.slice(0, 800));
+      if (run) {
+        summary.failed++;
+        await sbPatch("workflow_runs", `id=eq.${run.id}`, {
+          status: "failed",
+          error: msg.slice(0, 800),
+          resume_at: null,
+          next_step: null,
+          finished_at: new Date().toISOString(),
+        }).catch(() => undefined);
+      }
+    }
+  }
+  return summary;
+}
+
+async function resumeOne(run: WorkflowRunRow): Promise<RunOutcome | "skipped"> {
+  const log: WorkflowRunLogEntry[] = Array.isArray(run.log) ? [...run.log] : [];
+  const at = () => new Date().toISOString();
+  const nextStep = typeof run.next_step === "number" ? run.next_step : null;
+
+  const finish = async (status: "failed" | "skipped", note: string) => {
+    log.push({ step_order: nextStep ?? 0, action_type: "resume", ok: status === "skipped", note, at: at() });
+    await sbPatch("workflow_runs", `id=eq.${run.id}`, {
+      status,
+      log,
+      error: status === "failed" ? note : null,
+      resume_at: null,
+      next_step: null,
+      finished_at: at(),
+    });
+    return status;
+  };
+
+  const workflow = (await sbGet<WorkflowRow>("workflows", "*", `id=eq.${encodeURIComponent(run.workflow_id)}`))[0] ?? null;
+  if (!workflow) return finish("failed", "workflow no longer exists");
+
+  const event = (await sbGet<EventRow>("events", "*", `id=eq.${run.event_id}`))[0] ?? null;
+  if (!event) return finish("failed", `event #${run.event_id} no longer exists`);
+
+  // A manual run (pressing Run on a draft) is allowed to finish what it
+  // started; every other trigger requires the workflow to still be active,
+  // exactly as it did when the run began.
+  if (workflow.status !== "active" && event.type !== "manual.trigger") {
+    return finish("skipped", "workflow paused before this step ran");
+  }
+
+  // The payload as it was when the run paused wins over the stored event, so
+  // a later edit to the event cannot change what the remaining steps see.
+  const context: WorkflowRunContext = run.context && typeof run.context === "object" ? run.context : {};
+  if (context.payload && typeof context.payload === "object") event.payload = context.payload;
+
+  const contactId = context.contact_id ?? run.contact_id ?? null;
+  const contact = contactId ? await loadContact(contactId) : null;
+  if (contactId && !contact) {
+    log.push({ step_order: nextStep ?? 0, action_type: "resume", ok: true, note: `contact #${contactId} no longer exists; remaining steps run without a contact`, at: at() });
+  }
+
+  const actions = (await loadActions([workflow.id])).get(workflow.id) || [];
+  let startIndex = nextStep === null ? actions.length : actions.findIndex((a) => a.step_order >= nextStep);
+  if (startIndex < 0) startIndex = actions.length; // the wait was the last step: nothing left, finish done
+  log.push({
+    step_order: nextStep ?? 0,
+    action_type: "resume",
+    ok: true,
+    note: startIndex < actions.length ? `wait over; continuing from step ${actions[startIndex].step_order}` : "wait over; no steps left after it",
+    at: at(),
+  });
+
+  const ctx: Ctx = { event, workflow, contact, run };
+  return runSteps(ctx, actions, startIndex, log);
+}
+
 // Runs that have been "running" for longer than any serverless invocation can
 // live are dead. Mark them so the board does not show a spinner forever.
+// Waiting runs are untouched: their status is 'waiting', not 'running'.
 export async function failStuckRuns(olderThanMinutes = 10): Promise<number> {
   const cutoff = new Date(Date.now() - olderThanMinutes * 60 * 1000).toISOString();
   const rows = await sbPatch<{ id: number }>(

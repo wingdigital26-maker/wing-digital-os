@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import { parseTwilioWebhook, twiml, patchCallBySid, markMissed } from "../_lib";
+import { parseTwilioWebhook, twiml, escapeXml, patchCallBySid, markMissed, missedSay } from "../_lib";
 
 // ───────────────────────────────────────────────────────────────────────────
 // POST /api/voice/status: the <Dial action> callback from /api/voice/inbound,
@@ -46,8 +46,14 @@ export async function POST(req: NextRequest) {
   }
 
   if (MISSED.has(dialStatus)) {
-    await markMissed({ callSid, from, to, clientSlug: null, contactId: null, dialStatus });
-    return twiml("<Say>Sorry we missed you. We will text you right back.</Say><Hangup/>");
+    // markMissed resolves the client from the phone_calls row, then from
+    // voice_numbers by the To number. With no client it emits NOTHING (a
+    // client's caller must never fire Wing's own workflow); the reason rides
+    // along in an XML comment so the Twilio debugger shows why.
+    const r = await markMissed({ callSid, from, to, clientSlug: null, contactId: null, dialStatus });
+    // A double hyphen is illegal inside an XML comment, so split any.
+    const note = r.reason ? `<!-- ${escapeXml(r.reason).replace(/--/g, "- -")} -->` : "";
+    return twiml(`${note}<Say>${escapeXml(missedSay())}</Say><Hangup/>`);
   }
 
   // StatusCallback shape (no DialCallStatus): close the row on a terminal

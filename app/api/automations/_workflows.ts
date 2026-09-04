@@ -62,6 +62,13 @@ export function cleanTriggerFilter(v: unknown): Record<string, string> | null {
   return out;
 }
 
+// Longest a wait step may pause: 60 days. Anything longer is almost certainly
+// a typo (hours typed as minutes) and would hold a run for months.
+export const MAX_WAIT_HOURS = 24 * 60;
+// The event payload key a wait_until reads, e.g. starts_at. Lowercase letters
+// and underscores only, so it can never be a path or an expression.
+export const WAIT_FIELD_RE = /^[a-z_]{1,40}$/;
+
 // Validate and normalise an action's config against ACTION_DEFS. Returns the
 // cleaned config or a plain-English problem the UI can show verbatim.
 export function cleanActionConfig(
@@ -79,10 +86,35 @@ export function cleanActionConfig(
         continue;
       }
       const n = typeof v === "number" ? v : Number(v);
-      if (!Number.isFinite(n) || n < 0) {
+      if (!Number.isFinite(n)) {
+        return { ok: false, message: `${f.label} must be a number.` };
+      }
+      // wait: hours must be positive and no longer than 60 days.
+      if (type === "wait" && f.key === "hours") {
+        if (n <= 0) return { ok: false, message: "Hours must be more than zero for a wait." };
+        if (n > MAX_WAIT_HOURS) return { ok: false, message: `Hours must be ${MAX_WAIT_HOURS} (60 days) or less for a wait.` };
+        config[f.key] = n;
+        continue;
+      }
+      // wait_until: the offset may be negative (before) or positive (after).
+      if (type === "wait_until" && f.key === "offset_hours") {
+        if (Math.abs(n) > MAX_WAIT_HOURS) return { ok: false, message: `Offset must be within ${MAX_WAIT_HOURS} hours (60 days) either way.` };
+        config[f.key] = n;
+        continue;
+      }
+      if (n < 0) {
         return { ok: false, message: `${f.label} must be a number of zero or more.` };
       }
       config[f.key] = n;
+      continue;
+    }
+    if (type === "wait_until" && f.key === "field") {
+      const s = typeof v === "string" ? v.trim() : "";
+      if (!s) return { ok: false, message: `${f.label} is required for "${def.label}".` };
+      if (!WAIT_FIELD_RE.test(s)) {
+        return { ok: false, message: "The event time field must be a short name in lowercase letters and underscores, like starts_at." };
+      }
+      config[f.key] = s;
       continue;
     }
     const s = typeof v === "string" ? v.trim() : typeof v === "number" ? String(v) : "";

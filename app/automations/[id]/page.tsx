@@ -9,6 +9,7 @@ import {
   EVENT_TYPES,
   MERGE_TAGS,
   TRIGGER_FILTER_KEYS,
+  isWaitAction,
   type ActionConfigField,
   type ActionType,
   type EventType,
@@ -338,6 +339,7 @@ export default function AutomationEditorPage() {
                       stages={stages}
                       sequences={sequences}
                     />
+                    {isWaitAction(a.action_type) && <WaitHint />}
                     <div style={{ marginTop: 10 }}>
                       <button onClick={() => saveAction(a.id)} disabled={busy || !changed} style={btnPrimary}>Save</button>
                     </div>
@@ -396,6 +398,7 @@ export default function AutomationEditorPage() {
                 stages={stages}
                 sequences={sequences}
               />
+              {isWaitAction(adding) && <WaitHint />}
               <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
                 <button onClick={addAction} disabled={busy} style={btnPrimary}>Add this action</button>
                 <button onClick={() => setAdding("pick")} disabled={busy} style={btn}>Pick a different one</button>
@@ -456,6 +459,14 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
+function WaitHint() {
+  return (
+    <div style={{ ...muted, marginTop: 8, fontStyle: "italic" }}>
+      The automation pauses here; later steps run when the wait is over.
+    </div>
+  );
+}
+
 function HumanTag() {
   return (
     <span
@@ -508,10 +519,13 @@ function ConfigFields({
           );
         }
         if (f.kind === "number") {
+          // A wait offset may be negative (hours BEFORE the event time), so
+          // only clamp at zero for fields that cannot sensibly go below it.
+          const allowNegative = f.key === "offset_hours";
           return (
             <div key={f.key}>
               {lab}
-              <input type="number" min={0} value={v} onChange={(e) => set(f.key, e.target.value)} style={{ ...input, width: 120 }} />
+              <input type="number" min={allowNegative ? undefined : 0} step="any" value={v} onChange={(e) => set(f.key, e.target.value)} style={{ ...input, width: 120 }} />
               {f.hint && <div style={{ ...muted, marginTop: 3 }}>{f.hint}</div>}
             </div>
           );

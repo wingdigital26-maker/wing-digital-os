@@ -43,3 +43,16 @@ export function normalizePhone(input: unknown): NormalizedPhone {
 export function isE164(v: unknown): v is string {
   return typeof v === "string" && E164_RE.test(v);
 }
+
+// PostgREST filter that finds a crm_contacts row by phone. Phones are stored
+// as E.164 on every write path now, but rows written earlier may still hold
+// the bare 10-digit US form, so a US number is matched both ways. Returns null
+// when the input cannot be made into a number we could look up at all.
+export function phoneMatchFilter(input: unknown): string | null {
+  const n = normalizePhone(input);
+  if (!n.e164) return null;
+  const ten = n.e164.startsWith("+1") && n.e164.length === 12 ? n.e164.slice(2) : null;
+  return ten
+    ? `or=(phone.eq.${encodeURIComponent(n.e164)},phone.eq.${ten})`
+    : `phone=eq.${encodeURIComponent(n.e164)}`;
+}

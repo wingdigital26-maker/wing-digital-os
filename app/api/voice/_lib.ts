@@ -11,6 +11,7 @@ import type { NextRequest } from "next/server";
 import { sbUrl, sbService, sbSelect } from "@/lib/osSupabase";
 import { twilioCreds, validTwilioSignature, validWebhookKey, publicUrl, webhookKey } from "@/lib/sms";
 import { emitEventAsync } from "@/lib/automations/emit";
+import { phoneMatchFilter } from "@/lib/phone";
 
 export type VoiceNumberRow = {
   number: string;
@@ -33,6 +34,7 @@ export type PhoneCallRow = {
   duration_sec: number | null;
   started_at: string;
   ended_at: string | null;
+  notes?: string | null;
 };
 
 // ── Auth + body ────────────────────────────────────────────────────────────
@@ -85,23 +87,61 @@ export function callbackUrl(req: NextRequest, path: string): string {
 }
 
 // ── Lookups ────────────────────────────────────────────────────────────────
-export async function voiceNumberFor(to: string): Promise<VoiceNumberRow | null> {
-  if (!to) return null;
-  const rows = await sbSelect<VoiceNumberRow>({
+// "Not found" and "the query failed" are different facts: an unregistered
+// number is a config gap, a failed query is an outage. The inbound route must
+// say different things to the caller for each, so the result carries which.
+export type VoiceNumberLookup =
+  | { ok: true; row: VoiceNumberRow | null }
+  | { ok: false; error: string };
+
+export async function voiceNumberFor(to: string): Promise<VoiceNumberLookup> {
+  if (!to) return { ok: true, row: null };
+  const s = svc();
+  if (!s) return { ok: false, error: "OS_SUPABASE_URL / OS_SUPABASE_SERVICE_KEY are not set" };
+  const qs = `select=${encodeURIComponent("number,client_slug,forward_to,greeting,ring_seconds")}&number=eq.${encodeURIComponent(to)}&limit=1`;
+  try {
+    const r = await fetch(`${s.url}/rest/v1/voice_numbers?${qs}`, {
+      headers: { apikey: s.key, Authorization: `Bearer ${s.key}` },
+      cache: "no-store",
+    });
+    if (!r.ok) {
+      const body = await r.text().catch(() => "");
+      return { ok: false, error: `voice_numbers query failed (HTTP ${r.status}): ${body.slice(0, 200)}` };
+    }
+    const rows = (await r.json()) as VoiceNumberRow[];
+    return { ok: true, row: rows[0] ?? null };
+  } catch (e) {
+    return { ok: false, error: `voice_numbers unreachable: ${e instanceof Error ? e.message : String(e)}` };
+  }
+}
+
+// Which client owns a Twilio number. Shared by the voice and SMS webhooks so
+// an event is scoped to the client whose number was called or texted.
+//   found=false            the number is not registered (or the lookup failed)
+//   found=true, slug=null  registered as Wing's own number
+//   found=true, slug=...   registered to that client
+export type NumberOwner = { found: boolean; client_slug: string | null };
+
+export async function numberOwner(to: string): Promise<NumberOwner> {
+  if (!to) return { found: false, client_slug: null };
+  const rows = await sbSelect<{ client_slug: string | null }>({
     table: "voice_numbers",
-    select: "number,client_slug,forward_to,greeting,ring_seconds",
+    select: "client_slug",
     query: `number=eq.${encodeURIComponent(to)}&limit=1`,
     service: true,
   });
-  return rows[0] ?? null;
+  return rows[0] ? { found: true, client_slug: rows[0].client_slug ?? null } : { found: false, client_slug: null };
 }
 
+// Contact by phone. Twilio hands us E.164; the filter also tries the bare
+// 10-digit form for rows written before phones were normalized on write.
 export async function contactIdForPhone(phone: string): Promise<number | null> {
-  if (!phone) return null;
+  const filter = phoneMatchFilter(phone);
+  if (!filter) return null;
   const rows = await sbSelect<{ id: number }>({
     table: "crm_contacts",
     select: "id",
-    query: `phone=eq.${encodeURIComponent(phone)}&limit=1`,
+    query: `${filter}&limit=1`,
     service: true,
   });
   return rows[0]?.id ?? null;
@@ -161,6 +201,17 @@ export async function patchCallBySid(sid: string, patch: Record<string, unknown>
 // A missed call is the one voice fact the automation layer cares about
 // (missed-call text-back). Mark the row and hand the fact to the engine. The
 // async emit returns fast so the TwiML response is never held up.
+//
+// CLIENT SCOPING IS MANDATORY. The engine fires NULL-client workflows only
+// for NULL-client events (Wing's own), so a call.missed whose client is
+// merely UNKNOWN would run Wing's missed-call workflow for a client's
+// caller. The client comes from the phone_calls row, then the caller's
+// argument, then voice_numbers by the To number (where a registered row
+// with a NULL client_slug is Wing's own number, which is a known answer).
+// If none of those knows the number, NO event is emitted and the reason is
+// returned so the route can record it.
+export type MissedResult = { emitted: boolean; clientSlug: string | null; reason: string | null };
+
 export async function markMissed(args: {
   callSid: string;
   from: string;
@@ -168,15 +219,27 @@ export async function markMissed(args: {
   clientSlug: string | null;
   contactId: number | null;
   dialStatus: string;
-}): Promise<void> {
+}): Promise<MissedResult> {
   const updated = await patchCallBySid(args.callSid, {
     status: "missed",
     ended_at: new Date().toISOString(),
   });
+  let clientSlug = updated?.client_slug ?? args.clientSlug ?? null;
+  if (!clientSlug) {
+    const owner = await numberOwner(args.to);
+    if (!owner.found) {
+      return {
+        emitted: false,
+        clientSlug: null,
+        reason: `call.missed not emitted: no client for call ${args.callSid} (phone_calls row ${updated ? "has no client_slug" : "not found"}, and ${args.to || "(no To number)"} is not in voice_numbers)`,
+      };
+    }
+    clientSlug = owner.client_slug; // null here means Wing's own registered number
+  }
   try {
     await emitEventAsync({
       type: "call.missed",
-      client_slug: updated?.client_slug ?? args.clientSlug,
+      client_slug: clientSlug,
       contact_id: updated?.contact_id ?? args.contactId,
       payload: {
         phone: args.from || null,
@@ -185,7 +248,17 @@ export async function markMissed(args: {
         dial_status: args.dialStatus,
       },
     });
-  } catch {
+    return { emitted: true, clientSlug, reason: null };
+  } catch (e) {
     // The call row already says missed; the engine's cron can still notice.
+    return { emitted: false, clientSlug, reason: `emit failed: ${e instanceof Error ? e.message : String(e)}` };
   }
+}
+
+// What the caller hears after a miss. Only promise a text when the engine can
+// actually send one on this deployment.
+export function missedSay(): string {
+  return process.env.AUTOMATION_SEND_ENABLED === "1"
+    ? "Sorry we missed you. We will text you right back."
+    : "Sorry we missed you. Please try again shortly.";
 }

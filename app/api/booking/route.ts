@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { sbUrl, sbService } from "@/lib/osSupabase";
 import { requireStaff, isAuthFailure } from "../pipeline/_lib";
 import { emitEvent } from "@/lib/automations/emit";
+import { normalizePhone } from "@/lib/phone";
 
 // ───────────────────────────────────────────────────────────────────────────
 // Booking API — the GHL calendar replacement's engine room.
@@ -279,8 +280,11 @@ export async function POST(req: NextRequest) {
   }
 
   const name = typeof body?.name === "string" ? body.name.trim() : "";
-  const email = typeof body?.email === "string" ? body.email.trim() : "";
-  const phone = typeof body?.phone === "string" && body.phone.trim() ? body.phone.trim() : null;
+  // Lowercased so the engine's exact email match finds an existing contact;
+  // phone stored as E.164 when derivable, else as typed (NULL when empty).
+  const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
+  const phoneNorm = normalizePhone(body?.phone);
+  const phone = phoneNorm.e164 ?? phoneNorm.value;
   const notes = typeof body?.notes === "string" && body.notes.trim() ? body.notes.trim().slice(0, 2000) : null;
   const clientSlug =
     typeof body?.client_slug === "string" && /^[a-z0-9-]{1,60}$/.test(body.client_slug)

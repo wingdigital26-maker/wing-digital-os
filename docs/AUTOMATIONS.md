@@ -83,7 +83,69 @@ A workflow fires when all of these hold:
   error, and `log` shows every step that ran and what it did.
 - `add_tag` and `enroll_sequence` treat duplicates as skipped, not failed.
 - Runs stuck in `running` for more than 10 minutes are marked `failed`
-  ("timed out") by the cron.
+  ("timed out") by the cron. Runs in `waiting` are never touched by this.
+
+## Waits (time-delayed steps)
+
+Schema: `supabase/migrations/0022_workflow_waits.sql` adds `resume_at`,
+`next_step` and `context` to `workflow_runs`, plus a partial index on
+`resume_at where status = 'waiting'`.
+
+Two action types pause a run instead of doing something:
+
+| action | config | what happens |
+| --- | --- | --- |
+| `wait` | `{hours}` (number, > 0, at most 1440 = 60 days) | pauses for that long, then continues with the next step |
+| `wait_until` | `{field, offset_hours}` (`field` matches `/^[a-z_]{1,40}$/`, `offset_hours` any number, negative = before, positive = after) | pauses until `payload[field] + offset_hours`. If the event payload has no such field, the value is not a time, or the computed instant is already past, the run continues right away and the log says so |
+
+Example: `booking.created` carries `starts_at`; `wait_until {field: "starts_at", offset_hours: -24}`
+pauses until a day before the call.
+
+### The `waiting` status
+
+`workflow_runs.status` is free text. The full vocabulary is now
+`running | done | failed | skipped | waiting`. When a wait step is reached the
+engine patches the run to:
+
+- `status = 'waiting'`
+- `resume_at` = when to continue
+- `next_step` = the `step_order` of the step AFTER the wait (the wait itself never re-runs)
+- `context` = `{ payload: <event payload as it was>, contact_id }`
+
+and stops. The log gets an entry for the wait step ("paused for 24h; continues at ...").
+`resume_at` and `next_step` are NULL on every run that is not waiting.
+
+### The resume path
+
+Nothing continues a waiting run except `resumeWaitingRuns()` in
+`lib/automations/engine.ts`, which `GET /api/cron/automations` calls right
+after `processEvents`. So the cron MUST run on a schedule for delayed steps
+to ever happen; the inline path only ever starts them. Its summary comes back
+under `resumed` in the cron JSON: `{scanned, resumed, done, failed, skipped, waiting, errors}`.
+
+For each run with `status = 'waiting'` and `resume_at <= now()`:
+
+1. Claim it: `PATCH workflow_runs?id=eq.<id>&status=eq.waiting` with
+   `{status: 'running', resume_at: null}`. PostgREST returns the rows it
+   updated; zero rows back means another engine claimed it first, so this
+   one skips it. That filter is the whole double-resume guard.
+2. Re-load the workflow. If it no longer exists the run fails. If it is no
+   longer `active` the run is marked `skipped` with the note "workflow paused
+   before this step ran", UNLESS the event is a `manual.trigger` (a run you
+   started by hand on a draft is allowed to finish, matching how manual runs
+   start).
+3. Re-load the event and the contact. The payload snapshot in `context`
+   replaces the event's payload, so a later edit to the event cannot change
+   what the remaining steps see. A contact that has since been deleted is
+   noted and the remaining steps run without one.
+4. Continue from the first action whose `step_order >= next_step`, with the
+   same per-step logging, and end `done` / `failed`. Another wait pauses it
+   again (`waiting` counts in the summary). A wait that was the last step
+   ends `done`.
+
+A step that fails after a resume fails the run exactly like a step that fails
+on the first pass; the send gate is checked again at send time, so a workflow
+paused between the wait and the text produces a draft, not a send.
 
 ## The send gate
 
@@ -122,7 +184,7 @@ place and named in the run log. The engine never invents a company or a city.
 
 | route | who | does |
 | --- | --- | --- |
-| `GET /api/cron/automations` | Bearer `CRON_SECRET` or `x-heartbeat-key` | fails stuck runs, processes up to 50 unprocessed events |
+| `GET /api/cron/automations` | Bearer `CRON_SECRET` or `x-heartbeat-key` | fails stuck runs, processes up to 50 unprocessed events, resumes up to 50 waiting runs whose wait is over |
 | `POST /api/automations/run` | staff | `{workflow_id, contact_id}` manual run; `{event_id}` re-process |
 | `GET /api/automations/runs` | staff | last 100 runs with workflow + event embedded, `?workflow_id=`, plus `unprocessed_events` |
 | `GET/POST/PATCH /api/automations/tasks` | staff | open tasks; create; `{id, done}` (done emits `task.completed`) |
@@ -140,3 +202,5 @@ Add to the GitHub Actions cloud watchdog workflow (runs PC-off):
 ```
 
 Every 5 to 15 minutes is plenty; the inline path handles the normal case.
+That interval is also the resolution of a wait: a step due at 09:00 runs on
+the first tick after 09:00.

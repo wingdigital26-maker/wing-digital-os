@@ -392,7 +392,7 @@ function Row({ row: r, busy, err, onSave, onRemove }: {
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          {r.status === "received" ? (
+          {r.status === "received" && r.rating != null ? (
             <Stars value={r.rating} />
           ) : (
             <span style={{ fontSize: 12, color: "var(--text-muted)" }}>no rating yet</span>

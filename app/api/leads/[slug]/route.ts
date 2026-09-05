@@ -30,6 +30,7 @@
 
 import { NextResponse } from "next/server";
 import { readVaultFile } from "../../../../lib/vaultSource";
+import { verifyClientKey } from "../../../lib/clientKeys";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,6 +41,14 @@ export const dynamic = "force-dynamic";
  * this guards a distinct surface and must not piggyback on a key issued for
  * something else.
  */
+// The key the caller presented, from `Authorization: Bearer <key>` or `?k=<key>`.
+// Returns "" when neither is present.
+function extractKey(req: Request): string {
+  const auth = req.headers.get("authorization") || "";
+  if (auth.toLowerCase().startsWith("bearer ")) return auth.slice(7).trim();
+  return (new URL(req.url).searchParams.get("k") || "").trim();
+}
+
 function keyOk(req: Request): boolean {
   // Trim both sides. Piping a value into `vercel env add` stores the trailing
   // newline, which makes a correct password fail with an indistinguishable
@@ -62,15 +71,21 @@ export async function GET(
   req: Request,
   ctx: { params: Promise<{ slug: string }> },
 ) {
-  if (!keyOk(req)) {
-    // Deliberately identical for "no key configured" and "wrong key": a
-    // different message would tell a prober which of the two it hit.
-    return NextResponse.json({ error: "not authorized" }, { status: 401 });
-  }
-
   const { slug } = await ctx.params;
   if (!SLUG_RE.test(slug)) {
     return NextResponse.json({ error: "bad slug" }, { status: 400 });
+  }
+
+  // Two ways in, both fail-closed. The shared LEADS_DASHBOARD_KEY (one key for
+  // every client's leads), OR the per-client dashboard key that the /d/<slug>/
+  // <key> link already carries -- so the same link that opens the dashboard
+  // also unlocks that client's leads, scoped to this slug only.
+  const provided = extractKey(req);
+  const authorized = keyOk(req) || (await verifyClientKey(slug, provided));
+  if (!authorized) {
+    // Deliberately identical for "no key configured" and "wrong key": a
+    // different message would tell a prober which of the two it hit.
+    return NextResponse.json({ error: "not authorized" }, { status: 401 });
   }
 
   const raw = await readVaultFile(`_data/leads/${slug}.json`);

@@ -98,6 +98,17 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 .stat-l{margin-top:8px;font-size:.79rem;color:var(--t2);line-height:1.4}
 @media(max-width:620px){.stats{grid-template-columns:1fr}}
 
+/* highlights -- a quick per-type breakdown of published work. Every number here
+   is an honest count of PUBLISHED items of that type, read straight off the same
+   data the list below renders. It is a summary, never a new claim. */
+.highlights{display:flex;flex-wrap:wrap;gap:9px;margin-top:16px}
+.hl{display:flex;align-items:baseline;gap:8px;background:var(--surface);
+  border:1px solid var(--border);border-radius:999px;padding:7px 14px;
+  box-shadow:var(--shadow)}
+.hl i{width:9px;height:9px;border-radius:3px;flex:0 0 auto;transform:translateY(1px)}
+.hl b{font-size:.92rem;font-weight:700;font-variant-numeric:tabular-nums;color:var(--t1)}
+.hl span{font-size:.82rem;color:var(--t2)}
+
 /* sections */
 section{padding:44px 0 0}
 .sh{display:flex;align-items:baseline;gap:11px;flex-wrap:wrap}
@@ -295,6 +306,7 @@ section{padding:44px 0 0}
     <h1 id="headline"></h1>
     <p id="subhead"></p>
     <div class="stats" id="stats"></div>
+    <div class="highlights" id="highlights"></div>
     <div id="stale"></div>
   </div>
 </section>
@@ -377,8 +389,8 @@ section{padding:44px 0 0}
   </section>
 
   <section id="pending-sec">
-    <div class="sh"><h2>Not connected yet</h2></div>
-    <div class="sd">We only show a number once it comes from a real source. These are blank on purpose, not zero.</div>
+    <div class="sh"><h2>What unlocks next</h2></div>
+    <div class="sd">We only show a number once it comes from a real source, so these are blank on purpose, not zero. Each one below is a lever we can switch on — here is what it takes.</div>
     <div class="card" id="pending"></div>
   </section>
 
@@ -476,6 +488,23 @@ const DATA = __DATA__;
     el.innerHTML = '<div class="stat-v">'+s.v.toLocaleString()+'</div><div class="stat-l">'+esc(s.l)+'</div>';
     $('#stats').appendChild(el);
   });
+
+  /* highlights strip -- per-type published counts, an honest summary of the mix.
+     Same colours as the chart. Only the types that actually have published work
+     appear, so this can never show a fabricated "0 city pages" for a client who
+     does not run them. Hidden entirely when nothing is published yet. */
+  (function(){
+    const c = {};
+    PUB.forEach(i => c[i.type] = (c[i.type]||0) + 1);
+    const order = Object.keys(c).sort((a,b)=>c[b]-c[a]);
+    if (!order.length) return;
+    $('#highlights').innerHTML = order.map(t => {
+      const one = label(t), many = /page$/i.test(one) ? one.replace(/page$/i,'pages')
+        : /post$/i.test(one) ? one.replace(/post$/i,'posts') : one;
+      return '<div class="hl"><i style="background:'+color(t)+'"></i>'+
+        '<b>'+c[t]+'</b><span>'+esc(c[t]===1?one:many)+'</span></div>';
+    }).join('');
+  })();
 
   /* ── the chart ───────────────────────────────────────────────
      Buckets run from the first publish to the end of the RECORD -- never to

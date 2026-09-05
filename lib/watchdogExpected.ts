@@ -23,6 +23,11 @@ export const EXPECTED_HEARTBEATS: ExpectedHeartbeat[] = [
   { agent: "state-sync-daily", staleMin: 26 * 60, windowed: false, label: "State sync" },
   { agent: "chronicler-end-of-day", staleMin: 26 * 60, windowed: false, label: "Chronicler" },
   { agent: "renewal-content-weekly", staleMin: 8 * 24 * 60, windowed: false, label: "Renewal content engine" },
+  // Windows-scheduled Claude-CLI agents (launched via hidden_run.vbs +
+  // run_claude_agent.ps1). Without these, a Task Scheduler that stops LAUNCHING
+  // the task entirely posts no heartbeat and only pc-alive would notice.
+  { agent: "win-dispatch", staleMin: 26 * 60, windowed: false, label: "Dispatch (Windows)" },       // daily 6:30am
+  { agent: "win-prospector", staleMin: 8 * 24 * 60, windowed: false, label: "Prospector (Windows)" }, // weekly Sun 9pm
 ];
 
 // Hour of day in Central time, 0-23.

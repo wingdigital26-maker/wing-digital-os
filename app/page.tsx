@@ -41,6 +41,7 @@ const ReplyInboxBoard = dynamic(() => import("./components/ReplyInboxBoard"), { 
 const StormBoard = dynamic(() => import("./components/StormBoard"), { ssr: false });
 const SocialBoard = dynamic(() => import("./components/SocialBoard"), { ssr: false });
 const ReviewsBoard = dynamic(() => import("./components/ReviewsBoard"), { ssr: false });
+const CustomersBoard = dynamic(() => import("./components/CustomersBoard"), { ssr: false });
 
 type NavGroup = {
   id: string; label: string; icon: IconType;
@@ -118,6 +119,7 @@ const NAV: NavGroup[] = [
     subs: [
       { id: "social", label: "Social" },
       { id: "reviews", label: "Reviews" },
+      { id: "customers", label: "Customers" },
     ],
   },
   {
@@ -524,6 +526,7 @@ export default function Home() {
           {visited.has("storms") && <div className="app-view" style={{ display: active === "storms" ? "block" : "none" }}><StormBoard /></div>}
           {visited.has("social") && <div className="app-view" style={{ display: active === "social" ? "block" : "none" }}><SocialBoard /></div>}
           {visited.has("reviews") && <div className="app-view" style={{ display: active === "reviews" ? "block" : "none" }}><ReviewsBoard /></div>}
+          {visited.has("customers") && <div className="app-view" style={{ display: active === "customers" ? "block" : "none" }}><CustomersBoard /></div>}
           {visited.has("calendar") && <div className="app-view" style={{ display: active === "calendar" ? "block" : "none" }}><CalendarSection /></div>}
           {visited.has("competitors") && <div className="app-view" style={{ display: active === "competitors" ? "block" : "none" }}><CompetitorIntel onSendToAI={sendToAI} /></div>}
           {visited.has("knowledge") && <div className="app-view" style={{ display: active === "knowledge" ? "block" : "none" }}><KnowledgeBase initialPath={openNotePath} onSendToAI={sendToAI} /></div>}

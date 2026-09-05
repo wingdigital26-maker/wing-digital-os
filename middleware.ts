@@ -58,6 +58,11 @@ function isPublicPath(pathname: string): boolean {
     // calls it automatically. /api/messages/log is the email senders' ledger
     // ingest, x-heartbeat-key gated like /api/notify.
     pathname === "/api/sms/send" ||
+    // Email send: symmetric with /api/sms/send. Its own route accepts a staff
+    // session OR x-heartbeat-key and fails closed (503) when SMTP is not
+    // configured, so listing it here only lets that self-gate run for the
+    // armed-review sender's same-origin call.
+    pathname === "/api/email/send" ||
     pathname === "/api/messages/log" ||
     // One-click email unsubscribe: recipients click this from their inbox with
     // no OS account, so it must be public. The route verifies its own HMAC

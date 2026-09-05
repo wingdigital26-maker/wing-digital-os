@@ -29,7 +29,11 @@
 //       the destination is a real E.164 number
 //     Otherwise the message is written to the ledger as a DRAFT with the
 //     plain-English reason. Nothing is ever silently dropped.
-//   * send_email is ALWAYS a draft: no sending domain exists yet.
+//   * SEND GATE (send_email): same shape as send_sms. An email goes out only
+//     when AUTOMATION_SEND_ENABLED=1, the workflow is active, a contact exists
+//     and do_not_contact is false, email consent is not revoked, SMTP is
+//     configured (smtpCreds() is non-null), and the copy passes copyViolation.
+//     Otherwise it is written to the ledger as a DRAFT with the plain reason.
 //   * enroll_sequence writes an enrollment row. It sends nothing; the external
 //     sender decides, and only for active sequences.
 //   * Engine actions do NOT emit new events (no deal.stage_changed from
@@ -64,6 +68,7 @@ import {
 } from "./db";
 import { dueDateFrom, type StepRow } from "@/app/api/sequences/_lib";
 import { twilioCreds, twilioSend, logMessage, patchMessages, webhookKey } from "@/lib/sms";
+import { smtpCreds, smtpSend, copyViolation } from "@/lib/email";
 import { pushToAll } from "@/lib/push";
 import { phoneMatchFilter } from "@/lib/phone";
 import { isWaitAction } from "./types";
@@ -561,27 +566,76 @@ const sendSms: ActionFn = async (cfg, ctx) => {
 };
 
 const sendEmail: ActionFn = async (cfg, ctx) => {
-  const subject = str(cfg.subject);
-  const body = str(cfg.body);
-  if (!subject) throw new Error("send_email: config.subject is required");
-  if (!body) throw new Error("send_email: config.body is required");
+  const subjectTpl = str(cfg.subject);
+  const bodyTpl = str(cfg.body);
+  if (!subjectTpl) throw new Error("send_email: config.subject is required");
+  if (!bodyTpl) throw new Error("send_email: config.body is required");
   const to = lowerEmail(ctx.contact?.email) || lowerEmail(ctx.event.payload?.email);
   if (!to) return skipped("no email address on the contact");
-  const s = renderMerge(subject, { contact: ctx.contact, payload: ctx.event.payload });
-  const b = renderMerge(body, { contact: ctx.contact, payload: ctx.event.payload });
+  const s = renderMerge(subjectTpl, { contact: ctx.contact, payload: ctx.event.payload });
+  const b = renderMerge(bodyTpl, { contact: ctx.contact, payload: ctx.event.payload });
   const unresolved = Array.from(new Set([...s.unresolved, ...b.unresolved]));
-  const drafted = await logMessage({
+
+  // Never send copy that breaks Wing house rules (em dashes, unrendered
+  // tokens). Same gate the /api/email/send route enforces.
+  const violation = copyViolation(s.text, b.text);
+  if (violation) return skipped(`refused: ${violation}`);
+
+  const creds = smtpCreds();
+
+  // THE SEND GATE. Mirrors send_sms condition-for-condition, with the email
+  // consent check (emailRevoked) in place of the SMS one. First reason wins.
+  let reason: string | null = null;
+  if (process.env.AUTOMATION_SEND_ENABLED !== "1") reason = "sending is switched off on this deployment";
+  else if (ctx.workflow.status !== "active") reason = "workflow is not active";
+  else if (!ctx.contact) reason = "no contact";
+  else if (ctx.contact.do_not_contact) reason = "contact opted out";
+  else if (await emailRevoked(to, ctx.contact.id)) reason = "contact opted out";
+  else if (!creds) reason = "SMTP not configured";
+
+  if (reason || !creds) {
+    const drafted = await logMessage({
+      contact_id: ctx.contact?.id ?? null,
+      client_slug: ctx.event.client_slug,
+      channel: "email",
+      direction: "outbound",
+      to_addr: to,
+      from_addr: creds?.user ?? null,
+      body: `${s.text}\n\n${b.text}`,
+      status: "draft",
+      error: reason ?? "SMTP not configured",
+    });
+    if (drafted.id == null) throw new Error(`send_email: could not write the draft to the ledger (${drafted.error})`);
+    return { ok: true, note: `drafted email to ${to} (message #${drafted.id}), not sent: ${reason}${mergeNote(unresolved)}` };
+  }
+
+  // Log BEFORE sending, exactly like /api/email/send: an unlogged email is the
+  // untracked message the ledger exists to prevent.
+  const logged = await logMessage({
     contact_id: ctx.contact?.id ?? null,
     client_slug: ctx.event.client_slug,
     channel: "email",
     direction: "outbound",
     to_addr: to,
+    from_addr: creds.user,
     body: `${s.text}\n\n${b.text}`,
-    status: "draft",
-    error: "drafted; no sending domain exists yet",
+    status: "queued",
   });
-  if (drafted.id == null) throw new Error(`send_email: could not write the draft to the ledger (${drafted.error})`);
-  return { ok: true, note: `drafted email to ${to} (message #${drafted.id}); no sending domain exists yet${mergeNote(unresolved)}` };
+  if (logged.id == null) throw new Error(`send_email: refused to send, could not log first (${logged.error})`);
+
+  const sent = await smtpSend(creds, to, s.text, b.text);
+  const now = new Date().toISOString();
+  const patchErr = await patchMessages(
+    `id=eq.${logged.id}`,
+    sent.ok
+      ? { status: "sent", provider_sid: sent.messageId, status_updated_at: now }
+      : { status: "failed", error: sent.error, status_updated_at: now }
+  );
+  if (!sent.ok) throw new Error(`send_email: ${sent.error} (message #${logged.id})`);
+  return {
+    ok: true,
+    note: `sent to ${to} (message #${logged.id})${patchErr ? `; ledger update failed: ${patchErr}` : ""}${mergeNote(unresolved)}`,
+  };
 };
 
 const notifyPush: ActionFn = async (cfg, ctx) => {

@@ -5,6 +5,8 @@ import {
   smtpCreds,
   smtpSend,
   copyViolation,
+  isEmailSuppressed,
+  makeUnsubToken,
   SMTP_NOT_CONFIGURED,
 } from "@/lib/email";
 
@@ -78,6 +80,28 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Suppression gate: never email anyone who has opted out or is marked
+  // do_not_contact. Fails closed (isEmailSuppressed returns suppressed=true if
+  // the backend is unreachable). Runs AFTER the copy guard, BEFORE logging or
+  // sending, so a refused address touches neither the ledger nor the mailbox.
+  const supp = await isEmailSuppressed(to);
+  if (supp.suppressed) {
+    return NextResponse.json(
+      { ok: false, error: `Refused: ${supp.reason ?? "recipient is suppressed"}` },
+      { status: 403 }
+    );
+  }
+
+  // Build the absolute public unsubscribe URL from the proxy headers (same
+  // technique as publicUrl in lib/sms.ts), carrying a signed one-click token.
+  const proto = req.headers.get("x-forwarded-proto") ?? new URL(req.url).protocol.replace(":", "");
+  const host =
+    req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? new URL(req.url).host;
+  const unsubToken = makeUnsubToken(to);
+  const unsubscribeUrl = unsubToken
+    ? `${proto}://${host}/api/email/unsubscribe?email=${encodeURIComponent(to)}&token=${unsubToken}`
+    : undefined;
+
   // 1) Log BEFORE sending.
   const logged = await logMessage({
     contact_id: typeof b?.contact_id === "number" ? b.contact_id : null,
@@ -100,6 +124,7 @@ export async function POST(req: NextRequest) {
   const sent = await smtpSend(creds, to, subject, text, {
     replyTo: (b?.replyTo ?? "").trim() || undefined,
     unsubscribeMailto: (b?.unsubscribeMailto ?? "").trim() || undefined,
+    unsubscribeUrl,
   });
 
   // 3) Record the outcome on the same row.

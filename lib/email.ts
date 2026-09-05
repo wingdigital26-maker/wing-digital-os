@@ -19,6 +19,8 @@
 //   Instantly:    INSTANTLY_API_KEY, and a campaign id per call (or the
 //                 INSTANTLY_DEFAULT_CAMPAIGN fallback).
 import nodemailer from "nodemailer";
+import crypto from "node:crypto";
+import { sbUrl, sbService } from "./osSupabase";
 
 // ── House-rule copy guard (Wing rules, ported from SENDING-CONTRACT.md) ──────
 // Not a deliverability check — a brand-voice gate. Returns a reason string if
@@ -71,7 +73,7 @@ export async function smtpSend(
   to: string,
   subject: string,
   body: string,
-  opts?: { unsubscribeMailto?: string; replyTo?: string }
+  opts?: { unsubscribeMailto?: string; unsubscribeUrl?: string; replyTo?: string }
 ): Promise<SmtpSendResult> {
   const from = `${creds.name} <${creds.user}>`;
   try {
@@ -82,8 +84,16 @@ export async function smtpSend(
       auth: { user: creds.user, pass: creds.pass },
     });
     const headers: Record<string, string> = {};
-    if (opts?.unsubscribeMailto) {
-      headers["List-Unsubscribe"] = `<mailto:${opts.unsubscribeMailto}>`;
+    // RFC 8058: prefer an https one-click endpoint; include the mailto as a
+    // secondary when both are given. List-Unsubscribe-Post signals one-click.
+    const parts: string[] = [];
+    if (opts?.unsubscribeUrl) parts.push(`<${opts.unsubscribeUrl}>`);
+    if (opts?.unsubscribeMailto) parts.push(`<mailto:${opts.unsubscribeMailto}>`);
+    if (parts.length) {
+      headers["List-Unsubscribe"] = parts.join(", ");
+      if (opts?.unsubscribeUrl) {
+        headers["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click";
+      }
     }
     const info = await transporter.sendMail({
       from,
@@ -158,4 +168,104 @@ export async function instantlyAddLead(
       error: `Could not reach Instantly: ${e instanceof Error ? e.message : String(e)}`,
     };
   }
+}
+
+// ── Suppression + unsubscribe (opt-out) ─────────────────────────────────────
+// The suppression source of truth already exists (migration 0014 + 0004):
+//   * public.consent — a REVOKED email consent row (channel='email',
+//     revoked_at set) for an address is a hard opt-out.
+//   * public.crm_contacts.do_not_contact = true — a manual "never email".
+// This module never invents tables; it reads those through the service key.
+// FAIL CLOSED: if Supabase is unreachable or the service key is missing we
+// cannot prove the address is clear, so we treat it as suppressed.
+
+/** Lowercase + trim an address for stable comparison and HMAC keying. */
+function normAddr(addr: string): string {
+  return (addr || "").trim().toLowerCase();
+}
+
+export type SuppressionResult = { suppressed: boolean; reason: string | null };
+
+/** True if the address must not be emailed: a revoked email-consent row exists
+ *  OR a crm_contacts row with that email has do_not_contact=true. Never throws.
+ *  Fails closed (suppressed=true) when the backend cannot be reached. */
+export async function isEmailSuppressed(addr: string): Promise<SuppressionResult> {
+  const email = normAddr(addr);
+  if (!email) return { suppressed: true, reason: "empty address" };
+
+  const url = sbUrl();
+  const key = sbService();
+  if (!url || !key) {
+    return {
+      suppressed: true,
+      reason: "suppression list unreachable (OS_SUPABASE_URL / OS_SUPABASE_SERVICE_KEY not set)",
+    };
+  }
+  const headers = { apikey: key, Authorization: `Bearer ${key}` };
+
+  // 1) Revoked email consent row for this address (case-insensitive match).
+  try {
+    const q =
+      `select=id&channel=eq.email&revoked_at=not.is.null` +
+      `&address=ilike.${encodeURIComponent(email)}&limit=1`;
+    const r = await fetch(`${url}/rest/v1/consent?${q}`, { headers, cache: "no-store" });
+    if (!r.ok) {
+      return { suppressed: true, reason: `suppression check failed (consent HTTP ${r.status})` };
+    }
+    const rows = (await r.json()) as unknown[];
+    if (Array.isArray(rows) && rows.length > 0) {
+      return { suppressed: true, reason: "recipient opted out (revoked email consent)" };
+    }
+  } catch (e) {
+    return {
+      suppressed: true,
+      reason: `suppression check errored: ${e instanceof Error ? e.message : String(e)}`,
+    };
+  }
+
+  // 2) crm_contacts.do_not_contact = true for this email.
+  try {
+    const q =
+      `select=id&do_not_contact=is.true` +
+      `&email=ilike.${encodeURIComponent(email)}&limit=1`;
+    const r = await fetch(`${url}/rest/v1/crm_contacts?${q}`, { headers, cache: "no-store" });
+    if (!r.ok) {
+      return { suppressed: true, reason: `suppression check failed (crm_contacts HTTP ${r.status})` };
+    }
+    const rows = (await r.json()) as unknown[];
+    if (Array.isArray(rows) && rows.length > 0) {
+      return { suppressed: true, reason: "recipient is marked do_not_contact" };
+    }
+  } catch (e) {
+    return {
+      suppressed: true,
+      reason: `suppression check errored: ${e instanceof Error ? e.message : String(e)}`,
+    };
+  }
+
+  return { suppressed: false, reason: null };
+}
+
+/** The secret keying the unsubscribe HMAC. UNSUB_SECRET, falling back to
+ *  HEARTBEAT_KEY. null when neither is set — tokens cannot be made (fail
+ *  closed) but isEmailSuppressed still works. */
+function unsubSecret(): string | null {
+  return process.env.UNSUB_SECRET || process.env.HEARTBEAT_KEY || null;
+}
+
+/** HMAC-SHA256 over the lowercased address, hex. null when no secret is set. */
+export function makeUnsubToken(addr: string): string | null {
+  const secret = unsubSecret();
+  if (!secret) return null;
+  return crypto.createHmac("sha256", secret).update(normAddr(addr)).digest("hex");
+}
+
+/** Constant-time verify of an unsubscribe token for an address. False on any
+ *  missing piece (no secret, empty token) — fail closed. */
+export function verifyUnsubToken(addr: string, token: string): boolean {
+  const expected = makeUnsubToken(addr);
+  if (!expected || !token) return false;
+  const a = Buffer.from(expected);
+  const b = Buffer.from(token);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
 }

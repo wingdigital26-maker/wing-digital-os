@@ -19,6 +19,7 @@ const SECTIONS: { href: string; label: string }[] = [
   { href: "/", label: "Home" },
   { href: "/calls", label: "Call Room" },
   { href: "/sequences", label: "Sequences" },
+  { href: "/email", label: "Email" },
   { href: "/automations", label: "Automations" },
 ];
 

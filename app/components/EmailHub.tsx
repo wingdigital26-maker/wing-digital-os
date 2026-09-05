@@ -7,13 +7,14 @@ const MessagesBoard = dynamic(() => import("./MessagesBoard"), { ssr: false });
 const DeliverabilityBoard = dynamic(() => import("./DeliverabilityBoard"), { ssr: false });
 
 // One Email tab instead of three. Jack asked for fewer CRM tabs (2026-09-01):
-// the automated-send queue, the sent-message ledger, and email health are all
-// "email", so they live behind one nav entry with internal pills. The three
-// boards are mounted lazily and kept mounted once visited, same keep-alive
-// idea as the shell.
+// the automated-send queue, the email side of the message ledger, and email
+// health are all "email", so they live behind one nav entry with internal
+// pills. Texts moved to their own CRM tab 2026-09-04, so the ledger here is
+// locked to the email channel. The boards are mounted lazily and kept
+// mounted once visited, same keep-alive idea as the shell.
 const PILLS = [
   { id: "queue", label: "Going out next" },
-  { id: "ledger", label: "Sent and received" },
+  { id: "ledger", label: "Emails sent and received" },
   { id: "health", label: "Email health" },
 ] as const;
 
@@ -56,7 +57,7 @@ export default function EmailHub() {
         ))}
       </div>
       {visited.has("queue") && <div style={{ display: active === "queue" ? "block" : "none" }}><MessagingBoard /></div>}
-      {visited.has("ledger") && <div style={{ display: active === "ledger" ? "block" : "none" }}><MessagesBoard /></div>}
+      {visited.has("ledger") && <div style={{ display: active === "ledger" ? "block" : "none" }}><MessagesBoard channel="email" /></div>}
       {visited.has("health") && <div style={{ display: active === "health" ? "block" : "none" }}><DeliverabilityBoard /></div>}
     </div>
   );

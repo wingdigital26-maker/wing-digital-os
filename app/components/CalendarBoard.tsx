@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
-import WeekCalendar, { SOURCE_COLOR, toLocal, type Appointment } from "./WeekCalendar";
+import WeekCalendar, { PERSON_LABEL, SOURCE_COLOR, toLocal, type Appointment } from "./WeekCalendar";
 
 const InvoicesBoard = dynamic(() => import("./InvoicesBoard"), { ssr: false });
 const BookingsAdmin = dynamic(() => import("./BookingsAdmin"), { ssr: false });
@@ -9,29 +9,31 @@ const BookingsAdmin = dynamic(() => import("./BookingsAdmin"), { ssr: false });
 // ───────────────────────────────────────────────────────────────────────────
 // Calendar — the section's primary surface.
 //
-// Month grid and week grid over the SAME real feed (/api/calendar): Google
-// Calendar read through its private iCal address, scheduled call-backs from
-// the Cold Call Room, invoice due dates, and Jack's class schedule expanded
-// live from the published schedule app. Every event links back to the record
-// it came from, and only when that record actually has an address.
+// A normal calendar: a month grid first (Sun to Sat, weeks as rows, today
+// marked, every day listing its items as small coloured chips), with Week and
+// Day views one tap away and one Today / previous / next control shared by
+// all three. Everything is drawn from the SAME real feed (/api/calendar):
+// bookings from the public link, call-backs from the Cold Call Room, class and
+// study blocks, invoice due dates, Stripe, and Google when it is connected.
+// A person filter (Everyone / Jack / Maddox / Grant) narrows to one person's
+// items plus anything marked for the whole team.
 //
 // Nothing is ever synthesized. A feed with no credential is named out loud in
 // the lane strip so an empty calendar is never mistaken for a free week.
 //
-// Invoices are not gone: they live on as the second tab and keep every board,
-// total and payment calendar they had before.
+// Two writes live here: manual time blocks (add / edit / delete) and the
+// team's booking hours (the Availability panel), which is what the public
+// /book link uses to decide which slots to offer.
+//
+// Invoices are not gone: they live on as the second tab.
 // ───────────────────────────────────────────────────────────────────────────
 
 type CalendarSource = "google" | "callbacks" | "payments" | "school" | "blocks" | "stripe" | "bookings";
 
-// Lane-strip colour for sources WeekCalendar's SOURCE_COLOR does not know yet.
-// Bookings events carry their own explicit color token from the API.
 function laneColor(source: CalendarSource): string {
   return SOURCE_COLOR[source] ?? "var(--accent-2)";
 }
 
-// One row of Jack's own calendar_blocks table, carried on each block event so
-// the UI can open it straight into the edit form.
 type BlockRow = {
   id: string;
   title: string;
@@ -41,6 +43,7 @@ type BlockRow = {
   category: string;
   notes: string | null;
   recurrence: string | null;
+  person?: string | null;
 };
 
 type ApiEvent = {
@@ -56,6 +59,7 @@ type ApiEvent = {
   status: string | null;
   color?: string | null;
   block?: BlockRow | null;
+  person?: string | null;
 };
 
 type Lane = {
@@ -69,8 +73,9 @@ type Lane = {
 };
 
 const BLOCK_CATEGORIES = ["study", "call", "work", "personal", "other"] as const;
+const PEOPLE = ["jack", "maddox", "grant"] as const;
+type PersonFilter = "all" | (typeof PEOPLE)[number];
 
-// What the block form is editing. `id` empty = creating a new block.
 type BlockDraft = {
   id: string;
   title: string;
@@ -80,19 +85,18 @@ type BlockDraft = {
   category: string;
   notes: string;
   weekly: boolean;
+  person: string;
 };
 
-// New blocks default to the next round hour so the form is usually ready to
-// save with just a title.
 function nextRoundHour(): { start: string; end: string } {
   const h = Math.min(new Date().getHours() + 1, 22);
   const p = (n: number) => String(n).padStart(2, "0");
   return { start: `${p(h)}:00`, end: `${p(Math.min(h + 1, 23))}:00` };
 }
 
-function emptyDraft(date: string): BlockDraft {
+function emptyDraft(date: string, person: string): BlockDraft {
   const t = nextRoundHour();
-  return { id: "", title: "", date, start_time: t.start, end_time: t.end, category: "work", notes: "", weekly: false };
+  return { id: "", title: "", date, start_time: t.start, end_time: t.end, category: "work", notes: "", weekly: false, person };
 }
 
 function draftFrom(b: BlockRow): BlockDraft {
@@ -105,6 +109,7 @@ function draftFrom(b: BlockRow): BlockDraft {
     category: b.category,
     notes: b.notes ?? "",
     weekly: b.recurrence === "weekly",
+    person: b.person || "jack",
   };
 }
 
@@ -123,6 +128,18 @@ function dayKey(d: Date): string {
   ).padStart(2, "0")}`;
 }
 
+function startOfDay(d: Date): Date {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
+function sundayOf(d: Date): Date {
+  const x = startOfDay(d);
+  x.setDate(x.getDate() - x.getDay());
+  return x;
+}
+
 function time12(value: string): string {
   const d = toLocal(value);
   let h = d.getHours();
@@ -132,30 +149,86 @@ function time12(value: string): string {
   return m ? `${h}:${String(m).padStart(2, "0")}${ampm}` : `${h}${ampm}`;
 }
 
+// Which person an event belongs to for the filter. The class lane is Jack's
+// own schedule; feeds with no person (payments, Stripe, Google, call-backs)
+// return null and only show under Everyone.
+function personOf(e: ApiEvent): string | null {
+  if (e.person) return e.person;
+  if (e.source === "school") return "jack";
+  return null;
+}
+
+function normTitle(t: string): string {
+  return t.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function dedupe(list: ApiEvent[]): ApiEvent[] {
+  // Group by start + normalized title; within a group, items whose person
+  // matches (or is unknown) merge. School wins the chip; the block rides along.
+  const groups = new Map<string, ApiEvent[]>();
+  for (const e of list) {
+    if (!e.start) continue;
+    const k = `${e.start}|${normTitle(e.title)}`;
+    (groups.get(k) ?? groups.set(k, []).get(k)!).push(e);
+  }
+  const out: ApiEvent[] = [];
+  for (const g of groups.values()) {
+    if (g.length === 1) { out.push(g[0]); continue; }
+    const merged: ApiEvent[] = [];
+    for (const e of g) {
+      const p = personOf(e);
+      const host = merged.find((m) => {
+        const mp = personOf(m);
+        return (mp == null || p == null || mp === p) && (m.source === "school" ? e.source === "blocks" : e.source === "school");
+      });
+      if (!host) { merged.push({ ...e }); continue; }
+      const school = host.source === "school" ? host : e;
+      const block = host.source === "school" ? e : host;
+      const idx = merged.indexOf(host);
+      merged[idx] = {
+        ...school,
+        end: school.end ?? block.end,
+        block: block.block ?? null,
+        person: personOf(school) ?? personOf(block),
+        detail: [school.detail, "also blocked on the calendar"].filter(Boolean).join(" · "),
+      };
+    }
+    out.push(...merged);
+  }
+  return out.sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : 0));
+}
+
 export type CalendarSectionProps = {
-  /** Which tab opens first. Defaults to the calendar. */
   initialTab?: "calendar" | "invoices";
-  /** Which calendar layout opens first. Defaults to the month grid. */
-  initialView?: "month" | "week";
+  initialView?: "month" | "week" | "day";
 };
 
 export default function CalendarSection({
   initialTab = "calendar",
-  // Jack wants the week grid first — time blocks laid out like a class
-  // schedule — with the month grid one toggle away.
-  initialView = "week",
+  initialView = "month",
 }: CalendarSectionProps) {
   const [tab, setTab] = useState<"calendar" | "invoices">(initialTab);
-  const [view, setView] = useState<"month" | "week">(initialView);
+  const [view, setView] = useState<"month" | "week" | "day">(initialView);
+  const [anchor, setAnchor] = useState<Date>(() => startOfDay(new Date()));
+  const [person, setPerson] = useState<PersonFilter>("all");
   const [data, setData] = useState<Payload | null>(null);
   const [err, setErr] = useState("");
-  const [monthOffset, setMonthOffset] = useState(0);
-  const [openDay, setOpenDay] = useState<string | null>(null);
+  const [focusBooking, setFocusBooking] = useState<string | null>(null);
+  const [showHours, setShowHours] = useState(false);
+  const [narrow, setNarrow] = useState(false);
 
-  // The block form: null = closed; a draft with no id = creating.
   const [draft, setDraft] = useState<BlockDraft | null>(null);
   const [saving, setSaving] = useState(false);
   const [formErr, setFormErr] = useState("");
+
+  // Phone: month cells show dots instead of chips.
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 640px)");
+    const apply = () => setNarrow(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
 
   async function load() {
     try {
@@ -171,14 +244,9 @@ export default function CalendarSection({
     let live = true;
     fetch("/api/calendar")
       .then((r) => r.json())
-      .then((d: Payload) => {
-        if (!live) return;
-        setData(d);
-      })
+      .then((d: Payload) => { if (live) setData(d); })
       .catch((e) => live && setErr(String(e)));
-    return () => {
-      live = false;
-    };
+    return () => { live = false; };
   }, []);
 
   async function saveDraft() {
@@ -195,6 +263,7 @@ export default function CalendarSection({
         category: draft.category,
         notes: draft.notes || null,
         recurrence: draft.weekly ? "weekly" : null,
+        person: draft.person,
       };
       const res = await fetch("/api/blocks", {
         method: draft.id ? "PATCH" : "POST",
@@ -202,10 +271,7 @@ export default function CalendarSection({
         body: JSON.stringify(body),
       });
       const out = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setFormErr(out?.error || `Save failed (HTTP ${res.status})`);
-        return;
-      }
+      if (!res.ok) { setFormErr(out?.error || `Save failed (HTTP ${res.status})`); return; }
       setDraft(null);
       await load();
     } catch (e) {
@@ -222,10 +288,7 @@ export default function CalendarSection({
     try {
       const res = await fetch(`/api/blocks?id=${encodeURIComponent(draft.id)}`, { method: "DELETE" });
       const out = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setFormErr(out?.error || `Delete failed (HTTP ${res.status})`);
-        return;
-      }
+      if (!res.ok) { setFormErr(out?.error || `Delete failed (HTTP ${res.status})`); return; }
       setDraft(null);
       await load();
     } catch (e) {
@@ -235,10 +298,30 @@ export default function CalendarSection({
     }
   }
 
-  const events = useMemo(() => data?.events ?? [], [data]);
+  // Render-time dedupe: Jack's classes arrive twice, once from the published
+  // schedule (school lane) and once as a study block. Two items with the same
+  // person (or one with none), the same start and the same normalized title
+  // collapse into ONE chip that keeps the school colour and carries the
+  // block's row so Edit still works. Nothing is deleted from either source.
+  const allEvents = useMemo(() => dedupe(data?.events ?? []), [data]);
+  const events = useMemo(
+    () =>
+      person === "all"
+        ? allEvents
+        : allEvents.filter((e) => {
+            const p = personOf(e);
+            return p === person || p === "team";
+          }),
+    [allEvents, person]
+  );
+  // Legend counts follow what is actually drawn: a merged class counts once,
+  // under Classes, and is no longer counted as a separate time block.
+  const shownCount = useMemo(() => {
+    const c: Record<string, number> = {};
+    for (const e of allEvents) c[e.source] = (c[e.source] ?? 0) + 1;
+    return c;
+  }, [allEvents]);
 
-  // Every event bucketed onto its local calendar day. Real rows only; a day
-  // with nothing on it stays empty.
   const byDay = useMemo(() => {
     const g: Record<string, ApiEvent[]> = {};
     for (const e of events) {
@@ -251,8 +334,7 @@ export default function CalendarSection({
     return g;
   }, [events]);
 
-  // The week grid takes the same events through the shared Appointment shape.
-  const weekEvents: Appointment[] = useMemo(
+  const gridEvents: Appointment[] = useMemo(
     () =>
       events.map((e) => ({
         id: e.id,
@@ -266,14 +348,16 @@ export default function CalendarSection({
         detail: e.detail,
         allDay: e.allDay,
         color: e.color ?? null,
+        person: personOf(e),
       })),
     [events]
   );
 
-  const now = new Date();
-  const viewMonth = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
-  const todayKey = data?.today ?? dayKey(now);
+  const todayKey = data?.today ?? dayKey(new Date());
+  const anchorKey = dayKey(anchor);
+  const viewMonth = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
 
+  // Month grid: leading blanks, the days, trailing blanks to a full week.
   const cells = useMemo(() => {
     const y = viewMonth.getFullYear();
     const m = viewMonth.getMonth();
@@ -282,64 +366,81 @@ export default function CalendarSection({
     const out: ({ day: number; key: string } | null)[] = [];
     for (let i = 0; i < firstDow; i++) out.push(null);
     for (let d = 1; d <= days; d++) out.push({ day: d, key: dayKey(new Date(y, m, d)) });
+    while (out.length % 7) out.push(null);
     return out;
   }, [viewMonth]);
 
+  function shift(n: number) {
+    const d = new Date(anchor);
+    if (view === "month") d.setMonth(d.getMonth() + n, 1);
+    else if (view === "week") d.setDate(d.getDate() + n * 7);
+    else d.setDate(d.getDate() + n);
+    setAnchor(d);
+  }
+
+  const weekStart = sundayOf(anchor);
+  const weekEnd = new Date(weekStart); weekEnd.setDate(weekEnd.getDate() + 6);
+  const heading =
+    view === "month"
+      ? `${MONTHS[viewMonth.getMonth()]} ${viewMonth.getFullYear()}`
+      : view === "week"
+      ? `${weekStart.toLocaleDateString("en-US", { month: "short", day: "numeric" })} to ${weekEnd.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+      : anchor.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+  const isOnToday = todayKey === anchorKey;
+
   const lanes = data?.lanes ?? [];
   const unconfigured = lanes.filter((l) => !l.configured);
-  // Only lanes whose problem is a missing credential can name one. A lane that
-  // failed for another reason (the classes feed being unreachable, say) reports
-  // itself through its error line instead of an empty "Missing:".
   const missingCreds = unconfigured.filter((l) => l.missing);
   const laneErrors = lanes.filter((l) => l.error);
   const monthCount = cells.reduce((s, c) => s + (c ? (byDay[c.key]?.length ?? 0) : 0), 0);
 
-  const openEvents = openDay ? byDay[openDay] ?? [] : [];
+  function openDay(key: string) {
+    setAnchor(toLocal(key));
+    setView("day");
+  }
+
+  function openEvent(e: ApiEvent) {
+    if (e.block) { setFormErr(""); setDraft(draftFrom(e.block)); return; }
+    if (e.source === "bookings") { setFocusBooking(e.id.replace(/^booking:/, "")); return; }
+    openDay(dayKey(toLocal(e.start)));
+  }
+
+  const draftPerson = person === "all" ? "jack" : person;
+  const chipMax = 3;
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
       <style>{`
         .cal-day:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
         .cal-day:hover { background: var(--bg-hover) !important; }
+        .cal-chip:hover { filter: brightness(1.15); }
+        /* The phone stylesheet collapses inline grids; a month is always 7 wide. */
+        .app-view .cal-month-grid { grid-template-columns: repeat(7, minmax(0, 1fr)) !important; }
       `}</style>
 
-      {/* Tabs — calendar first, invoices kept right beside it. */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <button type="button" onClick={() => setTab("calendar")} style={tabBtn(tab === "calendar")}>
-          Calendar
-        </button>
-        <button type="button" onClick={() => setTab("invoices")} style={tabBtn(tab === "invoices")}>
-          Invoices and payments
-        </button>
+        <button type="button" onClick={() => setTab("calendar")} style={tabBtn(tab === "calendar")}>Calendar</button>
+        <button type="button" onClick={() => setTab("invoices")} style={tabBtn(tab === "invoices")}>Invoices and payments</button>
       </div>
 
       {tab === "invoices" ? (
-        <div id="invoices">
-          <InvoicesBoard />
-        </div>
+        <div id="invoices"><InvoicesBoard /></div>
       ) : (
         <>
-          {/* Which feeds are live, and exactly what is missing when one is not. */}
+          {/* Legend: which feeds are live, and what is missing when one is not. */}
           <section style={{ ...card, display: "grid", gap: 8 }}>
             <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center" }}>
               {lanes.filter((l) => l.configured).map((l) => (
                 <span key={l.source} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
-                  <span
-                    style={{
-                      width: 9, height: 9, borderRadius: 99,
-                      background: laneColor(l.source),
-                      border: `1px solid ${laneColor(l.source)}`,
-                    }}
-                  />
+                  <span style={{ width: 9, height: 9, borderRadius: 99, background: laneColor(l.source), border: `1px solid ${laneColor(l.source)}` }} />
                   <span style={{ color: "var(--text-secondary)" }}>{l.label}</span>
-                  <span style={{ ...num, color: "var(--text-muted)" }}>{l.count}</span>
+                  <span style={{ ...num, color: "var(--text-muted)" }} title={shownCount[l.source] !== l.count ? `${l.count} in the feed, ${shownCount[l.source] ?? 0} shown after merging duplicates` : undefined}>
+                    {data ? shownCount[l.source] ?? 0 : l.count}
+                  </span>
                 </span>
               ))}
               {!data && !err ? <span style={{ fontSize: 12, color: "var(--text-muted)" }}>Loading…</span> : null}
             </div>
-            {/* Everything not connected collapses to one quiet plain-English
-                line. The exact missing credential is kept off the screen and
-                lives in a hover tooltip on the lane name. */}
             {unconfigured.length ? (
               <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)" }}>
                 {unconfigured.map((l, i) => (
@@ -357,127 +458,101 @@ export default function CalendarSection({
               </p>
             ) : null}
             {lanes.filter((l) => l.note).map((l) => (
-              <p key={`n-${l.source}`} style={{ margin: 0, fontSize: 12, color: "var(--text-muted)" }}>
-                {l.note}
-              </p>
+              <p key={`n-${l.source}`} style={{ margin: 0, fontSize: 12, color: "var(--text-muted)" }}>{l.note}</p>
             ))}
             {laneErrors.map((l) => (
-              <p key={`e-${l.source}`} style={{ margin: 0, fontSize: 12, color: "var(--red)" }}>
-                {l.error}
-              </p>
+              <p key={`e-${l.source}`} style={{ margin: 0, fontSize: 12, color: "var(--red)" }}>{l.error}</p>
             ))}
             {err ? <p style={{ margin: 0, fontSize: 12, color: "var(--red)" }}>Calendar: {err}</p> : null}
           </section>
 
-          {/* View switch + the one write this calendar owns: add a block. */}
+          {/* Toolbar: Today / prev / next, the heading, view switch, person filter. */}
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            <button type="button" onClick={() => setView("week")} style={tabBtn(view === "week")}>
-              Week
-            </button>
-            <button type="button" onClick={() => setView("month")} style={tabBtn(view === "month")}>
-              Month
-            </button>
+            <button type="button" onClick={() => setAnchor(startOfDay(new Date()))} style={tabBtn(isOnToday)} aria-label="Go to today">Today</button>
+            <button type="button" onClick={() => shift(-1)} style={navBtn} aria-label={`Previous ${view}`}>‹</button>
+            <button type="button" onClick={() => shift(1)} style={navBtn} aria-label={`Next ${view}`}>›</button>
+            <span style={{ fontSize: 14, fontWeight: 700, ...num }}>{heading}</span>
+            <div style={{ display: "flex", gap: 4, marginLeft: "auto" }}>
+              {(["month", "week", "day"] as const).map((v) => (
+                <button key={v} type="button" onClick={() => setView(v)} style={tabBtn(view === v)} aria-pressed={view === v}>
+                  {v[0].toUpperCase() + v.slice(1)}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+            <span style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Show</span>
+            {(["all", ...PEOPLE] as PersonFilter[]).map((p) => (
+              <button key={p} type="button" onClick={() => setPerson(p)} style={{ ...tabBtn(person === p), padding: "5px 10px", fontSize: 12 }} aria-pressed={person === p}>
+                {p === "all" ? "Everyone" : PERSON_LABEL[p]}
+              </button>
+            ))}
             <button
               type="button"
-              onClick={() => { setFormErr(""); setDraft(emptyDraft(todayKey)); }}
-              style={{ ...tabBtn(false), marginLeft: "auto", borderColor: "var(--accent)", color: "var(--accent)" }}
+              onClick={() => { setFormErr(""); setDraft(emptyDraft(view === "month" ? todayKey : anchorKey, draftPerson)); }}
+              style={{ ...tabBtn(false), marginLeft: "auto", padding: "5px 10px", fontSize: 12, borderColor: "var(--accent)", color: "var(--accent)" }}
             >
               + Add block
+            </button>
+            <button type="button" onClick={() => setShowHours((v) => !v)} style={{ ...tabBtn(showHours), padding: "5px 10px", fontSize: 12 }} aria-expanded={showHours}>
+              Availability
             </button>
           </div>
 
           {draft ? (
-            <BlockForm
-              draft={draft}
-              setDraft={setDraft}
-              onSave={saveDraft}
-              onDelete={deleteDraft}
-              saving={saving}
-              error={formErr}
-            />
+            <BlockForm draft={draft} setDraft={setDraft} onSave={saveDraft} onDelete={deleteDraft} saving={saving} error={formErr} />
           ) : null}
 
-          {view === "week" ? (
+          {showHours ? <AvailabilityPanel onClose={() => setShowHours(false)} /> : null}
+
+          {view !== "month" ? (
             <WeekCalendar
-              appointments={weekEvents}
+              appointments={gridEvents}
+              startDate={view === "week" ? weekStart : anchor}
+              days={view === "week" ? 7 : 1}
               onEdit={(a) => {
-                const ev = events.find((e) => e.id === a.id);
+                const ev = allEvents.find((e) => e.id === a.id);
                 if (ev?.block) { setFormErr(""); setDraft(draftFrom(ev.block)); }
               }}
+              onOpenBooking={(a) => setFocusBooking(a.id.replace(/^booking:/, ""))}
               emptyNote={
                 missingCreds.length
                   ? `nothing scheduled · ${missingCreds.map((l) => l.label).join(", ")} not connected yet`
-                  : "nothing scheduled this week"
+                  : view === "day" ? "nothing scheduled this day" : "nothing scheduled this week"
               }
             />
           ) : (
             <section style={{ ...card, padding: 0, overflow: "hidden" }}>
-              <header
-                style={{
-                  display: "flex", alignItems: "center", justifyContent: "space-between",
-                  padding: "14px 20px", borderBottom: "1px solid var(--border)", gap: 12,
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <button onClick={() => setMonthOffset((m) => m - 1)} style={navBtn} aria-label="Previous month">‹</button>
-                  <span style={{ fontSize: 14, fontWeight: 700 }}>
-                    {MONTHS[viewMonth.getMonth()]} <span style={num}>{viewMonth.getFullYear()}</span>
-                  </span>
-                  <button onClick={() => setMonthOffset((m) => m + 1)} style={navBtn} aria-label="Next month">›</button>
-                  {monthOffset !== 0 ? (
-                    <button
-                      onClick={() => setMonthOffset(0)}
-                      style={{ fontSize: 11, color: "var(--accent)", background: "var(--accent-glow)", border: "1px solid var(--accent)", borderRadius: 6, padding: "3px 10px", cursor: "pointer" }}
-                    >
-                      Today
-                    </button>
-                  ) : null}
-                </div>
-                <span style={{ ...num, fontSize: 12, color: "var(--text-muted)" }}>
-                  {monthCount > 0
-                    ? `${monthCount} ${monthCount === 1 ? "event" : "events"}`
-                    : data
-                    ? "nothing scheduled this month"
-                    : ""}
-                </span>
-              </header>
-
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", borderBottom: "1px solid var(--border)" }}>
+              <div className="cal-month-grid" style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", borderBottom: "1px solid var(--border)" }}>
                 {DOW.map((d) => (
-                  <div key={d} style={{ padding: "6px 4px", textAlign: "center", fontSize: 10, color: "var(--text-muted)", textTransform: "uppercase" }}>
-                    {d}
-                  </div>
+                  <div key={d} style={{ padding: "6px 4px", textAlign: "center", fontSize: 10, color: "var(--text-muted)", textTransform: "uppercase" }}>{d}</div>
                 ))}
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)" }}>
+              <div className="cal-month-grid" style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))" }}>
                 {cells.map((c, i) => {
-                  if (!c) return <div key={i} style={{ minHeight: 96, borderTop: "1px solid var(--border)", borderLeft: i % 7 ? "1px solid var(--border)" : "none" }} />;
+                  if (!c) return <div key={i} style={{ minHeight: narrow ? 56 : 104, borderTop: "1px solid var(--border)", borderLeft: i % 7 ? "1px solid var(--border)" : "none", background: "var(--bg-secondary)", opacity: 0.5 }} />;
                   const list = byDay[c.key] ?? [];
                   const isToday = c.key === todayKey;
-                  const isOpen = openDay === c.key;
                   return (
-                    <button
+                    <div
                       key={i}
-                      type="button"
+                      role="button"
+                      tabIndex={0}
                       className="cal-day"
-                      aria-expanded={isOpen}
-                      aria-label={`${c.key} — ${list.length} event${list.length === 1 ? "" : "s"}`}
-                      onClick={() => setOpenDay((cur) => (cur === c.key ? null : c.key))}
+                      aria-label={`${c.key}, ${list.length} item${list.length === 1 ? "" : "s"}. Open day.`}
+                      onClick={() => openDay(c.key)}
+                      onKeyDown={(ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); openDay(c.key); } }}
                       style={{
-                        font: "inherit",
-                        minHeight: 96,
-                        textAlign: "left",
-                        padding: 5,
+                        minHeight: narrow ? 56 : 104,
+                        padding: narrow ? 4 : 5,
                         cursor: "pointer",
                         display: "grid",
                         gap: 3,
                         alignContent: "start",
                         borderTop: "1px solid var(--border)",
                         borderLeft: i % 7 ? "1px solid var(--border)" : "none",
-                        borderRight: "none",
-                        borderBottom: "none",
-                        background: isOpen ? "var(--bg-hover)" : isToday ? "rgba(124,106,245,0.06)" : "transparent",
+                        background: isToday ? "var(--accent-glow)" : "transparent",
                         color: "var(--text-secondary)",
                         overflow: "hidden",
                       }}
@@ -485,7 +560,7 @@ export default function CalendarSection({
                       <span
                         style={{
                           ...num, fontSize: 12, fontWeight: isToday ? 700 : 500,
-                          color: isToday ? "#fff" : "var(--text-primary)",
+                          color: isToday ? "var(--bg-card)" : "var(--text-primary)",
                           background: isToday ? "var(--accent)" : "transparent",
                           borderRadius: "50%", width: 22, height: 22,
                           display: "flex", alignItems: "center", justifyContent: "center",
@@ -493,130 +568,197 @@ export default function CalendarSection({
                       >
                         {c.day}
                       </span>
-                      {list.slice(0, 3).map((e) => {
-                        const color = e.color ?? SOURCE_COLOR[e.source] ?? "var(--accent)";
-                        return (
-                          <span
-                            key={e.id}
-                            title={[e.title, e.detail].filter(Boolean).join(" · ")}
-                            style={{
-                              fontSize: 10, lineHeight: 1.3, borderRadius: 4,
-                              padding: "1px 4px", background: color + "22",
-                              // Manual blocks read apart from feed events: dashed edge.
-                              border: e.source === "blocks" ? `1px dashed ${color}` : "none",
-                              borderLeft: `2px solid ${color}`, color: "var(--text-primary)",
-                              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                            }}
-                          >
-                            {e.allDay ? "" : `${time12(e.start)} `}
-                            {e.title}
+                      {narrow ? (
+                        list.length ? (
+                          <span style={{ display: "flex", gap: 3, flexWrap: "wrap" }} aria-hidden>
+                            {list.slice(0, 6).map((e) => (
+                              <span key={e.id} style={{ width: 6, height: 6, borderRadius: 99, background: e.color ?? SOURCE_COLOR[e.source] ?? "var(--accent)" }} />
+                            ))}
+                            {list.length > 6 ? <span style={{ fontSize: 9, color: "var(--text-muted)", lineHeight: "6px" }}>+{list.length - 6}</span> : null}
                           </span>
-                        );
-                      })}
-                      {list.length > 3 ? (
-                        <span style={{ fontSize: 10, color: "var(--text-muted)" }}>+{list.length - 3} more</span>
-                      ) : null}
-                    </button>
+                        ) : null
+                      ) : (
+                        <>
+                          {list.slice(0, chipMax).map((e) => {
+                            const color = e.color ?? SOURCE_COLOR[e.source] ?? "var(--accent)";
+                            const who = personOf(e);
+                            return (
+                              <button
+                                key={e.id}
+                                type="button"
+                                className="cal-chip"
+                                title={[e.title, who && who !== "team" ? PERSON_LABEL[who] : null, e.detail].filter(Boolean).join(" · ")}
+                                onClick={(ev) => { ev.stopPropagation(); openEvent(e); }}
+                                style={{
+                                  font: "inherit", textAlign: "left", cursor: "pointer",
+                                  fontSize: 10, lineHeight: 1.3, borderRadius: 4,
+                                  padding: "1px 4px", background: `color-mix(in srgb, ${color} 14%, transparent)`,
+                                  border: e.source === "blocks" ? `1px dashed ${color}` : "1px solid transparent",
+                                  borderLeft: `2px solid ${color}`, color: "var(--text-primary)",
+                                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                                }}
+                              >
+                                {e.allDay ? "" : `${time12(e.start)} `}
+                                {e.title}
+                                {e.source === "bookings" && who ? ` (${PERSON_LABEL[who] ?? who})` : ""}
+                              </button>
+                            );
+                          })}
+                          {list.length > chipMax ? (
+                            <span style={{ fontSize: 10, color: "var(--text-muted)" }}>+{list.length - chipMax} more</span>
+                          ) : null}
+                        </>
+                      )}
+                    </div>
                   );
                 })}
               </div>
-
-              {/* Day detail — every event on the clicked day, each linked to its
-                  real source record when that record has an address. */}
-              {openDay ? (
-                <div style={{ borderTop: "1px solid var(--border)", padding: "12px 16px", display: "grid", gap: 8 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
-                    <strong style={{ ...num, fontSize: 13 }}>{openDay}</strong>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <button
-                        type="button"
-                        onClick={() => { setFormErr(""); setDraft(emptyDraft(openDay)); }}
-                        style={{ ...btn, borderColor: "var(--accent)", color: "var(--accent)" }}
-                      >
-                        + Add block here
-                      </button>
-                      <button type="button" onClick={() => setOpenDay(null)} style={btn}>Close</button>
-                    </div>
-                  </div>
-                  {openEvents.length === 0 ? (
-                    <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)" }}>Nothing on this day.</p>
-                  ) : null}
-                  {openEvents.map((e) => {
-                    const color = e.color ?? SOURCE_COLOR[e.source] ?? "var(--accent)";
-                    return (
-                      <div
-                        key={e.id}
-                        style={{
-                          border: e.source === "blocks" ? `1px dashed ${color}` : "1px solid var(--border)",
-                          borderLeft: `3px solid ${color}`,
-                          borderRadius: 10, padding: 10, background: "var(--bg-secondary)",
-                          display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap",
-                        }}
-                      >
-                        <span style={{ ...num, fontSize: 11, color: "var(--text-muted)", minWidth: 62 }}>
-                          {e.allDay ? "all day" : time12(e.start)}
-                        </span>
-                        <span style={{ fontSize: 13, color: "var(--text-primary)" }}>{e.title}</span>
-                        {e.detail ? (
-                          <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{e.detail}</span>
-                        ) : null}
-                        <span style={{ fontSize: 10, color, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                          {e.source}
-                        </span>
-                        {e.block ? (
-                          <button
-                            type="button"
-                            onClick={() => { setFormErr(""); setDraft(draftFrom(e.block as BlockRow)); }}
-                            style={{ ...btn, marginLeft: "auto", borderColor: "var(--accent)", color: "var(--accent)" }}
-                          >
-                            Edit
-                          </button>
-                        ) : null}
-                        {e.url ? (
-                          e.external ? (
-                            <a
-                              href={e.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              style={linkBtn}
-                            >
-                              {e.source === "school" ? "Open schedule app" : "Open in Google Calendar"}
-                            </a>
-                          ) : e.url === "#invoices" ? (
-                            <button type="button" onClick={() => setTab("invoices")} style={{ ...btn, borderColor: "var(--accent)", color: "var(--accent)" }}>
-                              Open invoice
-                            </button>
-                          ) : (
-                            <a href={e.url} style={linkBtn}>Open in call room</a>
-                          )
-                        ) : null}
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : null}
+              <p style={{ margin: 0, padding: "8px 14px", fontSize: 12, color: "var(--text-muted)", borderTop: "1px solid var(--border)", ...num }}>
+                {monthCount > 0
+                  ? `${monthCount} ${monthCount === 1 ? "item" : "items"} this month${person !== "all" ? ` for ${PERSON_LABEL[person]}` : ""}. Tap a day to open it.`
+                  : data
+                  ? `Nothing scheduled this month${person !== "all" ? ` for ${PERSON_LABEL[person]}` : ""}.`
+                  : ""}
+              </p>
             </section>
           )}
 
-          {/* Bookings from the public /book link, managed right where they
-              appear on the calendar. */}
-          <BookingsAdmin />
+          <BookingsAdmin focusId={focusBooking} onFocused={() => setFocusBooking(null)} />
         </>
       )}
     </div>
   );
 }
 
+// ── Availability panel ─────────────────────────────────────────────────────
+// The hours the public booking link may offer, per person. Plain English,
+// HH:MM time inputs, one Save per person. Reads and writes
+// /api/calendar/availability (staff only).
+type HourRange = [string, string];
+type Hours = Partial<Record<string, HourRange[]>>;
+type PersonHours = { person: string; label: string; hours: Hours; takes_bookings: boolean; exists: boolean };
+
+const WEEKDAYS: { key: string; label: string }[] = [
+  { key: "mon", label: "Monday" }, { key: "tue", label: "Tuesday" }, { key: "wed", label: "Wednesday" },
+  { key: "thu", label: "Thursday" }, { key: "fri", label: "Friday" }, { key: "sat", label: "Saturday" }, { key: "sun", label: "Sunday" },
+];
+
+function AvailabilityPanel({ onClose }: { onClose: () => void }) {
+  const [people, setPeople] = useState<PersonHours[] | null>(null);
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState("");
+  const [savedFor, setSavedFor] = useState("");
+
+  useEffect(() => {
+    let live = true;
+    fetch("/api/calendar/availability")
+      .then(async (r) => {
+        const d = await r.json().catch(() => ({}));
+        if (!live) return;
+        if (!r.ok) { setErr(d?.message || `Could not read availability (HTTP ${r.status}).`); return; }
+        setPeople(d.people as PersonHours[]);
+      })
+      .catch((e) => live && setErr(String(e)));
+    return () => { live = false; };
+  }, []);
+
+  function update(person: string, patch: Partial<PersonHours>) {
+    setPeople((ps) => (ps ?? []).map((p) => (p.person === person ? { ...p, ...patch } : p)));
+  }
+  function setRange(person: string, day: string, idx: number, range: HourRange | null) {
+    setPeople((ps) =>
+      (ps ?? []).map((p) => {
+        if (p.person !== person) return p;
+        const list = [...(p.hours[day] ?? [])];
+        if (range) list[idx] = range; else list.splice(idx, 1);
+        return { ...p, hours: { ...p.hours, [day]: list } };
+      })
+    );
+  }
+
+  async function save(p: PersonHours) {
+    setBusy(p.person);
+    setErr("");
+    setSavedFor("");
+    try {
+      const hours: Hours = {};
+      for (const [k, v] of Object.entries(p.hours)) if (v && v.length) hours[k] = v;
+      const r = await fetch("/api/calendar/availability", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ person: p.person, hours, takes_bookings: p.takes_bookings }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { setErr(d?.message || `Save failed (HTTP ${r.status}).`); return; }
+      setSavedFor(p.person);
+      update(p.person, { exists: true });
+    } catch (e) {
+      setErr(String(e));
+    } finally {
+      setBusy("");
+    }
+  }
+
+  return (
+    <section style={{ ...card, display: "grid", gap: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <strong style={{ fontSize: 13 }}>Availability for the booking link</strong>
+        <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
+          Central Time. A slot is offered when at least one person here is free: inside their hours, no block on the calendar, no other booking.
+        </span>
+        <button type="button" onClick={onClose} style={{ ...btn, marginLeft: "auto" }}>Close</button>
+      </div>
+      {err ? <p style={{ margin: 0, fontSize: 12, color: "var(--red)" }}>{err}</p> : null}
+      {!people && !err ? <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)" }}>Loading…</p> : null}
+      {(people ?? []).map((p) => (
+        <div key={p.person} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 10, display: "grid", gap: 8, background: "var(--bg-secondary)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <strong style={{ fontSize: 13 }}>{p.label}</strong>
+            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--text-secondary)", cursor: "pointer" }}>
+              <input type="checkbox" checked={p.takes_bookings} onChange={(e) => update(p.person, { takes_bookings: e.target.checked })} />
+              Takes bookings from the public link
+            </label>
+            {!p.exists ? <span style={{ fontSize: 11, color: "var(--orange)" }}>No hours saved yet</span> : null}
+            <button
+              type="button"
+              disabled={busy === p.person}
+              onClick={() => save(p)}
+              style={{ ...btn, marginLeft: "auto", borderColor: "var(--accent)", color: "var(--accent)", background: "var(--accent-glow)" }}
+            >
+              {busy === p.person ? "Saving…" : savedFor === p.person ? "Saved" : `Save ${p.label}`}
+            </button>
+          </div>
+          <div style={{ display: "grid", gap: 4, opacity: p.takes_bookings ? 1 : 0.6 }}>
+            {WEEKDAYS.map((d) => {
+              const ranges = p.hours[d.key] ?? [];
+              return (
+                <div key={d.key} style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", fontSize: 12 }}>
+                  <span style={{ width: 80, color: "var(--text-secondary)" }}>{d.label}</span>
+                  {ranges.length === 0 ? <span style={{ color: "var(--text-muted)" }}>Off</span> : null}
+                  {ranges.map((r, i) => (
+                    <span key={i} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                      <input type="time" value={r[0]} onChange={(e) => setRange(p.person, d.key, i, [e.target.value, r[1]])} style={timeInput} />
+                      <span style={{ color: "var(--text-muted)" }}>to</span>
+                      <input type="time" value={r[1]} onChange={(e) => setRange(p.person, d.key, i, [r[0], e.target.value])} style={timeInput} />
+                      <button type="button" onClick={() => setRange(p.person, d.key, i, null)} style={{ ...btn, padding: "2px 7px" }} aria-label={`Remove ${d.label} hours`}>✕</button>
+                    </span>
+                  ))}
+                  <button type="button" onClick={() => setRange(p.person, d.key, ranges.length, ["09:00", "17:00"])} style={{ ...btn, padding: "2px 7px", fontSize: 11 }}>
+                    + hours
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </section>
+  );
+}
+
 // ── Block form ─────────────────────────────────────────────────────────────
-// One small card that both creates and edits. Plain inputs, stacked on narrow
-// screens via flex-wrap, token colours only.
 function BlockForm({
-  draft,
-  setDraft,
-  onSave,
-  onDelete,
-  saving,
-  error,
+  draft, setDraft, onSave, onDelete, saving, error,
 }: {
   draft: BlockDraft;
   setDraft: (d: BlockDraft | null) => void;
@@ -632,12 +774,7 @@ function BlockForm({
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <label style={label}>
           Title
-          <input
-            value={draft.title}
-            onChange={(e) => set({ title: e.target.value })}
-            placeholder="Study, calls, deep work…"
-            style={{ ...input, minWidth: 180 }}
-          />
+          <input value={draft.title} onChange={(e) => set({ title: e.target.value })} placeholder="Study, calls, deep work…" style={{ ...input, minWidth: 180 }} />
         </label>
         <label style={label}>
           Date
@@ -652,28 +789,26 @@ function BlockForm({
           <input type="time" value={draft.end_time} onChange={(e) => set({ end_time: e.target.value })} style={input} />
         </label>
       </div>
-      {/* One-tap category chips instead of a dropdown. */}
+      <div style={{ display: "grid", gap: 4 }}>
+        <span style={{ ...label, flex: "none" }}>Whose time</span>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {[...PEOPLE, "team"].map((p) => {
+            const active = draft.person === p;
+            return (
+              <button key={p} type="button" onClick={() => set({ person: p })} aria-pressed={active} style={chip(active)}>
+                {p === "team" ? "Whole team" : PERSON_LABEL[p]}
+              </button>
+            );
+          })}
+        </div>
+      </div>
       <div style={{ display: "grid", gap: 4 }}>
         <span style={{ ...label, flex: "none" }}>Category</span>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {BLOCK_CATEGORIES.map((c) => {
             const active = draft.category === c;
             return (
-              <button
-                key={c}
-                type="button"
-                onClick={() => set({ category: c })}
-                aria-pressed={active}
-                style={{
-                  ...btn,
-                  padding: "6px 12px",
-                  borderColor: active ? "var(--accent)" : "var(--border)",
-                  color: active ? "var(--accent)" : "var(--text-secondary)",
-                  background: active ? "var(--accent-glow)" : "var(--bg-card)",
-                }}
-              >
-                {c}
-              </button>
+              <button key={c} type="button" onClick={() => set({ category: c })} aria-pressed={active} style={chip(active)}>{c}</button>
             );
           })}
         </div>
@@ -686,26 +821,17 @@ function BlockForm({
         <input type="checkbox" checked={draft.weekly} onChange={(e) => set({ weekly: e.target.checked })} />
         Repeat weekly on this weekday
       </label>
+      <p style={{ margin: 0, fontSize: 11, color: "var(--text-muted)" }}>
+        Blocks also hide that person's booking slots on the public link.
+      </p>
       {error ? <p style={{ margin: 0, fontSize: 12, color: "var(--red)" }}>{error}</p> : null}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <button
-          type="button"
-          onClick={onSave}
-          disabled={saving}
-          style={{ ...btn, borderColor: "var(--accent)", color: "var(--accent)", background: "var(--accent-glow)", opacity: saving ? 0.6 : 1 }}
-        >
+        <button type="button" onClick={onSave} disabled={saving} style={{ ...btn, borderColor: "var(--accent)", color: "var(--accent)", background: "var(--accent-glow)", opacity: saving ? 0.6 : 1 }}>
           {saving ? "Saving…" : draft.id ? "Save changes" : "Add block"}
         </button>
-        <button type="button" onClick={() => setDraft(null)} disabled={saving} style={btn}>
-          Cancel
-        </button>
+        <button type="button" onClick={() => setDraft(null)} disabled={saving} style={btn}>Cancel</button>
         {draft.id ? (
-          <button
-            type="button"
-            onClick={onDelete}
-            disabled={saving}
-            style={{ ...btn, marginLeft: "auto", borderColor: "var(--red)", color: "var(--red)" }}
-          >
+          <button type="button" onClick={onDelete} disabled={saving} style={{ ...btn, marginLeft: "auto", borderColor: "var(--red)", color: "var(--red)" }}>
             Delete block
           </button>
         ) : null}
@@ -715,60 +841,41 @@ function BlockForm({
 }
 
 const label: React.CSSProperties = {
-  display: "grid",
-  gap: 4,
-  fontSize: 11,
-  color: "var(--text-muted)",
-  textTransform: "uppercase",
-  letterSpacing: "0.05em",
-  flex: "1 1 120px",
+  display: "grid", gap: 4, fontSize: 11, color: "var(--text-muted)",
+  textTransform: "uppercase", letterSpacing: "0.05em", flex: "1 1 120px",
 };
 
 const input: React.CSSProperties = {
-  font: "inherit",
-  fontSize: 13,
-  color: "var(--text-primary)",
-  background: "var(--bg-secondary)",
-  border: "1px solid var(--border)",
-  borderRadius: 8,
-  padding: "7px 10px",
-  width: "100%",
+  font: "inherit", fontSize: 13, color: "var(--text-primary)", background: "var(--bg-secondary)",
+  border: "1px solid var(--border)", borderRadius: 8, padding: "7px 10px", width: "100%",
+};
+
+const timeInput: React.CSSProperties = {
+  font: "inherit", fontSize: 12, color: "var(--text-primary)", background: "var(--bg-card)",
+  border: "1px solid var(--border)", borderRadius: 6, padding: "3px 6px",
 };
 
 const card: React.CSSProperties = {
-  background: "var(--bg-card)",
-  border: "1px solid var(--border)",
-  borderRadius: 14,
-  padding: 16,
+  background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 14, padding: 16,
 };
 
 const btn: React.CSSProperties = {
-  font: "inherit",
-  background: "var(--bg-card)",
-  border: "1px solid var(--border)",
-  borderRadius: 8,
-  color: "var(--text-secondary)",
-  padding: "5px 10px",
-  fontSize: 12,
-  cursor: "pointer",
+  font: "inherit", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8,
+  color: "var(--text-secondary)", padding: "5px 10px", fontSize: 12, cursor: "pointer",
 };
 
-const linkBtn: React.CSSProperties = {
-  marginLeft: "auto",
-  fontSize: 12,
-  color: "var(--accent)",
-  background: "var(--accent-glow)",
-  border: "1px solid var(--accent)",
-  borderRadius: 8,
-  padding: "5px 10px",
-  textDecoration: "none",
-};
+function chip(active: boolean): React.CSSProperties {
+  return {
+    ...btn, padding: "6px 12px",
+    borderColor: active ? "var(--accent)" : "var(--border)",
+    color: active ? "var(--accent)" : "var(--text-secondary)",
+    background: active ? "var(--accent-glow)" : "var(--bg-card)",
+  };
+}
 
 function tabBtn(active: boolean): React.CSSProperties {
   return {
-    ...btn,
-    padding: "7px 14px",
-    fontSize: 13,
+    ...btn, padding: "7px 14px", fontSize: 13,
     borderColor: active ? "var(--accent)" : "var(--border)",
     color: active ? "var(--accent)" : "var(--text-secondary)",
     background: active ? "var(--accent-glow)" : "var(--bg-card)",
@@ -778,6 +885,5 @@ function tabBtn(active: boolean): React.CSSProperties {
 const navBtn: React.CSSProperties = {
   background: "var(--bg-hover)", border: "1px solid var(--border)", borderRadius: 6,
   width: 28, height: 28, cursor: "pointer", color: "var(--text-primary)",
-  fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center",
-  padding: 0,
+  fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
 };

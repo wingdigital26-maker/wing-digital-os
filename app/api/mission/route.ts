@@ -277,7 +277,7 @@ function parseHealthBoard(raw: string): { runDate: string | null; clients: Clien
 // section (one line per problem), a RESOLVED section, and an ALL CLEAR line
 // listing each agent with state OK/LATE/SILENT/DISABLED. The file may not
 // exist yet (first run pending) — that is a normal, non-error state.
-interface WatchdogProblem { text: string; url: string | null }
+interface WatchdogProblem { text: string; url: string | null; action?: string | null; open?: string | null }
 interface Watchdog {
   available: boolean;
   updated: string | null;
@@ -286,14 +286,102 @@ interface Watchdog {
   problems: WatchdogProblem[];
   resolved: string[];
   agents: Record<string, string>; // agent name -> OK | LATE | SILENT | DISABLED
+  // Checks the PC report says it could not verify. Never a problem; the UI
+  // shows them as a muted "n checks could not be verified" line.
+  couldNotVerify: number;
+}
+
+// ── the newer plain-text Da Boss format (ghl-cli/boss_report.py) ────────────
+// Header "DA BOSS - Fri 04 Sep 18:12", then sections in caps:
+//   MOST EXPENSIVE THING ON THIS PAGE   one item: title on the next line
+//   ALSO YOURS TO DO (n)                items "  - title", each with
+//   STUCK, WANTS A DECISION FROM YOU (n)  VERIFIED / DO / OPEN <link> lines
+//   CHRONIC, REPORTING HAS NOT WORKED (n) items "  - title  [day n, since ..]"
+//   COULD NOT VERIFY (n)                 blind checks, not problems
+//   "n resolved: ..."                    resolved this run
+//   "Nothing needs you. Every check re-verified clean at HH:MM."  -> all clear
+// Returns null when the text is not in this format.
+function parseBossPlain(raw: string): Watchdog | null {
+  const lines = raw.split(/\r?\n/);
+  const head = lines[0]?.trim().match(/^DA BOSS\s*-\s*(.+)$/i);
+  if (!head) return null;
+  const wd: Watchdog = {
+    available: true, updated: null, overall: "unknown",
+    problemCount: 0, problems: [], resolved: [], agents: {}, couldNotVerify: 0,
+  };
+  // "Fri 04 Sep 18:12" has no year: assume the current year unless that lands
+  // in the future, then last year.
+  const hm = head[1].match(/^(?:\w{3}\s+)?(\d{1,2})\s+(\w{3})\s+(\d{1,2}):(\d{2})/);
+  if (hm) {
+    const months = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"];
+    const mi = months.indexOf(hm[2].toLowerCase());
+    if (mi >= 0) {
+      const now = new Date();
+      let d = new Date(now.getFullYear(), mi, Number(hm[1]), Number(hm[3]), Number(hm[4]));
+      if (d.getTime() > now.getTime() + 86400000) d = new Date(now.getFullYear() - 1, mi, Number(hm[1]), Number(hm[3]), Number(hm[4]));
+      const p = (n: number) => String(n).padStart(2, "0");
+      wd.updated = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+    }
+  }
+  type Sec = "top" | "hands" | "decision" | "chronic" | "blind" | null;
+  let sec: Sec = null;
+  let cur: WatchdogProblem | null = null;
+  let topPending = false;
+  for (const line of lines.slice(1)) {
+    const t = line.trim();
+    if (!t) continue;
+    if (/^Nothing needs you\./i.test(t)) { wd.overall = "ok"; continue; }
+    if (/^MOST EXPENSIVE THING/i.test(t)) { sec = "top"; topPending = true; cur = null; continue; }
+    if (/^ALSO YOURS TO DO/i.test(t)) { sec = "hands"; cur = null; continue; }
+    if (/^STUCK, WANTS A DECISION/i.test(t)) { sec = "decision"; cur = null; continue; }
+    if (/^CHRONIC, REPORTING HAS NOT WORKED/i.test(t)) { sec = "chronic"; cur = null; continue; }
+    if (/^COULD NOT VERIFY\s*\((\d+)\)/i.test(t)) { wd.couldNotVerify = Number(t.match(/\((\d+)\)/)?.[1] ?? 0); sec = "blind"; cur = null; continue; }
+    const blindInline = t.match(/^\((\d+) check\(s\) could not be verified/i);
+    if (blindInline) { wd.couldNotVerify = Number(blindInline[1]); continue; }
+    const res = t.match(/^(\d+) resolved:\s*(.+)$/i);
+    if (res) { wd.resolved.push(clean(redact(res[2])).slice(0, 300)); sec = null; cur = null; continue; }
+    if (/^Everything above was measured/i.test(t) || /^\[dry run/i.test(t)) { sec = null; cur = null; continue; }
+    if (/^\+\d+ more/i.test(t)) { continue; }
+    if (sec === "blind" || sec === null) continue;
+
+    if (sec === "top" && topPending && !/^(VERIFIED|DO|OPEN|DECIDE)\b/.test(t)) {
+      cur = { text: clean(redact(t)).slice(0, 400), url: null };
+      wd.problems.push(cur);
+      topPending = false;
+      continue;
+    }
+    const item = t.match(/^-\s+(.+)$/);
+    if (item) {
+      const title = item[1].replace(/\s{2,}\[day \d+.*$/i, "").trim();
+      cur = { text: clean(redact(title)).slice(0, 400), url: null };
+      wd.problems.push(cur);
+      continue;
+    }
+    if (!cur) continue;
+    const open = t.match(/^OPEN\s+(\S.*)$/);
+    if (open) {
+      const target = open[1].trim();
+      if (/^https?:\/\//i.test(target)) cur.url = target.replace(/[.,;:]+$/, "");
+      else cur.open = clean(redact(target)).slice(0, 300);
+      continue;
+    }
+    const doLine = t.match(/^DO\s+(\S.*)$/);
+    if (doLine && !cur.action) cur.action = clean(redact(doLine[1])).slice(0, 300);
+  }
+  wd.problemCount = wd.problems.length;
+  if (wd.problemCount > 0) wd.overall = "problems";
+  else if (wd.overall === "unknown" && /re-verified clean|Nothing needs you/i.test(raw)) wd.overall = "ok";
+  return wd;
 }
 
 function parseWatchdog(raw: string | null): Watchdog {
   const wd: Watchdog = {
     available: false, updated: null, overall: "unknown",
-    problemCount: 0, problems: [], resolved: [], agents: {},
+    problemCount: 0, problems: [], resolved: [], agents: {}, couldNotVerify: 0,
   };
   if (!raw) return wd;
+  const plain = parseBossPlain(raw);
+  if (plain) return plain;
   wd.available = true;
   wd.updated =
     raw.match(/^updated:\s*["']?([^"'\r\n]+)["']?\s*$/m)?.[1]?.trim() ?? null;

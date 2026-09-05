@@ -14,10 +14,12 @@ type IconType = React.ComponentType<{ size?: number; color?: string }>;
 
 const VaultGraph = dynamic(() => import("./components/VaultGraph"), { ssr: false });
 const Search = dynamic(() => import("./components/Search"), { ssr: false });
-const ActivityLog = dynamic(() => import("./components/ActivityLog"), { ssr: false });
+// ActivityLog is no longer mounted (removed from the Intel group 2026-09-04);
+// the file stays on disk.
 const MissionOps = dynamic(() => import("./components/MissionOps"), { ssr: false });
 const ClientsBoard = dynamic(() => import("./components/ClientsBoard"), { ssr: false });
 const SonarBoard = dynamic(() => import("./components/SonarBoard"), { ssr: false });
+const PotentialClientsBoard = dynamic(() => import("./components/PotentialClientsBoard"), { ssr: false });
 // One CRM surface (2026-08-30). Inbox was only Outbound filtered to drafts, so
 // it is a default filter now, not a screen. Pipeline is folded in as two record
 // types; no record and no field was dropped.
@@ -25,6 +27,8 @@ const CrmWorkspace = dynamic(() => import("./components/CrmWorkspace"), { ssr: f
 // Email hub (2026-09-01): MessagingBoard + MessagesBoard + DeliverabilityBoard
 // behind one tab with internal pills. The three boards moved there untouched.
 const EmailHub = dynamic(() => import("./components/EmailHub"), { ssr: false });
+// Text tab (2026-09-04): the same message ledger locked to the sms channel.
+const MessagesBoard = dynamic(() => import("./components/MessagesBoard"), { ssr: false });
 // CrmBoard / ClientInbox / PipelineBoard / SchoolBoard are no longer mounted
 // here. Files kept on disk as fallbacks; School was removed from the nav
 // 2026-09-01 (classes still show as the school lane on the Calendar).
@@ -57,6 +61,9 @@ const NAV: NavGroup[] = [
     hint: "Your clients, new leads, and storm alerts",
     subs: [
       { id: "clients", label: "Clients" },
+      // Potential clients (2026-09-04): paste a website, the OS researches it
+      // and files it as a prospect to work toward signing.
+      { id: "potential", label: "Potential clients" },
       { id: "sonar", label: "Sonar Leads" },
       // Storm Response (2026-09-01): SPC hail events near DFW with the drafts
       // Wing WOULD fire (FB post, ad plan, Nextdoor). Demo build: draft-only,
@@ -71,22 +78,32 @@ const NAV: NavGroup[] = [
     // Pipeline's data (Wing's own book of business, the GoHighLevel
     // replacement) is folded in as a category, never deleted.
     id: "crm", label: "CRM", icon: Note,
-    hint: "Contacts, outreach emails, replies, automations, and email health",
+    hint: "Contacts, outreach emails, texts and replies",
+    // Exactly four tabs (2026-09-04, Jack): Everything, Email, Text, Reply
+    // Inbox. Sequences and Automations moved to their own group below.
     subs: [
       { id: "crm", label: "Everything" },
+      // Email: the automated-send queue, the email side of the message
+      // ledger, and email health as internal pills. See EmailHub.tsx.
+      { id: "email", label: "Email" },
+      // Text: the SMS conversations and the texting-line status, on their
+      // own. Same MessagesBoard, locked to the sms channel.
+      { id: "text", label: "Text" },
       // Reply Inbox (2026-09-01): every inbound cold-email reply, hot first,
       // with the thread and an editable draft. Read/draft only; never sends.
       { id: "replies", label: "Reply Inbox" },
-      // Sequences (2026-09-01): the GHL-workflow replacement. Routed section
-      // (/sequences), not an in-shell view — see EXTERNAL_SUB_LINKS.
-      { id: "sequences", label: "Sequences" },
-      // Automations + Forms (2026-09-02): the trigger-to-action layer, the
-      // part of GHL that was actually GHL. Routed section (/automations).
+    ],
+  },
+  {
+    // Automations (2026-09-04): sequences and automations out of the CRM tab
+    // and onto the left rail as their own thing. Every sub is a routed page
+    // (see EXTERNAL_SUB_LINKS), so clicking the group icon navigates too.
+    id: "automate", label: "Automations", icon: Route,
+    hint: "Automations, email sequences, and the call room",
+    subs: [
       { id: "automations", label: "Automations" },
-      // Email (2026-09-01, Jack: "too many tabs"): one tab wrapping the
-      // automated-send queue, the sent-message ledger, and email health as
-      // internal pills. See EmailHub.tsx; old ids alias here.
-      { id: "email", label: "Email" },
+      { id: "sequences", label: "Sequences" },
+      { id: "calls", label: "Call Room" },
     ],
   },
   {
@@ -110,7 +127,9 @@ const NAV: NavGroup[] = [
     subs: [
       { id: "knowledge", label: "Knowledge Base" },
       { id: "competitors", label: "Competitor Intel" },
-      { id: "log", label: "Activity Log" },
+      // Activity Log removed from the nav 2026-09-04 (Jack). The component
+      // stays on disk; the legacy alias below lands old links on the
+      // Knowledge Base.
     ],
   },
 ];
@@ -126,16 +145,21 @@ const LEGACY_VIEW_ALIAS: Record<string, string> = {
   // 2026-09-01 consolidation: School folded into Calendar, three email tabs
   // folded into the Email hub.
   school: "calendar",
+  // 2026-09-04: the message ledger split by channel. Texts have their own tab.
   messaging: "email",
-  messages: "email",
+  messages: "text",
   deliverability: "email",
+  log: "knowledge",
 };
 
 // Sub-tabs that are real routed pages rather than in-shell views. Clicking one
-// navigates instead of switching the mounted view.
+// navigates instead of switching the mounted view. The os:navigate handler
+// honors these too, so a panel dispatching "sequences" still lands somewhere.
 const EXTERNAL_SUB_LINKS: Record<string, string> = {
   sequences: "/sequences",
   automations: "/automations",
+  forms: "/automations/forms",
+  calls: "/calls",
 };
 
 // which group owns a given view id
@@ -220,7 +244,7 @@ export default function Home() {
     return () => mq.removeEventListener("change", on);
   }, []);
   // Views hidden from the phone sub-tab strip (still reachable on desktop).
-  const MOBILE_HIDDEN_SUBS = new Set(["competitors", "log"]);
+  const MOBILE_HIDDEN_SUBS = new Set(["competitors"]);
 
   // ── Pull-to-refresh (phone only, Command + Mission views) ───────────────
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -261,6 +285,8 @@ export default function Home() {
       const raw = (e as CustomEvent).detail;
       if (typeof raw !== "string") return;
       const id = LEGACY_VIEW_ALIAS[raw] ?? raw;
+      const href = EXTERNAL_SUB_LINKS[id];
+      if (href) { window.location.href = href; return; }
       if (NAV.some(g => g.subs.some(s => s.id === id))) setActive(id);
     };
     window.addEventListener("os:navigate", onNav);
@@ -349,6 +375,10 @@ export default function Home() {
             return (
               <button key={item.id} onClick={() => {
                 sfx.play("nav");
+                // A group whose first sub is a routed page (Automations) has
+                // no in-shell view to mount, so the icon navigates instead.
+                const href = EXTERNAL_SUB_LINKS[item.subs[0].id];
+                if (href) { window.location.href = href; return; }
                 setActive(item.subs[0].id);
                 if (item.id === "command") setNewLeadCount(0);
               }}
@@ -472,15 +502,16 @@ export default function Home() {
           {visited.has("command") && <div className="app-view" style={{ display: active === "command" ? "block" : "none" }}><CommandCenter data={revenueData} loading={loading} onSendToAI={sendToAI} /></div>}
           {visited.has("clients") && <div className="app-view" style={{ display: active === "clients" ? "block" : "none" }}><ClientsBoard /></div>}
           {visited.has("sonar") && <div className="app-view" style={{ display: active === "sonar" ? "block" : "none" }}><SonarBoard /></div>}
+          {visited.has("potential") && <div className="app-view" style={{ display: active === "potential" ? "block" : "none" }}><PotentialClientsBoard /></div>}
           {visited.has("crm") && <div className="app-view" style={{ display: active === "crm" ? "block" : "none" }}><CrmWorkspace /></div>}
           {visited.has("email") && <div className="app-view" style={{ display: active === "email" ? "block" : "none" }}><EmailHub /></div>}
+          {visited.has("text") && <div className="app-view" style={{ display: active === "text" ? "block" : "none" }}><MessagesBoard channel="sms" /></div>}
           {visited.has("replies") && <div className="app-view" style={{ display: active === "replies" ? "block" : "none" }}><ReplyInboxBoard /></div>}
           {visited.has("storms") && <div className="app-view" style={{ display: active === "storms" ? "block" : "none" }}><StormBoard /></div>}
           {visited.has("calendar") && <div className="app-view" style={{ display: active === "calendar" ? "block" : "none" }}><CalendarSection /></div>}
           {visited.has("competitors") && <div className="app-view" style={{ display: active === "competitors" ? "block" : "none" }}><CompetitorIntel onSendToAI={sendToAI} /></div>}
           {visited.has("knowledge") && <div className="app-view" style={{ display: active === "knowledge" ? "block" : "none" }}><KnowledgeBase initialPath={openNotePath} onSendToAI={sendToAI} /></div>}
           {visited.has("agent") && <div className="app-view" style={{ display: active === "agent" ? "block" : "none" }}><MissionOps /></div>}
-          {visited.has("log") && <div className="app-view" style={{ display: active === "log" ? "block" : "none" }}><ActivityLog /></div>}
           {/* Jack-only views never mount for a restricted session, even when a
               stale `visited` entry exists from before the role resolved. */}
           {fullAccess && visited.has("personal") && <div className="app-view" style={{ display: active === "personal" ? "block" : "none" }}><PersonalSection /></div>}

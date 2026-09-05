@@ -4,6 +4,26 @@ import path from "path";
 import { execFile } from "child_process";
 import { readVaultFile, isGithubVault, VAULT_PATH, commitVaultFile } from "../../../../lib/vaultSource";
 import { readOutreachLive, sendsTodayHonest, parseSnapshotAsOf } from "../../../../lib/liveTruth";
+import { EXPECTED_HEARTBEATS, inPcWindow } from "../../../../lib/watchdogExpected";
+
+// ───────────────────────────────────────────────────────────────────────────
+// WHAT JACK READS (2026-09-04 rewrite of the result shape)
+//
+// The response now carries three plain lists on top of the legacy `checks`:
+//   problems      real failures verified live just now. Each one links to the
+//                 thing that is broken. This is the ONLY list that counts.
+//   couldNotCheck checks that cannot run in this environment (the cloud has no
+//                 PC disk, no prospects.db, no Windows task scheduler). Never a
+//                 problem, never a green: a one-line reason plus the last result
+//                 the PC reported through its heartbeat, when there is one.
+//   fine          everything that ran and came back clean, with what was
+//                 measured, so Jack can see the check is actually working.
+//
+// Before this rewrite the UI summed "problem" statuses across checks and then
+// printed the write-back note "Live check only, report not updated - needs
+// PC" under it, which read as if "live check only" were the problem. It was
+// never a check; it only said the vault file was not rewritten.
+// ───────────────────────────────────────────────────────────────────────────
 
 // ───────────────────────────────────────────────────────────────────────────
 // THE BOSS — live "Recheck" endpoint (POST).
@@ -46,8 +66,27 @@ export const runtime = "nodejs";
 const WATCHDOG_REL = "wiki/state/watchdog.md";
 const SCHEDULED_DIR = "C:\\Users\\wjack\\.claude\\scheduled-tasks";
 
-// Only these hosts are ever fetched. Live-client domains + Jack's own OS host.
-const ALLOWED_URL_HOSTS = ["renewalhealth.life"];
+// Public sites the cloud verifies from anywhere: the OS itself plus every
+// active client site. Same list as .github/workflows/watchdog.yml (keep the two
+// in step; a dropped client comes off both the day they leave). WATCHDOG_SITES
+// (comma-separated URLs) overrides without a code change.
+const DEFAULT_SITES = [
+  "https://wing-digital-os.vercel.app/manifest.json",
+  "https://herosjunkremovaltx.com",
+  "https://renewalhealth.life",
+];
+function siteList(): string[] {
+  const env = (process.env.WATCHDOG_SITES ?? "").split(",").map((s) => s.trim()).filter((s) => /^https?:\/\//.test(s));
+  return env.length ? env : DEFAULT_SITES;
+}
+function hostOf(u: string): string {
+  try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return u; }
+}
+// Only these hosts are ever fetched for flagged-page rechecks: the site list
+// hosts. Nothing in a vault file can make this route fetch an arbitrary URL.
+const ALLOWED_URL_HOSTS = (): string[] => siteList().map(hostOf);
+// Where the cloud jobs live, for the self-check link.
+const ACTIONS_URL = process.env.OS_ACTIONS_URL || "https://github.com/wingdigital26-maker/wing-digital-os/actions";
 
 // Build-note / scaffolding leak markers. If a fetched page body still contains
 // ANY of these, it is reachable but NOT fixed — it can never count as a green.
@@ -115,6 +154,401 @@ interface CheckResult {
   items?: CheckItem[];
 }
 
+// ── Findings: the plain-English result ─────────────────────────────────────
+// link forms: an absolute URL, an OS path ("/automations/runs"), or
+// "view:<tab>" for a tab of the home screen (crm, email, text, calendar,
+// knowledge, agent). The UI turns view: links into a tab switch.
+export interface Finding {
+  id: string;
+  title: string; // one plain sentence
+  detail: string; // what was measured, with the numbers and the time
+  link: string | null;
+  linkLabel?: string;
+}
+interface Findings {
+  problems: Finding[];
+  couldNotCheck: Finding[];
+  fine: Finding[];
+}
+function emptyFindings(): Findings {
+  return { problems: [], couldNotCheck: [], fine: [] };
+}
+function merge(into: Findings, from: Findings): void {
+  into.problems.push(...from.problems);
+  into.couldNotCheck.push(...from.couldNotCheck);
+  into.fine.push(...from.fine);
+}
+const nowClock = (): string =>
+  new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/Chicago" });
+function isoAgo(ms: number): string {
+  return new Date(Date.now() - ms).toISOString();
+}
+function minutesAgo(iso: string): number {
+  return Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+}
+function agoWords(iso: string | null | undefined): string {
+  if (!iso) return "never";
+  const m = minutesAgo(iso);
+  if (m < 60) return `${m} min ago`;
+  if (m < 48 * 60) return `${Math.round(m / 60)}h ago`;
+  return `${Math.round(m / 1440)}d ago`;
+}
+
+// ── Supabase GET that tells us WHY it failed (sbSelect hides that) ──────────
+// [] from a failed request must never read as "no problems", so every check
+// below goes through this and treats a non-OK answer as "could not check".
+interface SbAnswer<T> { ok: boolean; status: number | null; rows: T[]; err: string | null }
+async function restGet<T>(base: string | undefined, key: string | undefined, pathAndQuery: string): Promise<SbAnswer<T>> {
+  if (!base || !key) return { ok: false, status: null, rows: [], err: "not configured on this host" };
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 10000);
+    const res = await fetch(`${base}/rest/v1/${pathAndQuery}`, {
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+      cache: "no-store",
+      signal: ctrl.signal,
+    });
+    clearTimeout(t);
+    if (!res.ok) {
+      try { await res.text(); } catch { /* ignore */ }
+      return { ok: false, status: res.status, rows: [], err: `HTTP ${res.status}` };
+    }
+    const rows = (await res.json()) as T[];
+    return { ok: true, status: res.status, rows: Array.isArray(rows) ? rows : [], err: null };
+  } catch (e: unknown) {
+    return { ok: false, status: null, rows: [], err: e instanceof Error ? e.name : "fetch failed" };
+  }
+}
+const osGet = <T,>(q: string) => restGet<T>(process.env.OS_SUPABASE_URL, process.env.OS_SUPABASE_SERVICE_KEY, q);
+const sonarGet = <T,>(q: string) => restGet<T>(process.env.SONAR_SUPABASE_URL, process.env.SONAR_SUPABASE_SERVICE_KEY, q);
+
+// ── (a) public sites: 200 AND a real page ───────────────────────────────────
+// A 200 with a "Not found" title, an empty body, or (for the OS manifest) a
+// body that is not the manifest is a soft failure and counts as down.
+const SOFT_404 = /\b(404|not found|page not found|access denied|forbidden|untitled|error)\b/i;
+async function checkSites(urls: string[]): Promise<Findings> {
+  const out = emptyFindings();
+  const results = await Promise.all(urls.map(async (u) => {
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 15000);
+      const res = await fetch(u, { redirect: "follow", signal: ctrl.signal, cache: "no-store", headers: { "User-Agent": "wing-os-boss-recheck/1.0" } });
+      const body = await res.text().catch(() => "");
+      clearTimeout(t);
+      return { u, status: res.status, body, err: null as string | null };
+    } catch (e: unknown) {
+      return { u, status: null as number | null, body: "", err: e instanceof Error ? e.name : "fetch failed" };
+    }
+  }));
+  for (const r of results) {
+    const host = hostOf(r.u);
+    const id = `site:${host}${r.u.endsWith("manifest.json") ? ":manifest" : ""}`;
+    if (r.status === null) {
+      out.problems.push({ id, title: `${host} is unreachable`, detail: `Fetch failed (${r.err}) at ${nowClock()}.`, link: r.u, linkLabel: "Open the site" });
+      continue;
+    }
+    if (r.status >= 400) {
+      let isHome = true;
+      try { const u = new URL(r.u); isHome = u.pathname === "/" || u.pathname === ""; } catch { /* keep */ }
+      out.problems.push({
+        id,
+        title: isHome ? `${host} is down: HTTP ${r.status}` : `A page on ${host} returns HTTP ${r.status}`,
+        detail: `Fetched ${r.u} live at ${nowClock()} and got HTTP ${r.status}.`,
+        link: r.u, linkLabel: "Open the page",
+      });
+      continue;
+    }
+    if (r.u.endsWith("manifest.json")) {
+      let name: string | null = null;
+      try { name = String((JSON.parse(r.body) as { name?: string }).name ?? "") || null; } catch { /* not json */ }
+      if (!name) {
+        out.problems.push({ id, title: `${host} answered but not with the OS manifest`, detail: `HTTP ${r.status} but the body is not the app manifest. The OS may be serving an error page.`, link: r.u, linkLabel: "Open" });
+      } else {
+        out.fine.push({ id, title: `OS app (${host}) is up`, detail: `HTTP ${r.status}, manifest name "${name}", checked ${nowClock()}.`, link: r.u });
+      }
+      continue;
+    }
+    const title = (r.body.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? "").replace(/\s+/g, " ").trim();
+    if (!title) {
+      out.problems.push({ id, title: `${host} loads but has no page title`, detail: `HTTP ${r.status}, ${r.body.length} bytes, no <title>. Looks like a broken or placeholder page.`, link: r.u, linkLabel: "Open the site" });
+    } else if (SOFT_404.test(title)) {
+      out.problems.push({ id, title: `${host} is showing an error page`, detail: `HTTP ${r.status} but the title reads "${title.slice(0, 80)}".`, link: r.u, linkLabel: "Open the site" });
+    } else if (r.body.length < 500) {
+      out.problems.push({ id, title: `${host} is nearly empty`, detail: `HTTP ${r.status}, title "${title.slice(0, 60)}", only ${r.body.length} bytes of HTML.`, link: r.u, linkLabel: "Open the site" });
+    } else if (bodyHasLeak(r.body)) {
+      out.problems.push({ id, title: `${host} is leaking build notes`, detail: `HTTP ${r.status} but the page body still contains build scaffolding text.`, link: r.u, linkLabel: "Open the site" });
+    } else {
+      out.fine.push({ id, title: `${host} is up`, detail: `HTTP ${r.status}, title "${title.slice(0, 70)}", checked ${nowClock()}.`, link: r.u });
+    }
+  }
+  return out;
+}
+
+// ── (b) + (i) agent heartbeats vs their cadence, error reports, cloud jobs ──
+interface Beat { agent: string; status: string; message: string | null; last_beat: string }
+interface HeartbeatOutcome extends Findings {
+  pcLastResult: string | null; // what the PC's own Da Boss last reported, for the could-not-check lines
+  configured: boolean;
+}
+async function checkHeartbeats(): Promise<HeartbeatOutcome> {
+  const out: HeartbeatOutcome = { ...emptyFindings(), pcLastResult: null, configured: true };
+  const ans = await osGet<Beat>("agent_heartbeats?select=agent,status,message,last_beat&order=last_beat.desc&limit=100");
+  if (!ans.ok) {
+    out.configured = false;
+    out.couldNotCheck.push({ id: "heartbeats", title: "Agent heartbeats", detail: `Could not read agent_heartbeats (${ans.err}).`, link: "/mission" });
+    return out;
+  }
+  const byAgent = new Map(ans.rows.map((b) => [b.agent, b]));
+  const inWindow = inPcWindow();
+
+  const local = byAgent.get("local-watchdog");
+  if (local) {
+    const first = (local.message ?? "").split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+    const count = local.message?.match(/PROBLEMS\s*\((\d+)\)/i)?.[1] ?? null;
+    out.pcLastResult = `${local.status}${count ? `, ${count} problem${count === "1" ? "" : "s"}` : ""} at ${agoWords(local.last_beat)}`;
+    if (local.status === "error" && count) {
+      const items = first.filter((l) => /^\d+\.\s/.test(l)).slice(0, 5).map((l) => l.replace(/^\d+\.\s*/, ""));
+      out.problems.push({
+        id: "pc:da-boss",
+        title: `Da Boss on the PC found ${count} problem${count === "1" ? "" : "s"}`,
+        detail: `Reported ${agoWords(local.last_beat)}: ${items.join(" | ").slice(0, 400)}`,
+        link: "/mission",
+        linkLabel: "Open Mission Control",
+      });
+    }
+  }
+
+  for (const exp of EXPECTED_HEARTBEATS) {
+    const b = byAgent.get(exp.agent);
+    const id = `heartbeat:${exp.agent}`;
+    if (!b) {
+      if (exp.agent === "pc-alive") {
+        out.problems.push({ id, title: "PC is offline: no heartbeat has ever arrived", detail: "The local agent fleet cannot run without it.", link: "/mission" });
+      } else {
+        out.couldNotCheck.push({ id, title: `${exp.label} has never reported`, detail: "No heartbeat row yet, so there is nothing to judge.", link: "/mission" });
+      }
+      continue;
+    }
+    if (b.status === "disabled") {
+      out.fine.push({ id, title: `${exp.label} is switched off on purpose`, detail: `Marked disabled ${agoWords(b.last_beat)}. Not judged.`, link: "/mission" });
+      continue;
+    }
+    const ageMin = minutesAgo(b.last_beat);
+    if (exp.windowed && !inWindow) {
+      out.fine.push({ id, title: `${exp.label}: outside the PC hours, not judged`, detail: `Last beat ${agoWords(b.last_beat)}. Only judged 6am-10pm Central.`, link: "/mission" });
+      continue;
+    }
+    if (ageMin > exp.staleMin) {
+      out.problems.push({
+        id,
+        title: exp.agent === "pc-alive" ? "PC is offline" : `${exp.label} has gone silent`,
+        detail: `Last heartbeat ${agoWords(b.last_beat)}; allowed ${exp.staleMin >= 120 ? `${Math.round(exp.staleMin / 60)}h` : `${exp.staleMin} min`}.`,
+        link: "/mission",
+        linkLabel: "Open Mission Control",
+      });
+    } else {
+      out.fine.push({ id, title: `${exp.label} is on time`, detail: `Last heartbeat ${agoWords(b.last_beat)} (allowed ${exp.staleMin >= 120 ? `${Math.round(exp.staleMin / 60)}h` : `${exp.staleMin} min`}).`, link: "/mission" });
+    }
+  }
+
+  // Any agent that reported an error is a real, verified problem (the agent said so).
+  for (const b of ans.rows) {
+    if (b.status !== "error" || b.agent === "local-watchdog" || b.agent === "cloud-jobs") continue;
+    const msg = (b.message ?? "No detail given.").split(/\r?\n/)[0].slice(0, 220);
+    out.problems.push({ id: `error:${b.agent}`, title: `${b.agent} reported an error`, detail: `${msg} (reported ${agoWords(b.last_beat)})`, link: "/mission", linkLabel: "Open Mission Control" });
+  }
+
+  // (i) the GitHub Actions cloud jobs' own self-check heartbeat.
+  const cj = byAgent.get("cloud-jobs");
+  if (!cj) {
+    out.couldNotCheck.push({ id: "cloud-jobs", title: "Cloud jobs self-check has never reported", detail: "The watchdog workflow's self-check step has not written its heartbeat row yet.", link: ACTIONS_URL, linkLabel: "Open GitHub Actions" });
+  } else if (cj.status === "error") {
+    const linkInMsg = cj.message?.match(/https?:\/\/\S+/)?.[0] ?? ACTIONS_URL;
+    out.problems.push({ id: "cloud-jobs", title: "A cloud job is failing", detail: `${(cj.message ?? "").replace(/https?:\/\/\S+/g, "").trim().slice(0, 300)} (reported ${agoWords(cj.last_beat)})`, link: linkInMsg, linkLabel: "Open GitHub Actions" });
+  } else if (minutesAgo(cj.last_beat) > 200) {
+    out.problems.push({ id: "cloud-jobs", title: "Cloud jobs self-check has gone quiet", detail: `Last self-check ${agoWords(cj.last_beat)}; it should run every 30 minutes.`, link: ACTIONS_URL, linkLabel: "Open GitHub Actions" });
+  } else {
+    out.fine.push({ id: "cloud-jobs", title: "Cloud jobs are healthy", detail: `${(cj.message ?? "ok").replace(/https?:\/\/\S+/g, "").trim().slice(0, 160)} (checked ${agoWords(cj.last_beat)})`, link: ACTIONS_URL });
+  }
+  const su = byAgent.get("site-uptime");
+  if (su) {
+    out.fine.push({ id: "site-uptime:cron", title: "Cloud uptime patrol is running", detail: `Last patrol ${agoWords(su.last_beat)}: ${(su.message ?? "").slice(0, 120)}`, link: ACTIONS_URL });
+  }
+  return out;
+}
+
+// ── (c) database reachability ───────────────────────────────────────────────
+async function checkDatabases(): Promise<Findings> {
+  const out = emptyFindings();
+  const os = await osGet<{ id: unknown }>("crm_stages?select=id&limit=1");
+  if (!process.env.OS_SUPABASE_URL) {
+    out.couldNotCheck.push({ id: "db:os", title: "OS database", detail: "OS_SUPABASE_URL is not set on this host.", link: "view:crm" });
+  } else if (os.ok) {
+    out.fine.push({ id: "db:os", title: "OS database is reachable", detail: `crm_stages answered HTTP ${os.status} at ${nowClock()}.`, link: "view:crm" });
+  } else {
+    out.problems.push({ id: "db:os", title: "OS database is not answering", detail: `crm_stages select failed (${os.err}) at ${nowClock()}. The CRM, calendar and automations all read from it.`, link: "view:crm", linkLabel: "Open the CRM" });
+  }
+  const sonar = await sonarGet<{ id: unknown }>("outbound?select=id&limit=1");
+  if (!process.env.SONAR_SUPABASE_URL) {
+    out.couldNotCheck.push({ id: "db:sonar", title: "Sonar database", detail: "SONAR_SUPABASE_URL is not set on this host.", link: "view:email" });
+  } else if (sonar.ok) {
+    out.fine.push({ id: "db:sonar", title: "Sonar database is reachable", detail: `outbound answered HTTP ${sonar.status} at ${nowClock()}.`, link: "view:email" });
+  } else {
+    out.problems.push({ id: "db:sonar", title: "Sonar database is not answering", detail: `outbound select failed (${sonar.err}) at ${nowClock()}. The send queue and client roster live there.`, link: "view:email", linkLabel: "Open the Email tab" });
+  }
+  return out;
+}
+
+// ── (d) + (e) automations engine ────────────────────────────────────────────
+async function checkAutomations(): Promise<Findings> {
+  const out = emptyFindings();
+  const RUNS = "/automations/runs";
+  const backlog = await osGet<{ id: number; type: string; created_at: string }>(
+    `events?select=id,type,created_at&processed_at=is.null&created_at=lt.${encodeURIComponent(isoAgo(30 * 60000))}&order=created_at.asc&limit=50`
+  );
+  const stuck = await osGet<{ id: number; started_at: string }>(
+    `workflow_runs?select=id,started_at&status=eq.running&started_at=lt.${encodeURIComponent(isoAgo(10 * 60000))}&limit=50`
+  );
+  const failed = await osGet<{ id: number; error: string | null; started_at: string }>(
+    `workflow_runs?select=id,error,started_at&status=eq.failed&started_at=gte.${encodeURIComponent(isoAgo(24 * 3600000))}&order=started_at.desc&limit=50`
+  );
+  if (!backlog.ok || !stuck.ok) {
+    out.couldNotCheck.push({ id: "automations:cron", title: "Automations catch-up", detail: `Could not read events/workflow_runs (${backlog.err ?? stuck.err}).`, link: RUNS });
+  } else if (backlog.rows.length > 0) {
+    const oldest = backlog.rows[0];
+    out.problems.push({
+      id: "automations:cron",
+      title: `${backlog.rows.length} automation event${backlog.rows.length === 1 ? "" : "s"} waiting over 30 minutes`,
+      detail: `Oldest is a "${oldest.type}" event from ${agoWords(oldest.created_at)}. The catch-up cron should clear these every 30 min, so it is not running or not finishing.`,
+      link: RUNS, linkLabel: "Open the runs board",
+    });
+  } else if (stuck.rows.length > 0) {
+    out.problems.push({ id: "automations:cron", title: `${stuck.rows.length} automation run${stuck.rows.length === 1 ? "" : "s"} stuck in "running"`, detail: `Started over 10 minutes ago and never finished; oldest ${agoWords(stuck.rows[0].started_at)}.`, link: RUNS, linkLabel: "Open the runs board" });
+  } else {
+    out.fine.push({ id: "automations:cron", title: "Automations are keeping up", detail: `No events waiting over 30 min and no runs stuck, checked ${nowClock()}.`, link: RUNS });
+  }
+  if (!failed.ok) {
+    out.couldNotCheck.push({ id: "automations:failed", title: "Failed automation runs", detail: `Could not read workflow_runs (${failed.err}).`, link: RUNS });
+  } else if (failed.rows.length > 0) {
+    const first = failed.rows[0];
+    out.problems.push({
+      id: "automations:failed",
+      title: `${failed.rows.length} automation run${failed.rows.length === 1 ? "" : "s"} failed in the last 24 hours`,
+      detail: `Latest ${agoWords(first.started_at)}: ${(first.error ?? "no error text").slice(0, 160)}`,
+      link: RUNS, linkLabel: "Open the runs board",
+    });
+  } else {
+    out.fine.push({ id: "automations:failed", title: "No automation runs failed in the last 24 hours", detail: `workflow_runs status=failed since ${isoAgo(24 * 3600000).slice(0, 16).replace("T", " ")} UTC: 0 rows.`, link: RUNS });
+  }
+  return out;
+}
+
+// ── (f) texts that did not get through ──────────────────────────────────────
+async function checkSms(): Promise<Findings> {
+  const out = emptyFindings();
+  const ans = await osGet<{ id: number; status: string; error: string | null; created_at: string }>(
+    `messages?select=id,status,error,created_at&channel=eq.sms&status=in.(failed,undelivered)&created_at=gte.${encodeURIComponent(isoAgo(24 * 3600000))}&order=created_at.desc&limit=50`
+  );
+  if (!ans.ok) {
+    out.couldNotCheck.push({ id: "sms:failed", title: "Text delivery", detail: `Could not read the messages ledger (${ans.err}).`, link: "view:text" });
+  } else if (ans.rows.length > 0) {
+    const f = ans.rows[0];
+    out.problems.push({
+      id: "sms:failed",
+      title: `${ans.rows.length} text${ans.rows.length === 1 ? "" : "s"} failed to deliver in the last 24 hours`,
+      detail: `Latest ${agoWords(f.created_at)} is "${f.status}"${f.error ? `: ${f.error.slice(0, 140)}` : ""}.`,
+      link: "view:text", linkLabel: "Open the Text tab",
+    });
+  } else {
+    out.fine.push({ id: "sms:failed", title: "Every text in the last 24 hours got through", detail: "messages channel=sms status failed/undelivered: 0 rows.", link: "view:text" });
+  }
+  return out;
+}
+
+// ── (g) bookings in the next 24 hours ───────────────────────────────────────
+async function checkBookings(): Promise<Findings> {
+  const out = emptyFindings();
+  const now = new Date().toISOString();
+  const ans = await osGet<{ id: string; name: string | null; status: string; starts_at: string; assigned_to: string | null }>(
+    `bookings?select=id,name,status,starts_at,assigned_to&starts_at=gte.${encodeURIComponent(now)}&starts_at=lte.${encodeURIComponent(new Date(Date.now() + 24 * 3600000).toISOString())}&order=starts_at.asc&limit=100`
+  );
+  if (!ans.ok) {
+    out.couldNotCheck.push({ id: "bookings:next24h", title: "Upcoming bookings", detail: `Could not read bookings (${ans.err}).`, link: "view:calendar" });
+    return out;
+  }
+  const cancelled = ans.rows.filter((b) => /cancel/i.test(b.status));
+  const unassigned = ans.rows.filter((b) => !/cancel/i.test(b.status) && !(b.assigned_to ?? "").trim());
+  const when = (b: { starts_at: string }) => new Date(b.starts_at).toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit", timeZone: "America/Chicago" });
+  if (unassigned.length > 0) {
+    out.problems.push({
+      id: "bookings:unassigned",
+      title: `${unassigned.length} booking${unassigned.length === 1 ? "" : "s"} in the next 24 hours ${unassigned.length === 1 ? "has" : "have"} nobody assigned`,
+      detail: `First: ${unassigned[0].name ?? "unnamed"} at ${when(unassigned[0])}.`,
+      link: "view:calendar", linkLabel: "Open the calendar",
+    });
+  }
+  if (cancelled.length > 0) {
+    out.problems.push({
+      id: "bookings:cancelled",
+      title: `${cancelled.length} booking${cancelled.length === 1 ? "" : "s"} in the next 24 hours ${cancelled.length === 1 ? "is" : "are"} cancelled`,
+      detail: `First: ${cancelled[0].name ?? "unnamed"} at ${when(cancelled[0])}. The slot is open again.`,
+      link: "view:calendar", linkLabel: "Open the calendar",
+    });
+  }
+  if (unassigned.length === 0 && cancelled.length === 0) {
+    out.fine.push({ id: "bookings:next24h", title: `Next 24 hours of bookings look right (${ans.rows.length} booked)`, detail: ans.rows.length ? `All assigned, none cancelled; first at ${when(ans.rows[0])}.` : "No bookings in the window.", link: "view:calendar" });
+  }
+  return out;
+}
+
+// ── (h) the outbound send lane (Sonar project) ──────────────────────────────
+async function checkOutbound(): Promise<Findings> {
+  const out = emptyFindings();
+  const since = encodeURIComponent(isoAgo(24 * 3600000));
+  const ans = await sonarGet<{ id: string; recipient: string | null; last_send_error: string | null; last_send_attempt_at: string | null }>(
+    `outbound?select=id,recipient,last_send_error,last_send_attempt_at&status=eq.failed&last_send_attempt_at=gte.${since}&order=last_send_attempt_at.desc&limit=50`
+  );
+  if (!ans.ok) {
+    out.couldNotCheck.push({ id: "outbound:failed", title: "Outbound email send lane", detail: `Could not read the outbound table (${ans.err}).`, link: "view:email" });
+  } else if (ans.rows.length > 0) {
+    const f = ans.rows[0];
+    out.problems.push({
+      id: "outbound:failed",
+      title: `${ans.rows.length} outbound email${ans.rows.length === 1 ? "" : "s"} failed to send in the last 24 hours`,
+      detail: `Latest ${agoWords(f.last_send_attempt_at)}${f.last_send_error ? `: ${f.last_send_error.slice(0, 140)}` : ""}.`,
+      link: "view:email", linkLabel: "Open the Email tab",
+    });
+  } else {
+    out.fine.push({ id: "outbound:failed", title: "No outbound emails failed in the last 24 hours", detail: "outbound status=failed with a send attempt in 24h: 0 rows.", link: "view:email" });
+  }
+  return out;
+}
+
+// ── sender pause flag (so a deliberate pause is never reported as a fault) ──
+interface OutreachState { client: string; paused: boolean; day: string | null; count: number | null; updated_at: string | null }
+async function readSenderPause(): Promise<{ known: boolean; paused: boolean; since: string | null }> {
+  const ans = await osGet<OutreachState>("outreach_state?select=client,paused,day,count,updated_at&order=updated_at.desc&limit=5");
+  if (!ans.ok || ans.rows.length === 0) return { known: false, paused: false, since: null };
+  const row = ans.rows[0];
+  return { known: true, paused: !!row.paused, since: row.updated_at ?? row.day };
+}
+
+// Fold a legacy CheckResult's items into findings with a link, so the older
+// checks (flagged pages, snapshot freshness, outreach vitals) speak the same
+// language as the new ones.
+function foldCheck(c: CheckResult, link: string | null, pcLast: string | null): Findings {
+  const out = emptyFindings();
+  const items = c.items && c.items.length ? c.items : [{ label: c.label, status: c.status, line: c.line, url: null, http: null }];
+  for (const it of items) {
+    const id = `${c.id}:${it.label}`;
+    const f: Finding = { id, title: it.label === c.label ? c.label : `${c.label}: ${it.label}`, detail: it.line, link: it.url ?? link };
+    if (it.status === "problem") out.problems.push(f);
+    else if (it.status === "needs-pc") out.couldNotCheck.push({ ...f, detail: `${it.line} This runs on Jack's PC.${pcLast ? ` Last PC result: ${pcLast}.` : ""}` });
+    else out.fine.push(f);
+  }
+  return out;
+}
+
 // ── writability detection (safe, never throws) ─────────────────────────────
 function vaultWritable(): boolean {
   if (isGithubVault()) return false;
@@ -142,7 +576,7 @@ function extractAllowedUrls(text: string): string[] {
   const out: string[] = [];
   for (const m of text.match(/https?:\/\/[^\s|,)\]"'<>]+/g) ?? []) {
     const u = m.replace(/[.,;:>]+$/, "");
-    if (!ALLOWED_URL_HOSTS.some((h) => u.includes(h))) continue;
+    if (!ALLOWED_URL_HOSTS().some((h) => hostOf(u) === h || hostOf(u).endsWith("." + h))) continue;
     if (!out.includes(u)) out.push(u);
   }
   return out;
@@ -360,8 +794,11 @@ async function checkFreshness(): Promise<CheckResult> {
 async function checkOutreach(): Promise<CheckResult> {
   const raw = await readVaultFile("wiki/state/outreach-snapshot.md");
   if (!raw) {
-    return { id: "outreach", label: "Outreach vitals", status: "problem", line: "outreach-snapshot.md missing.", items: [] };
+    return { id: "outreach", label: "Outreach vitals", status: "needs-pc", line: "outreach-snapshot.md is missing from the vault, so the outreach vitals could not be read.", items: [] };
   }
+  // A sender Jack paused on purpose is not a fault. The pause flag lives in
+  // Supabase outreach_state, so the cloud can verify it too.
+  const pause = await readSenderPause();
   const num = (re: RegExp): number | null => {
     const m = raw.match(re);
     return m ? Number(m[1].replace(/,/g, "")) : null;
@@ -395,7 +832,13 @@ async function checkOutreach(): Promise<CheckResult> {
 
   // sent-today judgement — from live DB when available, honest snapshot otherwise.
   if (sentToday === null) {
-    items.push({ label: "Sent today", status: "problem", line: `Sent-today count unknown (${sentSourceLabel}). Connect the PC to confirm.` });
+    items.push({ label: "Sent today", status: "needs-pc", line: `Sent-today count unknown (${sentSourceLabel}).` });
+  } else if (pause.known && pause.paused) {
+    items.push({
+      label: "Sent today",
+      status: "ok",
+      line: `${sentToday} sent today, and that is expected: the cold email sender is paused on purpose (pause flag set ${pause.since ? pause.since.slice(0, 10) : "earlier"}).`,
+    });
   } else if (sentToday === 0 && isWeekday && afterEleven) {
     items.push({
       label: "Sent today",
@@ -416,7 +859,7 @@ async function checkOutreach(): Promise<CheckResult> {
 
   // pool judgement
   if (pool === null) {
-    items.push({ label: "Ready pool", status: "problem", line: "No ready/armed pool figure available." });
+    items.push({ label: "Ready pool", status: "needs-pc", line: "No ready/armed pool figure available here." });
   } else if (pool < 20) {
     items.push({
       label: "Ready pool",
@@ -432,23 +875,24 @@ async function checkOutreach(): Promise<CheckResult> {
   }
 
   const anyProblem = items.some((i) => i.status === "problem");
+  const anyNeedsPc = items.some((i) => i.status === "needs-pc");
   return {
     id: "outreach",
     label: "Outreach vitals",
-    status: anyProblem ? "problem" : "ok",
-    line: anyProblem ? "Outreach vitals off target." : "Outreach vitals within thresholds.",
+    status: anyProblem ? "problem" : anyNeedsPc ? "needs-pc" : "ok",
+    line: anyProblem ? "Outreach vitals off target." : anyNeedsPc ? "Part of the outreach vitals could not be read here." : "Outreach vitals within thresholds.",
     items,
   };
 }
 
 // ── check: scheduled-task heartbeats (LOCAL DISK ONLY) ──────────────────────
-function checkHeartbeats(cloud: boolean): CheckResult {
+function checkTaskFiles(cloud: boolean): CheckResult {
   if (cloud) {
     return {
       id: "heartbeats",
-      label: "Task heartbeats",
+      label: "Scheduled task run files",
       status: "needs-pc",
-      line: "Scheduled-task heartbeats live on Jack's PC disk. Cannot verify from the cloud.",
+      line: "Windows scheduled-task run files live on the PC disk.",
       items: [],
     };
   }
@@ -458,7 +902,7 @@ function checkHeartbeats(cloud: boolean): CheckResult {
   } catch {
     return {
       id: "heartbeats",
-      label: "Task heartbeats",
+      label: "Scheduled task run files",
       status: "needs-pc",
       line: "Scheduled-tasks directory not reachable on this host.",
       items: [],
@@ -492,13 +936,13 @@ function checkHeartbeats(cloud: boolean): CheckResult {
     }
   }
   if (items.length === 0) {
-    return { id: "heartbeats", label: "Task heartbeats", status: "ok", line: "No task run-state files found on disk yet.", items };
+    return { id: "heartbeats", label: "Scheduled task run files", status: "needs-pc", line: "No task run-state files on disk to read, so nothing could be judged.", items };
   }
   const anyProblem = items.some((i) => i.status === "problem");
   const problemN = items.filter((i) => i.status === "problem").length;
   return {
     id: "heartbeats",
-    label: "Task heartbeats",
+    label: "Scheduled task run files",
     status: anyProblem ? "problem" : "ok",
     line: anyProblem ? `${problemN} task${problemN === 1 ? "" : "s"} look overdue.` : `${items.length} tasks reporting on time.`,
     items,
@@ -782,24 +1226,58 @@ export async function POST(req: NextRequest) {
   const cloud = isGithubVault();
   const wantAll = target === "all";
 
+  // Development-only test hook: ?testUrl=<url> adds one more site to the
+  // uptime check so a deliberately broken URL can prove the check catches it.
+  // Ignored outside development, so production can never be pointed at an
+  // arbitrary host.
+  const testUrl = process.env.NODE_ENV === "development" ? req.nextUrl.searchParams.get("testUrl") : null;
+  const sites = testUrl && /^https?:\/\//.test(testUrl) ? [...siteList(), testUrl] : siteList();
+
   const [watchdogRaw, healthRaw] = await Promise.all([
     wantAll || target === "urls" ? readVaultFile(WATCHDOG_REL) : Promise.resolve(null),
     wantAll || target === "urls" ? readVaultFile("wiki/state/health-board.md") : Promise.resolve(null),
   ]);
 
   const checks: CheckResult[] = [];
+  const findings = emptyFindings();
   let cleanUrls = new Set<string>();
 
+  // Live checks the cloud can run from anywhere. Heartbeats go first because
+  // the PC's own last report feeds the "could not check here" lines.
+  const hb = wantAll || target === "heartbeats" ? await checkHeartbeats() : null;
+  const pcLast = hb?.pcLastResult ?? null;
+  if (hb) merge(findings, hb);
+
   if (wantAll || target === "urls") {
-    const { result, cleanUrls: c } = await checkUrls(watchdogRaw, healthRaw);
-    checks.push(result);
-    cleanUrls = c;
+    const [siteFindings, flagged] = await Promise.all([checkSites(sites), checkUrls(watchdogRaw, healthRaw)]);
+    merge(findings, siteFindings);
+    checks.push(flagged.result);
+    cleanUrls = flagged.cleanUrls;
+    if (flagged.result.items && flagged.result.items.length) merge(findings, foldCheck(flagged.result, null, pcLast));
+    else findings.fine.push({ id: "urls", title: "No pages are flagged as broken in the last report", detail: flagged.result.line, link: null });
   }
+  if (wantAll) {
+    const [db, auto, sms, bookings, outbound] = await Promise.all([checkDatabases(), checkAutomations(), checkSms(), checkBookings(), checkOutbound()]);
+    for (const f of [db, auto, sms, bookings, outbound]) merge(findings, f);
+  }
+
   let freshnessResult: CheckResult | null = null;
   let outreachResult: CheckResult | null = null;
-  if (wantAll || target === "freshness") { freshnessResult = await checkFreshness(); checks.push(freshnessResult); }
-  if (wantAll || target === "outreach") { outreachResult = await checkOutreach(); checks.push(outreachResult); }
-  if (wantAll || target === "heartbeats") checks.push(checkHeartbeats(cloud));
+  if (wantAll || target === "freshness") {
+    freshnessResult = await checkFreshness();
+    checks.push(freshnessResult);
+    merge(findings, foldCheck(freshnessResult, "view:knowledge", pcLast));
+  }
+  if (wantAll || target === "outreach") {
+    outreachResult = await checkOutreach();
+    checks.push(outreachResult);
+    merge(findings, foldCheck(outreachResult, "view:email", pcLast));
+  }
+  if (wantAll || target === "heartbeats") {
+    const tasks = checkTaskFiles(cloud);
+    checks.push(tasks);
+    merge(findings, foldCheck(tasks, "/mission", pcLast));
+  }
 
   // ── Persistence: rewrite watchdog.md honestly, then sync ──────────────────
   // Decide which PROBLEM blocks the recheck TRULY verified, build the rewritten
@@ -822,6 +1300,29 @@ export async function POST(req: NextRequest) {
     // those categories fall to needs-pc (kept, never resurrected as red).
     const probe = cloud ? null : await runProbe();
 
+    // The probe's facts are live checks in their own right (local only).
+    const probeLink = "view:email";
+    if (!probe) {
+      findings.couldNotCheck.push({
+        id: "probe",
+        title: "PC-only checks: ready pool, wrong-company guard, agent budget caps, blog cadence",
+        detail: `${cloud ? "These read prospects.db and files on Jack's PC, which the cloud cannot reach." : "The local probe (watchdog_probe.py) could not run on this host."}${pcLast ? ` Last PC result: ${pcLast}.` : ""}`,
+        link: "/mission",
+      });
+    } else {
+      if (probe.eligiblePool == null) findings.couldNotCheck.push({ id: "probe:pool", title: "Eligible send pool", detail: "The probe could not count the pool.", link: probeLink });
+      else if (probe.eligiblePool < POOL_FLOOR) findings.problems.push({ id: "probe:pool", title: `Eligible send pool is low: ${probe.eligiblePool}`, detail: `Under the ${POOL_FLOOR} floor, measured live from prospects.db.`, link: probeLink, linkLabel: "Open the Email tab" });
+      else findings.fine.push({ id: "probe:pool", title: `Eligible send pool is ${probe.eligiblePool}`, detail: `At or above the ${POOL_FLOOR} floor, measured live from prospects.db.`, link: probeLink });
+      if (probe.wrongCompanyUnsentFails == null) findings.couldNotCheck.push({ id: "probe:guard", title: "Wrong-company guard", detail: "The probe could not evaluate the guard.", link: probeLink });
+      else if (probe.wrongCompanyUnsentFails > 0) findings.problems.push({ id: "probe:guard", title: `Wrong-company guard is holding back ${probe.wrongCompanyUnsentFails} unsent row${probe.wrongCompanyUnsentFails === 1 ? "" : "s"}`, detail: "Counted live on the unsent pool. Clean the rows or add a carve-out; do not disable the guard.", link: probeLink, linkLabel: "Open the Email tab" });
+      else findings.fine.push({ id: "probe:guard", title: "Wrong-company guard: 0 unsent rows held", detail: "Counted live on the unsent pool.", link: probeLink });
+      if (probe.budgetAgentsAtCap && probe.budgetAgentsAtCap.toLowerCase() !== "none") findings.problems.push({ id: "probe:budget", title: `Agent at its daily cap: ${probe.budgetAgentsAtCap}`, detail: "Live per-agent budget check.", link: "/mission", linkLabel: "Open Mission Control" });
+      else findings.fine.push({ id: "probe:budget", title: "No agent is at its daily cap", detail: "Live per-agent budget check.", link: "/mission" });
+      if (probe.cadenceStaleDays == null) findings.couldNotCheck.push({ id: "probe:cadence", title: "Blog cadence", detail: `The probe could not find a last blog date (LAST_BLOG_DATE=${probe.lastBlogDate ?? "missing"}), so the cadence was not judged.`, link: "/mission" });
+      else if (probe.cadenceStaleDays > CADENCE_WINDOW_DAYS) findings.problems.push({ id: "probe:cadence", title: `Last blog was ${probe.cadenceStaleDays} days ago`, detail: `Over the ${CADENCE_WINDOW_DAYS}-day window (last_blog_date ${probe.lastBlogDate ?? "unknown"}).`, link: "/mission" });
+      else findings.fine.push({ id: "probe:cadence", title: `Last blog was ${probe.cadenceStaleDays} day${probe.cadenceStaleDays === 1 ? "" : "s"} ago`, detail: `Within the ${CADENCE_WINDOW_DAYS}-day window (last_blog_date ${probe.lastBlogDate ?? "unknown"}).`, link: "/mission" });
+    }
+
     const { blocks } = parseProblemBlocks(watchdogRaw);
     const { marks: resolvedMarks, verdicts } = classifyBlocks(blocks, cleanUrls, freshnessResult, probe);
     resolvedCount = resolvedMarks.length;
@@ -838,10 +1339,10 @@ export async function POST(req: NextRequest) {
         );
         if (res.ok) {
           persisted = true; mode = "cloud-github"; commit = res.commit; refetchMission = true;
-          writeNote = `Report updated in the cloud vault: ${resolvedCount} moved to RESOLVED.`;
+          writeNote = `Report updated in the cloud vault: ${resolvedCount} moved to resolved.`;
         } else {
           persisted = false; reason = res.reason;
-          writeNote = "Live check only, report not updated (cloud write unavailable).";
+          writeNote = "The report file could not be updated from the cloud, so the fixed items stay listed until the PC rewrites it.";
         }
       } else if (vaultWritable()) {
         // LOCAL: write to disk, then push the vault to the cloud copy.
@@ -849,29 +1350,33 @@ export async function POST(req: NextRequest) {
           fs.writeFileSync(WATCHDOG_ABS(), next, "utf-8");
           persisted = true; mode = "local"; refetchMission = true;
           pushedToCloud = await pushVaultToCloud();
-          writeNote = `Report updated on disk: ${resolvedCount} moved to RESOLVED.`
+          writeNote = `Report updated on disk: ${resolvedCount} moved to resolved.`
             + (pushedToCloud ? " Cloud copy synced." : " Cloud sync will catch up on the next scheduled push.");
         } catch {
           persisted = false; reason = "disk write failed"; mode = "none";
-          writeNote = "Live check only, report not updated (disk write failed).";
+          writeNote = "The report file on disk could not be written.";
         }
       } else {
         persisted = false; reason = "vault not writable and not cloud-backed";
-        writeNote = "Live check only, report not updated - needs PC.";
+        writeNote = "The report file can only be rewritten on the PC.";
       }
     } else {
-      // Nothing verifiable to clear: overlay-only, and that is honest.
-      writeNote = resolvedMarks.length
-        ? "No net change to write."
-        : "Live check only - nothing verified as newly resolved.";
+      // Nothing verifiable to clear: the report file stays as it is, and that
+      // is honest. This is NOT a problem and is never counted as one.
+      writeNote = resolvedMarks.length ? "No net change to write to the report file." : null;
     }
   }
 
-  // overall roll-up
-  const anyProblem = checks.some((c) => c.status === "problem");
+  // overall roll-up: ONLY verified problems count. A check that could not run
+  // here is neither red nor green.
   const anyResolved = checks.some((c) => c.status === "resolved");
-  const allNeedsPc = checks.length > 0 && checks.every((c) => c.status === "needs-pc");
-  const overall: CheckStatus = anyProblem ? "problem" : anyResolved ? "resolved" : allNeedsPc ? "needs-pc" : "ok";
+  const overall: CheckStatus = findings.problems.length > 0 ? "problem" : anyResolved ? "resolved" : "ok";
+
+  // Stable ordering: problems first by id, could-not-check, then fine.
+  const byId = (a: Finding, b: Finding) => a.id.localeCompare(b.id);
+  findings.problems.sort(byId);
+  findings.couldNotCheck.sort(byId);
+  findings.fine.sort(byId);
 
   return NextResponse.json({
     ranAt: new Date().toISOString(),
@@ -888,6 +1393,17 @@ export async function POST(req: NextRequest) {
     wrote: persisted, // backward-compat
     writeNote,
     overall,
+    // What Jack reads.
+    problems: findings.problems,
+    couldNotCheck: findings.couldNotCheck,
+    fine: findings.fine,
+    summary: {
+      problems: findings.problems.length,
+      couldNotCheck: findings.couldNotCheck.length,
+      fine: findings.fine.length,
+      pcLastResult: pcLast,
+    },
+    // Legacy per-check shape, still returned for older callers.
     checks,
   });
 }

@@ -28,6 +28,8 @@ async function isStaff(): Promise<boolean> {
 }
 
 export const CATEGORIES = ["study", "call", "work", "personal", "other"] as const;
+// Whose time the block is (migration 0019). 'team' blocks everyone.
+const PERSONS = ["jack", "maddox", "grant", "team"] as const;
 
 type BlockBody = {
   id?: string;
@@ -38,6 +40,7 @@ type BlockBody = {
   category?: string;
   notes?: string | null;
   recurrence?: string | null;
+  person?: string;
 };
 
 // Validate exactly what the table would reject anyway, but with readable
@@ -65,6 +68,9 @@ function validate(b: BlockBody, forInsert: boolean): string | null {
   if (b.recurrence != null && b.recurrence !== "weekly") {
     return "Recurrence is either empty (one-off) or 'weekly'.";
   }
+  if (b.person !== undefined && !PERSONS.includes(b.person as (typeof PERSONS)[number])) {
+    return `Person must be one of: ${PERSONS.join(", ")}.`;
+  }
   return null;
 }
 
@@ -77,6 +83,7 @@ function pick(b: BlockBody): Record<string, unknown> {
   if (b.category !== undefined) out.category = b.category;
   if (b.notes !== undefined) out.notes = b.notes?.trim() || null;
   if (b.recurrence !== undefined) out.recurrence = b.recurrence || null;
+  if (b.person !== undefined) out.person = b.person;
   return out;
 }
 

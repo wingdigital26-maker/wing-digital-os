@@ -53,6 +53,10 @@ export type CalendarEvent = {
   color?: string | null;
   /** The raw calendar_blocks row behind a block event, so the UI can edit it. */
   block?: BlockRow | null;
+  /** Whose item this is: jack | maddox | grant | team. Null = not a person's
+   *  item (payments, Stripe, Google) or unknown (a booking nobody was
+   *  assigned to). Drives the person filter in the UI. */
+  person?: string | null;
 };
 
 export type LaneStatus = {
@@ -485,6 +489,8 @@ export type BlockRow = {
   category: string;
   notes: string | null;
   recurrence: string | null;
+  /** jack | grant | maddox | team (migration 0019). */
+  person: string;
 };
 
 // Category → colour token. The UI stays token-only; hex never appears.
@@ -547,6 +553,7 @@ async function blocksLane(): Promise<{ lane: LaneStatus; events: CalendarEvent[]
         status: r.recurrence === "weekly" ? "weekly" : null,
         color: BLOCK_COLOR[r.category] ?? "var(--accent)",
         block: r,
+        person: r.person || "jack",
       });
     };
 
@@ -715,7 +722,10 @@ type BookingRow = {
   status: string;
   source: string;
   client_slug: string | null;
+  assigned_to: string | null;
 };
+
+const FIRST: Record<string, string> = { jack: "Jack", maddox: "Maddox", grant: "Grant" };
 
 async function bookingsLane(): Promise<{ lane: LaneStatus; events: CalendarEvent[] }> {
   const url = sbUrl();
@@ -732,7 +742,7 @@ async function bookingsLane(): Promise<{ lane: LaneStatus; events: CalendarEvent
   if (!url || !key) return { lane, events: [] };
   try {
     const res = await fetch(
-      `${url}/rest/v1/bookings?select=id,name,email,phone,starts_at,ends_at,status,source,client_slug` +
+      `${url}/rest/v1/bookings?select=id,name,email,phone,starts_at,ends_at,status,source,client_slug,assigned_to` +
         `&status=neq.cancelled&order=starts_at.asc&limit=1000`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` }, cache: "no-store" }
     );
@@ -753,11 +763,19 @@ async function bookingsLane(): Promise<{ lane: LaneStatus; events: CalendarEvent
       end: r.ends_at,
       allDay: false,
       detail:
-        [r.email, r.phone, r.client_slug].filter(Boolean).join(" · ") || null,
+        [
+          r.assigned_to ? `with ${FIRST[r.assigned_to] ?? r.assigned_to}` : "not assigned yet",
+          r.email,
+          r.phone,
+          r.client_slug,
+        ]
+          .filter(Boolean)
+          .join(" · ") || null,
       url: null,
       external: false,
       status: r.status,
       color: "var(--accent-2)",
+      person: r.assigned_to,
     }));
     lane.count = events.length;
     return { lane, events };

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 // ───────────────────────────────────────────────────────────────────────────
 // BookingsAdmin — the small staff board behind the public /book link.
@@ -21,7 +21,11 @@ type BookingRow = {
   client_slug: string | null;
   notes: string | null;
   created_at: string;
+  /** Who the booking landed on (migration 0024). Null = unknown. */
+  assigned_to: string | null;
 };
+
+const FIRST_NAME: Record<string, string> = { jack: "Jack", maddox: "Maddox", grant: "Grant" };
 
 const STATUS_COLOR: Record<string, string> = {
   confirmed: "var(--green)",
@@ -43,11 +47,32 @@ function fmt(iso: string): string {
   });
 }
 
-export default function BookingsAdmin() {
+export default function BookingsAdmin({
+  focusId = null,
+  onFocused,
+}: {
+  /** A booking id to scroll to and highlight (set when a calendar chip is clicked). */
+  focusId?: string | null;
+  /** Called once the row has been brought into view. */
+  onFocused?: () => void;
+} = {}) {
   const [rows, setRows] = useState<BookingRow[] | null>(null);
   const [err, setErr] = useState("");
   const [busyId, setBusyId] = useState("");
   const [copied, setCopied] = useState(false);
+  const [lit, setLit] = useState<string | null>(null);
+  const rowRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  useEffect(() => {
+    if (!focusId || !rows) return;
+    const el = rowRefs.current[focusId];
+    setLit(focusId);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    onFocused?.();
+    const t = setTimeout(() => setLit(null), 2500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusId, rows]);
 
   async function load() {
     try {
@@ -140,11 +165,14 @@ export default function BookingsAdmin() {
       {(rows ?? []).map((b) => {
         const color = STATUS_COLOR[b.status] ?? "var(--text-muted)";
         const cancelled = b.status === "cancelled";
+        const who = b.assigned_to ? FIRST_NAME[b.assigned_to] ?? b.assigned_to : null;
         return (
           <div
             key={b.id}
+            ref={(el) => { rowRefs.current[b.id] = el; }}
             style={{
-              border: "1px solid var(--border)",
+              border: `1px solid ${lit === b.id ? "var(--accent)" : "var(--border)"}`,
+              boxShadow: lit === b.id ? "0 0 0 2px var(--accent-glow)" : "none",
               borderLeft: `3px solid ${color}`,
               borderRadius: 10,
               padding: 10,
@@ -168,6 +196,9 @@ export default function BookingsAdmin() {
             </span>
             <span style={{ fontSize: 10, color, textTransform: "uppercase", letterSpacing: "0.06em" }}>
               {b.status.replace("_", " ")}
+            </span>
+            <span style={{ fontSize: 12, color: who ? "var(--text-secondary)" : "var(--orange)" }}>
+              {who ? `with ${who}` : "not assigned to anyone"}
             </span>
             {b.notes ? (
               <span style={{ fontSize: 12, color: "var(--text-muted)", flexBasis: "100%" }}>{b.notes}</span>

@@ -37,7 +37,9 @@ export interface AgentCard {
   filesFacts?: FilesFacts | null;
 }
 export interface FilesFacts { filesChanged: number; filesChangedAt: string | null; files: string[] }
-export interface WatchdogProblem { text: string; url: string | null }
+// text is the plain one-line title; action is the one-line "what to do";
+// open is a file path or other non-URL target (shown in the panel only).
+export interface WatchdogProblem { text: string; url: string | null; action?: string | null; open?: string | null }
 export interface WatchdogData {
   available: boolean;
   updated: string | null;
@@ -46,6 +48,7 @@ export interface WatchdogData {
   problems: WatchdogProblem[];
   resolved: string[];
   agents: Record<string, string>;
+  couldNotVerify?: number; // checks the PC report could not run; never problems
 }
 export interface FeedEntry { date: string; type: string; title: string; lines: string[] }
 export interface ClientHealth {
@@ -750,18 +753,23 @@ export function OpsMap({ agents, volumes, watchdog, onSelect, hero }: {
 
 // Render a problem line with any URL in it as a clickable link.
 function ProblemLine({ p, color }: { p: WatchdogProblem; color: string }) {
-  if (!p.url) return <span>{p.text}</span>;
-  const i = p.text.indexOf(p.url);
-  const before = i >= 0 ? p.text.slice(0, i) : p.text + " ";
-  const after = i >= 0 ? p.text.slice(i + p.url.length) : "";
+  const i = p.url ? p.text.indexOf(p.url) : -1;
+  const before = p.url ? (i >= 0 ? p.text.slice(0, i) : p.text + " ") : p.text;
+  const after = p.url && i >= 0 ? p.text.slice(i + p.url.length) : "";
   return (
-    <span>
-      {before}
-      <a href={p.url} target="_blank" rel="noreferrer" style={{ color, textDecoration: "underline" }}
-        onClick={(e) => e.stopPropagation()}>
-        {i >= 0 ? p.url : "open link"} &#8599;
-      </a>
-      {after}
+    <span style={{ display: "inline-flex", flexDirection: "column", gap: 2 }}>
+      <span>
+        {before}
+        {p.url && (
+          <a href={p.url} target="_blank" rel="noreferrer" style={{ color, textDecoration: "underline" }}
+            onClick={(e) => e.stopPropagation()}>
+            {i >= 0 ? p.url : "open link"} &#8599;
+          </a>
+        )}
+        {after}
+      </span>
+      {p.action && <span style={{ color: "var(--text-secondary, #9ca3af)" }}>What to do: {p.action}</span>}
+      {p.open && <span style={{ color: "var(--text-muted, #6b7280)", wordBreak: "break-all" }}>Open: {p.open}</span>}
     </span>
   );
 }
@@ -870,12 +878,121 @@ function WatchdogCopyButton({ watchdog, color }: { watchdog: WatchdogData; color
 // shows a subtle pill. Honest: it only greens what the server truly verified.
 export interface RecheckItem { label: string; status: string; line: string; url?: string | null; http?: number | null }
 export interface RecheckCheck { id: string; label: string; status: string; line: string; items?: RecheckItem[] }
+// One finding from the recheck. link is an absolute URL, an OS path, or
+// "view:<tab>" for a tab of the home screen.
+export interface RecheckFinding { id: string; title: string; detail: string; link: string | null; linkLabel?: string }
 export interface RecheckResult {
   ranAt: string; target: string; cloud: boolean;
   persisted?: boolean; mode?: "local" | "cloud-github" | "none";
   pushedToCloud?: boolean | null; commit?: string | null; reason?: string | null;
   resolvedCount?: number; refetchMission?: boolean;
   wrote: boolean; writeNote: string | null; overall: string; checks: RecheckCheck[];
+  problems?: RecheckFinding[];
+  couldNotCheck?: RecheckFinding[];
+  fine?: RecheckFinding[];
+  summary?: { problems: number; couldNotCheck: number; fine: number; pcLastResult: string | null };
+}
+
+// Turn a finding link into something clickable. "view:<tab>" switches the home
+// screen tab when we are on it, otherwise goes home first (the shell has no
+// tab deep links). Paths and URLs are plain anchors.
+function FindingLink({ link, label, color }: { link: string | null; label?: string; color: string }) {
+  if (!link) return null;
+  const style: React.CSSProperties = { color, textDecoration: "underline", fontSize: 10.5, whiteSpace: "nowrap", marginLeft: 6, background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: "inherit" };
+  if (link.startsWith("view:")) {
+    const view = link.slice(5);
+    const names: Record<string, string> = { crm: "Open the CRM", email: "Open the Email tab", text: "Open the Text tab", calendar: "Open the calendar", knowledge: "Open the Knowledge Base", agent: "Open Mission Control" };
+    return (
+      <button type="button" style={style}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (typeof window === "undefined") return;
+          if (window.location.pathname === "/") window.dispatchEvent(new CustomEvent("os:navigate", { detail: view }));
+          else window.location.href = "/";
+        }}>
+        {label ?? names[view] ?? "Open"} &rarr;
+      </button>
+    );
+  }
+  const external = /^https?:\/\//.test(link);
+  return (
+    <a href={link} target={external ? "_blank" : undefined} rel={external ? "noreferrer" : undefined} style={style} onClick={(e) => e.stopPropagation()}>
+      {label ?? (external ? "Open" : "Open")} &rarr;
+    </a>
+  );
+}
+
+function FindingRow({ f, color, muted }: { f: RecheckFinding; color: string; muted?: boolean }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 1, fontSize: 11.5, lineHeight: 1.45, borderLeft: `2px solid ${color}55`, paddingLeft: 8 }}>
+      <div style={{ display: "flex", alignItems: "baseline", flexWrap: "wrap", gap: 4 }}>
+        <span style={{ color: muted ? "var(--text-secondary, #9ca3af)" : color, fontWeight: muted ? 500 : 700 }}>{f.title}</span>
+        <FindingLink link={f.link} label={f.linkLabel} color={muted ? "var(--text-secondary, #9ca3af)" : color} />
+      </div>
+      <div style={{ color: "var(--text-muted, #6b7280)", fontSize: 10.5 }}>{f.detail}</div>
+    </div>
+  );
+}
+
+// The plain-English result of a recheck. Problems are the only red. Checks
+// that could not run here are a muted, collapsed list with the reason. Every
+// check that ran clean sits in a collapsed "Checked and fine" list so Jack can
+// see the check is actually doing something.
+function RecheckFindings({ result, ranAt }: { result: RecheckResult; ranAt: number | null }) {
+  const [showPc, setShowPc] = useState(false);
+  const [showFine, setShowFine] = useState(false);
+  const mono = "'JetBrains Mono', monospace";
+  const problems = result.problems ?? [];
+  const cnc = result.couldNotCheck ?? [];
+  const fine = result.fine ?? [];
+  const color = problems.length ? "var(--red)" : BOSS_CLEAR;
+  const when = ranAt ? new Date(ranAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : "";
+  const toggleBtn: React.CSSProperties = { background: "none", border: "none", color: "var(--text-muted, #6b7280)", cursor: "pointer", fontSize: 10.5, fontFamily: mono, padding: 0, textAlign: "left" };
+  return (
+    <div style={{
+      border: `1px solid ${color}55`, borderRadius: 10, padding: "9px 11px",
+      background: "rgba(255,255,255,0.02)", display: "flex", flexDirection: "column", gap: 7,
+    }} onClick={(e) => e.stopPropagation()}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color, fontFamily: mono }}>
+        <StatusMark status={problems.length ? "problem" : "ok"} />
+        <span style={{ fontWeight: 700 }}>
+          {problems.length === 0
+            ? `Checked just now: all clear (${fine.length} check${fine.length === 1 ? "" : "s"} passed)`
+            : `Something needs attention: ${problems.length} problem${problems.length === 1 ? "" : "s"}`}
+          {(result.resolvedCount ?? 0) > 0 ? `, ${result.resolvedCount} fixed since the last report` : ""}
+        </span>
+        <span style={{ marginLeft: "auto", color: "var(--text-muted, #6b7280)", fontSize: 10.5 }}>{when}{result.cloud ? " · from the cloud" : " · from the PC"}</span>
+      </div>
+
+      {problems.map((f) => <FindingRow key={f.id} f={f} color="var(--red)" />)}
+
+      {cnc.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+          <button type="button" style={toggleBtn} onClick={() => setShowPc((v) => !v)}>
+            {showPc ? "▾" : "▸"} {cnc.length} check{cnc.length === 1 ? "" : "s"} can only run on the PC{result.summary?.pcLastResult ? ` · last PC result: ${result.summary.pcLastResult}` : ""}
+          </button>
+          {showPc && cnc.map((f) => <FindingRow key={f.id} f={f} color="#93a4b8" muted />)}
+        </div>
+      )}
+
+      {fine.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+          <button type="button" style={toggleBtn} onClick={() => setShowFine((v) => !v)}>
+            {showFine ? "▾" : "▸"} Checked and fine ({fine.length})
+          </button>
+          {showFine && fine.map((f) => <FindingRow key={f.id} f={f} color="var(--green)" muted />)}
+        </div>
+      )}
+
+      {(result.persisted || result.writeNote) && (
+        <div style={{ fontSize: 10, fontFamily: mono, color: result.persisted ? "var(--green)" : "var(--text-muted, #6b7280)", borderTop: "1px solid var(--border)", paddingTop: 6 }}>
+          {result.persisted
+            ? `Report file updated${result.mode === "cloud-github" ? " in the cloud vault" : result.pushedToCloud ? " and synced" : ""}.`
+            : result.writeNote}
+        </div>
+      )}
+    </div>
+  );
 }
 
 const RECHECK_TARGETS: { id: string; label: string }[] = [
@@ -918,7 +1035,7 @@ export function RecheckButton({ onRechecked, compact }: { onRechecked?: () => vo
       const j: RecheckResult = await res.json();
       setResult(j);
       setRanAt(Date.now());
-      const anyResolved = j.checks.some((c) => c.status === "resolved" || (c.items ?? []).some((i) => i.status === "resolved"));
+      const anyResolved = (j.checks ?? []).some((c) => c.status === "resolved" || (c.items ?? []).some((i) => i.status === "resolved"));
       sfx.play(anyResolved ? "chime" : "blip-watchdog"); // positive chime if anything resolved, else the watchdog tone
       onRechecked?.(); // re-pull /api/mission so banner/agent states/red lines update
     } catch (e: unknown) {
@@ -988,76 +1105,8 @@ export function RecheckButton({ onRechecked, compact }: { onRechecked?: () => vo
       {err && <div style={{ fontSize: 10.5, color: "var(--red)", fontFamily: mono }}>recheck failed: {err}</div>}
 
       {result && !busy && (
-        <div style={{
-          border: `1px solid ${statusColor(result.overall)}55`, borderRadius: 8, padding: "8px 10px",
-          background: "rgba(255,255,255,0.02)", display: "flex", flexDirection: "column", gap: 6, minWidth: compact ? undefined : 280,
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 10.5, fontFamily: mono, color: statusColor(result.overall) }}>
-            <StatusMark status={result.overall} />
-            <span style={{ fontWeight: 700, letterSpacing: "0.08em" }}>
-              RECHECKED JUST NOW{result.cloud ? " (cloud)" : ""}
-            </span>
-            <span style={{ marginLeft: "auto", color: "var(--text-muted, #6b7280)" }}>
-              {ranAt ? new Date(ranAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : ""}
-            </span>
-          </div>
-          {result.checks.map((c) => (
-            <div key={c.id} style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: statusColor(c.status), fontFamily: mono }}>
-                <StatusMark status={c.status} />
-                <span style={{ fontWeight: 600 }}>{c.label}:</span>
-                <span style={{ color: "var(--text-secondary, #9ca3af)" }}>{c.line}</span>
-              </div>
-              {(c.items ?? []).map((it, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 6, fontSize: 10.5, paddingLeft: 16, color: "var(--text-secondary, #9ca3af)", lineHeight: 1.45 }}>
-                  <StatusMark status={it.status} />
-                  <span>
-                    {it.url ? (
-                      <a href={it.url} target="_blank" rel="noreferrer" style={{ color: statusColor(it.status), textDecoration: "underline" }}>
-                        {it.url}
-                      </a>
-                    ) : (
-                      <span style={{ color: statusColor(it.status) }}>{it.label}</span>
-                    )}
-                    {" — "}{it.line}
-                  </span>
-                </div>
-              ))}
-            </div>
-          ))}
-          {(() => {
-            const persisted = !!result.persisted;
-            const cloud = result.mode === "cloud-github";
-            const n = result.resolvedCount ?? 0;
-            const col = persisted ? "var(--green)" : "#93a4b8";
-            return (
-              <div style={{
-                display: "flex", alignItems: "center", gap: 6, fontSize: 10, fontFamily: mono,
-                color: col, borderTop: "1px solid var(--border)", paddingTop: 6,
-              }}>
-                {persisted ? (
-                  // synced / cloud icon
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    {cloud
-                      ? <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" />
-                      : <><path d="M21 12a9 9 0 1 1-2.64-6.36" /><path d="M21 3v6h-6" /></>}
-                  </svg>
-                ) : (
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
-                  </svg>
-                )}
-                <span style={{ fontWeight: 700 }}>
-                  {persisted
-                    ? `Report updated${n ? `, ${n} resolved` : ""}${cloud ? " (cloud)" : result.pushedToCloud ? " (synced)" : ""}`
-                    : "Live check only, report not updated - needs PC"}
-                </span>
-                {result.writeNote && (
-                  <span style={{ color: "var(--text-muted, #6b7280)", fontWeight: 400 }}>· {result.writeNote}</span>
-                )}
-              </div>
-            );
-          })()}
+        <div style={{ minWidth: compact ? 300 : 320, maxWidth: 560 }}>
+          <RecheckFindings result={result} ranAt={ranAt} />
         </div>
       )}
     </div>
@@ -1072,6 +1121,7 @@ export function RecheckButton({ onRechecked, compact }: { onRechecked?: () => vo
 export function RunDaBossButton({ onRechecked, block, small }: { onRechecked?: () => void; block?: boolean; small?: boolean }) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<RecheckResult | null>(null);
+  const [ranAt, setRanAt] = useState<number | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const mono = "'JetBrains Mono', monospace";
 
@@ -1088,6 +1138,7 @@ export function RunDaBossButton({ onRechecked, block, small }: { onRechecked?: (
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const j: RecheckResult = await res.json();
       setResult(j);
+      setRanAt(Date.now());
       if ((j.resolvedCount ?? 0) > 0) sfx.play("chime"); // positive chime only if something got fixed
       onRechecked?.(); // refresh banner, agent states, ops-map red lines from the newly written report
     } catch (e: unknown) {
@@ -1097,11 +1148,6 @@ export function RunDaBossButton({ onRechecked, block, small }: { onRechecked?: (
       setBusy(false);
     }
   };
-
-  const problems = result
-    ? result.checks.reduce((n, c) => n + ((c.items ?? []).filter(i => i.status === "problem").length || (c.status === "problem" ? 1 : 0)), 0)
-    : 0;
-  const persisted = !!result?.persisted;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8, width: block ? "100%" : undefined }}
@@ -1132,25 +1178,7 @@ export function RunDaBossButton({ onRechecked, block, small }: { onRechecked?: (
 
       {err && <div style={{ fontSize: 11, color: "var(--red)", fontFamily: mono }}>Da Boss run failed: {err}</div>}
 
-      {result && !busy && (
-        <div style={{
-          border: `1px solid ${statusColor(result.overall)}55`, borderRadius: 10, padding: "9px 11px",
-          background: "rgba(255,255,255,0.02)", display: "flex", flexDirection: "column", gap: 5,
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11.5, fontFamily: mono, color: statusColor(result.overall) }}>
-            <StatusMark status={result.overall} />
-            <span style={{ fontWeight: 700, letterSpacing: "0.06em" }}>
-              {problems} problem{problems === 1 ? "" : "s"}
-              {(result.resolvedCount ?? 0) > 0 ? `, ${result.resolvedCount} resolved this run` : ""}
-            </span>
-          </div>
-          <div style={{ fontSize: 10.5, fontFamily: mono, color: persisted ? "var(--green)" : "#93a4b8" }}>
-            {persisted
-              ? `Report updated${result.mode === "cloud-github" ? " (cloud)" : result.pushedToCloud ? " (synced)" : ""}`
-              : "Live check only, report not updated - needs PC"}
-          </div>
-        </div>
-      )}
+      {result && !busy && <RecheckFindings result={result} ranAt={ranAt} />}
     </div>
   );
 }
@@ -1196,9 +1224,15 @@ export function WatchdogBanner({ watchdog, onRechecked }: { watchdog?: WatchdogD
   // All clear and fresh: one calm line.
   if (!hasProblems && !stale) {
     const when = ageMin === null ? "not checked yet today" : `checked ${relAge(ageMin)}`;
+    const pcOnlyQuiet = watchdog.couldNotVerify ?? 0;
     return (
       <div style={{ ...base, fontFamily: "inherit", border: `1px solid rgba(${BOSS_CLEAR_RGB},0.35)`, background: `rgba(${BOSS_CLEAR_RGB},0.06)` }}>
         {quietRow(BOSS_CLEAR, `System check: all clear · ${when}`, true)}
+        {pcOnlyQuiet > 0 && (
+          <div style={{ fontSize: 10.5, color: "var(--text-muted, #6b7280)", paddingLeft: 19 }}>
+            {pcOnlyQuiet} check{pcOnlyQuiet === 1 ? "" : "s"} can only run on the PC
+          </div>
+        )}
       </div>
     );
   }
@@ -1213,12 +1247,24 @@ export function WatchdogBanner({ watchdog, onRechecked }: { watchdog?: WatchdogD
     setExpanded(!isOpen);
   };
   const headline = hasProblems
-    ? `Something needs attention: ${count} problem${count === 1 ? "" : "s"} found`
+    ? `Something needs attention: ${count} problem${count === 1 ? "" : "s"}`
     : `The system check is overdue (last ran ${relAge(ageMin)})`;
+  const pcOnly = watchdog.couldNotVerify ?? 0;
+
+  // Plain-English problem rows: "<title> · <what to do>" plus its link. File
+  // paths and machine phrasing stay in the panel; the banner never shows them.
+  const plainTitle = (s: string) =>
+    s.replace(/\s*Open:\s*\S.*$/i, "").replace(/\s*Do:\s*.*$/i, "").replace(/\s--\s.*$/, "").replace(/[A-Za-z]:\\[^\s]+/g, "").replace(/\s{2,}/g, " ").trim();
+  const plainAction = (s: string | null | undefined) =>
+    (s ?? "").split(/\.\s|\s\s+/)[0].replace(/[A-Za-z]:\\[^\s]+/g, "").replace(/\s*\(.*$/, "").trim();
+  const shown = isOpen ? problems : problems.slice(0, 3);
+  const hidden = Math.max(0, count - shown.length);
+  const rowStyle: React.CSSProperties = { display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap", fontSize: 12.5, lineHeight: 1.45, paddingLeft: 19, color: "var(--text-secondary, #9ca3af)" };
 
   return (
-    <div className="mo-click wd-banner" onClick={toggle} role="button" style={{
+    <div className="wd-banner" style={{
       ...base,
+      fontFamily: "inherit",
       border: `1px solid ${color}66`,
       background: hasProblems ? "rgba(248,113,113,0.08)" : "rgba(251,146,60,0.08)",
     }}>
@@ -1228,60 +1274,53 @@ export function WatchdogBanner({ watchdog, onRechecked }: { watchdog?: WatchdogD
       `}</style>
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
         <Dot color={color} pulse />
-        <span style={{ fontSize: 13, fontWeight: 700, color, fontFamily: "inherit" }}>{headline}</span>
+        <span style={{ fontSize: 13, fontWeight: 700, color }}>{headline}</span>
         {hasProblems && stale && (
-          <span style={{ fontSize: 10, color: "var(--orange)", border: "1px solid #fb923c55", borderRadius: 99, padding: "1px 8px" }}>
-            report is also late ({relAge(ageMin)})
+          <span style={{ fontSize: 11, color: "var(--orange)", border: "1px solid #fb923c55", borderRadius: 99, padding: "1px 8px" }}>
+            the report is also late ({relAge(ageMin)})
           </span>
         )}
-        <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "flex-start", gap: 8 }}>
-          <RecheckButton onRechecked={onRechecked} compact />
+        <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 8 }}>
           <WatchdogCopyButton watchdog={watchdog} color={color} />
-          <span style={{ fontSize: 10, color: "var(--text-muted, #6b7280)" }}>
-            {isOpen ? "collapse" : "expand"}
-          </span>
+          <RunDaBossButton onRechecked={onRechecked} small />
         </span>
       </div>
 
-      {/* One-tap full patrol, front and center when there are problems */}
-      <RunDaBossButton onRechecked={onRechecked} block />
-
-      {/* collapsed: count + worst (first) problem line */}
-      {hasProblems && !isOpen && problems.length > 0 && (
-        <div style={{ fontSize: 11.5, color: "var(--text-secondary, #9ca3af)", lineHeight: 1.5, paddingLeft: 19 }}>
-          <ProblemLine p={problems[0]} color={color} />
-          {count > 1 && <span style={{ color: "var(--text-muted, #6b7280)" }}> (+{count - 1} more)</span>}
-        </div>
-      )}
-
-      {/* expanded: every problem, one line each, with its suggested action */}
-      {isOpen && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 5, paddingLeft: 19 }}>
-          {problems.map((p, i) => (
-            <div key={i} style={{ fontSize: 11.5, color: "var(--text-secondary, #9ca3af)", lineHeight: 1.5, borderLeft: `2px solid ${color}55`, paddingLeft: 8 }}>
-              <ProblemLine p={p} color={color} />
-            </div>
-          ))}
-          {hasProblems && problems.length === 0 && (
-            <div style={{ fontSize: 11.5, color: "var(--text-secondary, #9ca3af)" }}>
-              The report counts {count} problem{count === 1 ? "" : "s"} but lists no detail lines.
-            </div>
-          )}
-          {watchdog.resolved.length > 0 && (
-            <div style={{ fontSize: 10.5, color: "var(--text-muted, #6b7280)", lineHeight: 1.5 }}>
-              resolved: {watchdog.resolved.slice(0, 4).join("; ")}
-            </div>
-          )}
-          {stale && hasProblems && (
-            <div style={{ fontSize: 10.5, color: "var(--orange)" }}>
-              Da Boss report itself is older than 3 hours - Da Boss being silent is also a problem.
-            </div>
-          )}
-          <div style={{ fontSize: 10, color: "var(--text-muted, #6b7280)" }}>
-            last report from Da Boss {relAge(ageMin)}
+      {shown.map((p, i) => {
+        const action = plainAction(p.action);
+        return (
+          <div key={i} style={rowStyle}>
+            <span style={{ color: "var(--text-primary, inherit)", fontWeight: 600 }}>{plainTitle(p.text)}</span>
+            {action && <span>· {action}</span>}
+            {p.url && (
+              <a href={p.url} target="_blank" rel="noreferrer" style={{ color, textDecoration: "underline", fontSize: 12 }}>
+                Open &rarr;
+              </a>
+            )}
           </div>
-        </div>
+        );
+      })}
+      {hasProblems && problems.length === 0 && (
+        <div style={rowStyle}>The report counts {count} problem{count === 1 ? "" : "s"} but lists no detail.</div>
       )}
+
+      <div style={{ display: "flex", alignItems: "center", gap: 12, paddingLeft: 19, fontSize: 11.5, color: "var(--text-muted, #6b7280)", flexWrap: "wrap" }}>
+        {hidden > 0 && (
+          <button type="button" onClick={toggle}
+            style={{ background: "none", border: "none", padding: 0, color, cursor: "pointer", fontSize: 11.5, fontFamily: "inherit", textDecoration: "underline" }}>
+            +{hidden} more
+          </button>
+        )}
+        {isOpen && problems.length > 3 && (
+          <button type="button" onClick={toggle}
+            style={{ background: "none", border: "none", padding: 0, color: "var(--text-muted, #6b7280)", cursor: "pointer", fontSize: 11.5, fontFamily: "inherit", textDecoration: "underline" }}>
+            show fewer
+          </button>
+        )}
+        {pcOnly > 0 && <span>{pcOnly} check{pcOnly === 1 ? "" : "s"} can only run on the PC</span>}
+        {stale && hasProblems && <span style={{ color: "var(--orange)" }}>Da Boss itself has not reported in over 3 hours.</span>}
+        <span>last report {relAge(ageMin)}</span>
+      </div>
     </div>
   );
 }
@@ -2723,6 +2762,7 @@ function WatchdogPanel({ watchdog, onClose, onRechecked }: { watchdog?: Watchdog
               ? `Da Boss is reporting ${Math.max(watchdog.problemCount, watchdog.problems.length)} open problem${Math.max(watchdog.problemCount, watchdog.problems.length) === 1 ? "" : "s"}.`
               : "Every agent is reporting on schedule. Nothing needs attention.",
             `Last report from Da Boss ${relAge(ageMin)}.`,
+            ...((watchdog.couldNotVerify ?? 0) > 0 ? [`${watchdog.couldNotVerify} check${watchdog.couldNotVerify === 1 ? "" : "s"} could not be verified in that report. Not counted as problems.`] : []),
           ]} />
 
           <Section title={`Problems (${watchdog.problems.length})`} defaultOpen={hasProblems}>

@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 
-// One thing on the week grid. Every field past `startTime` is optional so the
+// One thing on the time grid. Every field past `startTime` is optional so the
 // same grid can draw a Google Calendar event, a scheduled call-back and a
 // payment due date without any of them being padded with invented values.
 export interface Appointment {
@@ -24,9 +24,12 @@ export interface Appointment {
   allDay?: boolean;
   /** Explicit colour token; wins over the source colour (block categories). */
   color?: string | null;
+  /** Whose item: jack | maddox | grant | team. Null = nobody's / unknown. */
+  person?: string | null;
 }
 
-const HOURS = Array.from({ length: 13 }, (_, i) => i + 7); // 7am - 7pm
+// 7am to 9pm: late enough that an evening study block still lands on the grid.
+const HOURS = Array.from({ length: 15 }, (_, i) => i + 7);
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 export const SOURCE_COLOR: Record<string, string> = {
   google: "var(--accent)",
@@ -38,26 +41,22 @@ export const SOURCE_COLOR: Record<string, string> = {
   // (each block event carries its own `color`), so "blocks" here is a fallback.
   stripe: "var(--accent-dim)",
   blocks: "var(--accent)",
+  bookings: "var(--accent-2)",
 };
 const STATUS_COLOR: Record<string, string> = {
   confirmed: "var(--green)",
   booked: "var(--accent)",
   showed: "var(--accent)",
   noshow: "var(--red)",
-  cancelled: "#6b7280",
+  cancelled: "var(--text-muted)",
 };
 
-function getWeekDays(offset = 0): Date[] {
-  const now = new Date();
-  const sunday = new Date(now);
-  sunday.setDate(now.getDate() - now.getDay() + offset * 7);
-  sunday.setHours(0, 0, 0, 0);
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(sunday);
-    d.setDate(sunday.getDate() + i);
-    return d;
-  });
-}
+export const PERSON_LABEL: Record<string, string> = {
+  jack: "Jack",
+  maddox: "Maddox",
+  grant: "Grant",
+  team: "Team",
+};
 
 // A date string from the feed to a real local Date. A plain YYYY-MM-DD is
 // built field by field, because handing it to Date() would read it as UTC
@@ -75,31 +74,56 @@ function fmt12(date: Date) {
   return `${h}:${m.toString().padStart(2, "0")}${ampm}`;
 }
 
+function sameDay(a: Date, day: Date) {
+  return (
+    a.getFullYear() === day.getFullYear() &&
+    a.getMonth() === day.getMonth() &&
+    a.getDate() === day.getDate()
+  );
+}
+
+export function colorFor(a: Appointment): string {
+  return (
+    a.color ??
+    (a.source ? SOURCE_COLOR[a.source] : undefined) ??
+    (a.status ? STATUS_COLOR[a.status.toLowerCase()] : undefined) ??
+    "var(--accent)"
+  );
+}
+
+// The hour grid. Draws `days` consecutive days starting at `startDate` (7 for
+// a week, 1 for a single day). Navigation lives in the parent so the month,
+// week and day views share one Today / previous / next control.
 export default function WeekCalendar({
   appointments,
+  startDate,
+  days = 7,
   emptyNote,
   onEdit,
+  onOpenBooking,
 }: {
   appointments: Appointment[];
+  /** First day drawn (local midnight). */
+  startDate: Date;
+  /** How many days to draw from startDate: 7 = week, 1 = day. */
+  days?: number;
   /** Shown instead of a count when there is nothing to draw. Must say what is
    *  actually missing; it is never a placeholder for hidden data. */
   emptyNote?: string;
   /** When set, an editable item (a manual time-block) gets an Edit button in
-   *  the detail panel. Called with the appointment's id. */
+   *  the detail panel. */
   onEdit?: (a: Appointment) => void;
+  /** When set, a booking gets a "Manage booking" button in the detail panel. */
+  onOpenBooking?: (a: Appointment) => void;
 }) {
-  const [weekOffset, setWeekOffset] = useState(0);
   const [selected, setSelected] = useState<Appointment | null>(null);
-  const days = getWeekDays(weekOffset);
   const today = new Date();
-
-  function sameDay(a: Date, day: Date) {
-    return (
-      a.getFullYear() === day.getFullYear() &&
-      a.getMonth() === day.getMonth() &&
-      a.getDate() === day.getDate()
-    );
-  }
+  const cols = Array.from({ length: days }, (_, i) => {
+    const d = new Date(startDate);
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() + i);
+    return d;
+  });
 
   // Map events to their day slot. All-day items are kept out of the hour grid;
   // they have no hour to sit at and would otherwise pile onto 12am.
@@ -114,67 +138,80 @@ export default function WeekCalendar({
     );
   }
 
-  const inWeek = appointments.filter(
-    (a) => a.startTime && days.some((d) => sameDay(toLocal(a.startTime), d))
+  const inRange = appointments.filter(
+    (a) => a.startTime && cols.some((d) => sameDay(toLocal(a.startTime), d))
   ).length;
 
-  function colorFor(a: Appointment) {
-    return (
-      a.color ??
-      (a.source ? SOURCE_COLOR[a.source] : undefined) ??
-      (a.status ? STATUS_COLOR[a.status.toLowerCase()] : undefined) ??
-      "var(--accent)"
-    );
-  }
-
+  const span = HOURS.length;
   function topPct(date: Date) {
     const h = date.getHours() + date.getMinutes() / 60;
-    return Math.max(0, ((h - 7) / 13) * 100);
+    return Math.max(0, ((h - HOURS[0]) / span) * 100);
   }
-
   function heightPct(start: Date, end: Date) {
     const dur = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
-    return Math.max(2, (dur / 13) * 100);
+    return Math.max(2, (dur / span) * 100);
+  }
+
+  const gridCols = `48px repeat(${days}, minmax(0, 1fr))`;
+  // The phone stylesheet collapses inline grid-template-columns to one or two
+  // tracks; the class + CSS variable below wins it back for these grids.
+  const gridVars = { "--cal-cols": String(days) } as React.CSSProperties;
+
+  // Items that overlap in time share the column side by side instead of
+  // stacking on top of each other (two people's classes at the same hour).
+  function layout(list: Appointment[]): Map<string, { col: number; cols: number }> {
+    const items = list
+      .map((a) => {
+        const s = toLocal(a.startTime).getTime();
+        const e = a.endTime ? toLocal(a.endTime).getTime() : s + 60 * 60 * 1000;
+        return { id: a.id, s, e };
+      })
+      .sort((x, y) => x.s - y.s || x.e - y.e);
+    const out = new Map<string, { col: number; cols: number }>();
+    let cluster: { id: string; s: number; e: number; col: number }[] = [];
+    let clusterEnd = -1;
+    const flush = () => {
+      const cols = Math.max(1, ...cluster.map((c) => c.col + 1));
+      for (const c of cluster) out.set(c.id, { col: c.col, cols });
+      cluster = [];
+    };
+    for (const it of items) {
+      if (cluster.length && it.s >= clusterEnd) flush();
+      const taken = new Set(cluster.filter((c) => c.e > it.s).map((c) => c.col));
+      let col = 0;
+      while (taken.has(col)) col++;
+      cluster.push({ ...it, col });
+      clusterEnd = Math.max(clusterEnd, it.e);
+    }
+    if (cluster.length) flush();
+    return out;
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 0, background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 14, overflow: "hidden" }}>
-
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", borderBottom: "1px solid var(--border)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <button onClick={() => setWeekOffset(w => w - 1)} style={navBtn}>‹</button>
-          <span style={{ fontSize: 14, fontWeight: 700 }}>
-            {weekOffset === 0 ? "This Week" : weekOffset === 1 ? "Next Week" : weekOffset === -1 ? "Last Week" :
-              `${days[0].toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${days[6].toLocaleDateString("en-US", { month: "short", day: "numeric" })}`}
-          </span>
-          <button onClick={() => setWeekOffset(w => w + 1)} style={navBtn}>›</button>
-        </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {weekOffset !== 0 && (
-            <button onClick={() => setWeekOffset(0)} style={{ fontSize: 11, color: "var(--accent)", background: "var(--accent-glow)", border: "1px solid var(--accent)", borderRadius: 6, padding: "3px 10px", cursor: "pointer" }}>
-              Today
-            </button>
-          )}
-          <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
-            {inWeek > 0
-              ? `${inWeek} ${inWeek === 1 ? "event" : "events"} this week`
-              : emptyNote ?? "nothing scheduled this week"}
-          </span>
-        </div>
-      </div>
+    <div className="cal-time" style={{ display: "flex", flexDirection: "column", gap: 0, background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 14, overflow: "hidden" }}>
+      <style>{`
+        .app-view .cal-time-row { grid-template-columns: 48px repeat(var(--cal-cols, 7), minmax(0, 1fr)) !important; }
+        @media (max-width: 768px) {
+          .cal-time { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+          .cal-time-row[data-days="7"] { min-width: 640px; }
+          .app-view .cal-time-row { grid-template-columns: 40px repeat(var(--cal-cols, 7), minmax(0, 1fr)) !important; }
+        }
+      `}</style>
 
       {/* Day headers */}
-      <div style={{ display: "grid", gridTemplateColumns: "48px repeat(7, 1fr)", borderBottom: "1px solid var(--border)" }}>
+      <div className="cal-time-row" data-days={days} style={{ ...gridVars, display: "grid", gridTemplateColumns: gridCols, borderBottom: "1px solid var(--border)" }}>
         <div />
-        {days.map((day, i) => {
-          const isToday = day.toDateString() === today.toDateString();
+        {cols.map((day, i) => {
+          const isToday = sameDay(day, today);
           return (
             <div key={i} style={{ padding: "8px 4px", textAlign: "center", borderLeft: "1px solid var(--border)" }}>
-              <p style={{ fontSize: 10, color: "var(--text-muted)", textTransform: "uppercase" }}>{DAYS[i]}</p>
+              <p style={{ fontSize: 10, color: "var(--text-muted)", textTransform: "uppercase", margin: 0 }}>
+                {DAYS[day.getDay()]}
+                {days === 1 ? ` · ${day.toLocaleDateString("en-US", { month: "short" })}` : ""}
+              </p>
               <p style={{
                 fontSize: 16, fontWeight: 700, marginTop: 2,
-                color: isToday ? "#fff" : "var(--text-primary)",
+                color: isToday ? "var(--bg-card)" : "var(--text-primary)",
                 background: isToday ? "var(--accent)" : "transparent",
                 borderRadius: "50%", width: 28, height: 28,
                 display: "flex", alignItems: "center", justifyContent: "center",
@@ -185,14 +222,19 @@ export default function WeekCalendar({
         })}
       </div>
 
-      {/* All-day band — payment due dates and all-day calendar events. Only
-          drawn when the week actually has some. */}
-      {days.some((d) => allDayForDay(d).length > 0) && (
-        <div style={{ display: "grid", gridTemplateColumns: "48px repeat(7, 1fr)", borderBottom: "1px solid var(--border)" }}>
+      {inRange === 0 ? (
+        <p style={{ margin: 0, padding: "8px 14px", fontSize: 12, color: "var(--text-muted)", borderBottom: "1px solid var(--border)" }}>
+          {emptyNote ?? (days === 1 ? "nothing scheduled this day" : "nothing scheduled this week")}
+        </p>
+      ) : null}
+
+      {/* All-day band, only when the range actually has some. */}
+      {cols.some((d) => allDayForDay(d).length > 0) && (
+        <div className="cal-time-row" data-days={days} style={{ ...gridVars, display: "grid", gridTemplateColumns: gridCols, borderBottom: "1px solid var(--border)" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", paddingRight: 8 }}>
             <span style={{ fontSize: 9, color: "var(--text-muted)", textTransform: "uppercase" }}>all day</span>
           </div>
-          {days.map((day, i) => (
+          {cols.map((day, i) => (
             <div key={i} style={{ borderLeft: "1px solid var(--border)", padding: 3, display: "grid", gap: 3 }}>
               {allDayForDay(day).map((a) => {
                 const color = colorFor(a);
@@ -201,7 +243,7 @@ export default function WeekCalendar({
                     key={a.id}
                     onClick={() => setSelected(a)}
                     style={{
-                      background: color + "22", border: `1px solid ${color}`, borderLeft: `3px solid ${color}`,
+                      background: `color-mix(in srgb, ${color} 14%, transparent)`, border: `1px solid ${color}`, borderLeft: `3px solid ${color}`,
                       borderRadius: 6, padding: "2px 5px", cursor: "pointer", textAlign: "left",
                       font: "inherit", color: "var(--text-primary)", fontSize: 10, fontWeight: 600,
                       overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
@@ -217,8 +259,7 @@ export default function WeekCalendar({
       )}
 
       {/* Time grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "48px repeat(7, 1fr)", height: 520, overflow: "auto", position: "relative" }}>
-        {/* Hour labels */}
+      <div className="cal-time-row" data-days={days} style={{ ...gridVars, display: "grid", gridTemplateColumns: gridCols, height: 520, overflow: "auto", position: "relative" }}>
         <div style={{ display: "flex", flexDirection: "column" }}>
           {HOURS.map(h => (
             <div key={h} style={{ height: 40, display: "flex", alignItems: "flex-start", justifyContent: "flex-end", paddingRight: 8, paddingTop: 2, flexShrink: 0 }}>
@@ -227,32 +268,33 @@ export default function WeekCalendar({
           ))}
         </div>
 
-        {/* Day columns */}
-        {days.map((day, di) => {
+        {cols.map((day, di) => {
           const dayAppts = apptForDay(day);
-          const isToday = day.toDateString() === today.toDateString();
+          const isToday = sameDay(day, today);
+          const pos = layout(dayAppts);
           return (
             <div key={di} style={{
               position: "relative", borderLeft: "1px solid var(--border)",
-              background: isToday ? "rgba(124,106,245,0.03)" : "transparent",
+              background: isToday ? "var(--accent-glow)" : "transparent",
             }}>
-              {/* Hour lines */}
               {HOURS.map(h => (
                 <div key={h} style={{ height: 40, borderBottom: "1px solid var(--border)", flexShrink: 0 }} />
               ))}
-              {/* Appointments */}
               {dayAppts.map(a => {
                 const start = toLocal(a.startTime);
                 const end = a.endTime ? toLocal(a.endTime) : new Date(start.getTime() + 60 * 60 * 1000);
                 const top = topPct(start);
                 const height = heightPct(start, end);
                 const color = colorFor(a);
+                const who = a.person && a.person !== "team" ? PERSON_LABEL[a.person] ?? a.person : null;
+                const p = pos.get(a.id) ?? { col: 0, cols: 1 };
                 return (
-                  <div key={a.id} onClick={() => setSelected(a)} style={{
+                  <div key={a.id} onClick={() => setSelected(a)} title={[a.title, who, a.detail].filter(Boolean).join(" · ")} style={{
                     position: "absolute",
                     top: `${top}%`, height: `${height}%`,
-                    left: 2, right: 2,
-                    background: color + "22",
+                    left: `calc(${(p.col / p.cols) * 100}% + 2px)`,
+                    width: `calc(${(1 / p.cols) * 100}% - 4px)`,
+                    background: `color-mix(in srgb, ${color} 14%, transparent)`,
                     // Manual time-blocks read apart from feed events: dashed edge.
                     border: `1px ${a.source === "blocks" ? "dashed" : "solid"} ${color}`,
                     borderLeft: `3px solid ${color}`,
@@ -260,8 +302,12 @@ export default function WeekCalendar({
                     cursor: "pointer", overflow: "hidden",
                     zIndex: 1,
                   }}>
-                    <p style={{ fontSize: 10, fontWeight: 700, color, lineHeight: 1.3 }}>{fmt12(start)}</p>
-                    <p style={{ fontSize: 10, color: "var(--text-primary)", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.contactName || a.title}</p>
+                    <p style={{ fontSize: 10, fontWeight: 700, color, lineHeight: 1.3, margin: 0 }}>
+                      {fmt12(start)}{who && days === 1 ? ` · ${who}` : ""}
+                    </p>
+                    <p style={{ fontSize: 10, color: "var(--text-primary)", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", margin: 0 }}>
+                      {a.contactName || a.title}
+                    </p>
                   </div>
                 );
               })}
@@ -272,11 +318,12 @@ export default function WeekCalendar({
 
       {/* Selected appointment detail */}
       {selected && (
-        <div style={{ padding: "14px 20px", borderTop: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+        <div style={{ padding: "14px 20px", borderTop: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
           <div>
-            <p style={{ fontSize: 13, fontWeight: 700 }}>{selected.title}</p>
-            <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
+            <p style={{ fontSize: 13, fontWeight: 700, margin: 0 }}>{selected.title}</p>
+            <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2, marginBottom: 0 }}>
               {[
+                selected.person && selected.person !== "team" ? PERSON_LABEL[selected.person] ?? selected.person : null,
                 selected.contactName || selected.detail,
                 selected.allDay
                   ? "all day"
@@ -291,17 +338,19 @@ export default function WeekCalendar({
             </p>
             {selected.status ? (
               <span style={{ fontSize: 10, color: colorFor(selected), fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                {selected.status}
+                {selected.status.replace("_", " ")}
               </span>
             ) : null}
           </div>
-          <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {onEdit && selected.source === "blocks" ? (
-              <button
-                onClick={() => { onEdit(selected); setSelected(null); }}
-                style={{ fontSize: 12, color: "var(--accent)", background: "var(--accent-glow)", border: "1px solid var(--accent)", borderRadius: 8, padding: "6px 12px", cursor: "pointer" }}
-              >
+              <button onClick={() => { onEdit(selected); setSelected(null); }} style={accentBtn}>
                 Edit block
+              </button>
+            ) : null}
+            {onOpenBooking && selected.source === "bookings" ? (
+              <button onClick={() => { onOpenBooking(selected); setSelected(null); }} style={accentBtn}>
+                Manage booking
               </button>
             ) : null}
             {/* Only a link the feed actually gave us. No link is shown for an
@@ -310,7 +359,7 @@ export default function WeekCalendar({
               <a
                 href={selected.url}
                 {...(selected.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-                style={{ fontSize: 12, color: "var(--accent)", background: "var(--accent-glow)", border: "1px solid var(--accent)", borderRadius: 8, padding: "6px 12px", textDecoration: "none" }}
+                style={{ ...accentBtn, textDecoration: "none" }}
               >
                 {selected.source === "school"
                   ? "Open schedule app"
@@ -319,7 +368,7 @@ export default function WeekCalendar({
                   : "Open source"}
               </a>
             ) : null}
-            <button onClick={() => setSelected(null)} style={{ fontSize: 12, color: "var(--text-muted)", background: "transparent", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 12px", cursor: "pointer" }}>
+            <button onClick={() => setSelected(null)} style={{ font: "inherit", fontSize: 12, color: "var(--text-muted)", background: "transparent", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 12px", cursor: "pointer" }}>
               Dismiss
             </button>
           </div>
@@ -329,9 +378,13 @@ export default function WeekCalendar({
   );
 }
 
-const navBtn: React.CSSProperties = {
-  background: "var(--bg-hover)", border: "1px solid var(--border)", borderRadius: 6,
-  width: 28, height: 28, cursor: "pointer", color: "var(--text-primary)",
-  fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center",
-  padding: 0,
+const accentBtn: React.CSSProperties = {
+  font: "inherit",
+  fontSize: 12,
+  color: "var(--accent)",
+  background: "var(--accent-glow)",
+  border: "1px solid var(--accent)",
+  borderRadius: 8,
+  padding: "6px 12px",
+  cursor: "pointer",
 };

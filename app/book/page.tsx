@@ -4,19 +4,22 @@ import { useEffect, useMemo, useState } from "react";
 // ───────────────────────────────────────────────────────────────────────────
 // /book — the PUBLIC self-serve booking page (GHL calendar replacement).
 //
-// No login. A prospect opens the link, picks a day, picks a 30-minute slot
-// (Mon-Fri 9am-5pm Central), types name/email, and confirms. The row lands in
-// public.bookings via /api/booking and shows up on the OS calendar's
-// "Bookings" lane and the staff bookings board.
+// No login. A prospect opens the link, picks a day, picks a 30-minute slot,
+// types name/email, and confirms. The row lands in public.bookings via
+// /api/booking and shows up on the OS calendar's "Bookings" lane and the
+// staff bookings board.
 //
-// All availability comes from the API; nothing here invents free time. Slot
-// labels are Central Time on both sides by design: the API computes CT slots
-// and this page shows the API's own labels, with the timezone named out loud.
+// All availability comes from the API; nothing here invents free time. The
+// API merges the whole team's hours, classes and existing bookings into one
+// yes/no per slot, so this page only ever says "with Wing Digital". The one
+// team fact shown is on the confirmation: the first name of the person who
+// will call, because the visitor needs to know who to expect.
 // ───────────────────────────────────────────────────────────────────────────
 
 type Slot = { starts_at: string; ends_at: string; label: string; available: boolean };
 type Day = { date: string; slots: Slot[] };
 type Payload = { timezone: string; from: string; to: string; days: Day[] };
+type Done = { label: string; date: string; with: string | null };
 
 const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -38,7 +41,7 @@ export default function BookPage() {
   const [notes, setNotes] = useState("");
   const [sending, setSending] = useState(false);
   const [formErr, setFormErr] = useState("");
-  const [done, setDone] = useState<{ label: string; date: string } | null>(null);
+  const [done, setDone] = useState<Done | null>(null);
 
   async function load() {
     try {
@@ -102,7 +105,7 @@ export default function BookPage() {
         }
         return;
       }
-      setDone({ label: pickedSlot.label, date: pickedDay ?? "" });
+      setDone({ label: pickedSlot.label, date: pickedDay ?? "", with: typeof out?.with === "string" ? out.with : null });
     } catch (e) {
       setFormErr(String(e));
     } finally {
@@ -128,9 +131,9 @@ export default function BookPage() {
           <span style={{ fontSize: 12, letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--accent)" }}>
             Wing Digital
           </span>
-          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800 }}>Book a call</h1>
+          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800 }}>Book a call with Wing Digital</h1>
           <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>
-            Pick a day and a 30-minute slot. Monday to Friday, 9am to 5pm Central Time.
+            Pick a day and a 30-minute slot. Times are Central Time; only slots we can actually take are shown.
           </p>
         </header>
 
@@ -139,10 +142,11 @@ export default function BookPage() {
             <span style={{ fontSize: 34 }}>✓</span>
             <h2 style={{ margin: 0, fontSize: 18 }}>You are booked</h2>
             <p style={{ margin: 0, fontSize: 14, color: "var(--text-secondary)" }}>
-              {dayLabel(done.date).dow}, {dayLabel(done.date).date} at {done.label} Central Time.
+              {dayLabel(done.date).dow}, {dayLabel(done.date).date} at {done.label} Central Time
+              {done.with ? ` with ${done.with} from Wing Digital` : " with Wing Digital"}.
             </p>
             <p style={{ margin: 0, fontSize: 13, color: "var(--text-muted)" }}>
-              Your spot is saved under {email}. We will reach out before the call. Need a different time? Reply to any message from us and we will move it.
+              Your spot is saved under {email}. {done.with ? `${done.with} will call you at that time.` : "We will call you at that time."} Need a different time? Reply to any message from us and we will move it.
             </p>
           </section>
         ) : (

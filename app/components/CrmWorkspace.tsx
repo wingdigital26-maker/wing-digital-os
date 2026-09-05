@@ -117,6 +117,7 @@ type PipelinePayload = {
 // ── Categories ─────────────────────────────────────────────────────────────
 
 type TypeKey = "outbound" | "contact" | "deal";
+type Pane = "contacts" | "deals" | "drafts";
 type StatusKey =
   | "needs_decision" | "client_handover" | "approved" | "rejected" | "sent" | "other_outbound"
   | "deal_open" | "deal_won" | "deal_lost" | "contact_on_file";
@@ -806,7 +807,6 @@ export default function CrmWorkspace({
   const [loading, setLoading] = useState(true);
 
   const [status, setStatus] = useState<StatusKey | "all">(initialStatus);
-  const [type, setType] = useState<TypeKey | "all">("all");
   const [client, setClient] = useState<string>(initialClient ?? "all");
   const [channel, setChannel] = useState<string>("all");
   const [blocked, setBlocked] = useState<"all" | "blocked" | "clear">("all");
@@ -1038,29 +1038,45 @@ export default function CrmWorkspace({
     return { st, ty, cl, ch, blockedN, clearN: rows.length - blockedN, readyN, stuckN, handoverN };
   }, [rows]);
 
-  // The "Needs your decision" bucket is the right place to open only when it
-  // has something in it. Opening on an empty bucket showed a new user "nothing
-  // matches" over thousands of records, which reads as an empty CRM. Once the
-  // first load lands, an empty bucket drops the view to Everything. Done once,
-  // so a filter Jack picks later is never overridden.
-  const [autoDefaulted, setAutoDefaulted] = useState(false);
+  // ── The three panes ─────────────────────────────────────────────────────
+  // Jack (2026-09-04): "too much going on". The Everything view is now one
+  // search box and three pills: Contacts, Deals, Drafts to review. Every
+  // record is still here, split by what it is; the old status, client,
+  // channel and blocker facets live under "More filters" with their counts.
+  // The pane is null until the first load lands, then opens on Drafts if any
+  // need a decision and on Contacts otherwise. Decided once, so a pill Jack
+  // picks later is never overridden.
+  const [pane, setPane] = useState<Pane | null>(null);
   useEffect(() => {
-    if (autoDefaulted || loading || rows.length === 0) return;
-    setAutoDefaulted(true);
-    if (initialStatus === "needs_decision" && status === "needs_decision" && !counts.st.needs_decision) {
-      setStatus("all");
-    }
-  }, [autoDefaulted, loading, rows.length, counts, status, initialStatus]);
+    if (pane !== null || loading) return;
+    if (rows.length === 0 && !crm && !pipe) return;
+    if (initialStatus === "contact_on_file") { setPane("contacts"); setStatus("all"); return; }
+    if (initialStatus.startsWith("deal_")) { setPane("deals"); return; }
+    if (counts.st.needs_decision) { setPane("drafts"); setStatus("needs_decision"); return; }
+    setPane("contacts"); setStatus("all");
+  }, [pane, loading, rows.length, counts, initialStatus, crm, pipe]);
+
+  const choosePane = (p: Pane) => {
+    setPane(p);
+    // Drafts opens on what needs a decision; the other panes show everything.
+    setStatus(p === "drafts" ? "needs_decision" : "all");
+    setChannel("all"); setBlocked("all"); setOpen(null);
+  };
+
+  const paneType: TypeKey = pane === "deals" ? "deal" : pane === "contacts" ? "contact" : "outbound";
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return rows.filter((r) => {
+      if (r.type !== paneType) return false;
+      // Handover leads live in their own collapsed section under the drafts
+      // list, never in the main list.
+      if (r.status === "client_handover") return false;
       // A row Jack just decided on stays put. Approving moves it out of the
       // "needs your decision" bucket, and letting it vanish mid-click left him
       // with no confirmation that anything happened at all.
       if (r.outbound && done[r.outbound.id]) return true;
       if (status !== "all" && r.status !== status) return false;
-      if (type !== "all" && r.type !== type) return false;
       if (client !== "all" && r.client !== client) return false;
       if (channel !== "all" && r.channel !== channel) return false;
       if (blocked === "blocked" && r.blockers.length === 0) return false;
@@ -1068,64 +1084,50 @@ export default function CrmWorkspace({
       if (needle && !r.search.includes(needle)) return false;
       return true;
     });
-  }, [rows, status, type, client, channel, blocked, q, done]);
+  }, [rows, paneType, status, client, channel, blocked, q, done]);
 
   // Changing the filters is Jack moving on, so the "just decided" exemption
   // above is dropped at the same moment the page size resets.
-  useEffect(() => { setShown(PAGE_SIZE); setDone({}); }, [status, type, client, channel, blocked, q]);
+  useEffect(() => { setShown(PAGE_SIZE); setDone({}); }, [pane, status, client, channel, blocked, q]);
 
-  /** The one-click answer to "what should I do right now". */
-  const showReady = () => {
-    setStatus("needs_decision"); setBlocked("clear");
-    setType("all"); setChannel("all"); setQ("");
-  };
-  const showStuck = () => {
-    setStatus("needs_decision"); setBlocked("blocked");
-    setType("all"); setChannel("all"); setQ("");
-  };
-  const viewingReady = status === "needs_decision" && blocked === "clear";
-  const showHandover = () => {
-    setStatus("client_handover"); setBlocked("all");
-    setType("all"); setChannel("all"); setQ("");
-  };
-  const viewingHandover = status === "client_handover";
-
-  // Every handover lead, in row order, for the lane-level copy.
-  const handoverRows = useMemo(
-    () => rows.filter((r) => r.status === "client_handover"),
-    [rows],
-  );
+  // Every handover lead, in row order, for the collapsed section and its
+  // lane-level copy. The search box applies here too.
+  const handoverRows = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return rows.filter((r) => r.status === "client_handover" && (!needle || r.search.includes(needle)));
+  }, [rows, q]);
   // Which clients the lane covers, read off the rows themselves rather than
   // named anywhere in this file.
   const handoverClients = useMemo(
     () => Array.from(new Set(handoverRows.map((r) => r.client))).sort(),
     [handoverRows],
   );
+  const [handoverOpen, setHandoverOpen] = useState(false);
 
   const active: string[] = [];
-  if (status !== "all") active.push(STATUS_LABEL[status]);
-  if (type !== "all") active.push(TYPE_LABEL[type]);
+  if (status !== "all" && pane !== "drafts") active.push(STATUS_LABEL[status]);
+  if (status !== "all" && status !== "needs_decision" && pane === "drafts") active.push(STATUS_LABEL[status]);
   if (client !== "all") active.push(client);
   if (channel !== "all") active.push(`channel ${channel}`);
   if (blocked !== "all") active.push(blocked === "blocked" ? "blocked only" : "nothing blocking only");
   if (q.trim()) active.push(`search "${q.trim()}"`);
 
   const clearAll = () => {
-    setStatus("all"); setType("all"); setClient("all");
+    setStatus(pane === "drafts" ? "needs_decision" : "all"); setClient("all");
     setChannel("all"); setBlocked("all"); setQ("");
   };
 
   const clientNames = Object.keys(counts.cl).sort((a, b) => counts.cl[b] - counts.cl[a]);
-  const channelNames = Object.keys(counts.ch).sort((a, b) => counts.ch[b] - counts.ch[a]);
-  const statusOrder: StatusKey[] = [
-    "needs_decision", "client_handover", "approved", "sent", "rejected", "other_outbound",
-    "deal_open", "deal_won", "deal_lost", "contact_on_file",
-  ];
+  const channelNames = Object.keys(counts.ch).filter((c) => c !== NO_CHANNEL).sort((a, b) => counts.ch[b] - counts.ch[a]);
+  const statusOrder: StatusKey[] = pane === "deals"
+    ? ["deal_open", "deal_won", "deal_lost"]
+    : ["needs_decision", "approved", "sent", "rejected", "other_outbound"];
 
   // Every facet's counts survive the condensing: they moved from a chip row
   // into the option labels of the select that replaced it.
+  const paneTotal = counts.ty[paneType] ?? 0;
   const statusOptions = [
-    { value: "all", label: `Everything (${rows.length})` },
+    { value: "all", label: pane === "deals" ? `Every deal (${paneTotal})` : `Every draft (${paneTotal})` },
     ...statusOrder.filter((s) => counts.st[s]).map((s) => ({
       value: s, label: `${STATUS_LABEL[s]} (${counts.st[s]})`,
     })),
@@ -1133,12 +1135,6 @@ export default function CrmWorkspace({
   const clientOptions = [
     { value: "all", label: `Every client (${rows.length})` },
     ...clientNames.map((c) => ({ value: c, label: `${c} (${counts.cl[c]})` })),
-  ];
-  const typeOptions = [
-    { value: "all", label: "Every record type" },
-    ...(["outbound", "contact", "deal"] as TypeKey[]).filter((t) => counts.ty[t]).map((t) => ({
-      value: t, label: `${TYPE_LABEL[t]} (${counts.ty[t]})`,
-    })),
   ];
   const channelOptions = [
     { value: "all", label: "Every channel" },
@@ -1150,7 +1146,57 @@ export default function CrmWorkspace({
     { value: "clear", label: `Nothing blocking it (${counts.clearN})` },
   ];
   const hiddenFacets =
-    (type !== "all" ? 1 : 0) + (channel !== "all" ? 1 : 0) + (blocked !== "all" ? 1 : 0);
+    (client !== "all" ? 1 : 0) + (channel !== "all" ? 1 : 0) + (blocked !== "all" ? 1 : 0)
+    + (pane === "deals" && status !== "all" ? 1 : 0)
+    + (pane === "drafts" && status !== "needs_decision" ? 1 : 0);
+
+  const needsN = counts.st.needs_decision ?? 0;
+  const pills: { id: Pane; label: string; count: number }[] = [
+    { id: "contacts", label: "Contacts", count: counts.ty.contact ?? 0 },
+    { id: "deals", label: "Deals", count: counts.ty.deal ?? 0 },
+    { id: "drafts", label: "Drafts to review", count: needsN },
+  ];
+
+  // ── Add contact ─────────────────────────────────────────────────────────
+  // The one create on this screen. POST /api/pipeline/contacts, the same
+  // route the pipeline used; business name is the only required field, and
+  // the new contact opens in the full contact view once it exists.
+  const [addOpen, setAddOpen] = useState(false);
+  const [addBusy, setAddBusy] = useState(false);
+  const [addErr, setAddErr] = useState("");
+  const [addForm, setAddForm] = useState({ business_name: "", contact_name: "", email: "", phone: "", city: "", state: "" });
+  const addField = (k: keyof typeof addForm, v: string) => setAddForm((f) => ({ ...f, [k]: v }));
+  const submitAdd = async () => {
+    if (!addForm.business_name.trim()) { setAddErr("Give the business a name first."); return; }
+    setAddBusy(true); setAddErr("");
+    try {
+      const res = await fetch("/api/pipeline/contacts", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          business_name: addForm.business_name.trim(),
+          contact_name: addForm.contact_name.trim() || null,
+          email: addForm.email.trim() || null,
+          phone: addForm.phone.trim() || null,
+          city: addForm.city.trim() || null,
+          state: addForm.state.trim() || null,
+        }),
+      });
+      const j = await res.json().catch(() => null) as { ok?: boolean; error?: string; message?: string; contact?: { id: number } } | null;
+      if (!res.ok || !j?.ok) {
+        setAddErr(j?.message || j?.error || `The contact was not saved (HTTP ${res.status}).`);
+        return;
+      }
+      setAddForm({ business_name: "", contact_name: "", email: "", phone: "", city: "", state: "" });
+      setAddOpen(false);
+      await load();
+      setPane("contacts");
+      if (j.contact?.id) setContactView(j.contact.id);
+    } catch (e) {
+      setAddErr(`${e instanceof Error ? e.message : String(e)}. The contact was not saved.`);
+    } finally {
+      setAddBusy(false);
+    }
+  };
 
   // ── The decision controls for one row ───────────────────────────────────
   // A ready draft gets ONE filled button. A blocked draft gets no approve at
@@ -1165,6 +1211,7 @@ export default function CrmWorkspace({
     const note: React.CSSProperties = {
       fontSize: 11, lineHeight: 1.45, fontWeight: 600,
       textAlign: big ? "left" : "right", maxWidth: big ? "100%" : 190,
+      whiteSpace: "normal",
     };
 
     // The handover lane gets its own single action. No approve button appears
@@ -1208,7 +1255,7 @@ export default function CrmWorkspace({
         {ready && (
           <PrimaryButton label="Approve draft" busy={isBusy} onClick={() => { void decide(id, "approve"); }} />
         )}
-        {r.status === "needs_decision" && !ready && (
+        {r.status === "needs_decision" && !ready && big && (
           <span style={{ ...note, color: "var(--red)" }}>
             Not approvable yet. Clear the blocker first.
           </span>
@@ -1216,7 +1263,7 @@ export default function CrmWorkspace({
         {r.status === "needs_decision" && (
           <QuietButton label="Skip" busy={isBusy} onClick={() => { void decide(id, "skip"); }} />
         )}
-        {r.status === "approved" && (
+        {r.status === "approved" && big && (
           <span style={{ ...note, color: "var(--green)" }}>
             Approved and not sent. Grant sends it.
           </span>
@@ -1238,28 +1285,184 @@ export default function CrmWorkspace({
     );
   };
 
+  // ── One compact row ─────────────────────────────────────────────────────
+  // One line on desktop: name, one-line context, status, date, action. Two
+  // lines on a phone (the .crm-row rules below). A contact opens the full
+  // contact view; a deal opens its detail; a draft opens the draft detail
+  // with the same approve flow as before.
+  const openRow = (r: Row) => {
+    if (r.contact) { setContactView(r.contact.id); return; }
+    setOpen(open === r.key ? null : r.key);
+  };
+  const contextOf = (r: Row): string => {
+    if (r.outbound) {
+      const bits = [r.who ?? "no contact recorded", r.client];
+      if (r.channel && r.channel !== NO_CHANNEL && r.channel !== "no channel recorded") bits.push(r.channel);
+      return bits.join(" · ");
+    }
+    if (r.contact) {
+      const c = r.contact;
+      return [r.who ?? "no person named", r.where, c.trade].filter(Boolean).join(" · ");
+    }
+    return [r.who ?? "no business recorded", r.where].filter(Boolean).join(" · ");
+  };
+  const renderRow = (r: Row) => {
+    const isOpen = open === r.key;
+    const n = r.blockers.length;
+    return (
+      <div key={r.key} style={{ display: "grid", gap: 8 }}>
+        <div
+          className="crm-row"
+          role="button"
+          tabIndex={0}
+          title={TYPE_LABEL[r.type]}
+          onClick={() => openRow(r)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openRow(r); }
+          }}
+          style={{
+            border: `1px solid ${isOpen ? "var(--accent)" : "var(--border)"}`,
+            borderLeft: `3px solid ${STATUS_COLOR[r.status]}`,
+            borderRadius: 10, padding: "8px 12px", cursor: "pointer",
+            background: "var(--bg-card)",
+          }}
+        >
+          <div className="crm-row-main">
+            <span className="crm-row-title">{r.title}</span>
+            <span className="crm-row-ctx">{contextOf(r)}</span>
+          </div>
+          <div className="crm-row-meta">
+            {n > 0 && (
+              <span
+                title={r.blockers.map((b) => `${b.label}: ${b.detail}`).join("\n\n")}
+                style={{
+                  fontSize: 10.5, fontWeight: 700, color: "var(--red)",
+                  border: "1px solid var(--red)", borderRadius: 6, padding: "1px 7px",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {n === 1 ? r.blockers[0].label : `${n} things blocking it`}
+              </span>
+            )}
+            <span style={{ fontSize: 11.5, fontWeight: 700, color: STATUS_COLOR[r.status], whiteSpace: "nowrap" }}>
+              {r.statusText}
+            </span>
+            <span style={{ fontSize: 11, color: "var(--text-muted)", whiteSpace: "nowrap" }}>
+              {when(r.when)}
+            </span>
+            {rowActions(r, false)}
+          </div>
+        </div>
+
+        {isOpen && (r.outbound
+          ? <CrmRowDetail
+              it={toDetail(r.outbound)}
+              onClose={() => setOpen(null)}
+              actions={
+                <div style={{ display: "grid", gap: 7 }}>
+                  {r.blockers.length > 0 && (
+                    <div style={{ display: "grid", gap: 4 }}>
+                      <span style={{ fontSize: 10.5, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--text-muted)", fontWeight: 700 }}>
+                        What is blocking it
+                      </span>
+                      <BlockerCell blockers={r.blockers} />
+                    </div>
+                  )}
+                  {rowActions(r, true)}
+                  <span style={{ fontSize: 11, lineHeight: 1.5, color: "var(--text-muted)" }}>
+                    {r.status === "client_handover" ? HANDOVER_NOTE : NO_SEND_NOTE}
+                  </span>
+                </div>
+              }
+            />
+          : <PipelineDetail row={r} onClose={() => setOpen(null)} onViewContact={setContactView} />)}
+      </div>
+    );
+  };
+
+  const inputStyle: React.CSSProperties = {
+    minWidth: 0, padding: "7px 12px", borderRadius: 9,
+    border: "1px solid var(--border)",
+    background: "var(--bg-secondary)", color: "var(--text-primary)", fontSize: 12.5,
+  };
+
   return (
     <div style={{ display: "grid", gap: 14 }}>
-      {/* ── Header ───────────────────────────────────────────────────────── */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "baseline" }}>
+      <style>{`
+        .crm-row { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 6px 14px; align-items: center; }
+        .crm-row-main { display: flex; gap: 10px; min-width: 0; align-items: baseline; }
+        .crm-row-title { font-size: 13.5px; font-weight: 650; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; max-width: 60%; }
+        .crm-row-ctx { font-size: 11.5px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1 1 0; min-width: 0; }
+        .crm-row-meta { display: flex; gap: 10px; align-items: center; justify-content: flex-end; flex-wrap: nowrap; }
+        .crm-pane-pill { padding: 7px 14px; border-radius: 999px; font-size: 12.5px; cursor: pointer; background: transparent; white-space: nowrap; }
+        @media (max-width: 768px) {
+          .crm-row { grid-template-columns: minmax(0,1fr); gap: 5px; }
+          .crm-row-main { flex-direction: column; gap: 1px; align-items: stretch; }
+          .crm-row-title, .crm-row-ctx { max-width: 100%; flex: none; }
+          .crm-row-meta { justify-content: flex-start; flex-wrap: wrap; gap: 6px 10px; }
+        }
+      `}</style>
+
+      {/* ── Header: search, add, refresh ─────────────────────────────────── */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
         <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "var(--text-primary)" }}>
           CRM
         </h2>
-        <span style={{ fontSize: 12.5, color: "var(--text-muted)" }}>
-          Drafts waiting on you, everything ever drafted, and Wing&rsquo;s own contact book and
-          deals, in one list.
-        </span>
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search any name, company, subject or note"
+          aria-label="Search the CRM"
+          style={{
+            ...inputStyle, flex: "1 1 240px",
+            border: `1px solid ${q.trim() ? "var(--accent)" : "var(--border)"}`,
+          }}
+        />
+        <button
+          type="button"
+          onClick={() => { setAddOpen((o) => !o); setAddErr(""); }}
+          aria-expanded={addOpen}
+          style={{
+            padding: "7px 15px", borderRadius: 9, fontSize: 12.5, fontWeight: 700, cursor: "pointer",
+            border: "1px solid var(--accent)", background: addOpen ? "var(--accent-glow)" : "transparent",
+            color: "var(--accent)", whiteSpace: "nowrap",
+          }}
+        >
+          {addOpen ? "Close" : "Add contact"}
+        </button>
         <button
           type="button"
           onClick={() => { void load(); }}
-          style={{
-            ...chipBase, marginLeft: "auto",
-            border: "1px solid var(--border)", color: "var(--text-muted)",
-          }}
+          style={{ ...chipBase, border: "1px solid var(--border)", color: "var(--text-muted)" }}
         >
           {loading ? "Loading" : "Refresh"}
         </button>
       </div>
+
+      {addOpen && (
+        <div style={{
+          border: "1px solid var(--accent)", borderRadius: 12, padding: "12px 14px",
+          background: "var(--bg-card)", display: "grid", gap: 10,
+        }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>New contact</div>
+          <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))" }}>
+            <input value={addForm.business_name} onChange={(e) => addField("business_name", e.target.value)} placeholder="Business name (required)" style={inputStyle} />
+            <input value={addForm.contact_name} onChange={(e) => addField("contact_name", e.target.value)} placeholder="Person" style={inputStyle} />
+            <input value={addForm.email} onChange={(e) => addField("email", e.target.value)} placeholder="Email" type="email" style={inputStyle} />
+            <input value={addForm.phone} onChange={(e) => addField("phone", e.target.value)} placeholder="Phone" type="tel" style={inputStyle} />
+            <input value={addForm.city} onChange={(e) => addField("city", e.target.value)} placeholder="City" style={inputStyle} />
+            <input value={addForm.state} onChange={(e) => addField("state", e.target.value)} placeholder="State" style={inputStyle} />
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <PrimaryButton label="Save contact" busy={addBusy} onClick={() => { void submitAdd(); }} />
+            <QuietButton label="Cancel" onClick={() => { setAddOpen(false); setAddErr(""); }} />
+            {addErr && <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--red)" }}>{addErr}</span>}
+            <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+              Saving adds the contact to Wing&rsquo;s own book. It does not send anything.
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* ── What could not be read. Never silent. ───────────────────────── */}
       {crmErr && (
@@ -1281,205 +1484,147 @@ export default function CrmWorkspace({
         } />
       )}
 
-      {/* ── What to do right now. The first thing on screen, above the
-             filters, because "which of these can I actually act on" is the
-             only question the CRM is opened to answer. ──────────────────── */}
-      {!loading && rows.length > 0 && (
-        <div style={{
-          border: `1px solid ${counts.readyN > 0 ? "var(--green)" : "var(--border)"}`,
-          borderRadius: 12, padding: "12px 14px", background: "var(--bg-card)",
-          display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center",
-        }}>
-          <div style={{ flex: "1 1 320px", minWidth: 0 }}>
-            <div style={{
-              fontSize: 14.5, fontWeight: 700,
-              color: counts.readyN > 0 ? "var(--green)" : "var(--text-secondary)",
-            }}>
-              {counts.readyN > 0
-                ? `${counts.readyN} draft${counts.readyN === 1 ? " is" : "s are"} ready for your decision, with nothing blocking ${counts.readyN === 1 ? "it" : "them"}.`
-                : "No draft is ready for your decision right now."}
-            </div>
-            <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 3, lineHeight: 1.5 }}>
-              {counts.stuckN > 0
-                ? `${counts.stuckN} more ${counts.stuckN === 1 ? "draft is" : "drafts are"} waiting on a decision but something is blocking ${counts.stuckN === 1 ? "it" : "them"} first.`
-                : "Nothing else is waiting on a decision."}
-              {" "}{NO_SEND_NOTE}
-            </div>
-          </div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {counts.readyN > 0 && (
-              <PrimaryButton
-                label={viewingReady ? `Showing the ${counts.readyN} ready` : `Show the ${counts.readyN} ready`}
-                onClick={showReady}
-                disabled={viewingReady}
-              />
-            )}
-            {counts.stuckN > 0 && (
-              <QuietButton label={`Show the ${counts.stuckN} blocked`} onClick={showStuck} />
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ── The handover lane ────────────────────────────────────────────
-             Its own band, deliberately not the red of a blocker. These drafts
-             are working exactly as intended: the client's contract says Wing
-             does not send for them, so the output is a lead to hand over, not
-             outbound waiting on a decision. They are counted here and NOWHERE
-             in the ready/blocked line above, which is why that headline can be
-             trusted. Nothing is hidden and the drafter keeps producing them. */}
-      {!loading && counts.handoverN > 0 && (
-        <div style={{
-          border: "1px solid var(--accent-2)", borderRadius: 12, padding: "12px 14px",
-          background: "var(--bg-card)", display: "flex", flexWrap: "wrap", gap: 12,
-          alignItems: "center",
-        }}>
-          <div style={{ flex: "1 1 320px", minWidth: 0 }}>
-            <div style={{ fontSize: 14.5, fontWeight: 700, color: "var(--accent-2)" }}>
-              {counts.handoverN} lead{counts.handoverN === 1 ? "" : "s"} to hand to the client.
-            </div>
-            <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 3, lineHeight: 1.5 }}>
-              {handoverClients.length === 1
-                ? `${handoverClients[0]} does not permit Wing to send on their behalf, so these are `
-                : `${handoverClients.join(", ")} do not permit Wing to send on their behalf, so these are `}
-              research Jack passes over, not outbound Wing is deciding whether to mail. They are
-              still being written and are all here to read. They are counted out of the ready and
-              blocked numbers above on purpose, so that line only counts drafts Wing could act on.
-            </div>
-          </div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <QuietButton
-              label={viewingHandover
-                ? `Showing the ${counts.handoverN}`
-                : `Show the ${counts.handoverN} to hand over`}
-              tone="var(--accent-2)"
-              onClick={showHandover}
-            />
-            <QuietButton
-              label={`Copy all ${counts.handoverN}`}
-              tone="var(--accent-2)"
-              onClick={() => {
-                void copyLead(
-                  "__lane__",
-                  handoverRows.map(handoverText).join("\n\n----------------\n\n"),
-                  `All ${handoverRows.length} leads copied. Paste them to the client.`,
-                );
-              }}
-            />
-          </div>
-          {copied.__lane__ && (
-            <div style={{
-              flex: "1 1 100%", fontSize: 11.5, fontWeight: 600,
-              color: copied.__lane__.startsWith("The copy failed") ? "var(--red)" : "var(--green)",
-            }}>
-              {copied.__lane__}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── Filters ──────────────────────────────────────────────────────── */}
-      {/* Was five stacked chip rows (roughly twenty chips) before a single
-          record was visible. Search, the view and the client stay out here
-          because they are what actually gets changed; type, channel and the
-          blocker split fold behind "More filters". Every count they carried
-          moved into the select labels, so nothing stopped being knowable. */}
-      <div style={{
-        border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px",
-        background: "var(--bg-card)", display: "grid", gap: 10,
-      }}>
-        <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
-          <label style={{ display: "flex", flexDirection: "column", gap: 3, flex: "1 1 240px", minWidth: 0 }}>
-            <span style={{
-              fontSize: 9.5, textTransform: "uppercase", letterSpacing: ".07em",
-              fontWeight: 700, color: "var(--text-muted)", paddingLeft: 2,
-            }}>
-              Search
-            </span>
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Any name, company, subject or note"
-              style={{
-                minWidth: 0, padding: "7px 12px", borderRadius: 9,
-                border: `1px solid ${q.trim() ? "var(--accent)" : "var(--border)"}`,
-                background: "var(--bg-secondary)", color: "var(--text-primary)", fontSize: 12.5,
-              }}
-            />
-          </label>
-
-          <Select name="View" value={status} options={statusOptions} wide
-                  onChange={(v) => setStatus(v as StatusKey | "all")} />
-          <Select name="Client" value={client} options={clientOptions} wide onChange={setClient} />
-
-          <button
-            type="button"
-            onClick={() => setMore((m) => !m)}
-            aria-expanded={more}
-            style={{
-              padding: "7px 13px", borderRadius: 9, fontSize: 12.5, cursor: "pointer",
-              border: `1px solid ${hiddenFacets > 0 ? "var(--accent)" : "var(--border)"}`,
-              color: hiddenFacets > 0 ? "var(--accent)" : "var(--text-muted)",
-              fontWeight: hiddenFacets > 0 ? 700 : 500,
-              background: "var(--bg-secondary)", whiteSpace: "nowrap",
-            }}
-          >
-            {more ? "Fewer filters" : "More filters"}
-            {hiddenFacets > 0 && !more ? ` (${hiddenFacets} on)` : ""}
-          </button>
-
-          {active.length > 0 && (
+      {/* ── The three pills + filters ────────────────────────────────────── */}
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        {pills.map((p) => {
+          const on = pane === p.id;
+          return (
             <button
+              key={p.id}
               type="button"
-              onClick={clearAll}
+              className="crm-pane-pill"
+              onClick={() => choosePane(p.id)}
+              aria-pressed={on}
               style={{
-                padding: "7px 13px", borderRadius: 9, fontSize: 12.5, cursor: "pointer",
-                border: "1px solid var(--accent)", color: "var(--accent)",
-                fontWeight: 700, background: "var(--bg-secondary)", whiteSpace: "nowrap",
+                fontWeight: on ? 700 : 500,
+                border: `1px solid ${on ? "var(--accent)" : "var(--border)"}`,
+                background: on ? "var(--accent-glow)" : "transparent",
+                color: on ? "var(--accent)" : "var(--text-secondary)",
               }}
             >
-              Clear all filters
+              {p.label}
+              <span style={{ marginLeft: 6, fontWeight: 700, color: on ? "var(--accent)" : "var(--text-muted)" }}>
+                {loading && rows.length === 0 ? "" : p.count.toLocaleString("en-US")}
+              </span>
             </button>
-          )}
-        </div>
+          );
+        })}
 
-        {more && (
+        <button
+          type="button"
+          onClick={() => setMore((m) => !m)}
+          aria-expanded={more}
+          style={{
+            marginLeft: "auto", padding: "7px 13px", borderRadius: 9, fontSize: 12.5, cursor: "pointer",
+            border: `1px solid ${hiddenFacets > 0 ? "var(--accent)" : "var(--border)"}`,
+            color: hiddenFacets > 0 ? "var(--accent)" : "var(--text-muted)",
+            fontWeight: hiddenFacets > 0 ? 700 : 500,
+            background: "var(--bg-secondary)", whiteSpace: "nowrap",
+          }}
+        >
+          {more ? "Fewer filters" : "More filters"}
+          {hiddenFacets > 0 && !more ? ` (${hiddenFacets} on)` : ""}
+        </button>
+      </div>
+
+      {more && (
+        <div style={{
+          border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px",
+          background: "var(--bg-card)", display: "grid", gap: 10,
+        }}>
           <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
-            <Select name="Record type" value={type} options={typeOptions}
-                    onChange={(v) => setType(v as TypeKey | "all")} />
-            <Select name="Channel" value={channel} options={channelOptions} onChange={setChannel} />
+            {pane !== "contacts" && (
+              <Select name={pane === "deals" ? "Deal status" : "Draft status"} value={status} options={statusOptions} wide
+                      onChange={(v) => setStatus(v as StatusKey | "all")} />
+            )}
+            <Select name="Client" value={client} options={clientOptions} wide onChange={setClient} />
+            {pane === "drafts" && (
+              <Select name="Channel" value={channel} options={channelOptions} onChange={setChannel} />
+            )}
             <Select name="Blockers" value={blocked} options={blockedOptions} wide
                     onChange={(v) => setBlocked(v as "all" | "blocked" | "clear")} />
+            {active.length > 0 && (
+              <button
+                type="button"
+                onClick={clearAll}
+                style={{
+                  padding: "7px 13px", borderRadius: 9, fontSize: 12.5, cursor: "pointer",
+                  border: "1px solid var(--accent)", color: "var(--accent)",
+                  fontWeight: 700, background: "var(--bg-secondary)", whiteSpace: "nowrap",
+                }}
+              >
+                Clear all filters
+              </button>
+            )}
           </div>
-        )}
+        </div>
+      )}
 
-        {active.length > 0 && (
-          <div style={{ fontSize: 12, color: "var(--accent)", fontWeight: 600 }}>
-            Showing: {active.join(" · ")}
-            <span style={{ color: "var(--text-muted)", fontWeight: 500 }}>
-              {"  "}({filtered.length} of {rows.length} records)
-            </span>
+      {active.length > 0 && (
+        <div style={{ fontSize: 12, color: "var(--accent)", fontWeight: 600 }}>
+          Showing: {active.join(" · ")}
+          <span style={{ color: "var(--text-muted)", fontWeight: 500 }}>
+            {"  "}({filtered.length} of {paneTotal} {pane === "deals" ? "deals" : pane === "contacts" ? "contacts" : "drafts"})
+          </span>
+        </div>
+      )}
+
+      {/* ── Drafts: the one-line status ──────────────────────────────────── */}
+      {pane === "drafts" && !loading && (
+        <div style={{ display: "grid", gap: 3 }}>
+          <div style={{
+            fontSize: 14, fontWeight: 700,
+            color: counts.readyN > 0 ? "var(--green)" : "var(--text-secondary)",
+          }}>
+            {needsN === 0
+              ? "No draft needs a decision."
+              : `${needsN} draft${needsN === 1 ? " needs" : "s need"} your decision` +
+                (counts.readyN > 0 ? `, ${counts.readyN} ready to approve` : "") +
+                (counts.stuckN > 0 ? `, ${counts.stuckN} blocked` : "") + "."}
           </div>
-        )}
-
-      </div>
+          <div style={{ fontSize: 11.5, color: "var(--text-muted)", lineHeight: 1.5 }}>{NO_SEND_NOTE}</div>
+        </div>
+      )}
 
       {/* ── The list ─────────────────────────────────────────────────────── */}
       {/* rowActions is a plain JSX helper rather than a nested component, so the
           buttons are not remounted (and their busy state lost) on every render. */}
       {loading && rows.length === 0 ? (
         <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Loading every CRM record</div>
-      ) : filtered.length === 0 ? (
+      ) : pane === null ? null : filtered.length === 0 ? (
         <div style={{
           border: "1px dashed var(--border)", borderRadius: 12, padding: 18,
           fontSize: 13, color: "var(--text-muted)", lineHeight: 1.6,
         }}>
           {rows.length === 0 ? (
             "No CRM records were returned at all. That is not the same as an empty CRM: read the errors above before treating this as nothing to do."
+          ) : paneTotal === 0 ? (
+            pane === "contacts" ? "No contacts are on file yet. Add one with the button above."
+              : pane === "deals" ? "No deals are on file yet. Open a contact to start one."
+              : "No drafts have been written yet."
+          ) : pane === "drafts" && status === "needs_decision" && active.length === 0 ? (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <span>
+                Nothing is waiting on you. The {paneTotal.toLocaleString("en-US")} drafts on file were all
+                already approved, sent or skipped.
+              </span>
+              <button
+                type="button"
+                onClick={() => setStatus("all")}
+                style={{
+                  padding: "6px 12px", borderRadius: 8, cursor: "pointer",
+                  border: "1px solid var(--accent)", background: "transparent",
+                  color: "var(--accent)", fontSize: 12.5, fontWeight: 600,
+                }}
+              >
+                Show every draft
+              </button>
+            </span>
           ) : (
             <span style={{ display: "inline-flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <span>
-                Nothing matches these filters. Clear them to see all {rows.length.toLocaleString("en-US")} records.
+                Nothing matches these filters. Clear them to see all {paneTotal.toLocaleString("en-US")}{" "}
+                {pane === "deals" ? "deals" : pane === "contacts" ? "contacts" : "drafts"}.
               </span>
               <button
                 type="button"
@@ -1496,100 +1641,13 @@ export default function CrmWorkspace({
           )}
         </div>
       ) : (
-        <div style={{ display: "grid", gap: 8 }}>
+        <div style={{ display: "grid", gap: 6 }}>
           <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
-            {filtered.length} record{filtered.length === 1 ? "" : "s"}
+            {filtered.length} {pane === "deals" ? "deal" : pane === "contacts" ? "contact" : "draft"}{filtered.length === 1 ? "" : "s"}
             {filtered.length > shown ? `, showing the first ${shown}` : ""}
           </div>
 
-          {filtered.slice(0, shown).map((r) => {
-            const isOpen = open === r.key;
-            return (
-              <div key={r.key} style={{ display: "grid", gap: 8 }}>
-                <div
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => setOpen(isOpen ? null : r.key)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen(isOpen ? null : r.key); }
-                  }}
-                  style={{
-                    border: `1px solid ${isOpen ? "var(--accent)" : "var(--border)"}`,
-                    borderLeft: `3px solid ${STATUS_COLOR[r.status]}`,
-                    borderRadius: 10, padding: "10px 12px", cursor: "pointer",
-                    background: "var(--bg-card)", display: "grid", gap: 6,
-                    gridTemplateColumns: "minmax(0,2.2fr) minmax(0,1fr) minmax(0,1.6fr) auto",
-                    alignItems: "center",
-                  }}
-                >
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{
-                      fontSize: 13.5, fontWeight: 650, color: "var(--text-primary)",
-                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                    }}>
-                      {r.title}
-                    </div>
-                    <div style={{
-                      fontSize: 11.5, color: "var(--text-muted)", marginTop: 2,
-                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                    }}>
-                      {TYPE_LABEL[r.type]} · {r.who ?? "no contact recorded"}
-                      {r.where ? ` · ${r.where}` : ""} · {r.client}
-                    </div>
-                  </div>
-
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 11.5, fontWeight: 700, color: STATUS_COLOR[r.status] }}>
-                      {r.statusText}
-                    </div>
-                    <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
-                      {r.channel === NO_CHANNEL ? "" : r.channel}
-                    </div>
-                  </div>
-
-                  <div style={{ minWidth: 0, display: "grid", gap: 4 }}>
-                    {r.status === "client_handover" && (
-                      <span
-                        title={r.handoverNote ?? undefined}
-                        style={{
-                          fontSize: 10.5, fontWeight: 700, color: "var(--accent-2)",
-                          border: "1px solid var(--accent-2)", borderRadius: 6,
-                          padding: "1px 7px", justifySelf: "start",
-                        }}
-                      >
-                        hand to the client, Wing will not send
-                      </span>
-                    )}
-                    {(r.status !== "client_handover" || r.blockers.length > 0) && (
-                      <BlockerCell blockers={r.blockers} />
-                    )}
-                  </div>
-
-                  <div style={{ display: "grid", gap: 6, justifyItems: "end" }}>
-                    <div style={{ fontSize: 11, color: "var(--text-muted)", whiteSpace: "nowrap" }}>
-                      {when(r.when)}
-                    </div>
-                    {rowActions(r, false)}
-                  </div>
-                </div>
-
-                {isOpen && (r.outbound
-                  ? <CrmRowDetail
-                      it={toDetail(r.outbound)}
-                      onClose={() => setOpen(null)}
-                      actions={
-                        <div style={{ display: "grid", gap: 7 }}>
-                          {rowActions(r, true)}
-                          <span style={{ fontSize: 11, lineHeight: 1.5, color: "var(--text-muted)" }}>
-                            {r.status === "client_handover" ? HANDOVER_NOTE : NO_SEND_NOTE}
-                          </span>
-                        </div>
-                      }
-                    />
-                  : <PipelineDetail row={r} onClose={() => setOpen(null)} onViewContact={setContactView} />)}
-              </div>
-            );
-          })}
+          {filtered.slice(0, shown).map(renderRow)}
 
           {filtered.length > shown && (
             <button
@@ -1602,6 +1660,78 @@ export default function CrmWorkspace({
             >
               Show {Math.min(PAGE_SIZE, filtered.length - shown)} more
             </button>
+          )}
+        </div>
+      )}
+
+      {/* ── Handover leads, collapsed under the drafts list ───────────────
+             These drafts are working exactly as intended: the client's
+             contract says Wing does not send for them, so the output is a lead
+             to hand over, not outbound waiting on a decision. Counted out of
+             the status line above on purpose. Nothing is hidden and the
+             drafter keeps producing them. */}
+      {pane === "drafts" && !loading && (
+        <div style={{
+          border: `1px solid ${handoverOpen ? "var(--accent-2)" : "var(--border)"}`, borderRadius: 12,
+          background: "var(--bg-card)", display: "grid", gap: 10, padding: "10px 14px",
+        }}>
+          <button
+            type="button"
+            onClick={() => setHandoverOpen((o) => !o)}
+            aria-expanded={handoverOpen}
+            style={{
+              background: "transparent", border: "none", padding: 0, cursor: "pointer",
+              textAlign: "left", fontSize: 13, fontWeight: 700, color: "var(--accent-2)",
+              display: "flex", gap: 8, alignItems: "center", minHeight: 0,
+            }}
+          >
+            <span aria-hidden="true">{handoverOpen ? "▾" : "▸"}</span>
+            Leads for clients who do not allow sending ({counts.handoverN})
+          </button>
+          {handoverOpen && (
+            counts.handoverN === 0 ? (
+              <div style={{ fontSize: 12.5, color: "var(--text-muted)" }}>
+                None right now.
+              </div>
+            ) : (
+              <>
+                <div style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>
+                  {handoverClients.length === 1
+                    ? `${handoverClients[0]} does not permit Wing to send on their behalf, so these are `
+                    : `${handoverClients.join(", ")} do not permit Wing to send on their behalf, so these are `}
+                  leads to pass over, not outbound Wing is deciding whether to mail. Nothing here will ever be sent from this screen.
+                </div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  <QuietButton
+                    label={`Copy all ${handoverRows.length}`}
+                    tone="var(--accent-2)"
+                    onClick={() => {
+                      void copyLead(
+                        "__lane__",
+                        handoverRows.map(handoverText).join("\n\n----------------\n\n"),
+                        `All ${handoverRows.length} leads copied. Paste them to the client.`,
+                      );
+                    }}
+                  />
+                  {copied.__lane__ && (
+                    <span style={{
+                      fontSize: 11.5, fontWeight: 600,
+                      color: copied.__lane__.startsWith("The copy failed") ? "var(--red)" : "var(--green)",
+                    }}>
+                      {copied.__lane__}
+                    </span>
+                  )}
+                </div>
+                {handoverRows.length === 0 && q.trim() && (
+                  <div style={{ fontSize: 12.5, color: "var(--text-muted)" }}>
+                    None match the search. Clear it to see all {counts.handoverN}.
+                  </div>
+                )}
+                <div style={{ display: "grid", gap: 6 }}>
+                  {handoverRows.map(renderRow)}
+                </div>
+              </>
+            )
           )}
         </div>
       )}

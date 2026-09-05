@@ -4,6 +4,16 @@ import { sbUrl, sbService } from "@/lib/osSupabase";
 import { requireStaff, isAuthFailure } from "../pipeline/_lib";
 import { emitEvent } from "@/lib/automations/emit";
 import { normalizePhone } from "@/lib/phone";
+import {
+  FIRST_NAME,
+  loadAvailability,
+  loadBlocks,
+  pickAssignee,
+  unionHours,
+  whoIsFree,
+  type AvailabilityRow,
+  type BlockRow as AvailBlockRow,
+} from "../calendar/availability/_lib";
 
 // ───────────────────────────────────────────────────────────────────────────
 // Booking API — the GHL calendar replacement's engine room.
@@ -13,14 +23,22 @@ import { normalizePhone } from "@/lib/phone";
 //   POST { name, email, starts_at, ... }   public: create a booking
 //   PATCH { id, status }                   staff: cancel / complete / no-show
 //
-// Availability: Mon-Fri 9:00-17:00 America/Chicago, 30-minute slots. A slot
-// is gone when it overlaps any non-cancelled booking. Times are STORED as UTC
-// timestamptz and DISPLAYED in CT; all the zone math lives here, explicitly,
-// so the client never has to guess an offset.
+// Availability (migration 0024): 30-minute slots in America/Chicago. A slot
+// is OFFERED when at least one person on the team who takes bookings is
+// free: inside their weekly hours for that weekday, not covered by any of
+// their calendar_blocks (weekly blocks expanded onto every matching weekday),
+// and not already holding a non-cancelled booking. The rule itself lives in
+// app/api/calendar/availability/_lib.ts so the staff hours editor and this
+// engine can never disagree. The public response carries only `available`;
+// names never leave the server. POST assigns the booking to a free person
+// (jack, then grant, then maddox) and stores it in bookings.assigned_to.
+//
+// Times are STORED as UTC timestamptz and DISPLAYED in CT; all the zone math
+// lives here, explicitly, so the client never has to guess an offset.
 //
 // TODO: fold in Google Calendar busy times (GOOGLE_CALENDAR_ICS_URL) so a
-// slot Jack already has a meeting in is not offered. Deliberately left out of
-// this round; the public link only knows about its own bookings table.
+// slot Jack already has a meeting in is not offered. Deliberately left out;
+// the public link knows its own bookings table, the team's hours and blocks.
 // ───────────────────────────────────────────────────────────────────────────
 
 export const runtime = "nodejs";
@@ -28,8 +46,6 @@ export const dynamic = "force-dynamic";
 
 const TZ = "America/Chicago";
 const SLOT_MINUTES = 30;
-const OPEN_HOUR = 9; // 9:00 CT
-const CLOSE_HOUR = 17; // last slot starts 16:30 CT
 
 // ── Timezone math ──────────────────────────────────────────────────────────
 // UTC-ms offset of Chicago at a given instant (local = utc + offset). Read
@@ -84,17 +100,22 @@ function isYmd(v: unknown): v is string {
   return typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
 }
 
-// A CT slot start on a day: label like "9:30 AM" for humans, plus UTC bounds.
-type Slot = { starts_at: string; ends_at: string; label: string };
+// A CT slot start on a day: label like "9:30 AM" for humans, plus UTC bounds
+// and the Central wall-clock minutes the availability rule works in.
+type Slot = { starts_at: string; ends_at: string; label: string; startMin: number; endMin: number };
 
-function slotsForDay(ymd: string): Slot[] {
+// Every 30-minute slot that falls inside the union of the team's hours for
+// that weekday. The union is only the candidate list; each slot is then
+// judged person by person. A day nobody works on yields no slots.
+function slotsForDay(ymd: string, availability: AvailabilityRow[]): Slot[] {
   const [y, mo, d] = ymd.split("-").map(Number);
-  // Weekday of that DATE in Chicago: noon CT on that day is safely inside it.
-  const wd = wallAt(chicagoToUtc(y, mo, d, 12, 0)).wd;
-  if (wd === "Sat" || wd === "Sun") return [];
   const out: Slot[] = [];
-  for (let h = OPEN_HOUR; h < CLOSE_HOUR; h++) {
-    for (const mi of [0, SLOT_MINUTES]) {
+  for (const [rs, re] of unionHours(availability, ymd)) {
+    // Start on the first :00/:30 boundary at or after the range start.
+    let m = Math.ceil(rs / SLOT_MINUTES) * SLOT_MINUTES;
+    for (; m + SLOT_MINUTES <= re; m += SLOT_MINUTES) {
+      const h = Math.floor(m / 60);
+      const mi = m % 60;
       const start = chicagoToUtc(y, mo, d, h, mi);
       const end = new Date(start.getTime() + SLOT_MINUTES * 60_000);
       const h12 = h % 12 || 12;
@@ -102,10 +123,19 @@ function slotsForDay(ymd: string): Slot[] {
         starts_at: start.toISOString(),
         ends_at: end.toISOString(),
         label: `${h12}:${String(mi).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`,
+        startMin: m,
+        endMin: m + SLOT_MINUTES,
       });
     }
   }
   return out;
+}
+
+// Everything the rule needs, read once per request.
+async function loadRules(): Promise<{ availability: AvailabilityRow[]; blocks: AvailBlockRow[] } | null> {
+  const [availability, blocks] = await Promise.all([loadAvailability(), loadBlocks()]);
+  if (availability === null || blocks === null) return null;
+  return { availability, blocks };
 }
 
 // ── Bookings reads (service key: RLS is staff-only; this route validates) ──
@@ -121,6 +151,8 @@ type BookingRow = {
   client_slug: string | null;
   notes: string | null;
   created_at: string;
+  /** Which person the booking landed on (migration 0024). NULL = unknown. */
+  assigned_to: string | null;
 };
 
 async function bookingsBetween(
@@ -146,10 +178,6 @@ async function bookingsBetween(
   } catch {
     return null;
   }
-}
-
-function overlaps(slotStart: string, slotEnd: string, rows: BookingRow[]): boolean {
-  return rows.some((b) => b.starts_at < slotEnd && b.ends_at > slotStart);
 }
 
 // ── Rate limit: naive in-memory, per IP. Good enough for one Vercel instance;
@@ -233,13 +261,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "bad_request", message: "Invalid date range." }, { status: 400 });
   }
 
-  const windowStart = slotsForDay(dayList[0])[0]?.starts_at ?? chicagoToUtc(...(dayList[0].split("-").map(Number) as [number, number, number]), 0, 0).toISOString();
+  const [fy, fmo, fd] = dayList[0].split("-").map(Number);
+  const windowStart = chicagoToUtc(fy, fmo, fd, 0, 0).toISOString();
   const lastDay = dayList[dayList.length - 1];
   const [ly, lmo, ld] = lastDay.split("-").map(Number);
   const windowEnd = chicagoToUtc(ly, lmo, ld, 23, 59).toISOString();
 
-  const existing = await bookingsBetween(windowStart, windowEnd);
-  if (existing === null) {
+  const [existing, rules] = await Promise.all([bookingsBetween(windowStart, windowEnd), loadRules()]);
+  if (existing === null || rules === null) {
     return NextResponse.json(
       { error: "unavailable", message: "The booking calendar is not connected to its database right now. Please try again later." },
       { status: 503 }
@@ -248,9 +277,22 @@ export async function GET(req: NextRequest) {
 
   const nowIso = new Date().toISOString();
   const days = dayList.map((ymd) => {
-    const slots = slotsForDay(ymd)
+    const slots = slotsForDay(ymd, rules.availability)
       .filter((s) => s.starts_at > nowIso)
-      .map((s) => ({ ...s, available: !overlaps(s.starts_at, s.ends_at, existing) }));
+      .map((s) => {
+        const check = whoIsFree({
+          ymd,
+          startMin: s.startMin,
+          endMin: s.endMin,
+          slotStartIso: s.starts_at,
+          slotEndIso: s.ends_at,
+          availability: rules.availability,
+          blocks: rules.blocks,
+          bookings: existing,
+        });
+        // Public shape on purpose: no names, no counts, only yes or no.
+        return { starts_at: s.starts_at, ends_at: s.ends_at, label: s.label, available: check.free.length > 0 };
+      });
     return { date: ymd, slots };
   });
 
@@ -307,23 +349,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "bad_request", message: "That time is in the past. Please pick another slot." }, { status: 400 });
   }
 
-  // The requested instant must be one of OUR slots: Mon-Fri, 9:00-17:00 CT,
-  // on a :00 or :30 boundary. Anything else is rejected, not rounded.
+  // The requested instant must sit on a :00 or :30 boundary. Anything else is
+  // rejected, not rounded. Whether it is inside anyone's hours is checked
+  // against the availability table below, never against a constant here.
   const w = wallAt(start);
-  const validWall =
-    w.wd !== "Sat" &&
-    w.wd !== "Sun" &&
-    w.h >= OPEN_HOUR &&
-    w.h < CLOSE_HOUR &&
-    (w.mi === 0 || w.mi === SLOT_MINUTES) &&
-    w.s === 0 &&
-    start.getMilliseconds() === 0;
-  if (!validWall) {
+  const onGrid = (w.mi === 0 || w.mi === SLOT_MINUTES) && w.s === 0 && start.getMilliseconds() === 0;
+  if (!onGrid) {
     return NextResponse.json(
-      { error: "bad_request", message: "That time is outside booking hours (Monday to Friday, 9am to 5pm Central)." },
+      { error: "bad_request", message: "Please pick one of the offered time slots." },
       { status: 400 }
     );
   }
+  const slotYmd = `${w.y}-${String(w.mo).padStart(2, "0")}-${String(w.d).padStart(2, "0")}`;
+  const slotStartMin = w.h * 60 + w.mi;
 
   // Validation passed: this is a real booking attempt, so it counts toward
   // the (smaller) booking rate limit.
@@ -337,17 +375,35 @@ export async function POST(req: NextRequest) {
   const slotStart = start.toISOString();
   const slotEnd = new Date(start.getTime() + SLOT_MINUTES * 60_000).toISOString();
 
-  // Still free? Re-check right before insert. This is the friendly fast path;
-  // the bookings_slot_unique index on the table is the real guarantee, and the
-  // insert below handles its 409 with the same friendly message.
-  const existing = await bookingsBetween(slotStart, slotEnd);
-  if (existing === null) {
+  // Who is free? Re-checked right before insert against hours, blocks and
+  // current bookings. This is the friendly fast path; the bookings_slot_unique
+  // index on (starts_at, assigned_to) is the real guarantee, and the insert
+  // below handles its 409 with the same friendly message.
+  const [existing, rules] = await Promise.all([bookingsBetween(slotStart, slotEnd), loadRules()]);
+  if (existing === null || rules === null) {
     return NextResponse.json(
       { error: "unavailable", message: "The booking calendar is not connected to its database right now. Please try again later." },
       { status: 503 }
     );
   }
-  if (overlaps(slotStart, slotEnd, existing)) {
+  const check = whoIsFree({
+    ymd: slotYmd,
+    startMin: slotStartMin,
+    endMin: slotStartMin + SLOT_MINUTES,
+    slotStartIso: slotStart,
+    slotEndIso: slotEnd,
+    availability: rules.availability,
+    blocks: rules.blocks,
+    bookings: existing,
+  });
+  if (check.inHours.length === 0) {
+    return NextResponse.json(
+      { error: "bad_request", message: "That time is outside our booking hours. Please pick one of the offered slots." },
+      { status: 400 }
+    );
+  }
+  const assignee = pickAssignee(check.free);
+  if (!assignee) {
     return NextResponse.json(
       { error: "slot_taken", message: "Sorry, that slot was just taken. Please pick another time." },
       { status: 409 }
@@ -386,6 +442,7 @@ export async function POST(req: NextRequest) {
         source: "public_link",
         client_slug: clientSlug,
         notes,
+        assigned_to: assignee,
       }),
     });
     if (!r.ok) {
@@ -423,12 +480,19 @@ export async function POST(req: NextRequest) {
           ends_at: created.ends_at,
           client_slug: clientSlug,
           booking_id: created.id,
+          assigned_to: created.assigned_to,
         },
       });
     } catch {
       // The booking exists; the engine's cron can still find it.
     }
-    return NextResponse.json({ ok: true, booking: created }, { status: 201 });
+    // `with` is the one team fact the public page may show: the first name
+    // of the person who will call, because the visitor needs to know who
+    // to expect. Nothing else about the team leaves the server.
+    return NextResponse.json(
+      { ok: true, booking: created, with: FIRST_NAME[created.assigned_to ?? ""] ?? null },
+      { status: 201 }
+    );
   } catch {
     return NextResponse.json(
       { error: "insert_failed", message: "The booking could not be saved. Please try again." },

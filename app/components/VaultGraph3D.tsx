@@ -385,7 +385,6 @@ export default function VaultGraph3D(props: {
       dom?.removeEventListener("wheel", onRealInput);
       dom?.removeEventListener("touchstart", onRealInput);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [graph.nodes.length]);
 
   const anyHi = highlightNodes.current.size > 0;

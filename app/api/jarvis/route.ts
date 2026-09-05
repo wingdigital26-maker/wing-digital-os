@@ -1,607 +1,504 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import crypto from "crypto";
 import { execFileSync, spawn } from "child_process";
 import { isCloud } from "@/lib/runtime";
-import { VAULT_PATH, listVaultFiles, readVaultFile } from "@/lib/vaultSource";
-import { getRevenueTruth, BASIS_LABEL } from "@/lib/revenue";
+import { VAULT_PATH, readVaultFile } from "@/lib/vaultSource";
+import { sbUrl, sbService } from "@/lib/osSupabase";
+import { requireStaff, isAuthFailure } from "@/app/api/pipeline/_lib";
+import {
+  JARVIS_TOOLS,
+  WRITE_TOOLS,
+  isKnownTool,
+  runJarvisTool,
+  describeAction,
+  toolActivityLine,
+} from "@/lib/jarvisTools";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-// ── Jarvis: agentic assistant for Wing Digital OS ─────────────────────────────
-// Jarvis has FULL-ACCESS tools (Anthropic tool-use / function calling), enabled
-// at Jack's explicit request. When Claude asks for a tool we run it here on
-// Jack's PC, feed the result back, and continue the loop until Claude produces
-// a final answer, which we stream to the browser. Outward-facing / destructive
-// actions require an in-chat confirmation from Jack (enforced by the system
-// prompt) plus hard guardrails in the tool implementations below (vault path
-// containment, no raw/ writes, secret scanning, no GHL DELETE).
+// ───────────────────────────────────────────────────────────────────────────
+// Jarvis: Wing Digital's operator assistant.
+//
+// ENGINES
+//   api      Anthropic Messages API tool loop (default when ANTHROPIC_API_KEY
+//            is set). Streams text, runs the cloud-safe tools in
+//            lib/jarvisTools.ts, and pauses on any WRITE tool until the user
+//            confirms it in the chat UI. Works with the PC off.
+//   cli      Claude Code CLI on Jack's PC (JARVIS_ENGINE=cli, or no API key
+//            and the CLI exists). Free on the subscription but has no
+//            confirmation flow; the CLI's own toolset applies.
+//   limited  No key and no CLI: a plain readout of the vault state files.
+//
+// STREAM CONTRACT (text/event-stream, one JSON object per `data:` line)
+//   { engine }                       which engine answered
+//   { text }                         a chunk of the answer
+//   { tool, detail, line }           a tool is running (line = human wording)
+//   { tool_done, ok, links }         a tool finished; links point into the OS
+//   { pending_action: {...} }        a WRITE tool wants confirmation; the turn
+//                                    ends here. The UI re-posts with
+//                                    confirm_action_id to run it.
+//   { budget: {...} }                spend ceiling refusal or backend outage
+//   { error }                        anything else
+//   data: [DONE]
+//
+// MONEY
+//   Every model call reserves against the "jarvis" bucket in api_usage
+//   (supabase/migrations/0026_api_usage.sql), the bucketed twin of
+//   lib/rateLimit.ts. Defaults 200 calls and $3 a day, env-overridable. Fails
+//   CLOSED: if the counter is unreachable the call is refused.
+//
+// CONFIRMATION TOKEN
+//   pending_action.id is base64url(payload).base64url(HMAC-SHA256(payload))
+//   signed with AUTH_SESSION_SECRET. payload = {tool, args, exp, nonce}. The
+//   server executes exactly the tool and args inside the token, never anything
+//   the client sends alongside it. 10 minute expiry. Nonces are remembered per
+//   instance so a token cannot be replayed on the same server.
+// ───────────────────────────────────────────────────────────────────────────
 
-const MODEL = "claude-opus-5";
-
-const VAULT_ROOT = VAULT_PATH;
-const VAULT_WIKI = path.join(VAULT_ROOT, "wiki");
-const GHL_CLI_DIR = "C:\\Users\\wjack\\ghl-cli";
-const PROSPECTS_DB = path.join(GHL_CLI_DIR, "prospects.db");
-const DAILY_COUNT_JSON = path.join(GHL_CLI_DIR, "outreach_logs", "daily_count.json");
-
-const SYSTEM_PROMPT = `You are Jarvis, the AI assistant for Wing Digital, a DFW marketing automation agency. Owner: Jack Wing.
-
-There is NO CRM connected. GHL was retired 2026-08-22 and a replacement has not been built yet. You cannot search contacts, view or move pipeline deals, add leads, tag contacts, or read appointment calendars. If Jack asks for any of that, say plainly that there is no CRM data source since GHL was retired. Revenue and client-count questions ARE answerable: the query_ghl tool returns the local revenue truth (lib/revenue.ts), which is the only source for MRR and active clients. Never state a client name or dollar figure a tool did not return.
-
-You are an AGENT with FULL read/write access via live tools that run on Jack's PC. Jack explicitly enabled this. Use tools to act on REAL data instead of guessing.
-
-READ tools (no confirmation needed):
-- read_vault_file: read any file from Jack's Obsidian vault (relative path).
-- search_vault: keyword-search the vault wiki/ folder, returns matching files + lines.
-- query_ghl: the local revenue truth — MRR, active clients, pipeline vs earned, open questions. NOT a CRM: contact, appointment, and pipeline-deal counts have no data source.
-- outreach_status: cold-email pipeline status — emails sent today, total prospects, emailed, remaining.
-- business_snapshot: the two condensed live state files (business + outreach snapshot).
-- web_search: search the internet (DuckDuckGo) — titles, URLs, snippets.
-- fetch_url: fetch a URL and return its readable text.
-
-WRITE / ACTION tools:
-- write_vault_file: create, overwrite, or append a vault file. Never touches raw/ (hard rule) and refuses content containing secrets.
-- run_outreach: trigger one outreach send (daily_outreach.py). dryRun=true previews; dryRun=false sends REAL cold emails.
-- ghl_update: RETIRED. It has no backend and always errors, because GHL is gone and no CRM replaced it. Do not call it; tell Jack there is nothing to update.
-- run_agent: trigger one of the 4 agents: dispatch, prospector, outreach, chronicler.
-
-CONFIRMATION RULES:
-- Internal reads (any read tool, dry runs) need NO confirmation — just do them.
-- OUTWARD-FACING or DESTRUCTIVE actions — sending real emails (run_outreach with dryRun=false, run_agent outreach), overwriting existing vault files — require confirmation: state exactly what you're about to do, ask Jack to confirm in chat, and only execute after he says yes. One confirmation per action — never treat one yes as blanket approval for later actions.
-- When a question is about current numbers, clients, the vault, or outreach, CALL A TOOL — never fabricate figures.
-
-STYLE (hard rules — Jack talks to you by voice and your replies are read aloud):
-- Lead with the answer, then stop. Default length: 2-4 short sentences.
-- No bullet points, no headers, no markdown symbols, no emojis, no status-dot or decorative unicode characters. Plain spoken sentences only.
-- Give numbers plainly and in context ("184 emailed total, 18 today").
-- If there is more depth available, do not dump it. End with a short offer like "Want the breakdown?" and wait.
-- Tone: a competent chief of staff. Calm, direct, zero filler, no hedging, no restating the question.`;
-
-// Same style rules injected into the Claude Code CLI engine, which otherwise
-// runs with only the vault CLAUDE.md as context.
-const CLI_STYLE_PROMPT =
-  "You are Jarvis, Jack Wing's voice assistant for Wing Digital OS. Your reply is read aloud by TTS. " +
-  "Hard style rules: lead with the answer; 2-4 short sentences by default; no bullet lists, headers, markdown symbols, emojis, or status-dot/decorative unicode characters; " +
-  "give numbers plainly; if more depth exists, offer it briefly (for example 'Want the breakdown?') instead of dumping it. Sound like a competent chief of staff.";
-
-// ── Tool definitions (Anthropic tool-use schema) ──────────────────────────────
-const TOOLS = [
-  {
-    name: "read_vault_file",
-    description:
-      "Read a single file from Jack's Obsidian vault (Jacks Ai Brain 2.0). Read-only. Provide a path relative to the vault root, e.g. 'wiki/clients/heros-junk-removal.md'.",
-    input_schema: {
-      type: "object",
-      properties: {
-        path: {
-          type: "string",
-          description: "File path relative to the vault root. No leading slash, no '..'.",
-        },
-      },
-      required: ["path"],
-    },
-  },
-  {
-    name: "search_vault",
-    description:
-      "Search the vault's wiki/ folder for a keyword and return matching file paths plus the matching line. Read-only. Use to find where something is documented.",
-    input_schema: {
-      type: "object",
-      properties: {
-        keyword: { type: "string", description: "Case-insensitive keyword or phrase to search for." },
-      },
-      required: ["keyword"],
-    },
-  },
-  {
-    name: "query_ghl",
-    description:
-      "Get Wing Digital's revenue truth (from lib/revenue.ts): MRR with its basis, active client roster, pipeline vs earned split, and open revenue questions. Read-only. NOT a CRM — GHL was retired 2026-08-22 with no replacement, so contact, appointment, and pipeline-deal counts have no data source and are reported as such.",
-    input_schema: { type: "object", properties: {}, required: [] },
-  },
-  {
-    name: "outreach_status",
-    description:
-      "Get the cold-email outreach pipeline status: emails sent today, total prospects, how many have been emailed, and how many remain. Read-only.",
-    input_schema: { type: "object", properties: {}, required: [] },
-  },
-  {
-    name: "business_snapshot",
-    description:
-      "Return the two condensed, auto-generated live state files (business snapshot + outreach snapshot) from the vault. Fastest way to get a high-level current picture. Read-only.",
-    input_schema: { type: "object", properties: {}, required: [] },
-  },
-  {
-    name: "write_vault_file",
-    description:
-      "Create or edit a file in Jack's Obsidian vault. Paths under raw/ are never writable (hard business rule). Overwriting an existing file requires Jack's in-chat confirmation first; creating a new file or appending is lower-risk.",
-    input_schema: {
-      type: "object",
-      properties: {
-        path: { type: "string", description: "File path relative to the vault root, e.g. 'wiki/clients/new-client.md'. No leading slash, no '..'." },
-        content: { type: "string", description: "The content to write or append." },
-        mode: { type: "string", enum: ["overwrite", "append"], description: "'overwrite' replaces/creates the file; 'append' adds to the end (creates if missing)." },
-      },
-      required: ["path", "content", "mode"],
-    },
-  },
-  {
-    name: "run_outreach",
-    description:
-      "Trigger one outreach send by running daily_outreach.py (the cold-email pipeline). dryRun=true (default) previews without sending. dryRun=false sends REAL cold emails — get Jack's in-chat confirmation before calling with dryRun=false.",
-    input_schema: {
-      type: "object",
-      properties: {
-        dryRun: { type: "boolean", description: "Preview only when true (default). False sends real emails." },
-      },
-      required: [],
-    },
-  },
-  {
-    name: "ghl_update",
-    description:
-      "RETIRED — do not call. GHL was retired 2026-08-22 and no replacement CRM is connected, so this tool has no backend and always returns an error.",
-    input_schema: {
-      type: "object",
-      properties: {
-        method: { type: "string", enum: ["GET", "POST", "PUT"], description: "HTTP method." },
-        path: { type: "string", description: "API path, e.g. '/contacts/upsert' or '/contacts/?locationId=...'." },
-        body: { type: "object", description: "JSON body for POST/PUT requests." },
-      },
-      required: ["method", "path"],
-    },
-  },
-  {
-    name: "web_search",
-    description:
-      "Search the internet (DuckDuckGo). Returns the top ~8 results with title, URL, and snippet. Read-only.",
-    input_schema: {
-      type: "object",
-      properties: {
-        query: { type: "string", description: "Search query." },
-      },
-      required: ["query"],
-    },
-  },
-  {
-    name: "fetch_url",
-    description:
-      "Fetch a web page by URL and return its readable text (HTML stripped, capped ~8000 chars). Read-only.",
-    input_schema: {
-      type: "object",
-      properties: {
-        url: { type: "string", description: "Full URL to fetch, e.g. 'https://example.com/page'." },
-      },
-      required: ["url"],
-    },
-  },
-  {
-    name: "run_agent",
-    description:
-      "Trigger one of the 4 Wing Digital agents: dispatch (morning briefing), prospector (refresh audit PDFs), outreach (cold-email send — outward-facing, confirm with Jack first unless dryRun), chronicler (vault digest). Returns stdout/stderr.",
-    input_schema: {
-      type: "object",
-      properties: {
-        agent: { type: "string", enum: ["dispatch", "prospector", "outreach", "chronicler"], description: "Which agent to run." },
-        dryRun: { type: "boolean", description: "Dry run where supported (outreach, chronicler)." },
-      },
-      required: ["agent"],
-    },
-  },
-];
-
-// ── Tool implementations (ALL READ-ONLY) ──────────────────────────────────────
-
-async function toolReadVaultFile(input: { path?: string }): Promise<string> {
-  const rel = (input.path ?? "").replace(/^[/\\]+/, "");
-  if (rel.includes("..")) return "ERROR: path escapes the vault. Access denied.";
-  const text = await readVaultFile(rel);
-  if (text === null) return `ERROR: could not read '${rel}'. It may not exist.`;
-  return text.length > 20000 ? text.slice(0, 20000) + "\n...[truncated]" : text;
+const DEFAULT_MODEL = "claude-sonnet-5";
+function modelId(): string {
+  return (process.env.JARVIS_MODEL || DEFAULT_MODEL).trim();
 }
 
-async function toolSearchVault(input: { keyword?: string }): Promise<string> {
-  const keyword = (input.keyword ?? "").trim();
-  if (!keyword) return "ERROR: no keyword provided.";
-  const needle = keyword.toLowerCase();
-  const results: string[] = [];
-  const MAX = 40;
-
-  const files = (await listVaultFiles()).filter((rel) => rel.startsWith("wiki/"));
-  for (const rel of files) {
-    if (results.length >= MAX) break;
-    const text = await readVaultFile(rel);
-    if (!text) continue;
-    for (const line of text.split(/\r?\n/)) {
-      if (line.toLowerCase().includes(needle)) {
-        results.push(`${rel}: ${line.trim().slice(0, 200)}`);
-        break; // one hit per file keeps results readable
-      }
-    }
-  }
-
-  if (results.length === 0) return `No matches for "${keyword}" in the vault wiki.`;
-  return `Matches for "${keyword}" (${results.length}${results.length >= MAX ? "+" : ""}):\n` + results.join("\n");
+// $ per million tokens. Unknown ids fall back to the Sonnet rate.
+const PRICES: Record<string, { input: number; output: number; cacheRead: number; cacheWrite: number }> = {
+  "claude-sonnet-5": { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 },
+  "claude-sonnet-4-6": { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 },
+  "claude-haiku-4-5": { input: 1, output: 5, cacheRead: 0.1, cacheWrite: 1.25 },
+  "claude-opus-5": { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
+  "claude-opus-4-8": { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
+};
+function priceFor(model: string) {
+  return PRICES[model] ?? PRICES[DEFAULT_MODEL];
 }
-
-async function toolQueryGhl(): Promise<string> {
-  // GHL retired 2026-08-22 — every GHL API call 401s forever and no
-  // replacement CRM is connected. This tool now reports only the local
-  // revenue truth; contact/pipeline/appointment counts have NO data source
-  // and are reported as such rather than as zeroes.
-
-  // Revenue + client count come from lib/revenue.ts, the single source of truth.
-  //
-  // This block previously re-implemented the sum over wiki/clients/*.md AND, in its
-  // catch, assigned `mrr = 700; activeClients = 1;` with a literal client-name
-  // string. That meant that whenever the vault read failed, the assistant
-  // stated a specific client and a specific dollar figure as fact with no data
-  // behind either. An assistant inventing revenue is worse than one saying it does
-  // not know, so there is no fallback constant now — an unreachable source yields
-  // an explicit unknown.
-  const truth = await getRevenueTruth();
-  const mrr = truth.mrr;
-  const activeClients = truth.activeClients;
-  // Every active client is listed with its real basis, so the assistant can never
-  // describe a one-time or expected figure as monthly recurring revenue.
-  const clientNames: string[] = truth.clients.map((c) =>
-    c.amount == null
-      ? `${c.name} (amount unknown — not recorded, not $0)`
-      : `${c.name} ($${c.amount.toLocaleString()} ${BASIS_LABEL[c.basis]})`
-  );
-
-  return JSON.stringify(
-    {
-      crmStatus:
-        "CRM lives in the OS Supabase: crm_contacts, crm_deals, tasks, messages, workflows. Ask for counts through the pipeline and automations APIs.",
-      activeClients,
-      activeClientList: clientNames,
-      // Confirmed recurring retainers ONLY. One-time, expected and
-      // unconfirmed-recurrence amounts are reported separately below and must
-      // never be described as MRR.
-      mrr: `$${mrr.toLocaleString()}/mo`,
-      mrrBasis: truth.mrrBasisLine,
-      oneTimeCollected: truth.oneTimeTotal
-        ? `$${truth.oneTimeTotal.toLocaleString()} (one-time, NOT recurring)`
-        : "none recorded",
-      expectedNotYetEarned: truth.expectedTotal
-        ? `$${truth.expectedTotal.toLocaleString()} (pipeline — agreed or likely, not earned, never counted as revenue)`
-        : "none recorded",
-      amountsWithUnconfirmedBasis: truth.unconfirmedTotal
-        ? `$${truth.unconfirmedTotal.toLocaleString()} (held OUT of MRR until Jack confirms it recurs)`
-        : "none",
-      clientsWithNoFigureOnFile: truth.unknown.map((c) => c.name),
-      openQuestionsForJack: truth.questions,
-      rosterSource: truth.rosterSource,
-    },
-    null,
-    2
+function costUsd(model: string, u: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number }): number {
+  const p = priceFor(model);
+  return (
+    ((u.input_tokens ?? 0) * p.input +
+      (u.output_tokens ?? 0) * p.output +
+      (u.cache_read_input_tokens ?? 0) * p.cacheRead +
+      (u.cache_creation_input_tokens ?? 0) * p.cacheWrite) /
+    1_000_000
   );
 }
-
-function toolOutreachStatus(): string {
-  if (isCloud()) {
-    return "This reads the local prospects.db via python and needs the PC online. (pcRequired)";
-  }
-  const out: Record<string, unknown> = {};
-
-  // 1) daily_count.json if it exists (source of truth for "sent today" when present).
-  try {
-    if (fs.existsSync(DAILY_COUNT_JSON)) {
-      out.daily_count_json = JSON.parse(fs.readFileSync(DAILY_COUNT_JSON, "utf-8"));
-    }
-  } catch {
-    /* ignore */
-  }
-
-  // 2) prospects.db counts via python's stdlib sqlite3 (no node sqlite dep needed).
-  try {
-    const py = `import sqlite3,json
-c=sqlite3.connect(r"${PROSPECTS_DB}")
-total=c.execute("SELECT COUNT(*) FROM prospects").fetchone()[0]
-emailed=c.execute("SELECT COUNT(*) FROM prospects WHERE emailed_at IS NOT NULL").fetchone()[0]
-today=c.execute("SELECT COUNT(*) FROM prospects WHERE date(emailed_at)=date('now','localtime')").fetchone()[0]
-remaining=c.execute("SELECT COUNT(*) FROM prospects WHERE status IN ('new','enriching')").fetchone()[0]
-print(json.dumps({"total_prospects":total,"emailed":emailed,"emails_sent_today":today,"remaining_new_or_enriching":remaining}))`;
-    const stdout = execFileSync("python", ["-c", py], {
-      encoding: "utf-8",
-      timeout: 15000,
-    });
-    Object.assign(out, JSON.parse(stdout.trim()));
-  } catch (e: any) {
-    out.db_error =
-      "Could not read prospects.db via python. " + (e?.message ?? "unknown error");
-  }
-
-  if (Object.keys(out).length === 0) {
-    return "ERROR: no outreach data available (no daily_count.json and prospects.db unreadable).";
-  }
-  return JSON.stringify(out, null, 2);
+// Pessimistic pre-charge: full input at the model's rate plus a 1200 token answer.
+function estimateUsd(model: string, inputChars: number): number {
+  const p = priceFor(model);
+  return ((inputChars / 3.5) * p.input + 1200 * p.output) / 1_000_000;
 }
 
-function toolBusinessSnapshot(): string {
-  const files = [
-    ["business-snapshot", path.join(VAULT_WIKI, "state", "business-snapshot.md")],
-    ["outreach-snapshot", path.join(VAULT_WIKI, "state", "outreach-snapshot.md")],
-  ];
-  const parts: string[] = [];
-  for (const [label, p] of files) {
-    try {
-      parts.push(`### ${label}\n` + fs.readFileSync(p, "utf-8"));
-    } catch {
-      parts.push(`### ${label}\n(unavailable)`);
-    }
-  }
-  return parts.join("\n\n");
+// ── Spend ceiling (bucket "jarvis") ──────────────────────────────────────────
+type Limits = { burstLimit: number; burstSecs: number; ipDaily: number; globalDaily: number; spendUsd: number };
+function num(name: string, fallback: number): number {
+  const v = Number(process.env[name]);
+  return Number.isFinite(v) && v >= 0 ? v : fallback;
 }
-
-// ── Full-access tool implementations ──────────────────────────────────────────
-
-const SECRET_PATTERNS = ["sk-", "Bearer ", "pit-", "eyJ", "api_key="];
-
-function toolWriteVaultFile(input: { path?: string; content?: string; mode?: string }): string {
-  const rel = (input.path ?? "").replace(/^[/\\]+/, "");
-  if (!rel) return "ERROR: no path provided.";
-  const resolved = path.resolve(VAULT_ROOT, rel);
-  const rootWithSep = VAULT_ROOT.endsWith(path.sep) ? VAULT_ROOT : VAULT_ROOT + path.sep;
-  if (resolved !== VAULT_ROOT && !resolved.startsWith(rootWithSep)) {
-    return "ERROR: path escapes the vault. Write denied.";
-  }
-  // Hard business rule: nothing under raw/ is ever writable.
-  const relNorm = path.relative(VAULT_ROOT, resolved).replace(/\\/g, "/").toLowerCase();
-  if (relNorm === "raw" || relNorm.startsWith("raw/")) {
-    return "ERROR: writes under raw/ are forbidden (hard business rule).";
-  }
-  const content = input.content ?? "";
-  const hit = SECRET_PATTERNS.find((p) => content.includes(p));
-  if (hit) {
-    return `ERROR: content appears to contain a secret (matched '${hit}'). Refusing to write secrets into the vault.`;
-  }
-  const mode = input.mode === "append" ? "append" : "overwrite";
-  try {
-    fs.mkdirSync(path.dirname(resolved), { recursive: true });
-    const existed = fs.existsSync(resolved);
-    if (mode === "append") {
-      fs.appendFileSync(resolved, content, "utf-8");
-    } else {
-      fs.writeFileSync(resolved, content, "utf-8");
-    }
-    return `OK: ${mode === "append" ? "appended to" : existed ? "overwrote" : "created"} '${relNorm}' (${content.length} chars).`;
-  } catch (e: any) {
-    return "ERROR: write failed. " + (e?.message ?? "unknown");
-  }
+function jarvisLimits(): Limits {
+  return {
+    burstLimit: num("JARVIS_RATE_BURST", 20),
+    burstSecs: num("JARVIS_RATE_BURST_SECS", 60),
+    ipDaily: num("JARVIS_RATE_IP_DAILY", 200),
+    globalDaily: num("JARVIS_RATE_GLOBAL_DAILY", 200),
+    spendUsd: num("JARVIS_DAILY_SPEND_USD", 3),
+  };
 }
+type Reservation =
+  | { ok: true; dayCalls: number; daySpend: number }
+  | { ok: false; reason: string; retryAfter: number; detail: string };
 
-function runPythonInGhlCli(
-  args: string[],
-  extraEnv?: Record<string, string>
-): Promise<{ code: number; stdout: string; stderr: string }> {
-  return new Promise((resolve) => {
-    const child = spawn("python", args, {
-      cwd: GHL_CLI_DIR,
-      env: { ...process.env, PYTHONIOENCODING: "utf-8", ...(extraEnv || {}) },
-      windowsHide: true,
-    });
-    let stdout = "";
-    let stderr = "";
-    let done = false;
-    const finish = (r: { code: number; stdout: string; stderr: string }) => {
-      if (!done) {
-        done = true;
-        resolve(r);
-      }
-    };
-    child.stdout.on("data", (d) => (stdout += d.toString()));
-    child.stderr.on("data", (d) => (stderr += d.toString()));
-    child.on("error", (err) => finish({ code: -1, stdout, stderr: stderr + String(err) }));
-    child.on("close", (code) => finish({ code: code ?? -1, stdout, stderr }));
-    setTimeout(() => {
-      child.kill();
-      finish({ code: -2, stdout, stderr: stderr + "\n[timeout: killed after 120s]" });
-    }, 120_000);
+async function usageRpc(fn: string, args: Record<string, unknown>): Promise<unknown> {
+  const url = sbUrl();
+  const key = sbService();
+  if (!url || !key) throw new Error("OS_SUPABASE_URL / OS_SUPABASE_SERVICE_KEY not set");
+  const r = await fetch(`${url}/rest/v1/rpc/${fn}`, {
+    method: "POST",
+    headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify(args),
+    cache: "no-store",
   });
+  if (!r.ok) throw new Error(`${fn} -> ${r.status} ${(await r.text().catch(() => "")).slice(0, 200)}`);
+  return r.json();
 }
 
-async function toolRunOutreach(input: { dryRun?: boolean }): Promise<string> {
-  if (isCloud()) {
-    return "Outreach runs the local daily_outreach.py pipeline and needs the PC online. (pcRequired)";
-  }
-  const dryRun = input.dryRun !== false; // default true
-  const args = ["daily_outreach.py"];
-  if (dryRun) args.push("--dry-run");
-  const r = await runPythonInGhlCli(args);
-  return JSON.stringify(
-    { dryRun, command: `python ${args.join(" ")}`, exitCode: r.code, ok: r.code === 0, stdout: r.stdout.slice(0, 8000), stderr: r.stderr.slice(0, 4000) },
-    null,
-    2
-  );
-}
-
-// Same agent map as /api/agents/run — only the 4 known keeper agents.
-const JARVIS_AGENTS: Record<string, { args: string[]; env?: Record<string, string>; note?: string }> = {
-  outreach: { args: ["daily_outreach.py"] },
-  chronicler: {
-    args: ["chronicler.py", "--minutes", "90", "--since-watermark"],
-    env: { PYTHONIOENCODING: "utf-8" },
-  },
-  dispatch: { args: ["dispatch_briefing.py"] },
-  prospector: {
-    args: ["audit_pdf_generator.py", "--from-db"],
-    note: "Prospector is skill-driven (t1-lead-find). This only refreshes audit PDFs from the DB; a full scan needs a Claude session.",
-  },
+const BUDGET_WORDS: Record<string, string> = {
+  burst: "Jarvis is being asked too much too fast. Give it a minute.",
+  ip_daily: "This device has used up today's Jarvis allowance.",
+  global_daily: "Jarvis has used today's call allowance. It resets at midnight UTC.",
+  spend: "Jarvis has hit today's spend ceiling. It resets at midnight UTC.",
+  backend: "Jarvis could not reach the spend counter, so it refused to spend. Try again shortly.",
 };
 
-async function toolRunAgent(input: { agent?: string; dryRun?: boolean }): Promise<string> {
-  if (isCloud()) {
-    return "Running an agent spawns local python scripts and needs the PC online. (pcRequired)";
-  }
-  const agent = String(input.agent ?? "").trim();
-  const cfg = JARVIS_AGENTS[agent];
-  if (!cfg) {
-    return `ERROR: unknown agent '${agent}'. Allowed: ${Object.keys(JARVIS_AGENTS).join(", ")}.`;
-  }
-  const args = [...cfg.args];
-  if (input.dryRun === true && (agent === "outreach" || agent === "chronicler")) {
-    args.push("--dry-run");
-  }
-  const r = await runPythonInGhlCli(args, cfg.env);
-  return JSON.stringify(
-    { agent, command: `python ${args.join(" ")}`, exitCode: r.code, ok: r.code === 0, stdout: r.stdout.slice(0, 8000), stderr: r.stderr.slice(0, 4000), note: cfg.note },
-    null,
-    2
-  );
-}
-
-async function toolGhlUpdate(input: { method?: string; path?: string; body?: unknown }): Promise<string> {
-  // GHL retired 2026-08-22. Never call the dead API.
-  void input;
-  return "ERROR: GHL retired 2026-08-22, no replacement CRM connected. This tool has no backend.";
-}
-
-function stripHtml(html: string): string {
-  return html
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-async function toolWebSearch(input: { query?: string }): Promise<string> {
-  const query = (input.query ?? "").trim();
-  if (!query) return "ERROR: no query provided.";
+async function reserveJarvis(ip: string, limits: Limits, est: number): Promise<Reservation> {
+  let rows: unknown;
   try {
-    const res = await fetch(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`, {
-      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) JarvisBot/1.0" },
-      cache: "no-store",
+    rows = await usageRpc("api_rate_reserve", {
+      p_bucket: "jarvis", p_ip: ip,
+      p_burst_limit: limits.burstLimit, p_burst_secs: limits.burstSecs,
+      p_ip_limit: limits.ipDaily, p_day_limit: limits.globalDaily,
+      p_spend_limit: limits.spendUsd, p_est: est,
     });
-    if (!res.ok) return `ERROR: search returned HTTP ${res.status}.`;
-    const html = await res.text();
-    // Parse DDG html results: each result has result__a (title/link) and result__snippet.
-    const results: string[] = [];
-    const blockRe = /<a[^>]*class="[^"]*result__a[^"]*"[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?(?:class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\/(?:a|div|span)>)?/g;
-    let m: RegExpExecArray | null;
-    while ((m = blockRe.exec(html)) && results.length < 8) {
-      let url = m[1];
-      // DDG wraps URLs as /l/?uddg=<encoded>
-      const uddg = url.match(/[?&]uddg=([^&]+)/);
-      if (uddg) {
+  } catch (e) {
+    return { ok: false, reason: "backend", retryAfter: 60, detail: String(e).slice(0, 200) };
+  }
+  const row = (Array.isArray(rows) ? rows[0] : rows) as Record<string, unknown> | undefined;
+  if (!row || typeof row.allowed !== "boolean") return { ok: false, reason: "backend", retryAfter: 60, detail: "no decision returned" };
+  if (row.allowed) return { ok: true, dayCalls: Number(row.day_calls) || 0, daySpend: Number(row.day_spend) || 0 };
+  const reason = String(row.reason);
+  return { ok: false, reason: reason in BUDGET_WORDS ? reason : "backend", retryAfter: Math.max(1, Number(row.retry_after) || 60), detail: reason };
+}
+async function settleJarvis(ip: string, est: number, actual: number): Promise<void> {
+  const delta = actual - est;
+  if (Math.abs(delta) < 0.000001) return;
+  try {
+    await usageRpc("api_rate_settle", { p_bucket: "jarvis", p_ip: ip, p_delta: delta });
+  } catch {
+    // The estimate stands, which errs conservative.
+  }
+}
+function clientIp(req: Request): string {
+  const xff = req.headers.get("x-forwarded-for") ?? "";
+  return xff.split(",")[0]?.trim() || req.headers.get("x-real-ip")?.trim() || "unknown";
+}
+
+// ── Confirmation token ───────────────────────────────────────────────────────
+const TOKEN_TTL_MS = 10 * 60 * 1000;
+const usedNonces = new Map<string, number>(); // nonce -> exp (per instance)
+const b64u = (b: Buffer) => b.toString("base64url");
+function secret(): string | null {
+  const s = process.env.AUTH_SESSION_SECRET;
+  return s && s.length >= 16 ? s : null;
+}
+function signAction(tool: string, args: unknown): string | null {
+  const s = secret();
+  if (!s) return null;
+  const payload = Buffer.from(JSON.stringify({ tool, args, exp: Date.now() + TOKEN_TTL_MS, nonce: crypto.randomBytes(12).toString("hex") }));
+  const mac = crypto.createHmac("sha256", s).update(payload).digest();
+  return `${b64u(payload)}.${b64u(mac)}`;
+}
+function verifyAction(token: string): { tool: string; args: unknown } | { error: string } {
+  const s = secret();
+  if (!s) return { error: "AUTH_SESSION_SECRET is not set, so actions cannot be confirmed." };
+  const [p, m] = token.split(".");
+  if (!p || !m) return { error: "malformed confirmation token" };
+  let payload: Buffer;
+  let mac: Buffer;
+  try {
+    payload = Buffer.from(p, "base64url");
+    mac = Buffer.from(m, "base64url");
+  } catch {
+    return { error: "malformed confirmation token" };
+  }
+  const expected = crypto.createHmac("sha256", s).update(payload).digest();
+  if (mac.length !== expected.length || !crypto.timingSafeEqual(mac, expected)) return { error: "confirmation token failed its signature check" };
+  let data: { tool?: string; args?: unknown; exp?: number; nonce?: string };
+  try {
+    data = JSON.parse(payload.toString("utf8"));
+  } catch {
+    return { error: "malformed confirmation token" };
+  }
+  if (!data.tool || typeof data.exp !== "number" || !data.nonce) return { error: "malformed confirmation token" };
+  if (Date.now() > data.exp) return { error: "that confirmation expired (10 minute limit). Ask again." };
+  for (const [n, exp] of usedNonces) if (exp < Date.now()) usedNonces.delete(n);
+  if (usedNonces.has(data.nonce)) return { error: "that action was already run once." };
+  usedNonces.set(data.nonce, data.exp);
+  if (!isKnownTool(data.tool) || !WRITE_TOOLS.has(data.tool)) return { error: "that token is not for a confirmable action" };
+  return { tool: data.tool, args: data.args ?? {} };
+}
+
+// ── System prompt ────────────────────────────────────────────────────────────
+function centralNow(): string {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Chicago", weekday: "long", year: "numeric", month: "long", day: "numeric",
+    hour: "numeric", minute: "2-digit", timeZoneName: "short",
+  }).format(new Date());
+}
+
+const SYSTEM_PROMPT = `You are Jarvis, the operator assistant inside Wing Digital OS. Wing Digital is a DFW marketing agency run by Jack Wing. You work for Jack and his staff; you are talking to one of them now.
+
+WHAT THE OS CONTAINS
+The OS is Wing Digital's own system, built after GoHighLevel was retired in August 2026. Everything lives in the OS database and you reach it through tools:
+- CRM: contacts, tags, notes, activities, deals moving through pipeline stages, follow-up tasks.
+- Automations: workflows that fire on events (form filled, contact created, booking made, text received, call missed, call logged, deal moved, task done, manual run). Actions include tags, notes, deals, stage moves, tasks, sequence enrollment, texts, emails, push, webhooks, and wait steps that pause a run for hours or until a time on the event.
+- Forms: public endpoints that create submissions, contacts and events.
+- Booking: a public 30-minute booking page with team availability; bookings are assigned to whoever on the team is free.
+- Messaging: an SMS and email ledger. Texts and emails written by automations or by you are DRAFTS unless sending has been switched on for the deployment. Say "drafted, not sent" and mean it.
+- Sequences: multi-step email sequences. Activating one sends nothing; an external sender polls the due list.
+- Potential clients: business websites dropped in for research and tracked toward a proposal.
+- Clients and revenue: the client roster with MRR and its basis, one-time and pipeline money kept separate.
+- Agents: scheduled background agents that report heartbeats, and a watchdog report called Da Boss that says whether everything is running.
+- The vault: Jack's Obsidian notes (wiki pages, state snapshots, logs).
+
+HOW TO WORK
+- Prefer tools over memory. Anything about current numbers, contacts, tasks, bookings, automations, clients, money or system health comes from a tool call, never from recollection. This prompt tells you what exists, not what is in it.
+- Read tools run immediately. Write tools (create, complete, tag, note, move, draft, pause, activate, add, cancel, run) are not executed when you call them: the OS shows the user a confirmation card with Do it and Cancel buttons, and only runs the tool after Do it. So when the user asks you to do something, CALL the write tool straight away with the right arguments. Never ask "confirm?" or "shall I?" in text first; the card is the confirmation. One write per turn. When you need a contact or deal id, search first, then call the write tool in the same turn. Do not ask the user for ids they would not know.
+- When a tool says a value is null, could_not_check, or returned an error, say "I could not check that" and name what failed. Never fill a gap with a guess, a zero, or a plausible-sounding figure. Never state a client name, dollar amount or count a tool did not return.
+- Some tools need Jack's PC. If one answers pcRequired, say so plainly and offer what the cloud can do instead.
+- Money words are exact: MRR means confirmed recurring only. One-time, expected and unconfirmed amounts are never called MRR.
+- No em dashes. Plain English. No hype.
+
+STYLE
+Replies may be read aloud, so lead with the answer and stop. Default length is two to four short sentences. No bullet points, headers, markdown symbols, emojis or decorative characters. Give numbers plainly and in context. If there is more depth, end with a short offer such as "Want the list?" and wait. Tone: a calm, direct chief of staff. No filler, no restating the question, no apologies for tool limits, just the fact and the next step.
+
+After a confirmed action runs, report what actually happened from the tool result in one or two sentences, including the id it created when there is one.`;
+
+function systemBlocks() {
+  return [
+    { type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },
+    { type: "text", text: `Current date and time in Central time: ${centralNow()}. Deployment: ${isCloud() ? "cloud (Jack's PC may be off)" : "Jack's PC"}.` },
+  ];
+}
+
+// ── Anthropic streaming call (raw HTTP, matching the rest of this file) ──────
+type Block =
+  | { type: "text"; text: string }
+  | { type: "tool_use"; id: string; name: string; input: unknown };
+type Usage = { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number };
+type StreamResult = { blocks: Block[]; stopReason: string | null; usage: Usage };
+
+async function streamAnthropic(opts: {
+  apiKey: string;
+  model: string;
+  messages: unknown[];
+  onText: (t: string) => void;
+  signal: AbortSignal;
+}): Promise<StreamResult> {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "x-api-key": opts.apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+    body: JSON.stringify({
+      model: opts.model,
+      max_tokens: 2000,
+      stream: true,
+      system: systemBlocks(),
+      tools: JARVIS_TOOLS,
+      messages: opts.messages,
+    }),
+    signal: opts.signal,
+  });
+  if (!res.ok || !res.body) {
+    const err = await res.text().catch(() => "");
+    throw new Error(`Anthropic ${res.status}: ${err.slice(0, 300)}`);
+  }
+  const blocks: Block[] = [];
+  const partialJson: Record<number, string> = {};
+  const usage: Usage = {};
+  let stopReason: string | null = null;
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  const handle = (ev: Record<string, unknown>) => {
+    const type = ev.type as string;
+    if (type === "message_start") {
+      const u = (ev.message as { usage?: Usage })?.usage;
+      if (u) Object.assign(usage, u);
+    } else if (type === "content_block_start") {
+      const idx = ev.index as number;
+      const cb = ev.content_block as { type: string; id?: string; name?: string; text?: string };
+      if (cb.type === "text") blocks[idx] = { type: "text", text: cb.text ?? "" };
+      else if (cb.type === "tool_use") {
+        blocks[idx] = { type: "tool_use", id: cb.id ?? "", name: cb.name ?? "", input: {} };
+        partialJson[idx] = "";
+      }
+    } else if (type === "content_block_delta") {
+      const idx = ev.index as number;
+      const d = ev.delta as { type: string; text?: string; partial_json?: string };
+      if (d.type === "text_delta" && d.text) {
+        const b = blocks[idx];
+        if (b && b.type === "text") b.text += d.text;
+        opts.onText(d.text);
+      } else if (d.type === "input_json_delta" && typeof d.partial_json === "string") {
+        partialJson[idx] = (partialJson[idx] ?? "") + d.partial_json;
+      }
+    } else if (type === "content_block_stop") {
+      const idx = ev.index as number;
+      const b = blocks[idx];
+      if (b && b.type === "tool_use") {
+        const raw = partialJson[idx] ?? "";
         try {
-          url = decodeURIComponent(uddg[1]);
+          b.input = raw.trim() ? JSON.parse(raw) : {};
         } catch {
-          /* keep raw */
+          b.input = {};
         }
       }
-      const title = stripHtml(m[2] ?? "");
-      const snippet = stripHtml(m[3] ?? "");
-      if (title && url) results.push(`${results.length + 1}. ${title}\n   ${url}${snippet ? `\n   ${snippet.slice(0, 300)}` : ""}`);
+    } else if (type === "message_delta") {
+      const d = ev.delta as { stop_reason?: string };
+      if (d?.stop_reason) stopReason = d.stop_reason;
+      const u = ev.usage as Usage | undefined;
+      if (u) Object.assign(usage, u);
+    } else if (type === "error") {
+      throw new Error(`stream error: ${JSON.stringify(ev.error).slice(0, 200)}`);
     }
-    if (results.length === 0) return `No results parsed for "${query}".`;
-    return `Top results for "${query}":\n\n` + results.join("\n\n");
-  } catch (e: any) {
-    return "ERROR: search failed. " + (e?.message ?? "unknown");
+  };
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let nl: number;
+    while ((nl = buffer.indexOf("\n")) >= 0) {
+      const line = buffer.slice(0, nl).trim();
+      buffer = buffer.slice(nl + 1);
+      if (!line.startsWith("data:")) continue;
+      const data = line.slice(5).trim();
+      if (!data) continue;
+      try {
+        handle(JSON.parse(data));
+      } catch (e) {
+        if (e instanceof Error && e.message.startsWith("stream error")) throw e;
+      }
+    }
   }
+  return { blocks: blocks.filter(Boolean), stopReason, usage };
 }
 
-async function toolFetchUrl(input: { url?: string }): Promise<string> {
-  const url = (input.url ?? "").trim();
-  if (!/^https?:\/\//i.test(url)) return "ERROR: url must start with http:// or https://";
+// ── API engine: the tool loop with the confirmation pause ────────────────────
+type Send = (obj: Record<string, unknown>) => void;
+
+async function runApiLoop(opts: {
+  send: Send;
+  messages: unknown[];
+  apiKey: string;
+  ip: string;
+  signal: AbortSignal;
+  spendOverride: number | null;
+}) {
+  const { send, messages, apiKey, ip, signal } = opts;
+  const model = modelId();
+  const limits = jarvisLimits();
+  if (opts.spendOverride !== null) limits.spendUsd = opts.spendOverride;
+  const MAX_TURNS = 8;
+  for (let turn = 0; turn < MAX_TURNS; turn++) {
+    const inputChars = JSON.stringify(messages).length + SYSTEM_PROMPT.length + 12000;
+    const est = estimateUsd(model, inputChars);
+    const r = await reserveJarvis(ip, limits, est);
+    if (!r.ok) {
+      send({ budget: { refused: true, reason: r.reason, retryAfter: r.retryAfter, detail: r.detail } });
+      send({ text: BUDGET_WORDS[r.reason] ?? BUDGET_WORDS.backend });
+      return;
+    }
+    let result: StreamResult;
+    try {
+      result = await streamAnthropic({ apiKey, model, messages, onText: (t) => send({ text: t }), signal });
+    } catch (e) {
+      await settleJarvis(ip, est, 0);
+      throw e;
+    }
+    await settleJarvis(ip, est, costUsd(model, result.usage));
+    send({ usage: { model, ...result.usage, cost_usd: Number(costUsd(model, result.usage).toFixed(5)) } });
+
+    if (result.stopReason !== "tool_use") return;
+
+    const toolUses = result.blocks.filter((b): b is Extract<Block, { type: "tool_use" }> => b.type === "tool_use");
+    messages.push({ role: "assistant", content: result.blocks });
+
+    // A WRITE tool ends the turn with a pending_action. The other tool_use
+    // blocks in the same message get a "not run" result so the transcript
+    // stays valid if the client ever replays it; in practice the client
+    // continues with plain text history.
+    const pendingWrite = toolUses.find((t) => WRITE_TOOLS.has(t.name));
+    if (pendingWrite) {
+      const id = signAction(pendingWrite.name, pendingWrite.input);
+      if (!id) {
+        send({ text: "\n\nI cannot run actions right now: AUTH_SESSION_SECRET is not set on this deployment, so there is no way to sign a confirmation." });
+        return;
+      }
+      send({
+        pending_action: {
+          id,
+          tool: pendingWrite.name,
+          args: pendingWrite.input,
+          human_summary: describeAction(pendingWrite.name, pendingWrite.input),
+          expires_in_sec: TOKEN_TTL_MS / 1000,
+        },
+      });
+      return;
+    }
+
+    const results: unknown[] = [];
+    for (const tu of toolUses) {
+      send({ tool: tu.name, detail: "", line: toolActivityLine(tu.name, tu.input) });
+      const out = await runJarvisTool(tu.name, tu.input);
+      let ok = true;
+      try {
+        const parsed = JSON.parse(out.content);
+        ok = !(parsed && typeof parsed === "object" && ("error" in parsed || parsed.pcRequired));
+      } catch {
+        /* non-JSON content is a successful read */
+      }
+      send({ tool_done: tu.name, ok, links: out.links ?? [] });
+      results.push({ type: "tool_result", tool_use_id: tu.id, content: out.content });
+    }
+    messages.push({ role: "user", content: results });
+  }
+  send({ text: "\n\n(I stopped after several tool steps. Ask me to continue if you need more.)" });
+}
+
+// Runs a confirmed WRITE tool, then lets the model report on the result.
+async function runConfirmed(opts: {
+  send: Send;
+  messages: unknown[];
+  token: string;
+  apiKey: string | null;
+  ip: string;
+  signal: AbortSignal;
+  spendOverride: number | null;
+}) {
+  const v = verifyAction(opts.token);
+  if ("error" in v) {
+    opts.send({ text: `I did not run that: ${v.error}` });
+    return;
+  }
+  opts.send({ tool: v.tool, detail: "", line: toolActivityLine(v.tool, v.args) });
+  const out = await runJarvisTool(v.tool, v.args);
+  let parsed: Record<string, unknown> | null = null;
   try {
-    const res = await fetch(url, {
-      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) JarvisBot/1.0" },
-      cache: "no-store",
-      redirect: "follow",
-    });
-    const html = await res.text();
-    let text = stripHtml(html);
-    if (text.length > 8000) text = text.slice(0, 8000) + " ...[truncated]";
-    return `HTTP ${res.status} ${url}\n\n${text}`;
-  } catch (e: any) {
-    return "ERROR: fetch failed. " + (e?.message ?? "unknown");
+    parsed = JSON.parse(out.content);
+  } catch {
+    parsed = null;
   }
+  const ok = !(parsed && ("error" in parsed || parsed.pcRequired));
+  opts.send({ tool_done: v.tool, ok, links: out.links ?? [], result: parsed ?? out.content.slice(0, 500) });
+
+  if (!opts.apiKey) {
+    // No model available to narrate: report the raw outcome honestly.
+    opts.send({ text: ok ? `Done: ${describeAction(v.tool, v.args)}.` : `That did not work: ${out.content.slice(0, 300)}` });
+    return;
+  }
+  opts.messages.push({
+    role: "user",
+    content: `[System note] The user confirmed the action "${describeAction(v.tool, v.args)}" and it was executed. Tool ${v.tool} returned:\n${out.content.slice(0, 4000)}\nReport what happened in one or two plain sentences. Do not call this tool again for the same request.`,
+  });
+  await runApiLoop({ send: opts.send, messages: opts.messages, apiKey: opts.apiKey, ip: opts.ip, signal: opts.signal, spendOverride: opts.spendOverride });
 }
 
-async function runTool(name: string, input: any): Promise<string> {
-  switch (name) {
-    case "read_vault_file":
-      return await toolReadVaultFile(input ?? {});
-    case "search_vault":
-      return await toolSearchVault(input ?? {});
-    case "query_ghl":
-      return await toolQueryGhl();
-    case "outreach_status":
-      return toolOutreachStatus();
-    case "business_snapshot":
-      return toolBusinessSnapshot();
-    case "write_vault_file":
-      return toolWriteVaultFile(input ?? {});
-    case "run_outreach":
-      return await toolRunOutreach(input ?? {});
-    case "ghl_update":
-      return await toolGhlUpdate(input ?? {});
-    case "web_search":
-      return await toolWebSearch(input ?? {});
-    case "fetch_url":
-      return await toolFetchUrl(input ?? {});
-    case "run_agent":
-      return await toolRunAgent(input ?? {});
-    default:
-      return `ERROR: unknown tool '${name}'.`;
-  }
-}
-
-// ── Claude Code engine ─────────────────────────────────────────────────────────
-// Jarvis primarily runs through the Claude Code CLI (Jack's subscription, full
-// toolset, vault CLAUDE.md context — same trust level as the scheduled agents:
-// --dangerously-skip-permissions with cwd = the vault). The Anthropic API tool
-// loop below remains as a fallback if the CLI is missing or fails to spawn.
-
+// ── Claude Code CLI engine (PC only, opt-in) ─────────────────────────────────
+const CLI_STYLE_PROMPT =
+  "You are Jarvis, Jack Wing's voice assistant for Wing Digital OS. Your reply is read aloud by TTS. " +
+  "Hard style rules: lead with the answer; 2-4 short sentences by default; no bullet lists, headers, markdown symbols, emojis, or decorative unicode; " +
+  "give numbers plainly; if more depth exists, offer it briefly instead of dumping it. No em dashes. Sound like a competent chief of staff.";
 const CLAUDE_CODE_TIMEOUT_MS = 180_000;
 const SESSION_FILE = "C:\\Users\\wjack\\wing-digital-os\\.jarvis-session.json";
-
-let cachedCliPath: string | null | undefined; // undefined = not resolved yet
+let cachedCliPath: string | null | undefined;
 
 function findClaudeCli(): string | null {
-  // Test/ops override: force the Anthropic API engine even where the CLI exists
-  // (mirrors the Vercel condition, where no CLI is installed).
-  if (process.env.JARVIS_DISABLE_CLI === "1") return null;
+  if (isCloud()) return null;
   if (cachedCliPath !== undefined) return cachedCliPath;
   const candidates = [
     process.env.CLAUDE_CLI_PATH,
     path.join(process.env.USERPROFILE ?? "C:\\Users\\wjack", ".local", "bin", "claude.exe"),
-    "C:\\Users\\wjack\\.local\\bin\\claude.exe",
   ].filter(Boolean) as string[];
   for (const c of candidates) {
     try {
-      if (fs.existsSync(c)) {
-        cachedCliPath = c;
-        return c;
-      }
-    } catch {
-      /* keep looking */
-    }
+      if (fs.existsSync(c)) { cachedCliPath = c; return c; }
+    } catch { /* keep looking */ }
   }
-  // Same resolution the scheduler uses: (Get-Command claude).Source ≈ `where claude`.
   try {
     const out = execFileSync("where", ["claude"], { encoding: "utf-8", timeout: 5000 });
-    const first = out
-      .split(/\r?\n/)
-      .map((l) => l.trim())
-      .find((l) => l && fs.existsSync(l));
-    if (first) {
-      cachedCliPath = first;
-      return first;
-    }
-  } catch {
-    /* not on PATH */
-  }
+    const first = out.split(/\r?\n/).map((l) => l.trim()).find((l) => l && fs.existsSync(l));
+    if (first) { cachedCliPath = first; return first; }
+  } catch { /* not on PATH */ }
   cachedCliPath = null;
   return null;
 }
@@ -614,266 +511,76 @@ function readSessions(): Record<string, string> {
     return {};
   }
 }
-
 function saveSession(conversationId: string, sessionId: string) {
   try {
     const sessions = readSessions();
     sessions[conversationId] = sessionId;
-    // Keep the file small: cap at the 50 most recent conversations.
     const keys = Object.keys(sessions);
-    if (keys.length > 50) {
-      for (const k of keys.slice(0, keys.length - 50)) delete sessions[k];
-    }
+    if (keys.length > 50) for (const k of keys.slice(0, keys.length - 50)) delete sessions[k];
     fs.writeFileSync(SESSION_FILE, JSON.stringify(sessions, null, 2), "utf-8");
-  } catch {
-    /* non-fatal: continuity degrades to fresh sessions */
-  }
+  } catch { /* continuity degrades to fresh sessions */ }
 }
 
-function summarizeToolInput(input: unknown): string {
-  if (!input || typeof input !== "object") return "";
-  const i = input as Record<string, unknown>;
-  const v =
-    i.description ?? i.command ?? i.file_path ?? i.path ?? i.pattern ?? i.query ?? i.url ?? i.prompt ?? i.skill;
-  const s = typeof v === "string" ? v : JSON.stringify(input);
-  return (s ?? "").slice(0, 60);
-}
-
-// Runs one Jarvis turn through the Claude Code CLI, streaming into `send`.
-// Resolves true when the CLI handled the turn (even if it errored mid-stream —
-// we've already streamed output so falling back would double-answer).
-// Resolves false ONLY when the CLI never produced usable output (spawn error /
-// instant exit), in which case the caller falls back to the API path.
-function runClaudeCode(opts: {
-  cli: string;
-  userText: string;
-  conversationId: string | null;
-  send: (obj: any) => void;
-  signal: AbortSignal;
-}): Promise<boolean> {
+function runClaudeCode(opts: { cli: string; userText: string; conversationId: string | null; send: Send; signal: AbortSignal }): Promise<boolean> {
   return new Promise((resolve) => {
     const { cli, userText, conversationId, send, signal } = opts;
     const prevSession = conversationId ? readSessions()[conversationId] : undefined;
-    const args = [
-      "-p",
-      "--output-format",
-      "stream-json",
-      "--verbose",
-      "--include-partial-messages",
-      "--dangerously-skip-permissions",
-      "--append-system-prompt",
-      CLI_STYLE_PROMPT,
-    ];
+    const args = ["-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--dangerously-skip-permissions", "--append-system-prompt", CLI_STYLE_PROMPT];
     if (prevSession) args.push("--resume", prevSession);
     args.push(userText);
-
     let child: ReturnType<typeof spawn>;
     try {
-      child = spawn(cli, args, { cwd: VAULT_ROOT, windowsHide: true, env: process.env });
+      child = spawn(cli, args, { cwd: VAULT_PATH, windowsHide: true, env: process.env });
     } catch {
       resolve(false);
       return;
     }
-
-    let committed = false; // saw parseable CLI output → this engine owns the turn
-    let done = false;
-    let sawDelta = false; // partial text deltas observed → skip full-message text
-    let anyText = false;
-    let resultText = "";
-    let buffer = "";
-
-    const commit = () => {
-      if (!committed) {
-        committed = true;
-        send({ engine: "claude-code" });
-      }
-    };
-    const kill = () => {
-      try {
-        child.kill();
-      } catch {
-        /* already dead */
-      }
-    };
-    const onAbort = () => kill(); // client disconnected → don't leave the CLI running
+    let committed = false, done = false, sawDelta = false, anyText = false, resultText = "", buffer = "";
+    const commit = () => { if (!committed) { committed = true; send({ engine: "claude-code" }); } };
+    const kill = () => { try { child.kill(); } catch { /* dead */ } };
+    const onAbort = () => kill();
     signal.addEventListener("abort", onAbort);
-    const timer = setTimeout(() => {
-      if (committed) send({ text: "\n\n(Jarvis timed out after 180s — the CLI task was stopped.)" });
-      kill();
-    }, CLAUDE_CODE_TIMEOUT_MS);
-
+    const timer = setTimeout(() => { if (committed) send({ text: "\n\n(Jarvis timed out after 180s. The CLI task was stopped.)" }); kill(); }, CLAUDE_CODE_TIMEOUT_MS);
     const handleLine = (line: string) => {
-      let ev: any;
-      try {
-        ev = JSON.parse(line);
-      } catch {
-        return;
-      }
+      let ev: Record<string, unknown>;
+      try { ev = JSON.parse(line); } catch { return; }
       commit();
       if (ev.type === "system" && ev.subtype === "init") {
-        if (conversationId && ev.session_id) saveSession(conversationId, ev.session_id);
+        if (conversationId && ev.session_id) saveSession(conversationId, String(ev.session_id));
       } else if (ev.type === "stream_event") {
-        const e = ev.event;
-        if (e?.type === "content_block_delta" && e.delta?.type === "text_delta" && e.delta.text) {
-          sawDelta = true;
-          anyText = true;
-          send({ text: e.delta.text });
-        }
+        const e = ev.event as { type?: string; delta?: { type?: string; text?: string } };
+        if (e?.type === "content_block_delta" && e.delta?.type === "text_delta" && e.delta.text) { sawDelta = true; anyText = true; send({ text: e.delta.text }); }
       } else if (ev.type === "assistant") {
-        const blocks: any[] = ev.message?.content ?? [];
+        const blocks = ((ev.message as { content?: unknown[] })?.content ?? []) as { type: string; name?: string; text?: string }[];
         for (const b of blocks) {
-          if (b.type === "tool_use") {
-            send({ tool: b.name, detail: summarizeToolInput(b.input) });
-          } else if (b.type === "text" && b.text && !sawDelta) {
-            anyText = true;
-            send({ text: b.text });
-          }
+          if (b.type === "tool_use") send({ tool: b.name, detail: "", line: `Ran ${b.name}` });
+          else if (b.type === "text" && b.text && !sawDelta) { anyText = true; send({ text: b.text }); }
         }
       } else if (ev.type === "result") {
         if (typeof ev.result === "string") resultText = ev.result;
-        if (conversationId && ev.session_id) saveSession(conversationId, ev.session_id);
+        if (conversationId && ev.session_id) saveSession(conversationId, String(ev.session_id));
       }
     };
-
     child.stdout?.on("data", (d) => {
       buffer += d.toString();
       let nl;
-      while ((nl = buffer.indexOf("\n")) >= 0) {
-        const line = buffer.slice(0, nl).trim();
-        buffer = buffer.slice(nl + 1);
-        if (line) handleLine(line);
-      }
+      while ((nl = buffer.indexOf("\n")) >= 0) { const line = buffer.slice(0, nl).trim(); buffer = buffer.slice(nl + 1); if (line) handleLine(line); }
     });
-    child.stderr?.on("data", () => {
-      /* progress noise */
-    });
-
-    const finish = (ok: boolean) => {
-      if (done) return;
-      done = true;
-      clearTimeout(timer);
-      signal.removeEventListener("abort", onAbort);
-      resolve(ok);
-    };
-
-    child.on("error", () => {
-      // ENOENT etc. — CLI unusable, fall back if nothing was streamed yet.
-      if (!committed) finish(false);
-    });
+    child.stderr?.on("data", () => { /* progress noise */ });
+    const finish = (ok: boolean) => { if (done) return; done = true; clearTimeout(timer); signal.removeEventListener("abort", onAbort); resolve(ok); };
+    child.on("error", () => { if (!committed) finish(false); });
     child.on("close", (code) => {
       if (buffer.trim()) handleLine(buffer.trim());
-      if (!committed) {
-        finish(false); // produced nothing parseable → let the API path answer
-        return;
-      }
-      // Result text is the safety net when no assistant text was streamed.
+      if (!committed) { finish(false); return; }
       if (!anyText && resultText) send({ text: resultText });
-      else if (!anyText && code !== 0 && !signal.aborted) {
-        send({ text: "(Jarvis/Claude Code exited without a reply — try again.)" });
-      }
+      else if (!anyText && code !== 0 && !signal.aborted) send({ text: "(Jarvis/Claude Code exited without a reply. Try again.)" });
       finish(true);
     });
   });
 }
 
-// ── OS context for the API engine ─────────────────────────────────────────────
-// The same live OS state limited mode reads (mission data + vault state
-// snapshots + hot.md) is fed to the Anthropic API engine as system context so
-// Jarvis can answer anything about the OS even when it cannot reach a tool.
-async function buildOsContext(): Promise<string> {
-  const [biz, outreach, hot, log, health, watchdogRaw] = await Promise.all([
-    readVaultFile("wiki/state/business-snapshot.md"),
-    readVaultFile("wiki/state/outreach-snapshot.md"),
-    readVaultFile("wiki/hot.md"),
-    readVaultFile("wiki/log.md"),
-    readVaultFile("wiki/state/health-board.md"),
-    readVaultFile("wiki/state/watchdog.md"),
-  ]);
-  const parts: string[] = [];
-  const cap = (s: string, n: number) => (s.length > n ? s.slice(0, n) + "\n...[truncated]" : s);
-  // Watchdog report first: this is the ground truth for "is everything running".
-  if (watchdogRaw) {
-    const updated = watchdogRaw.match(/^updated:\s*(.+)$/m)?.[1]?.trim() ?? "unknown";
-    const overallLine = watchdogRaw.split(/\r?\n/).find((l) => /OVERALL/i.test(l))?.trim() ?? "OVERALL: unknown";
-    const wdLines = watchdogRaw.split(/\r?\n/);
-    const problemLines: string[] = [];
-    let inProblems = false;
-    for (const l of wdLines) {
-      const t = l.trim();
-      if (/^(#{1,4}|\*\*)?\s*PROBLEMS\b/i.test(t) && !/OVERALL/i.test(t)) { inProblems = true; continue; }
-      if (inProblems && (/^(#{1,4}|\*\*)?\s*(RESOLVED|ALL\s*CLEAR)\b/i.test(t) || /^#{1,4}\s/.test(t))) inProblems = false;
-      if (inProblems && /^(?:[-*]|\d+\.)\s+/.test(t)) problemLines.push(t);
-    }
-    parts.push(
-      "## DA BOSS REPORT (latest, updated " + updated + ")\n" +
-      "Answer \"is everything running\" from this report. If it lists problems, say so plainly.\n" +
-      overallLine +
-      (problemLines.length ? "\n" + cap(problemLines.join("\n"), 2000) : "")
-    );
-  } else {
-    parts.push("## DA BOSS REPORT\nDa Boss has not produced its first report yet (wiki/state/watchdog.md missing). Say so if asked whether everything is running.");
-  }
-  // Ground truth on WHEN things run, so Jarvis answers schedule questions correctly.
-  parts.push(
-    "## AGENT SCHEDULE (ground truth)\n" +
-    "- Outreach (b2b-outreach-engine): SCHEDULED, every 30 minutes from 8am to 8pm daily. Each run checks the send window and daily cap, dry-runs, then sends live if clean. Live since 2026-08-06.\n" +
-    "- Prospector (b2b-prospector-daily): SCHEDULED, daily at 6:15am. Refills prospects.db with fresh DFW B2B leads via free scrapers. Finds and stages only, never sends.\n" +
-    "- Sentinel: daily 7:00am (client health). Chronicler: daily 9:52pm (vault historian).\n" +
-    "- Renewal Engine (Lynette): Mondays 7:44am.\n" +
-    "- Dispatch, Reply-Triage, and Builder run on demand when Jack asks.\n" +
-    "- The old wing-digital-daily-outreach and wing-audit-roofing-batch tasks are retired Apollo-era relics, superseded by the two live B2B tasks above. Never present them as current."
-  );
-  if (biz) parts.push("## BUSINESS SNAPSHOT (live)\n" + cap(biz.trim(), 2500));
-  if (outreach) parts.push("## OUTREACH SNAPSHOT (live)\n" + cap(outreach.trim(), 2500));
-  if (hot) parts.push("## CURRENT FOCUS (hot.md)\n" + cap(hot.trim(), 3000));
-  if (health) parts.push("## CLIENT HEALTH BOARD\n" + cap(health.trim(), 2500));
-  if (log) {
-    // Recent activity: the last ~40 log entries (headers + a couple lines each).
-    const lines = log.split(/\r?\n/);
-    const idxs = lines
-      .map((l, i) => (l.startsWith("## ") ? i : -1))
-      .filter((i) => i >= 0);
-    const start = idxs.length > 40 ? idxs[idxs.length - 40] : 0;
-    parts.push("## RECENT OS ACTIVITY (log.md tail)\n" + cap(lines.slice(start).join("\n").trim(), 6000));
-  }
-  if (parts.length === 0) return "";
-  return (
-    "\n\n# LIVE WING OS STATE (auto-injected, current as of this request)\n" +
-    "Use this as ground truth about the OS, agents, clients, and pipeline. " +
-    "Prefer tools for anything not covered here.\n\n" +
-    parts.join("\n\n")
-  );
-}
-
-// ── Anthropic call (non-streaming) used inside the API engine loop ─────────────
-async function callAnthropic(apiKey: string, messages: any[], systemExtra: string) {
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: 1500,
-      system: SYSTEM_PROMPT + systemExtra,
-      tools: TOOLS,
-      messages,
-    }),
-  });
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(err);
-  }
-  return res.json();
-}
-
-// ── Limited mode (engine 3) ────────────────────────────────────────────────
-// No Claude Code CLI and no API key (e.g. a bare Vercel deploy). Instead of
-// erroring out, answer from the live vault state snapshots so Jarvis can still
-// report what is going on inside the OS. Clearly labeled as limited mode.
-async function runLimitedMode(send: (obj: any) => void, userText: string) {
+// ── Limited mode: no key, no CLI ─────────────────────────────────────────────
+async function runLimitedMode(send: Send, userText: string) {
   send({ engine: "limited" });
   const [biz, outreach, hot, log] = await Promise.all([
     readVaultFile("wiki/state/business-snapshot.md"),
@@ -881,169 +588,108 @@ async function runLimitedMode(send: (obj: any) => void, userText: string) {
     readVaultFile("wiki/hot.md"),
     readVaultFile("wiki/log.md"),
   ]);
-
-  const parts: string[] = [];
-  parts.push("Limited mode: the full AI backend is unreachable from here, so this is a direct readout of the live OS state instead of a reasoned answer.\n");
-
+  const parts: string[] = ["Limited mode: no AI backend is reachable from here, so this is a direct readout of the live OS state files.\n"];
   const q = userText.toLowerCase();
   const wantAll = !/(outreach|email|pipeline|client|mrr|focus|log|activity|agent)/.test(q);
-
-  if (biz && (wantAll || /client|mrr|business|money|revenue/.test(q))) {
-    parts.push("BUSINESS SNAPSHOT\n" + biz.trim().slice(0, 1200));
-  }
-  if (outreach && (wantAll || /outreach|email|pipeline|lead|prospect|sent/.test(q))) {
-    parts.push("\nOUTREACH SNAPSHOT\n" + outreach.trim().slice(0, 1200));
-  }
-  if (hot && (wantAll || /focus|priorit|question|decision|next/.test(q))) {
-    parts.push("\nCURRENT FOCUS (hot.md)\n" + hot.trim().slice(0, 1000));
-  }
+  if (biz && (wantAll || /client|mrr|business|money|revenue/.test(q))) parts.push("BUSINESS SNAPSHOT\n" + biz.trim().slice(0, 1200));
+  if (outreach && (wantAll || /outreach|email|pipeline|lead|prospect|sent/.test(q))) parts.push("\nOUTREACH SNAPSHOT\n" + outreach.trim().slice(0, 1200));
+  if (hot && (wantAll || /focus|priorit|question|decision|next/.test(q))) parts.push("\nCURRENT FOCUS (hot.md)\n" + hot.trim().slice(0, 1000));
   if (log && (wantAll || /log|activity|agent|recent|happen|today/.test(q))) {
-    const recent = log.split(/\r?\n/).filter(l => l.startsWith("## ")).slice(-8).join("\n");
+    const recent = log.split(/\r?\n/).filter((l) => l.startsWith("## ")).slice(-8).join("\n");
     if (recent) parts.push("\nRECENT ACTIVITY (log.md)\n" + recent);
   }
-  if (parts.length === 1) {
-    parts.push("No vault state files are reachable right now. Try again once the vault source is connected.");
-  }
+  if (parts.length === 1) parts.push("No vault state files are reachable right now.");
   send({ text: parts.join("\n") });
 }
 
-// Engine 2: the Anthropic Messages API agent loop — first-class whenever the
-// Claude Code CLI is unavailable (e.g. on Vercel). Gets the full OS context
-// (mission data + vault state snapshots + hot.md) as system context, plus the
-// same tool set (cloud-unsafe tools degrade gracefully with pcRequired notes).
-async function runApiLoop(send: (obj: any) => void, messages: any[], userText: string) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    await runLimitedMode(send, userText);
-    return;
-  }
-  let systemExtra = "";
-  try {
-    systemExtra = await buildOsContext();
-  } catch {
-    /* context is best-effort; the tools still work */
-  }
-  try {
-        // Agent loop: keep letting Claude call tools until it stops asking.
-        const MAX_TURNS = 8;
-        for (let turn = 0; turn < MAX_TURNS; turn++) {
-          const resp = await callAnthropic(apiKey, messages, systemExtra);
-          const blocks: any[] = resp.content ?? [];
-
-          // Stream any text this turn produced.
-          for (const b of blocks) {
-            if (b.type === "text" && b.text) send({ text: b.text });
-          }
-
-          if (resp.stop_reason === "tool_use") {
-            const toolUses = blocks.filter((b) => b.type === "tool_use");
-            // Record the assistant turn verbatim (text + tool_use blocks).
-            messages.push({ role: "assistant", content: blocks });
-
-            const toolResults: any[] = [];
-            for (const tu of toolUses) {
-              // Tell the UI which tool is running, with a short human hint.
-              const inp: any = tu.input ?? {};
-              const detail =
-                inp.query ?? inp.keyword ?? inp.path ?? inp.url ?? inp.agent ?? "";
-              send({ tool: tu.name, detail: String(detail).slice(0, 60) });
-              let result: string;
-              try {
-                result = await runTool(tu.name, tu.input);
-              } catch (e: any) {
-                result = "ERROR: " + (e?.message ?? "tool failed");
-              }
-              toolResults.push({
-                type: "tool_result",
-                tool_use_id: tu.id,
-                content: result,
-              });
-            }
-            messages.push({ role: "user", content: toolResults });
-            continue; // loop again so Claude can use the results
-          }
-
-          // No tool use -> this was the final answer.
-          break;
-        }
-  } catch (e: any) {
-    send({ text: "\n\n(Jarvis hit an error: " + (e?.message ?? "unknown") + ")" });
-  }
-}
+// ── Handler ──────────────────────────────────────────────────────────────────
+const MAX_HISTORY = 40; // 20 turns
 
 export async function POST(req: NextRequest) {
-  const body = await req.json();
-  const incoming = body.messages ?? [];
-  const conversationId =
-    typeof body.conversationId === "string" && body.conversationId.trim()
-      ? body.conversationId.trim().slice(0, 100)
-      : null;
-  // Normalize history: browser sends {role, content:string}. Keep as-is.
-  const messages: any[] = incoming.map((m: any) => ({ role: m.role, content: m.content }));
-  const lastUser = [...messages].reverse().find((m) => m.role === "user");
+  const auth = await requireStaff();
+  if (isAuthFailure(auth)) return auth;
+
+  let body: Record<string, unknown>;
+  try {
+    body = (await req.json()) as Record<string, unknown>;
+  } catch {
+    return NextResponse.json({ error: "bad_request", message: "Body must be JSON." }, { status: 400 });
+  }
+  const incoming = Array.isArray(body.messages) ? (body.messages as { role?: string; content?: unknown }[]) : [];
+  const conversationId = typeof body.conversationId === "string" && body.conversationId.trim() ? body.conversationId.trim().slice(0, 100) : null;
+  const confirmToken = typeof body.confirm_action_id === "string" ? body.confirm_action_id : null;
+
+  // History is plain text turns from the browser; the server keeps no chat state.
+  const messages: unknown[] = incoming
+    .filter((m) => (m.role === "user" || m.role === "assistant") && typeof m.content === "string" && (m.content as string).trim())
+    .slice(-MAX_HISTORY)
+    .map((m) => ({ role: m.role, content: (m.content as string).slice(0, 8000) }));
+  // The API needs the transcript to start with a user turn and never to end
+  // on an assistant turn when we are not confirming; drop leading assistant turns.
+  while (messages.length && (messages[0] as { role: string }).role !== "user") messages.shift();
+  const lastUser = [...incoming].reverse().find((m) => m.role === "user");
   const userText = typeof lastUser?.content === "string" ? lastUser.content : "";
+
+  const apiKey = process.env.ANTHROPIC_API_KEY || null;
+  const ip = clientIp(req);
+  // Local testing only: a request header can lower the spend ceiling to prove
+  // the refusal path. Ignored in production and in the cloud.
+  const overrideRaw = req.headers.get("x-jarvis-spend-ceiling");
+  const spendOverride =
+    overrideRaw !== null && process.env.NODE_ENV !== "production" && !isCloud() && Number.isFinite(Number(overrideRaw))
+      ? Number(overrideRaw)
+      : null;
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
       let closed = false;
-      const send = (obj: any) => {
+      const send: Send = (obj) => {
         if (closed) return;
         try {
           controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
         } catch {
-          closed = true; // client went away mid-stream
+          closed = true;
         }
       };
-
       try {
-        // Engine 1: Claude Code CLI (subscription + full toolset + vault context).
-        const cli = findClaudeCli();
-        let handled = false;
-        if (cli && userText) {
-          handled = await runClaudeCode({
-            cli,
-            userText,
-            conversationId,
-            send,
-            signal: req.signal,
-          });
+        if (confirmToken) {
+          send({ engine: "api" });
+          await runConfirmed({ send, messages, token: confirmToken, apiKey, ip, signal: req.signal, spendOverride });
+        } else if (!messages.length) {
+          send({ text: "Say something and I will get to work." });
+        } else {
+          const preferCli = process.env.JARVIS_ENGINE === "cli" || !apiKey;
+          const cli = preferCli ? findClaudeCli() : null;
+          let handled = false;
+          if (cli && userText) {
+            handled = await runClaudeCode({ cli, userText, conversationId, send, signal: req.signal });
+          }
+          if (!handled) {
+            if (apiKey) {
+              send({ engine: "api" });
+              await runApiLoop({ send, messages, apiKey, ip, signal: req.signal, spendOverride });
+            } else {
+              await runLimitedMode(send, userText);
+            }
+          }
         }
-        // Engine 2 (fallback): the original Anthropic API tool loop.
-        if (!handled) {
-          if (process.env.ANTHROPIC_API_KEY) send({ engine: "api" });
-          await runApiLoop(send, messages, userText);
-        }
-      } catch (e: any) {
-        send({ text: "\n\n(Jarvis hit an error: " + (e?.message ?? "unknown") + ")" });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        send({ error: msg.slice(0, 300) });
+        send({ text: `\n\n(Jarvis hit an error: ${msg.slice(0, 200)})` });
       } finally {
         if (!closed) {
           try {
             controller.enqueue(encoder.encode("data: [DONE]\n\n"));
             controller.close();
-          } catch {
-            /* already closed */
-          }
+          } catch { /* already closed */ }
         }
       }
     },
   });
 
   return new Response(stream, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      "Access-Control-Allow-Origin": "*",
-    },
-  });
-}
-
-export async function OPTIONS() {
-  return new Response(null, {
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
-    },
+    headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
   });
 }

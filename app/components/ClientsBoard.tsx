@@ -94,18 +94,26 @@ export default function ClientsBoard() {
           const icon = INDUSTRY_ICON[(c.industry || "").toLowerCase()] ?? "🏢";
           return (
             <div key={c.file}
-              onClick={() => { sfx.play("blip"); setHealthClient(c.name); }}
-              title="Click for client health"
+              // The whole card opens the client's live dashboard in a new tab
+              // (Jack, 2026-09-04). Only when one exists for this slug; the
+              // health check moved to its own button below.
+              role={c.dashboardUrl ? "link" : undefined}
+              tabIndex={c.dashboardUrl ? 0 : undefined}
+              onClick={() => { if (!c.dashboardUrl) return; sfx.play("nav"); window.open(c.dashboardUrl, "_blank", "noopener"); }}
+              onKeyDown={(e) => { if (c.dashboardUrl && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); window.open(c.dashboardUrl, "_blank", "noopener"); } }}
+              title={c.dashboardUrl ? "Open this client's dashboard" : "No dashboard yet"}
               style={{
                 background: "radial-gradient(ellipse 90% 70% at 50% -20%, rgba(52,211,153,0.12), transparent 60%), linear-gradient(180deg, var(--bg-card), var(--bg-card))",
                 border: "1px solid rgba(52,211,153,0.35)",
-                borderRadius: 14, padding: "16px 18px", cursor: "pointer",
+                borderRadius: 14, padding: "16px 18px", cursor: c.dashboardUrl ? "pointer" : "default",
               }}>
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
                 <div style={{ display: "flex", gap: 10, alignItems: "center", minWidth: 0 }}>
                   <span style={{ fontSize: 20 }}>{icon}</span>
                   <div style={{ minWidth: 0 }}>
-                    <p style={{ fontSize: 14, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</p>
+                    {/* Wraps rather than truncating: the term note beside it
+                        squeezed "Hero's Junk Removal" down to "Hero's ...". */}
+                    <p style={{ fontSize: 14, fontWeight: 700, overflowWrap: "anywhere", lineHeight: 1.25 }}>{c.name}</p>
                     <p style={{ fontSize: 11.5, color: "var(--text-muted)" }}>{c.owner || c.industry}</p>
                   </div>
                 </div>
@@ -133,7 +141,30 @@ export default function ClientsBoard() {
               </div>
               {/* No per-client CRM filter exists yet, so this is one generic
                   link into the CRM rather than a count that would be a guess. */}
-              <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--border)" }}>
+              <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--border)", display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                {c.dashboardUrl ? (
+                  <a href={c.dashboardUrl} target="_blank" rel="noopener noreferrer"
+                    onClick={(e) => { e.stopPropagation(); sfx.play("nav"); }}
+                    style={{
+                      display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 9,
+                      fontSize: 12, fontWeight: 700, textDecoration: "none",
+                      background: "var(--accent)", color: "var(--bg-primary)", border: "1px solid var(--accent)",
+                    }}>
+                    Open dashboard <span aria-hidden="true">↗</span>
+                  </a>
+                ) : (
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", padding: "6px 0" }}>
+                    No dashboard yet
+                  </span>
+                )}
+                <button type="button"
+                  onClick={(e) => { e.stopPropagation(); sfx.play("blip"); setHealthClient(c.name); }}
+                  style={{
+                    padding: "6px 12px", borderRadius: 9, fontSize: 12, fontWeight: 600, cursor: "pointer",
+                    background: "transparent", border: "1px solid var(--border)", color: "var(--text-secondary)", minHeight: 0,
+                  }}>
+                  Health check
+                </button>
                 <button type="button"
                   onClick={(e) => { e.stopPropagation(); sfx.play("nav"); window.dispatchEvent(new CustomEvent("os:navigate", { detail: "crm" })); }}
                   style={{ background: "none", border: "none", padding: 0, minHeight: 0, cursor: "pointer", fontSize: 11, color: "var(--accent)", textDecoration: "underline" }}>

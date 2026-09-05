@@ -1,8 +1,23 @@
 import { NextResponse } from "next/server";
 import { listVaultFiles, readVaultFile } from "@/lib/vaultSource";
 import { getRevenueTruth, BASIS_LABEL } from "@/lib/revenue";
+import { CLIENTS as DASHBOARD_CLIENTS } from "../dashboard/clients";
 
 export const runtime = "nodejs";
+
+// The dashboard registry (app/api/dashboard/clients.ts) is keyed by its own
+// short slug, which does not always equal the roster slug ("heros-junk" vs
+// "heros-junk-removal"). Match on the registry key first, then on the brand
+// name, so a dashboard that really exists is never reported as missing.
+// The page is credential-free, so no key goes in the URL.
+function dashboardUrlFor(slug: string, name: string): string | null {
+  const norm = (x: string) => x.toLowerCase().replace(/[^a-z0-9]+/g, "");
+  const key = DASHBOARD_CLIENTS[slug]
+    ? slug
+    : Object.keys(DASHBOARD_CLIENTS).find((k) => norm(DASHBOARD_CLIENTS[k].brand.name) === norm(name) || norm(k) === norm(slug));
+  return key ? `/dashboards/live.html?c=${encodeURIComponent(key)}` : null;
+}
+
 
 // The client roster + revenue view.
 //
@@ -97,6 +112,11 @@ export async function GET() {
         updated: d?.updated ?? "",
         isClient: c.isClient,
         needsVaultPage: c.needsVaultPage,
+        // The live client dashboard, only when a registry entry exists for
+        // this slug (app/api/dashboard/clients.ts). The page itself is
+        // credential-free, so no key is ever put in this URL; null means
+        // "no dashboard yet", never a dead link.
+        dashboardUrl: dashboardUrlFor(c.slug, c.name),
       };
     });
 

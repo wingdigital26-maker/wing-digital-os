@@ -116,9 +116,9 @@ const btn: React.CSSProperties = {
 };
 
 const metaLabel: React.CSSProperties = {
-  fontSize: 10,
+  fontSize: 11.5,
   fontWeight: 700,
-  letterSpacing: 0.7,
+  letterSpacing: 0.6,
   textTransform: "uppercase",
   color: "var(--text-muted)",
 };
@@ -237,10 +237,10 @@ export default function IntelProposalCard({
             }}>
               &ldquo;{p.evidence_quote}&rdquo;
             </p>
-            <footer style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <footer style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
               <span>
                 {p.video_title || "source video"}
-                {p.source_handle ? ` — ${p.source_handle}` : ""}
+                {p.source_handle ? `, ${p.source_handle}` : ""}
                 {p.evidence_ts ? ` @ ${p.evidence_ts}` : ""}
               </span>
               {link && (
@@ -260,7 +260,7 @@ export default function IntelProposalCard({
           </blockquote>
         ) : (
           <p style={{ fontSize: 13, color: "var(--orange)", marginTop: 6 }}>
-            No quote was captured for this proposal — nothing here proves the claim, so treat it
+            No quote was captured for this proposal, so nothing here proves the claim, so treat it
             as unverified{link ? " and check the video yourself." : "."}
             {link && (
               <>
@@ -283,7 +283,7 @@ export default function IntelProposalCard({
               onClick={() => onDecide(p.id, "approve")}
               style={{ ...btn, borderColor: "var(--green)", color: "var(--green)", opacity: busy ? 0.5 : 1 }}
             >
-              Approve — queue for me to apply
+              Approve and queue for me to apply
             </button>
             <button
               disabled={busy}
@@ -292,14 +292,14 @@ export default function IntelProposalCard({
             >
               Reject
             </button>
-            <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
+            <span style={{ fontSize: 13, color: "var(--text-muted)" }}>
               Approving records your decision only. Nothing is changed until you apply it yourself.
             </span>
           </>
         ) : (
           <>
             <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>
-              {p.status === "approved" && "Approved — queued for you to apply by hand. Not applied."}
+              {p.status === "approved" && "Approved and queued for you to apply by hand. Not applied."}
               {p.status === "rejected" && "Rejected. Nothing was changed."}
               {p.status === "applied" && `Applied${p.applied_at ? ` on ${stamp(p.applied_at)}` : ""}.`}
               {p.status === "failed" && "An apply attempt failed."}

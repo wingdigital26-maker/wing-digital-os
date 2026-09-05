@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { sbUrl, sbService, sbSelect } from "@/lib/osSupabase";
 import { pushToAll } from "@/lib/push";
+import { EXPECTED_HEARTBEATS, inPcWindow } from "@/lib/watchdogExpected";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -13,24 +14,9 @@ export const maxDuration = 60;
 
 const REPUSH_MS = 6 * 60 * 60 * 1000;
 
-// Expected cadence per heartbeat, in minutes of allowed silence.
-// windowed: only alert during 6am-10pm Central (the hours the PC should be up).
-const EXPECTED: { agent: string; staleMin: number; windowed: boolean; label: string }[] = [
-  { agent: "pc-alive", staleMin: 45, windowed: true, label: "PC heartbeat" },
-  { agent: "watchdog-heartbeat", staleMin: 200, windowed: true, label: "Watchdog patrol" },
-  { agent: "cloud-patrol", staleMin: 200, windowed: false, label: "Cloud patrol" },
-  { agent: "sentinel-daily", staleMin: 26 * 60, windowed: false, label: "Sentinel daily" },
-  { agent: "b2b-prospector-daily", staleMin: 26 * 60, windowed: false, label: "B2B prospector" },
-  { agent: "state-sync-daily", staleMin: 26 * 60, windowed: false, label: "State sync" },
-  { agent: "chronicler-end-of-day", staleMin: 26 * 60, windowed: false, label: "Chronicler" },
-  { agent: "renewal-content-weekly", staleMin: 8 * 24 * 60, windowed: false, label: "Renewal content engine" },
-];
-
-function centralHour(): number {
-  return Number(
-    new Intl.DateTimeFormat("en-US", { timeZone: "America/Chicago", hour: "numeric", hour12: false }).format(new Date())
-  );
-}
+// Expected cadence per heartbeat lives in lib/watchdogExpected.ts so the
+// on-demand Da Boss recheck judges the fleet by exactly the same table.
+const EXPECTED = EXPECTED_HEARTBEATS;
 
 type Beat = { agent: string; status: string; message: string | null; last_beat: string };
 type Alert = { key: string; title: string; body: string };
@@ -60,7 +46,7 @@ export async function GET(req: NextRequest) {
   if (!url || !key) return NextResponse.json({ error: "supabase not configured" }, { status: 503 });
 
   const now = Date.now();
-  const inWindow = centralHour() >= 6 && centralHour() < 22;
+  const inWindow = inPcWindow();
   const beats = await sbSelect<Beat>({ table: "agent_heartbeats", service: true });
   const byAgent = new Map(beats.map((b) => [b.agent, b]));
 

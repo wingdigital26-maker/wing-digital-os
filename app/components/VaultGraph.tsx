@@ -31,7 +31,14 @@ import type { GNode, GLink } from "./graphTypes";
 // three.js is heavy, so the scene is still code-split out of the main bundle.
 const VaultGraph3D = dynamic(() => import("./VaultGraph3D"), { ssr: false });
 
-const LS_DATA = "wingos-vault-graph-3d-v1"; // cached graph JSON for instant paint
+const SS_DATA = "wingos-vault-graph-3d-v2"; // last good graph JSON, per tab, for instant paint
+
+// Fetch budget. Measured 2026-09-04: production answers in ~0.2 s when the CDN
+// copy is warm but took 22-26 s on a cold build against the GitHub vault, and
+// the old code had no timeout at all, so a stalled request looked like "the
+// graph never loads". One automatic retry, then an honest error with a button.
+const FETCH_TIMEOUT_MS = 40_000;
+const AUTO_RETRIES = 1;
 
 // The scene's own ground color. Kept here (not just in VaultGraph3D) so the
 // wrapper paints the identical value behind the canvas — otherwise there is a
@@ -131,17 +138,56 @@ interface RawGraph {
   nodes: { id: string; name: string; path: string; group: string }[];
   links: { source: string; target: string }[];
   hash?: string;
+  error?: string;
 }
+
+// Where the graph is in its life. Every branch has something honest to show.
+type Phase =
+  | { kind: "loading"; attempt: number }
+  | { kind: "ready" }
+  | { kind: "empty"; reason: string }
+  | { kind: "error"; reason: string };
 
 function loadCache(): RawGraph | null {
   try {
-    const raw = window.localStorage.getItem(LS_DATA);
+    const raw = window.sessionStorage.getItem(SS_DATA);
     if (!raw) return null;
     const v = JSON.parse(raw) as RawGraph;
     if (!v || !Array.isArray(v.nodes) || !Array.isArray(v.links)) return null;
     return v;
   } catch {
     return null;
+  }
+}
+function saveCache(g: RawGraph) {
+  try {
+    window.sessionStorage.setItem(SS_DATA, JSON.stringify({ nodes: g.nodes, links: g.links, hash: g.hash }));
+  } catch { /* storage full or blocked; the graph still renders */ }
+}
+
+// One request with a hard deadline. Resolves to the parsed payload or throws
+// with a reason a person can read.
+async function fetchGraphOnce(): Promise<RawGraph> {
+  const ctrl = new AbortController();
+  const timer = window.setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const r = await fetch("/api/vault/graph", { cache: "no-store", signal: ctrl.signal });
+    let body: RawGraph | null = null;
+    try { body = (await r.json()) as RawGraph; } catch { body = null; }
+    if (body?.error) throw new Error(body.error);
+    if (!r.ok) throw new Error(`The graph API answered ${r.status}.`);
+    if (!body || !Array.isArray(body.nodes) || !Array.isArray(body.links)) {
+      throw new Error("The graph API returned something that is not a graph.");
+    }
+    return body;
+  } catch (e) {
+    if (e instanceof DOMException && e.name === "AbortError") {
+      throw new Error(`No answer from the graph API within ${Math.round(FETCH_TIMEOUT_MS / 1000)} s.`);
+    }
+    if (e instanceof TypeError) throw new Error("Could not reach the graph API (offline, or the server is down).");
+    throw e;
+  } finally {
+    window.clearTimeout(timer);
   }
 }
 
@@ -196,10 +242,25 @@ class GraphErrorBoundary extends Component<
 
 export default function VaultGraph({ onSelectNode, onToggleTree }: { onSelectNode: (path: string) => void; onToggleTree?: () => void }) {
   const wrapRef = useRef<HTMLDivElement>(null);
-  const [size, setSize] = useState({ w: 800, h: 600 });
-  const [graph, setGraph] = useState<{ nodes: GNode[]; links: GLink[] }>({ nodes: [], links: [] });
-  const [loading, setLoading] = useState(true);
-  const [restored, setRestored] = useState(false);
+  // w/h are 0 until the panel has actually been measured VISIBLE. The shell
+  // keeps every visited view mounted and hides the inactive ones with
+  // display:none, so a graph mounted while hidden measures 0x0; the scene must
+  // not start until there is a real box to draw into.
+  const [size, setSize] = useState({ w: 0, h: 0 });
+  // The last good graph (this tab's sessionStorage) paints on the very first
+  // render, before any network, so a reload never starts from a blank panel.
+  const [cachedRaw] = useState<RawGraph | null>(() => {
+    const c = loadCache();
+    return c && c.nodes.length ? c : null;
+  });
+  const [graph, setGraph] = useState<{ nodes: GNode[]; links: GLink[] }>(() =>
+    cachedRaw ? buildGraph(cachedRaw) : { nodes: [], links: [] }
+  );
+  const [phase, setPhase] = useState<Phase>({ kind: "loading", attempt: 1 });
+  const [elapsed, setElapsed] = useState(0); // seconds spent in the current load
+  const [reloadN, setReloadN] = useState(0); // bumped by the Retry button
+  const [restored, setRestored] = useState(!!cachedRaw);
+  const loading = phase.kind === "loading";
   const [query, setQuery] = useState("");
   // FLOW IS ON BY DEFAULT (Jack's ask): the galaxy should always look alive, not
   // wait for a click. VaultGraph3D bounds the cost by sampling a subset of links
@@ -227,7 +288,7 @@ export default function VaultGraph({ onSelectNode, onToggleTree }: { onSelectNod
   const canRender3D = webglOK && !sceneFailed;
 
   const onSelectRef = useRef(onSelectNode);
-  onSelectRef.current = onSelectNode;
+  useEffect(() => { onSelectRef.current = onSelectNode; }, [onSelectNode]);
 
   // Highlight state kept in refs (read by the scene); a tick forces React
   // re-renders so dependent visuals resync.
@@ -256,66 +317,80 @@ export default function VaultGraph({ onSelectNode, onToggleTree }: { onSelectNod
   const stats = { nodes: graph.nodes.length, links: graph.links.length };
 
   // ── Size tracking ──
+  // Measure on mount, on every resize, and again the moment the panel becomes
+  // visible (ResizeObserver fires on display:none -> block because the box goes
+  // from 0 to real; IntersectionObserver covers browsers/paths where it does
+  // not). A 0x0 measurement is kept as 0x0 rather than guessed, so the scene
+  // waits instead of creating a WebGL canvas at a made-up size.
   useEffect(() => {
     const wrap = wrapRef.current;
     if (!wrap) return;
     const apply = () => {
-      const vw = typeof window !== "undefined" ? window.innerWidth : 800;
-      const vh = typeof window !== "undefined" ? window.innerHeight : 600;
-      const w = wrap.clientWidth || vw || 800;
-      const h = wrap.clientHeight || Math.max(320, Math.round(vh * 0.6)) || 600;
-      setSize({ w, h });
+      const w = wrap.clientWidth;
+      const h = wrap.clientHeight;
+      setSize(prev => (prev.w === w && prev.h === h ? prev : { w, h }));
     };
     apply();
     const ro = new ResizeObserver(apply);
     ro.observe(wrap);
+    const io = typeof IntersectionObserver !== "undefined"
+      ? new IntersectionObserver(entries => { if (entries.some(e => e.isIntersecting)) apply(); })
+      : null;
+    io?.observe(wrap);
     window.addEventListener("resize", apply);
-    return () => { ro.disconnect(); window.removeEventListener("resize", apply); };
+    return () => { ro.disconnect(); io?.disconnect(); window.removeEventListener("resize", apply); };
   }, []);
+  const measured = size.w > 0 && size.h > 0;
 
-  // ── Load: cache instantly, then reconcile with the API ──
+  // ── Load: cached graph instantly, then reconcile with the API ──
+  // Timeout + one automatic retry, then a visible error with a Retry button.
+  // A cached paint is never torn down by a failed refresh.
   useEffect(() => {
     let cancelled = false;
-    const cached = loadCache();
-    const haveCache = !!(cached && cached.nodes.length);
-    if (haveCache) {
-      setGraph(buildGraph(cached!));
-      setLoading(false);
-      setRestored(true);
-    }
-    const attempt = (tries: number) => {
-      fetch("/api/vault/graph", { cache: "no-store" })
-        .then(r => r.json())
-        .then((g: RawGraph) => {
+    const cached = cachedRaw;
+    const haveCache = !!cached;
+    // While a refresh runs behind a cached paint the chip says "refreshing";
+    // with nothing cached the overlay counts seconds so a 25 s cold build
+    // reads as progress, not a hang.
+    const started = performance.now();
+    const ticker = window.setInterval(() => setElapsed(Math.floor((performance.now() - started) / 1000)), 1000);
+
+    (async () => {
+      let lastReason = "";
+      for (let attempt = 1; attempt <= AUTO_RETRIES + 1; attempt++) {
+        if (cancelled) return;
+        // Yield once so the state writes happen after the effect body, not in it.
+        await Promise.resolve();
+        setPhase({ kind: "loading", attempt });
+        if (attempt === 1) setElapsed(0);
+        try {
+          const g = await fetchGraphOnce();
           if (cancelled) return;
-          const ok = g && Array.isArray(g.nodes) && g.nodes.length > 0;
-          if (!ok) {
-            // Empty/invalid payload: keep any cached paint and retry a few times
-            // with backoff before giving up.
-            if (tries < 4) { window.setTimeout(() => attempt(tries + 1), 400 * (tries + 1)); return; }
-            setLoading(false);
+          if (g.nodes.length === 0) {
+            setPhase({ kind: "empty", reason: "The vault has no notes to map yet." });
             return;
           }
-          try {
-            window.localStorage.setItem(LS_DATA, JSON.stringify({ nodes: g.nodes, links: g.links, hash: g.hash }));
-          } catch { /* storage full */ }
-          if (haveCache && cached!.hash && g.hash && cached!.hash === g.hash) {
-            setLoading(false);
-            return;
+          saveCache(g);
+          if (!(haveCache && cached!.hash && g.hash && cached!.hash === g.hash)) {
+            setGraph(buildGraph(g));
+            setRestored(false);
           }
-          setGraph(buildGraph(g));
-          setLoading(false);
-          setRestored(false);
-        })
-        .catch(() => {
-          if (cancelled) return;
-          if (tries < 4) { window.setTimeout(() => attempt(tries + 1), 400 * (tries + 1)); return; }
-          setLoading(false);
-        });
-    };
-    attempt(0);
-    return () => { cancelled = true; };
-  }, []);
+          setPhase({ kind: "ready" });
+          return;
+        } catch (e) {
+          lastReason = e instanceof Error ? e.message : "Unknown error.";
+          if (attempt <= AUTO_RETRIES) await new Promise(r => window.setTimeout(r, 1200));
+        }
+      }
+      if (cancelled) return;
+      // Out of retries. With a cached graph on screen this is a quiet note in
+      // the chip; with nothing on screen it is the whole panel.
+      setPhase({ kind: "error", reason: lastReason });
+    })();
+
+    return () => { cancelled = true; window.clearInterval(ticker); };
+  }, [reloadN, cachedRaw]);
+  const retry = useCallback(() => setReloadN(n => n + 1), []);
 
   // Debug hook
   useEffect(() => {
@@ -323,30 +398,36 @@ export default function VaultGraph({ onSelectNode, onToggleTree }: { onSelectNod
     const degs = graph.nodes.map(n => n.deg ?? 0);
     (window as unknown as { __vaultGraphDebug?: unknown }).__vaultGraphDebug = {
       nodes: graph.nodes.length, links: graph.links.length,
-      degMax: Math.max(...degs, 0), mobile, webglOK, sceneFailed, flow,
+      degMax: Math.max(...degs, 0), mobile, webglOK, sceneFailed, flow, phase: phase.kind, size,
     };
-  }, [graph, mobile, webglOK, sceneFailed, flow]);
+  }, [graph, mobile, webglOK, sceneFailed, flow, phase, size]);
 
   // ── Search highlight: matches drive the same dim/highlight machinery ──
   useEffect(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) {
-      if (!hoverId.current && !focusId.current) {
-        highlightNodes.current = new Set();
-        highlightLinks.current = new Set();
-        bump();
+    // Deferred a frame: the highlight sets live in refs read by the scene, and
+    // the resync tick is a state write, which must not happen inside the effect
+    // body itself.
+    const id = window.setTimeout(() => {
+      const q = query.trim().toLowerCase();
+      if (!q) {
+        if (!hoverId.current && !focusId.current) {
+          highlightNodes.current = new Set();
+          highlightLinks.current = new Set();
+          bump();
+        }
+        return;
       }
-      return;
-    }
-    const nodes = new Set<string>();
-    for (const n of graph.nodes) if (n.name.toLowerCase().includes(q)) nodes.add(n.id);
-    const links = new Set<GLink>();
-    for (const l of graph.links) {
-      if (nodes.has(lid(l.source)) && nodes.has(lid(l.target))) links.add(l);
-    }
-    highlightNodes.current = nodes;
-    highlightLinks.current = links;
-    bump();
+      const nodes = new Set<string>();
+      for (const n of graph.nodes) if (n.name.toLowerCase().includes(q)) nodes.add(n.id);
+      const links = new Set<GLink>();
+      for (const l of graph.links) {
+        if (nodes.has(lid(l.source)) && nodes.has(lid(l.target))) links.add(l);
+      }
+      highlightNodes.current = nodes;
+      highlightLinks.current = links;
+      bump();
+    }, 0);
+    return () => window.clearTimeout(id);
   }, [query, graph, bump]);
 
   // ── Highlight a node's neighborhood ──
@@ -424,14 +505,41 @@ export default function VaultGraph({ onSelectNode, onToggleTree }: { onSelectNod
         boxShadow: "0 18px 44px rgba(15,23,42,0.16), inset 0 0 0 1px rgba(148,163,184,0.10)",
       }}
     >
-      {loading && (
-        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(203,213,225,0.65)", fontSize: 14, zIndex: 2 }}>
-          Charting the galaxy...
+      {/* Loading with nothing cached: say how long it has been. */}
+      {loading && graph.nodes.length === 0 && (
+        <div role="status" aria-live="polite" style={{ ...stateOverlay, zIndex: 2 }}>
+          <p style={{ color: "#e2e8f0", fontSize: 14, fontWeight: 600 }}>Charting the vault map</p>
+          <p style={{ color: "rgba(148,163,184,0.85)", fontSize: 12.5, lineHeight: 1.5, maxWidth: 360 }}>
+            {elapsed < 4
+              ? "Reading your notes and their links."
+              : elapsed < 20
+                ? `Still working, ${elapsed} s. The first load after a quiet spell rebuilds the whole map.`
+                : `Still working, ${elapsed} s. This is slower than usual; it will stop and tell you if it fails.`}
+            {phase.kind === "loading" && phase.attempt > 1 ? " Retrying once." : ""}
+          </p>
         </div>
       )}
 
-      {/* The galaxy — the one and only renderer. */}
-      {canRender3D && graph.nodes.length > 0 && (
+      {/* Failed with nothing cached: the reason, and a way to try again. */}
+      {phase.kind === "error" && graph.nodes.length === 0 && (
+        <div role="alert" style={{ ...stateOverlay, zIndex: 2 }}>
+          <p style={{ color: "#e2e8f0", fontSize: 14, fontWeight: 600 }}>The vault map could not load</p>
+          <p style={{ color: "rgba(148,163,184,0.9)", fontSize: 12.5, lineHeight: 1.5, maxWidth: 380 }}>{phase.reason}</p>
+          <button onClick={retry} style={{ ...toggleStyle(true), marginTop: 6 }}>Retry</button>
+        </div>
+      )}
+
+      {/* Loaded fine, but there is nothing to draw. */}
+      {phase.kind === "empty" && graph.nodes.length === 0 && (
+        <div role="status" style={{ ...stateOverlay, zIndex: 2 }}>
+          <p style={{ color: "#e2e8f0", fontSize: 14, fontWeight: 600 }}>Nothing to map yet</p>
+          <p style={{ color: "rgba(148,163,184,0.9)", fontSize: 12.5, lineHeight: 1.5, maxWidth: 380 }}>{phase.reason}</p>
+          <button onClick={retry} style={{ ...toggleStyle(false), marginTop: 6 }}>Check again</button>
+        </div>
+      )}
+
+      {/* The galaxy — the one and only renderer. Waits for a real, visible box. */}
+      {canRender3D && measured && graph.nodes.length > 0 && (
         <GraphErrorBoundary onError={() => { setSceneFailed(true); setGlow(false); }}>
           <VaultGraph3D
             graph={graph}
@@ -556,7 +664,14 @@ export default function VaultGraph({ onSelectNode, onToggleTree }: { onSelectNod
         </p>
         <p style={{ fontSize: 10.5, color: "rgba(148,163,184,0.95)" }}>
           {stats.nodes} notes · {stats.links} threads{restored ? " · restored" : ""}
+          {loading && stats.nodes > 0 ? ` · refreshing${elapsed >= 4 ? ` ${elapsed} s` : ""}` : ""}
         </p>
+        {phase.kind === "error" && stats.nodes > 0 && (
+          <p style={{ fontSize: 10.5, color: "#fcd34d", marginTop: 3, maxWidth: 260, lineHeight: 1.4 }}>
+            Showing the last saved map. Refresh failed: {phase.reason}{" "}
+            <button onClick={retry} style={{ background: "none", border: "none", padding: 0, color: "#e0f2fe", cursor: "pointer", fontSize: 10.5, fontWeight: 700, textDecoration: "underline" }}>Retry</button>
+          </p>
+        )}
       </div>
 
       {/* Toggles — the 2D/3D switch is gone; 3D is the only mode now. */}
@@ -602,6 +717,13 @@ export default function VaultGraph({ onSelectNode, onToggleTree }: { onSelectNod
     </div>
   );
 }
+
+// Centered message block for the loading / error / empty states, laid over the
+// dark scene ground so the panel never reads as a blank void.
+const stateOverlay: React.CSSProperties = {
+  position: "absolute", inset: 0, display: "flex", flexDirection: "column",
+  alignItems: "center", justifyContent: "center", gap: 8, padding: 24, textAlign: "center",
+};
 
 // ── Chrome styling ──
 // These panels float ON the dark scene, not on the light app surface, so they

@@ -34,7 +34,7 @@ type Tile =
 
 const TILES: Tile[] = [
   { icon: Users, name: "Clients", blurb: "Who pays you and how their sites are doing", view: "clients" },
-  { icon: Note, name: "CRM", blurb: "Every contact, deal, reply and message", view: "crm" },
+  { icon: Note, name: "CRM", blurb: "Every contact, deal, email, text and reply", view: "crm" },
   { icon: Call, name: "Call Room", blurb: "Dial the lead list and log what happened", href: "/calls" },
   { icon: Route, name: "Automations", blurb: "When something happens, do these things, with nobody at the keyboard", href: "/automations" },
   { icon: Calendar, name: "Calendar", blurb: "Bookings, call-backs, classes and payments", view: "calendar" },
@@ -178,7 +178,7 @@ export function TodayStrip() {
     { label: "Calls booked, next 7 days", value: s.bookings_upcoming_7d, view: "calendar" },
     { label: "Open deals", value: s.open_deals, view: "crm" },
     { label: "Automations running", value: s.automations_active, href: "/automations" },
-    { label: "Unread texts", value: s.unread_texts, view: "email" },
+    { label: "Unread texts", value: s.unread_texts, view: "text" },
   ];
 
   return (

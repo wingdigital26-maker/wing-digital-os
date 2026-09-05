@@ -196,14 +196,14 @@ function ReplyBox({ thread, configured, pipeNote, onSent }: {
   if (thread.channel !== "sms") {
     return (
       <div style={{ fontSize: 11.5, color: "var(--text-muted)", lineHeight: 1.5 }}>
-        Email threads are read-only here — email goes out through the senders, not this board.
+        Email threads are read-only here. Email goes out through the senders, not this board.
       </div>
     );
   }
   if (!configured) {
     return (
       <div style={{ fontSize: 11.5, color: "var(--orange)", lineHeight: 1.5 }}>
-        Replying is disabled: {pipeNote} See the Twilio status view for the exact setup steps.
+        Replying is disabled: {pipeNote} See the Texting line status view for the exact setup steps.
       </div>
     );
   }
@@ -356,7 +356,7 @@ function TwilioPanel() {
           border: "1px solid var(--border)", borderRadius: 12, background: "var(--bg-card)",
           padding: "12px 14px", display: "grid", gap: 8,
         }}>
-          <span style={label}>What is left to get the SMS pipe live</span>
+          <span style={label}>What is left to get the texting line live</span>
           {SETUP_STEPS.map((s, i) => (
             <div key={i} style={{ display: "flex", gap: 8, fontSize: 12.5, lineHeight: 1.55, color: "var(--text-secondary)" }}>
               <span style={{ fontWeight: 700, color: "var(--accent)" }}>{i + 1}.</span>
@@ -370,12 +370,25 @@ function TwilioPanel() {
 }
 
 // ── The board ───────────────────────────────────────────────────────────────
-export default function MessagesBoard() {
+/** Lock the ledger to one channel. The CRM's Text tab passes "sms" and the
+ *  Email tab passes "email"; without it the board is the old all-channel
+ *  ledger with its own channel filter. Presentation only: the same
+ *  /api/messages query runs, with the channel filter fixed. */
+export default function MessagesBoard({ channel: lockedChannel }: { channel?: "sms" | "email" } = {}) {
   const [data, setData] = useState<Payload | null>(null);
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(true);
   const [client, setClient] = useState("");
-  const [channel, setChannel] = useState("");
+  const [channel, setChannel] = useState(lockedChannel ?? "");
+  const textOnly = lockedChannel === "sms";
+  const emailOnly = lockedChannel === "email";
+  // On-screen words: the user sees "text", never "SMS".
+  const boardTitle = textOnly ? "Texts" : emailOnly ? "Emails" : "Messages";
+  const boardBlurb = textOnly
+    ? "Every text sent or received, both directions. Sending is a human action: nothing here fires on its own."
+    : emailOnly
+      ? "Every email logged in the ledger, both directions. Emails go out through the senders, not from here."
+      : "Every text and email logged in the ledger, both directions. Sending is a human action: nothing here fires on its own.";
   const [view, setView] = useState<"threads" | "twilio">("threads");
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState<string | null>(null);
@@ -468,13 +481,13 @@ export default function MessagesBoard() {
     <div style={{ display: "grid", gap: 14 }}>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "baseline" }}>
         <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "var(--text-primary)" }}>
-          Messages
+          {boardTitle}
         </h2>
         {data.unreadInbound != null && data.unreadInbound > 0 && (
           <Chip solid tone="var(--accent)" text={`${data.unreadInbound} unread`} />
         )}
         <span style={{ fontSize: 12.5, color: "var(--text-muted)" }}>
-          Every SMS and email logged in the ledger, both directions. Sending is a human action — nothing here fires on its own.
+          {boardBlurb}
         </span>
         <button
           type="button"
@@ -489,23 +502,26 @@ export default function MessagesBoard() {
         </button>
       </div>
 
-      {/* Pipe state + data-source honesty */}
-      <Note tone={data.smsPipe.configured ? "var(--green)" : "var(--orange)"} text={data.smsPipe.note} />
+      {/* Pipe state + data-source honesty. The texting-line note is about
+          texts, so the email-only view does not carry it. */}
+      {!emailOnly && <Note tone={data.smsPipe.configured ? "var(--green)" : "var(--orange)"} text={data.smsPipe.note} />}
       {!data.available && data.reason && (
         <Note tone={data.tableMissing ? "var(--orange)" : "var(--red)"} text={data.reason} />
       )}
       {data.unreadNote && <Note text={data.unreadNote} />}
       {data.contactNote && <Note text={data.contactNote} />}
 
-      {/* View switcher */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
-        {([
-          ["threads", "Conversations"],
-          ["twilio", "Twilio status"],
-        ] as const).map(([v, name]) => (
-          <button key={v} type="button" onClick={() => setView(v)} style={pill(view === v)}>{name}</button>
-        ))}
-      </div>
+      {/* View switcher. The texting-line status view is about texts only. */}
+      {!emailOnly && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+          {([
+            ["threads", "Conversations"],
+            ["twilio", "Texting line status"],
+          ] as const).map(([v, name]) => (
+            <button key={v} type="button" onClick={() => setView(v)} style={pill(view === v)}>{name}</button>
+          ))}
+        </div>
+      )}
 
       {view === "twilio" ? (
         <TwilioPanel />
@@ -516,7 +532,7 @@ export default function MessagesBoard() {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search name, number, or message text…"
+              placeholder={emailOnly ? "Search name, address, or message text" : "Search name, number, or message text"}
               style={{
                 flex: "1 1 220px", minWidth: 0, borderRadius: 999,
                 border: "1px solid var(--border)", background: "transparent",
@@ -525,13 +541,17 @@ export default function MessagesBoard() {
             />
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
-            <span style={label}>Channel</span>
-            {["", "sms", "email"].map((c) => (
-              <button key={c || "all"} type="button" onClick={() => setChannel(c)} style={pill(channel === c)}>
-                {c || "all"}
-              </button>
-            ))}
-            <span style={{ ...label, marginLeft: 12 }}>Client</span>
+            {!lockedChannel && (
+              <>
+                <span style={label}>Channel</span>
+                {(["", "sms", "email"] as const).map((c) => (
+                  <button key={c || "all"} type="button" onClick={() => setChannel(c)} style={pill(channel === c)}>
+                    {c === "" ? "all" : c === "sms" ? "text" : "email"}
+                  </button>
+                ))}
+              </>
+            )}
+            <span style={{ ...label, marginLeft: lockedChannel ? 0 : 12 }}>Client</span>
             <button type="button" onClick={() => setClient("")} style={pill(client === "")}>all</button>
             {data.clientSlugs.map((s) => (
               <button key={s} type="button" onClick={() => setClient(s)} style={pill(client === s)}>
@@ -556,8 +576,9 @@ export default function MessagesBoard() {
           {data.emptyNote && (
             <div style={{ fontSize: 12.5, color: "var(--text-muted)", lineHeight: 1.55 }}>
               {data.emptyNote}
-              {!data.smsPipe.configured &&
-                " Once Twilio is configured (see the Twilio status view), outbound texts you send and every reply will appear here automatically; email rows arrive when the senders log to /api/messages/log."}
+              {!data.smsPipe.configured && !emailOnly &&
+                " Once the texting line is set up (see the Texting line status view), texts you send and every reply will appear here automatically."}
+              {!textOnly && " Email rows arrive when the senders log them."}
             </div>
           )}
           {!data.emptyNote && search.trim() &&
@@ -590,7 +611,9 @@ export default function MessagesBoard() {
                     }}
                   >
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "baseline" }}>
-                      <Chip tone={t.channel === "sms" ? "var(--accent)" : "var(--text-secondary)"} text={t.channel.toUpperCase()} />
+                      {!lockedChannel && (
+                        <Chip tone={t.channel === "sms" ? "var(--accent)" : "var(--text-secondary)"} text={t.channel === "sms" ? "TEXT" : t.channel.toUpperCase()} />
+                      )}
                       <span style={{ fontSize: 13.5, fontWeight: 700, color: "var(--text-primary)", wordBreak: "break-word" }}>
                         {title}
                       </span>

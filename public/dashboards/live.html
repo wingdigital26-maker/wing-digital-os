@@ -657,20 +657,19 @@ function bootDashboard(){
     if (c.state === 'live') sent.push.apply(sent, c._items);
   });
 
-  $('#out-sd').textContent = OUT.intro ||
-    'Everything we send out on your behalf, and what is not running yet.';
-  $('#outn').textContent = sent.length
-    ? sent.length + ' sent' : '';
+  // Clients only ever see channels that are ACTUALLY running. Anything not
+  // connected, needs-access, or not-in-plan is hidden entirely rather than shown
+  // as a "Not connected" card (Jack's call: never surface not-connected to a
+  // client). If nothing is live, the whole section is hidden below.
+  const liveChans = chans.filter(c => c.state === 'live');
+  $('#out-sd').textContent = 'Everything we send out on your behalf.';
+  $('#outn').textContent = sent.length ? sent.length + ' sent' : '';
 
-  $('#chans').innerHTML = chans.length ? chans.map(c => {
-    const live = c.state === 'live';
-    const body = live
-      ? '<div class="chan-v">'+c._items.length+'</div>'
-      : '<div class="chan-state">'+esc(STATE_LABEL[c.state] || c.state)+'</div>';
-    return '<div class="chan'+(live?' live':'')+'"><div class="chan-h">'+
-      '<div class="chan-i">'+oSvg(c.icon)+'</div><div class="chan-n">'+esc(c.name)+'</div></div>'+
-      body + '<div class="chan-note">'+esc(c.note||'')+'</div></div>';
-  }).join('') : '';
+  $('#chans').innerHTML = liveChans.map(c =>
+    '<div class="chan live"><div class="chan-h">'+
+    '<div class="chan-i">'+oSvg(c.icon)+'</div><div class="chan-n">'+esc(c.name)+'</div></div>'+
+    '<div class="chan-v">'+c._items.length+'</div>'+
+    '<div class="chan-note">'+esc(c.note||'')+'</div></div>').join('');
 
   // The log underneath lists only what actually went out.
   if (sent.length) {
@@ -685,7 +684,7 @@ function bootDashboard(){
   } else {
     $('#outlist').innerHTML = '';
   }
-  if (!chans.length) $('#out-sec').hidden = true;
+  if (!liveChans.length) $('#out-sec').hidden = true;
 
   /* ── other pages: only what is NOT already listed above ──── */
   const listed = new Set(ITEMS.map(i => i.url).filter(Boolean));
@@ -710,11 +709,9 @@ function bootDashboard(){
   // A client can be configured with no pending list at all. Drop the whole
   // section rather than leaving an empty "Not connected yet" card, which reads
   // worse than not raising the subject.
-  const PEND = DATA.pendingMetrics || [];
-  if (!PEND.length) $('#pending-sec').hidden = true;
-  $('#pending').innerHTML = PEND.map(p =>
-    '<div class="prow"><span class="pd"></span><div><div class="pn">'+esc(p.name)+'</div>'+
-    '<div class="pw">'+esc(p.why)+'</div></div></div>').join('');
+  // Never surface "not connected yet" metrics to a client (Jack's call). The
+  // pending section is always hidden; what we are not doing yet is internal.
+  $('#pending-sec').hidden = true;
 
   /* ── storm and hail watch ────────────────────────────────────
      Roofing-only. Recent hail near the client's service area is real, time-

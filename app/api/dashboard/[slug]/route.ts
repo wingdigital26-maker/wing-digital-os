@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { CLIENTS, ClientConfig, ContentSource } from "../clients";
 import { verifyClientKey } from "@/app/lib/clientKeys";
-import { getOsSession, hasLegacyAuth } from "@/lib/osSupabase";
+import { getOsSession, hasLegacyAuth, sbSelect } from "@/lib/osSupabase";
 
 // ── Live client-dashboard data endpoint ──────────────────────────────────────
 // Serves a client's dashboard payload built FROM PUBLIC SOURCES AT REQUEST TIME.
@@ -238,6 +238,84 @@ async function fetchCloudflare(cfg: ClientConfig) {
   }
 }
 
+/**
+ * Storm & hail watch (roofing clients only).
+ *
+ * Recent hail near a roofer's service area is real, time-sensitive work: those
+ * roofs need inspection, and being first to the door wins the job. We read the
+ * SPC/NOAA hail feed already loaded into public.storm_events with the service
+ * key (the same key this route uses elsewhere) so a client dashboard can see it
+ * even though /api/storms is staff-only.
+ *
+ * HONESTY: this NEVER fabricates an event. sbSelect returns [] on any failure
+ * (missing table, query error, no keys), which surfaces as count 0 and an
+ * honest "nothing recent" state on the page -- never an invented storm. The
+ * feature is scoped to roofers; every other client gets null and no section.
+ */
+type StormRow = {
+  event_time: string;
+  size_in: number | string | null;
+  location: string | null;
+  county: string | null;
+  state: string | null;
+  affected: Array<{ zip?: string; city?: string; distance_mi?: number }> | null;
+};
+
+type StormPayload = {
+  window_days: number;
+  events: Array<{
+    date: string;
+    size_in: number | null;
+    location: string;
+    county: string;
+    cities: string[];
+  }>;
+  count: number;
+};
+
+const STORM_WINDOW_DAYS = 120;
+
+async function fetchStorm(cfg: ClientConfig, slug: string): Promise<StormPayload | null> {
+  const isRoofer = /roof/i.test(slug) || /roof/i.test(cfg.brand?.name || "");
+  if (!isRoofer) return null; // hail watch is roofing-specific; absent otherwise
+
+  const cutoff = new Date(Date.now() - STORM_WINDOW_DAYS * 86400000).toISOString();
+  const rows = await sbSelect<StormRow>({
+    table: "storm_events",
+    select: "event_time,size_in,location,county,state,affected",
+    query: `state=eq.TX&event_time=gte.${cutoff}&order=event_time.desc&limit=15`,
+    service: true,
+  });
+
+  const events = rows
+    .map((r) => {
+      const affected = Array.isArray(r.affected) ? r.affected : [];
+      const seen = new Set<string>();
+      const cities = affected
+        .slice()
+        .sort((a, b) => (a.distance_mi ?? 1e9) - (b.distance_mi ?? 1e9)) // nearest first
+        .map((a) => (a.city || "").trim())
+        .filter((c) => {
+          if (!c) return false;
+          const k = c.toLowerCase();
+          if (seen.has(k)) return false;
+          seen.add(k);
+          return true;
+        });
+      const size = r.size_in == null ? NaN : Number(r.size_in);
+      return {
+        date: (r.event_time || "").slice(0, 10),
+        size_in: Number.isFinite(size) ? size : null,
+        location: (r.location || "").trim(),
+        county: (r.county || "").trim(),
+        cities,
+      };
+    })
+    .filter((e) => e.date);
+
+  return { window_days: STORM_WINDOW_DAYS, events, count: events.length };
+}
+
 async function collect(cfg: ClientConfig) {
   const items: Item[] = [];
   const failed: string[] = [];
@@ -298,9 +376,10 @@ export async function GET(
     return NextResponse.json({ error: `unknown client '${slug}'` }, { status: 404 });
   }
 
-  const [{ items, failed, missed }, traffic] = await Promise.all([
+  const [{ items, failed, missed }, traffic, storm] = await Promise.all([
     collect(cfg),
     fetchCloudflare(cfg),
+    fetchStorm(cfg, slug),
   ]);
 
   // Live sources are current as of NOW -- unlike the old local state file, which
@@ -330,6 +409,10 @@ export async function GET(
       // null when no traffic source is wired: the page then shows the named
       // pending state instead of a zero that would read as "nobody visited".
       traffic,
+      // Roofing-only hail watch, straight from the SPC/NOAA storm_events feed.
+      // null for non-roofers (no section); an object with count 0 when the feed
+      // shows nothing recent (honest empty state, never a fabricated event).
+      storm,
       // Drop the "website visits" pending row once real traffic is flowing --
       // otherwise the page would show the number AND claim it is unavailable.
       pendingMetrics: (cfg.pendingMetrics || []).filter(

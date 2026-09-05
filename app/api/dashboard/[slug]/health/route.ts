@@ -64,14 +64,57 @@ async function get(url: string, ms = PER_REQUEST_MS, fresh = false) {
   }
 }
 
-/** Page list comes from the client's own sitemap: it is what Google is told exists. */
+const MAX_CHILD_SITEMAPS = 10; // cap how many child sitemaps we follow in an index
+
+/** Pull every <loc> value out of a sitemap body. */
+function locs(body: string): string[] {
+  const out: string[] = [];
+  const rx = /<loc>([^<]+)<\/loc>/g;
+  let m: RegExpExecArray | null;
+  while ((m = rx.exec(body))) out.push(m[1].trim());
+  return out;
+}
+
+/**
+ * Page list comes from the client's own sitemap: it is what Google is told
+ * exists. On WordPress and many other CMSes, /sitemap.xml is a SITEMAP INDEX:
+ * its <loc> entries point to OTHER sitemap files (.xml), not to real pages. If
+ * we audited those we would be checking XML files for a title and an H1, find
+ * none, and tell the client the files are broken pages. So when the top-level
+ * sitemap is an index, we follow each child sitemap and collect the real page
+ * URLs from them. Any .xml URL is excluded from the final list either way.
+ */
 async function sitemapUrls(site: string): Promise<{ urls: string[]; found: boolean }> {
   const r = await get(`${site.replace(/\/$/, "")}/sitemap.xml`);
   if (!r || !r.ok) return { urls: [], found: false };
-  const urls: string[] = [];
-  const rx = /<loc>([^<]+)<\/loc>/g;
-  let m: RegExpExecArray | null;
-  while ((m = rx.exec(r.body))) urls.push(m[1].trim());
+
+  const top = locs(r.body);
+  const isIndex = /<sitemapindex[\s>]/i.test(r.body)
+    || (top.length > 0 && top.every((u) => /\.xml($|\?)/i.test(u)));
+
+  let collected: string[] = top;
+  if (isIndex) {
+    // Follow the child sitemaps the index points to and gather their page URLs.
+    // Bounded and sequential so one large index cannot blow the time budget; a
+    // child that fails to fetch is skipped, never fabricated.
+    const children = top.filter((u) => /\.xml($|\?)/i.test(u)).slice(0, MAX_CHILD_SITEMAPS);
+    const pages: string[] = [];
+    for (const child of children) {
+      const cr = await get(child);
+      if (!cr || !cr.ok) continue;
+      pages.push(...locs(cr.body));
+    }
+    collected = pages;
+  }
+
+  // Belt and suspenders: never let an .xml file into the pages-to-check list,
+  // and de-dupe. If following the index turned up no real pages, fall back to
+  // the top-level page URLs (also .xml-filtered) so we report something true.
+  const clean = (arr: string[]) =>
+    Array.from(new Set(arr.filter((u) => !/\.xml($|\?)/i.test(u))));
+  let urls = clean(collected);
+  if (!urls.length && isIndex) urls = clean(top);
+
   return { urls, found: true };
 }
 

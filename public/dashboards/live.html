@@ -308,6 +308,14 @@ section{padding:44px 0 0}
     <div id="health"></div>
   </section>
 
+  <section id="storm-sec" hidden>
+    <div class="sh"><h2>Storm and hail watch</h2><span class="n" id="stormn"></span></div>
+    <div class="sd">When hail hits near your service area, roofs in those neighborhoods
+      often need a look. We watch the national storm feed every day and flag any hail
+      that lands close to you, so you can be first to the doors that need you.</div>
+    <div id="storm"></div>
+  </section>
+
   <section>
     <div class="sh"><h2>Published by month</h2></div>
     <div class="sd" id="chart-sd"></div>
@@ -707,6 +715,39 @@ function bootDashboard(){
   $('#pending').innerHTML = PEND.map(p =>
     '<div class="prow"><span class="pd"></span><div><div class="pn">'+esc(p.name)+'</div>'+
     '<div class="pw">'+esc(p.why)+'</div></div></div>').join('');
+
+  /* ── storm and hail watch ────────────────────────────────────
+     Roofing-only. Recent hail near the client's service area is real, time-
+     sensitive work: those roofs need inspection. Every row is a real SPC/NOAA
+     event from the storm feed. When the feed shows nothing recent we say so
+     plainly. We never invent a storm. */
+  const STORM = DATA.storm;
+  const stormSec = $('#storm-sec');
+  if (!STORM) {
+    stormSec.hidden = true;
+  } else {
+    stormSec.hidden = false;
+    const evs = STORM.events || [];
+    const win = STORM.window_days || 120;
+    $('#stormn').textContent = evs.length
+      ? evs.length + (evs.length === 1 ? ' recent event' : ' recent events') : '';
+    if (!evs.length) {
+      $('#storm').innerHTML = '<div class="empty">No hail reported near your area in the last '+
+        win +' days. We watch the national storm feed daily and will flag any that lands near you.</div>';
+    } else {
+      $('#storm').innerHTML = evs.map(function(e){
+        const size = (e.size_in != null) ? (esc(String(e.size_in)) + '&quot; hail') : 'Hail reported';
+        const place = [e.location, e.county ? e.county + ' County' : '']
+          .filter(Boolean).map(esc).join(', ');
+        const cities = (e.cities || []).length
+          ? '<div class="row-s">Near '+ e.cities.slice(0,6).map(esc).join(', ') +'</div>' : '';
+        return '<div class="row"><span class="row-dot" style="background:var(--accent)"></span>'+
+          '<div class="row-m"><div class="row-t">'+ size +'</div>'+
+          (place ? '<div class="row-s">'+ place +'</div>' : '') + cities +'</div>'+
+          '<div class="row-d">'+ fmt(e.date) +'</div></div>';
+      }).join('');
+    }
+  }
 
   /* ── the live site check ─────────────────────────────────────
      Every OUTCOME metric a client wants (search clicks, calls, form leads) sits

@@ -13,7 +13,9 @@ import {
   whoIsFree,
   type AvailabilityRow,
   type BlockRow as AvailBlockRow,
+  type BusyInterval,
 } from "../calendar/availability/_lib";
+import { parseIcs, type IcsEvent } from "../../lib/ics";
 
 // ───────────────────────────────────────────────────────────────────────────
 // Booking API — the GHL calendar replacement's engine room.
@@ -36,9 +38,14 @@ import {
 // Times are STORED as UTC timestamptz and DISPLAYED in CT; all the zone math
 // lives here, explicitly, so the client never has to guess an offset.
 //
-// TODO: fold in Google Calendar busy times (GOOGLE_CALENDAR_ICS_URL) so a
-// slot Jack already has a meeting in is not offered. Deliberately left out;
-// the public link knows its own bookings table, the team's hours and blocks.
+// Google Calendar busy times: when GOOGLE_CALENDAR_ICS_URL is set, the feed is
+// fetched and parsed with the shared reader in app/lib/ics.ts (the same parser
+// the /api/calendar google lane draws from), folded into UTC busy windows here
+// where the zone math lives, and handed to whoIsFree. A busy window belongs to
+// one person (Jack, whose calendar the feed is), so it only removes his
+// freeness — a slot he has a meeting in can still be offered when Grant or
+// Maddox is free, it just never double-books Jack. Feed unset = no busy list =
+// unchanged behavior; a busy time is never invented.
 // ───────────────────────────────────────────────────────────────────────────
 
 export const runtime = "nodejs";
@@ -131,11 +138,69 @@ function slotsForDay(ymd: string, availability: AvailabilityRow[]): Slot[] {
   return out;
 }
 
+// ── Google Calendar busy times ─────────────────────────────────────────────
+// A parsed ICS value ("YYYY-MM-DD" all-day, "…Z" UTC, or a floating local
+// "YYYY-MM-DDTHH:MM:SS") to a real UTC epoch-ms. A floating time is Central
+// wall-clock (the zone the calendar is authored in), converted with the same
+// chicagoToUtc used for slots so a meeting and a slot are compared as instants.
+function icsValueToUtcMs(value: string, allDay: boolean): number | null {
+  if (allDay) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    return m ? chicagoToUtc(+m[1], +m[2], +m[3], 0, 0).getTime() : null;
+  }
+  if (value.endsWith("Z")) {
+    const t = Date.parse(value);
+    return Number.isNaN(t) ? null : t;
+  }
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(value);
+  return m ? chicagoToUtc(+m[1], +m[2], +m[3], +m[4], +m[5]).getTime() : null;
+}
+
+// Parsed events to UTC busy windows. An all-day DTEND is exclusive per RFC
+// 5545, and an all-day event with no DTEND covers its single day. A timed
+// event with no DTEND has no duration to guess, so it becomes a zero-length
+// window and is dropped rather than fabricating a length.
+function busyIntervalsFromIcs(events: IcsEvent[]): BusyInterval[] {
+  const out: BusyInterval[] = [];
+  for (const ev of events) {
+    const startMs = icsValueToUtcMs(ev.start, ev.allDay);
+    if (startMs === null) continue;
+    let endMs: number | null;
+    if (ev.end) {
+      endMs = icsValueToUtcMs(ev.end, ev.allDay);
+    } else if (ev.allDay) {
+      const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ev.start);
+      endMs = m ? chicagoToUtc(+m[1], +m[2], +m[3] + 1, 0, 0).getTime() : null;
+    } else {
+      endMs = startMs;
+    }
+    if (endMs === null || endMs <= startMs) continue;
+    out.push({ startMs, endMs });
+  }
+  return out;
+}
+
+// Fetch and parse the Google Calendar feed into busy windows. Unset feed or any
+// failure yields an empty list, never an invented busy time.
+async function loadBusy(): Promise<BusyInterval[]> {
+  const feed = process.env.GOOGLE_CALENDAR_ICS_URL;
+  if (!feed) return [];
+  try {
+    const res = await fetch(feed, { cache: "no-store" });
+    if (!res.ok) return [];
+    return busyIntervalsFromIcs(parseIcs(await res.text()));
+  } catch {
+    return [];
+  }
+}
+
 // Everything the rule needs, read once per request.
-async function loadRules(): Promise<{ availability: AvailabilityRow[]; blocks: AvailBlockRow[] } | null> {
-  const [availability, blocks] = await Promise.all([loadAvailability(), loadBlocks()]);
+async function loadRules(): Promise<
+  { availability: AvailabilityRow[]; blocks: AvailBlockRow[]; busy: BusyInterval[] } | null
+> {
+  const [availability, blocks, busy] = await Promise.all([loadAvailability(), loadBlocks(), loadBusy()]);
   if (availability === null || blocks === null) return null;
-  return { availability, blocks };
+  return { availability, blocks, busy };
 }
 
 // ── Bookings reads (service key: RLS is staff-only; this route validates) ──
@@ -289,6 +354,7 @@ export async function GET(req: NextRequest) {
           availability: rules.availability,
           blocks: rules.blocks,
           bookings: existing,
+          busy: rules.busy,
         });
         // Public shape on purpose: no names, no counts, only yes or no.
         return { starts_at: s.starts_at, ends_at: s.ends_at, label: s.label, available: check.free.length > 0 };
@@ -395,6 +461,7 @@ export async function POST(req: NextRequest) {
     availability: rules.availability,
     blocks: rules.blocks,
     bookings: existing,
+    busy: rules.busy,
   });
   if (check.inHours.length === 0) {
     return NextResponse.json(

@@ -15,9 +15,21 @@ import { sbUrl, sbService } from "@/lib/osSupabase";
 //     && no non-cancelled booking assigned to them overlaps it
 //        (a booking with assigned_to NULL is a legacy/unknown row: it is
 //        treated as blocking everyone, never as free).
+//     && no Google Calendar busy event overlaps it, for the one person whose
+//        calendar GOOGLE_CALENDAR_ICS_URL is (Jack). The busy list is passed
+//        in by the booking engine (which owns the Chicago↔UTC math); when the
+//        feed is unset the list is empty and nobody is excluded by it.
 //
 // Nothing here invents hours: a person with no availability row is simply
 // never free.
+//
+// Per-person blocks (GAP 2): calendar_blocks already carries a `person` column
+// (migration 0019: jack | grant | maddox | team). blockedBy scopes to it, so a
+// block owned by 'grant' blocks only Grant and never Jack. That is the whole
+// mechanism for keeping Grant off the board during his classes — Jack enters
+// each class as a weekly calendar_blocks row with person='grant'. No global
+// block and no new column is needed; a 'team' block still blocks everyone as
+// before.
 // ───────────────────────────────────────────────────────────────────────────
 
 export const PEOPLE = ["jack", "maddox", "grant"] as const;
@@ -56,6 +68,14 @@ export type BookingSlim = {
   status: string;
   assigned_to: string | null;
 };
+
+/** A Google Calendar busy window as real UTC epoch-ms bounds. Built by the
+ *  booking engine from the parsed ICS feed (app/lib/ics.ts), which is where
+ *  the Chicago↔UTC conversion lives. */
+export type BusyInterval = { startMs: number; endMs: number };
+
+/** Whose calendar GOOGLE_CALENDAR_ICS_URL is: busy events exclude only him. */
+export const ICS_BUSY_PERSON = "jack";
 
 const HHMM = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
@@ -171,6 +191,14 @@ export function bookedFor(person: string, slotStartIso: string, slotEndIso: stri
   );
 }
 
+/** Does any Google Calendar busy window overlap [slotStartIso, slotEndIso)? */
+export function isBusy(slotStartIso: string, slotEndIso: string, busy: BusyInterval[]): boolean {
+  const s = Date.parse(slotStartIso);
+  const e = Date.parse(slotEndIso);
+  if (Number.isNaN(s) || Number.isNaN(e)) return false;
+  return busy.some((b) => s < b.endMs && e > b.startMs);
+}
+
 export type FreeCheck = {
   /** People whose hours contain the slot at all (bookings on or off). */
   inHours: string[];
@@ -187,15 +215,26 @@ export function whoIsFree(args: {
   availability: AvailabilityRow[];
   blocks: BlockRow[];
   bookings: BookingSlim[];
+  /** Google Calendar busy windows (UTC ms). Empty when the feed is unset, so
+   *  behavior is unchanged without it. */
+  busy?: BusyInterval[];
+  /** Who those busy windows belong to. Defaults to ICS_BUSY_PERSON (jack). */
+  busyPerson?: string;
 }): FreeCheck {
   const inHours: string[] = [];
   const free: string[] = [];
+  const busy = args.busy ?? [];
+  const busyPerson = args.busyPerson ?? ICS_BUSY_PERSON;
   for (const row of args.availability) {
     if (!insideHours(row, args.ymd, args.startMin, args.endMin)) continue;
     inHours.push(row.person);
     if (!row.takes_bookings) continue;
     if (blockedBy(row.person, args.ymd, args.startMin, args.endMin, args.blocks)) continue;
     if (bookedFor(row.person, args.slotStartIso, args.slotEndIso, args.bookings)) continue;
+    // The Google feed is one person's calendar: a busy event there removes only
+    // his freeness, so a slot Jack has a meeting in can still be offered when
+    // Grant or Maddox is free — it just never double-books Jack.
+    if (row.person === busyPerson && busy.length && isBusy(args.slotStartIso, args.slotEndIso, busy)) continue;
     free.push(row.person);
   }
   return { inHours, free };

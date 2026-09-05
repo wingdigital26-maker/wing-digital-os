@@ -39,6 +39,8 @@ const CalendarSection = dynamic(() => import("./components/CalendarBoard"), { ss
 const CompetitorIntel = dynamic(() => import("./components/CompetitorIntel"), { ssr: false });
 const ReplyInboxBoard = dynamic(() => import("./components/ReplyInboxBoard"), { ssr: false });
 const StormBoard = dynamic(() => import("./components/StormBoard"), { ssr: false });
+const SocialBoard = dynamic(() => import("./components/SocialBoard"), { ssr: false });
+const ReviewsBoard = dynamic(() => import("./components/ReviewsBoard"), { ssr: false });
 
 type NavGroup = {
   id: string; label: string; icon: IconType;
@@ -104,6 +106,18 @@ const NAV: NavGroup[] = [
       { id: "automations", label: "Automations" },
       { id: "sequences", label: "Sequences" },
       { id: "calls", label: "Call Room" },
+    ],
+  },
+  {
+    // Marketing (2026-09-05): the client-facing growth surfaces. Social is a
+    // draft/schedule board that never auto-publishes; Reviews queues a
+    // review request after a job closes and tracks the star ratings that
+    // come back. Both are draft-only, same as the rest of the OS.
+    id: "marketing", label: "Marketing", icon: Sparkles,
+    hint: "Social posts to schedule and reviews to request",
+    subs: [
+      { id: "social", label: "Social" },
+      { id: "reviews", label: "Reviews" },
     ],
   },
   {
@@ -508,6 +522,8 @@ export default function Home() {
           {visited.has("text") && <div className="app-view" style={{ display: active === "text" ? "block" : "none" }}><MessagesBoard channel="sms" /></div>}
           {visited.has("replies") && <div className="app-view" style={{ display: active === "replies" ? "block" : "none" }}><ReplyInboxBoard /></div>}
           {visited.has("storms") && <div className="app-view" style={{ display: active === "storms" ? "block" : "none" }}><StormBoard /></div>}
+          {visited.has("social") && <div className="app-view" style={{ display: active === "social" ? "block" : "none" }}><SocialBoard /></div>}
+          {visited.has("reviews") && <div className="app-view" style={{ display: active === "reviews" ? "block" : "none" }}><ReviewsBoard /></div>}
           {visited.has("calendar") && <div className="app-view" style={{ display: active === "calendar" ? "block" : "none" }}><CalendarSection /></div>}
           {visited.has("competitors") && <div className="app-view" style={{ display: active === "competitors" ? "block" : "none" }}><CompetitorIntel onSendToAI={sendToAI} /></div>}
           {visited.has("knowledge") && <div className="app-view" style={{ display: active === "knowledge" ? "block" : "none" }}><KnowledgeBase initialPath={openNotePath} onSendToAI={sendToAI} /></div>}

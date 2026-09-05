@@ -967,7 +967,12 @@ function bootDashboard(){
 // Data is fetched from /api/dashboard/<slug> at page load, so this one hosted
 // file stays current for every client with no rebuild on Jack's PC.
 (function(){
-  var slug = new URLSearchParams(location.search).get('c') || 'heros-junk';
+  var Q = new URLSearchParams(location.search);
+  var slug = Q.get('c') || 'heros-junk';
+  // The dashboard link is only valid with its per-client access key. Forward
+  // whatever ?k= is on this page to the API; a missing or wrong key comes back
+  // as 401 and is shown as a clean "missing access key" message below.
+  var key = Q.get('k');
 
   // Every word on this page is injected by JS after the payload lands, so until
   // then the reader is looking at an empty shell with a theme toggle in it. On a
@@ -985,9 +990,15 @@ function bootDashboard(){
   var killed = false;
   var timer = setTimeout(function(){ killed = true; if (ac) ac.abort(); }, 25000);
 
-  fetch('/api/dashboard/' + encodeURIComponent(slug),
+  fetch('/api/dashboard/' + encodeURIComponent(slug) +
+        (key ? '?k=' + encodeURIComponent(key) : ''),
         ac ? {cache:'no-store', signal: ac.signal} : {cache:'no-store'})
-    .then(function(r){ clearTimeout(timer); if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(function(r){
+      clearTimeout(timer);
+      if (r.status === 401) { var e = new Error('unauthorized'); e.unauthorized = true; throw e; }
+      if(!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
     .then(function(d){
       if (d.theme) {
         var root = document.documentElement;
@@ -1002,6 +1013,17 @@ function bootDashboard(){
     })
     .catch(function(e){
       clearTimeout(timer);
+      // A missing or wrong access key is not a system error — it means the link
+      // was opened without the key that makes it valid. Say so plainly instead
+      // of showing a broken page or a "try again" that will never work.
+      if (e && e.unauthorized) {
+        document.body.innerHTML = '<div style="max-width:640px;margin:80px auto;padding:0 24px;'+
+          'font-family:ui-sans-serif,system-ui,sans-serif;color:#1c1a17">'+
+          '<h1 style="font-size:1.3rem;margin-bottom:10px">This dashboard link is missing its access key</h1>'+
+          '<p style="color:#666;line-height:1.6">This dashboard can only be opened with the full, private '+
+          'link we sent you. Please use that link, or ask us to send it again.</p></div>';
+        return;
+      }
       // Never render a confident-looking empty dashboard on a failed fetch: a
       // client reads zeros as "you did nothing for me this month".
       var why = killed ? 'it took too long to answer' : String(e && e.message || e);

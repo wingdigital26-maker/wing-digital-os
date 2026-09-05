@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { CLIENTS, ClientConfig, ContentSource } from "../clients";
+import { verifyClientKey } from "@/app/lib/clientKeys";
+import { getOsSession, hasLegacyAuth } from "@/lib/osSupabase";
 
 // ── Live client-dashboard data endpoint ──────────────────────────────────────
 // Serves a client's dashboard payload built FROM PUBLIC SOURCES AT REQUEST TIME.
@@ -269,11 +271,28 @@ async function collect(cfg: ClientConfig) {
 }
 
 export async function GET(
-  _req: Request,
+  req: Request,
   ctx: { params: Promise<{ slug: string }> } | { params: { slug: string } }
 ) {
   const p = await (ctx.params as Promise<{ slug: string }>);
   const slug = p.slug;
+
+  // ── Access gate (FAILS CLOSED) ─────────────────────────────────────────────
+  // The dashboard is a public URL, so the slug alone is not a secret. A valid
+  // ?k=<key> for THIS client is required before any client data is loaded, so a
+  // guessed slug reveals nothing. Staff sessions (Supabase-auth or the legacy
+  // OS_PASSWORD cookie) bypass the key so the OS's own UI can embed the page.
+  // Anyone else with no key or a wrong key gets 401 and NO data. This block
+  // must stay ahead of every fetch below.
+  const key = new URL(req.url).searchParams.get("k");
+  const staff = (await getOsSession()) !== null || (await hasLegacyAuth());
+  if (!staff && !(await verifyClientKey(slug, key))) {
+    return NextResponse.json(
+      { error: "unauthorized", message: "missing or invalid access key" },
+      { status: 401 }
+    );
+  }
+
   const cfg = CLIENTS[slug];
   if (!cfg) {
     return NextResponse.json({ error: `unknown client '${slug}'` }, { status: 404 });

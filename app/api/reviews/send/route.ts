@@ -169,6 +169,23 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Dedicated arming switch, independent of raw provider config. The underlying
+  // /api/sms/send and /api/email/send deliver the moment Twilio/SMTP creds
+  // exist -- which they do in production -- so relying on those alone would let
+  // a queued review go out before A2P 10DLC is verified. This gate is OFF unless
+  // REVIEWS_SEND_ENABLED is exactly "1". While off, we send NOTHING and hold
+  // every queued request, without ever calling a send route.
+  if (process.env.REVIEWS_SEND_ENABLED !== "1") {
+    return NextResponse.json({
+      ok: true,
+      sent: 0,
+      held: queued.length,
+      skipped: 0,
+      reason:
+        "Review sending is turned off. Set REVIEWS_SEND_ENABLED=1 once A2P 10DLC is verified to arm it.",
+    });
+  }
+
   let sent = 0;
   let held = 0;
   let skipped = 0;

@@ -186,7 +186,15 @@ function normAddr(addr: string): string {
 
 export type SuppressionResult = { suppressed: boolean; reason: string | null };
 
-/** True if the address must not be emailed: a revoked email-consent row exists
+/** Escape SQL LIKE/ILIKE wildcards so an address is matched literally. Without
+ *  this, a real address containing `_` (or `%`) would be treated as a wildcard
+ *  and could over-match a different opted-out row. Backslash is PostgREST's
+ *  default LIKE escape char. */
+function likeEscape(s: string): string {
+  return s.replace(/([\\%_])/g, "\\$1");
+}
+
+/** True if the address must not be emailed: a revoked email-consent row exists,
  *  OR a crm_contacts row with that email has do_not_contact=true. Never throws.
  *  Fails closed (suppressed=true) when the backend cannot be reached. */
 export async function isEmailSuppressed(addr: string): Promise<SuppressionResult> {
@@ -207,7 +215,7 @@ export async function isEmailSuppressed(addr: string): Promise<SuppressionResult
   try {
     const q =
       `select=id&channel=eq.email&revoked_at=not.is.null` +
-      `&address=ilike.${encodeURIComponent(email)}&limit=1`;
+      `&address=ilike.${encodeURIComponent(likeEscape(email))}&limit=1`;
     const r = await fetch(`${url}/rest/v1/consent?${q}`, { headers, cache: "no-store" });
     if (!r.ok) {
       return { suppressed: true, reason: `suppression check failed (consent HTTP ${r.status})` };
@@ -227,7 +235,7 @@ export async function isEmailSuppressed(addr: string): Promise<SuppressionResult
   try {
     const q =
       `select=id&do_not_contact=is.true` +
-      `&email=ilike.${encodeURIComponent(email)}&limit=1`;
+      `&email=ilike.${encodeURIComponent(likeEscape(email))}&limit=1`;
     const r = await fetch(`${url}/rest/v1/crm_contacts?${q}`, { headers, cache: "no-store" });
     if (!r.ok) {
       return { suppressed: true, reason: `suppression check failed (crm_contacts HTTP ${r.status})` };

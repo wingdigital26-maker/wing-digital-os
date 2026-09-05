@@ -59,6 +59,12 @@ function isPublicPath(pathname: string): boolean {
     // ingest, x-heartbeat-key gated like /api/notify.
     pathname === "/api/sms/send" ||
     pathname === "/api/messages/log" ||
+    // One-click email unsubscribe: recipients click this from their inbox with
+    // no OS account, so it must be public. The route verifies its own HMAC
+    // unsubscribe token (UNSUB_SECRET/HEARTBEAT_KEY) and fails closed on a bad
+    // or missing token, writing nothing. Without this the login gate 401s every
+    // click and no one can opt out.
+    pathname === "/api/email/unsubscribe" ||
     // Public lead-capture endpoint client sites POST to: /api/forms/<slug>.
     // The route looks the slug up, rate-limits per IP, drops honeypot hits,
     // and answers 404/410 for unknown or paused forms. The bare /api/forms

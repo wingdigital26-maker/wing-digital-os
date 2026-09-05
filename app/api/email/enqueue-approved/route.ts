@@ -123,9 +123,22 @@ export async function POST(req: NextRequest) {
       : DEFAULT_LIMIT;
 
   // Optional explicit id allowlist. Only positive integers are honored.
-  const ids = Array.isArray(b?.ids)
-    ? b!.ids.filter((n): n is number => typeof n === "number" && Number.isInteger(n) && n > 0)
+  const idsProvided = Array.isArray(b?.ids);
+  const ids = idsProvided
+    ? b!.ids!.filter((n): n is number => typeof n === "number" && Number.isInteger(n) && n > 0)
     : null;
+  // An allowlist that was provided but sanitized down to nothing means the
+  // caller named only invalid ids. Enqueue NOTHING rather than silently falling
+  // back to the whole approved queue (which would push rows they never named).
+  if (idsProvided && ids!.length === 0) {
+    return NextResponse.json({
+      ok: true,
+      campaign,
+      summary: { total: 0, enqueued: 0, failed: 0 },
+      results: [],
+      note: "No valid ids were provided, so nothing was enqueued.",
+    });
+  }
 
   // ── Fetch approved rows from the Sonar outbound_sendable view ──────────────
   // Every row in this view is status='approved' (human-approved in the CRM).

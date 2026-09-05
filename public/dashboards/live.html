@@ -833,8 +833,8 @@ function bootDashboard(){
   (function leadsSection(){
     var P = new URLSearchParams(location.search);
     var key = P.get('k');
-    var slug = P.get('c') || 'heros-junk';
-    if (!key) return;
+    var slug = P.get('c') || '';
+    if (!key || !slug) return;
 
     var LD = null, LCAT = 'all', LSHOWN = 40;
 
@@ -968,7 +968,18 @@ function bootDashboard(){
 // file stays current for every client with no rebuild on Jack's PC.
 (function(){
   var Q = new URLSearchParams(location.search);
-  var slug = Q.get('c') || 'heros-junk';
+  var slug = Q.get('c') || '';
+  // No silent default: an empty or mangled link must NOT fall back to some other
+  // client's dashboard. If the client is missing, say so and stop.
+  if (!slug) {
+    var hdMissing = document.getElementById('headline');
+    var shMissing = document.getElementById('subhead');
+    var eyMissing = document.getElementById('eyebrow');
+    if (eyMissing) eyMissing.textContent = 'Link problem';
+    if (hdMissing) hdMissing.textContent = 'This dashboard link is incomplete';
+    if (shMissing) shMissing.textContent = 'The link is missing the part that says which business this is. Ask Wing Digital for a fresh link.';
+    return;
+  }
   // The dashboard link is only valid with its per-client access key. Forward
   // whatever ?k= is on this page to the API; a missing or wrong key comes back
   // as 401 and is shown as a clean "missing access key" message below.

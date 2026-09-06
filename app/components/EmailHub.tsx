@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 const MessagingBoard = dynamic(() => import("./MessagingBoard"), { ssr: false });
 const MessagesBoard = dynamic(() => import("./MessagesBoard"), { ssr: false });
 const DeliverabilityBoard = dynamic(() => import("./DeliverabilityBoard"), { ssr: false });
+const EmailComposer = dynamic(() => import("../email/EmailComposer"), { ssr: false });
 
 // One Email tab instead of three. Jack asked for fewer CRM tabs (2026-09-01):
 // the automated-send queue, the email side of the message ledger, and email
@@ -16,6 +17,7 @@ const PILLS = [
   { id: "queue", label: "Going out next" },
   { id: "ledger", label: "Emails sent and received" },
   { id: "health", label: "Email health" },
+  { id: "compose", label: "Compose" },
 ] as const;
 
 type PillId = (typeof PILLS)[number]["id"];
@@ -24,7 +26,7 @@ export default function EmailHub() {
   const [active, setActive] = useState<PillId>(() => {
     try {
       const saved = window.localStorage.getItem("wingos.emailhub.tab");
-      if (saved === "queue" || saved === "ledger" || saved === "health") return saved;
+      if (saved === "queue" || saved === "ledger" || saved === "health" || saved === "compose") return saved;
     } catch {}
     return "queue";
   });
@@ -59,6 +61,7 @@ export default function EmailHub() {
       {visited.has("queue") && <div style={{ display: active === "queue" ? "block" : "none" }}><MessagingBoard /></div>}
       {visited.has("ledger") && <div style={{ display: active === "ledger" ? "block" : "none" }}><MessagesBoard channel="email" /></div>}
       {visited.has("health") && <div style={{ display: active === "health" ? "block" : "none" }}><DeliverabilityBoard /></div>}
+      {visited.has("compose") && <div style={{ display: active === "compose" ? "block" : "none", maxWidth: 760 }}><EmailComposer embedded /></div>}
     </div>
   );
 }

@@ -349,15 +349,20 @@ function AddToCampaign() {
   );
 }
 
-export default function EmailComposer() {
+// `embedded` renders the composer without its page-level <h1>, for hosts that
+// already provide their own heading chrome (CRM > Email's Compose pill). The
+// forms, gates, and fetch logic are identical in both placements.
+export default function EmailComposer({ embedded = false }: { embedded?: boolean }) {
   const [mode, setMode] = useState<Mode>("send");
 
   return (
     <div style={{ display: "grid", gap: 18 }}>
       <div>
-        <h1 style={{ margin: 0, fontFamily: "'Space Grotesk',sans-serif", fontSize: 24, fontWeight: 700 }}>
-          Email
-        </h1>
+        {!embedded && (
+          <h1 style={{ margin: 0, fontFamily: "'Space Grotesk',sans-serif", fontSize: 24, fontWeight: 700 }}>
+            Email
+          </h1>
+        )}
         <p style={{ margin: "6px 0 0", fontSize: 13, color: "var(--text-muted)", lineHeight: 1.55 }}>
           Send a real 1:1 email, or drop a prospect into the cold campaign. The two are different jobs.
         </p>

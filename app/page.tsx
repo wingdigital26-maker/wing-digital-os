@@ -938,7 +938,7 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
 
       {/* Toast */}
       {toast && (
-        <div style={{ position: "fixed", bottom: 24, right: 24, background: "var(--green)", color: "#07080f", padding: "10px 18px", borderRadius: 10, fontWeight: 700, fontSize: 13, zIndex: 200 }}>
+        <div style={{ position: "fixed", bottom: "calc(88px + env(safe-area-inset-bottom, 0px))", right: 24, background: "var(--green)", color: "#07080f", padding: "10px 18px", borderRadius: 10, fontWeight: 700, fontSize: 13, zIndex: 600 }}>
           {toast}
         </div>
       )}
@@ -1757,7 +1757,7 @@ function KnowledgeBase({ initialPath, onSendToAI }: { initialPath?: string; onSe
 
       {/* Toast */}
       {toast && (
-        <div style={{ position: "fixed", bottom: 24, right: 24, background: "var(--green)", color: "#07080f", padding: "10px 18px", borderRadius: 10, fontWeight: 700, fontSize: 13, zIndex: 200 }}>
+        <div style={{ position: "fixed", bottom: "calc(88px + env(safe-area-inset-bottom, 0px))", right: 24, background: "var(--green)", color: "#07080f", padding: "10px 18px", borderRadius: 10, fontWeight: 700, fontSize: 13, zIndex: 600 }}>
           {toast}
         </div>
       )}
@@ -1911,6 +1911,9 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
       <div style={{
         position: "fixed", top: "15%", left: "50%", transform: "translateX(-50%)",
         width: "min(500px, 90vw)", zIndex: 201,
+        // Short phone viewport with the keyboard open: clamp and scroll
+        // instead of clipping below the fold.
+        maxHeight: "min(70dvh, calc(100dvh - 120px))", overflowY: "auto",
         background: "var(--bg-secondary)", border: "1px solid var(--border)",
         borderRadius: 14, padding: 24, display: "flex", flexDirection: "column", gap: 16,
         boxShadow: "0 24px 60px rgba(0,0,0,0.6)",

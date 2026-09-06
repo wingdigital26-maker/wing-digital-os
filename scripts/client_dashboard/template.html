@@ -270,6 +270,19 @@ section{padding:44px 0 0}
 .stale{margin-top:20px;padding:14px 17px;border-radius:var(--r);
   border:1px solid var(--accent);background:var(--accent-bg);
   font-size:.86rem;line-height:1.55}
+/* demo activity (SAMPLE / preview clients only) -- sit only on a config that
+   carries the demo payload; hidden and empty for real clients. Reuse the
+   page's stat tiles, rows and tokens so they read as part of the dashboard. */
+.dstats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+  gap:14px;margin-bottom:18px}
+.dband{padding:16px 19px;border-radius:var(--r);border:1px solid var(--border);
+  background:var(--surface-2)}
+.dband .dbtag{display:inline-block;font-size:.68rem;font-weight:700;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--t3);border:1px solid var(--border);
+  border-radius:999px;padding:3px 10px;margin-bottom:10px}
+.dband .dbt{font-size:.95rem;font-weight:550;color:var(--t1);line-height:1.5;max-width:66ch}
+.dband .dbs{font-size:.8rem;color:var(--t3);margin-top:7px;max-width:74ch;line-height:1.55}
+
 .foot{margin-top:56px;padding:24px 0 44px;border-top:1px solid var(--border);
   font-size:.79rem;color:var(--t3)}
 .foot a{color:var(--accent);text-decoration:none}
@@ -313,6 +326,32 @@ section{padding:44px 0 0}
 </section>
 
 <main class="wrap">
+
+  <!-- Demo activity sections (SAMPLE / preview clients only). These render ONLY
+       when the client payload carries the matching demo objects; for a real
+       client they stay hidden AND empty, and every visible label is injected by
+       the demoActivity() script below, so a real client's output contains none
+       of this text. No lead/review/message number is ever fabricated. -->
+  <section id="demo-projection-sec" hidden>
+    <div class="dband" id="demo-projection"></div>
+  </section>
+
+  <section id="demo-leads-sec" hidden>
+    <div class="sh"><h2 id="demo-lead-h"></h2><span class="n" id="demo-leadn"></span></div>
+    <div class="sd" id="demo-lead-sd"></div>
+    <div class="dstats" id="demo-lead-stats"></div>
+    <div class="card"><div id="demo-lead-list"></div></div>
+  </section>
+
+  <section id="demo-msg-sec" hidden>
+    <div class="sh"><h2 id="demo-msg-h"></h2></div>
+    <div class="sd" id="demo-msg-sd"></div>
+    <div class="dstats" id="demo-msg-stats"></div>
+    <div class="card">
+      <div class="mgroup" style="margin-top:0"><div class="mlabel" id="demo-msg-recent-label"></div></div>
+      <div id="demo-msg-list"></div>
+    </div>
+  </section>
 
   <section id="health-sec" hidden>
     <div class="sh"><h2>Your site, checked just now</h2><span class="n" id="healthn"></span></div>
@@ -987,6 +1026,89 @@ const DATA = __DATA__;
       m.hidden = rows.length <= LSHOWN;
       if (!m.hidden) m.textContent = 'Show ' +
         Math.min(40, rows.length - LSHOWN) + ' more of ' + n(rows.length);
+    }
+  })();
+
+  /* ── Demo activity: Leads / Messages+Reviews / typical-client band ──────────
+     Renders ONLY when the client payload carries the demo objects, which live
+     under DATA.brand so they pass through build.py unchanged (nested there
+     deliberately -- build.py copies the brand object whole). Real clients
+     (Hero's, Jackson) have none of these keys, so every section below stays
+     hidden and empty and NO lead, review or message figure is fabricated for
+     them. All visible text is injected here, so a real client's HTML contains
+     none of this section's copy at all. The Summit Ridge preview states at the
+     top of the page that its content is illustrative sample data. */
+  (function demoActivity(){
+    const D = DATA.brand || {};
+    const statTile = (v, l) =>
+      '<div class="stat"><div class="stat-v">'+esc(v)+'</div>'+
+      '<div class="stat-l">'+esc(l)+'</div></div>';
+
+    // Typical-client projection band -- framed as illustrative, never a promise.
+    const proj = D.projection;
+    if (proj && proj.text) {
+      $('#demo-projection').innerHTML =
+        '<span class="dbtag">'+esc(proj.label || 'Typical · illustrative')+'</span>'+
+        '<div class="dbt">'+esc(proj.text)+'</div>'+
+        (proj.sub ? '<div class="dbs">'+esc(proj.sub)+'</div>' : '');
+      $('#demo-projection-sec').hidden = false;
+    }
+
+    // Leads coming in
+    const lf = D.leadsFeed;
+    if (lf && Array.isArray(lf.leads) && lf.leads.length) {
+      const SRC_COLOR = {
+        'Google Search': '#3f6ea5',
+        'Google Business Profile': '#c9762a',
+        'Website form': '#2f8f6f',
+        'Facebook': '#4a5f7a'
+      };
+      $('#demo-lead-h').textContent = 'Leads coming in';
+      $('#demo-leadn').textContent = lf.leads.length + ' recent';
+      $('#demo-lead-sd').textContent = lf.note ||
+        'New enquiries as they land, with where each one came from.';
+      const tiles = [];
+      if (typeof lf.thisMonth === 'number')
+        tiles.push(statTile(lf.thisMonth.toLocaleString(), 'Leads this month'));
+      if (typeof lf.allTime === 'number')
+        tiles.push(statTile(lf.allTime.toLocaleString(), 'Leads all-time'));
+      $('#demo-lead-stats').innerHTML = tiles.join('');
+      const leads = lf.leads.slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+      $('#demo-lead-list').innerHTML = leads.map(x => {
+        const col = SRC_COLOR[x.source] || 'var(--accent)';
+        const sub = [x.source, x.city].filter(Boolean).map(esc).join(' · ');
+        return '<div class="row"><span class="row-dot" style="background:'+col+'"></span>'+
+          '<div class="row-m"><div class="row-t">'+esc(x.name)+'</div>'+
+          '<div class="row-s">'+sub+'</div></div>'+
+          '<div class="row-d">'+fmt(x.date)+'</div></div>';
+      }).join('');
+      $('#demo-leads-sec').hidden = false;
+    }
+
+    // Messages and reviews
+    const act = D.activity;
+    if (act) {
+      $('#demo-msg-h').textContent = 'Messages and reviews';
+      $('#demo-msg-sd').textContent = act.note ||
+        'Review requests, reviews collected, and follow-up texts sent on your behalf.';
+      const tiles = [];
+      if (typeof act.reviewRequests === 'number')
+        tiles.push(statTile(act.reviewRequests.toLocaleString(), 'Review requests sent'));
+      if (typeof act.reviewsCollected === 'number')
+        tiles.push(statTile(act.reviewsCollected.toLocaleString(), 'Reviews collected'));
+      if (typeof act.followUpTexts === 'number')
+        tiles.push(statTile(act.followUpTexts.toLocaleString(),
+          'Follow-up texts sent (missed-call text-backs and lead follow-ups)'));
+      $('#demo-msg-stats').innerHTML = tiles.join('');
+      const recent = (act.recent || []).slice();
+      if (recent.length) {
+        $('#demo-msg-recent-label').textContent = 'Recent activity';
+        $('#demo-msg-list').innerHTML = recent.map(r =>
+          '<div class="row"><span class="row-dot" style="background:var(--accent)"></span>'+
+          '<div class="row-m"><div class="row-t">'+esc(r.text)+'</div></div>'+
+          '<div class="row-d">'+(r.date ? fmt(r.date) : '')+'</div></div>').join('');
+      }
+      $('#demo-msg-sec').hidden = false;
     }
   })();
 })();

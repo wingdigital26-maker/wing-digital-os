@@ -6,7 +6,48 @@
     "site": "https://summitridgeroofing.com",
     "kicker": "Sample dashboard · preview",
     "headline": "What your Summit Ridge Roofing dashboard would look like",
-    "subhead": "This is a SAMPLE preview built with example content to show the exact dashboard a Summit Ridge account would get. The pages, posts and figures below are illustrative demo data, not work delivered on a live site."
+    "subhead": "This is a SAMPLE preview built with example content to show the exact dashboard a Summit Ridge account would get. The pages, posts and figures below are illustrative demo data, not work delivered on a live site.",
+    "_demo_comment": "These three objects (leadsFeed, activity, projection) drive the demo-only 'Leads coming in', 'Messages and reviews', and typical-client band. They live under brand ON PURPOSE so build.py passes them through unchanged (it copies the brand object whole). They exist ONLY on this SAMPLE preview -- real clients have no such keys, so those sections never render for them and no lead/review numbers are ever fabricated. Every value here is illustrative sample data.",
+    "leadsFeed": {
+      "thisMonth": 31,
+      "allTime": 268,
+      "note": "Sample view of leads landing in your account, tagged by where each one came from. In a live account these fill in automatically as calls and form fills arrive.",
+      "leads": [
+        { "name": "Marcus T.", "source": "Google Search", "city": "Frisco", "date": "2026-09-04" },
+        { "name": "Dana R.", "source": "Google Business Profile", "city": "McKinney", "date": "2026-09-04" },
+        { "name": "Kevin B.", "source": "Website form", "city": "Plano", "date": "2026-09-03" },
+        { "name": "Sofia M.", "source": "Google Search", "city": "Allen", "date": "2026-09-02" },
+        { "name": "Terrell J.", "source": "Facebook", "city": "Prosper", "date": "2026-09-02" },
+        { "name": "Angela P.", "source": "Google Business Profile", "city": "Frisco", "date": "2026-09-01" },
+        { "name": "Brandon L.", "source": "Google Search", "city": "Little Elm", "date": "2026-08-31" },
+        { "name": "Priya N.", "source": "Website form", "city": "Celina", "date": "2026-08-30" },
+        { "name": "Chris D.", "source": "Google Search", "city": "Wylie", "date": "2026-08-29" },
+        { "name": "Monica S.", "source": "Facebook", "city": "Melissa", "date": "2026-08-28" },
+        { "name": "Derek W.", "source": "Google Business Profile", "city": "Frisco", "date": "2026-08-27" },
+        { "name": "Hannah K.", "source": "Website form", "city": "McKinney", "date": "2026-08-26" },
+        { "name": "Jordan V.", "source": "Google Search", "city": "Anna", "date": "2026-08-25" },
+        { "name": "Lauren C.", "source": "Google Business Profile", "city": "Plano", "date": "2026-08-24" }
+      ]
+    },
+    "activity": {
+      "reviewRequests": 74,
+      "reviewsCollected": 46,
+      "followUpTexts": 58,
+      "note": "Sample view of the review and follow-up messaging that runs after each job -- review asks, missed-call text-backs, and lead follow-ups, all sent for you.",
+      "recent": [
+        { "text": "Review request sent to Marcus T.", "date": "2026-09-03" },
+        { "text": "Missed-call text-back sent", "date": "2026-09-02" },
+        { "text": "New 5-star review from Dana R.", "date": "2026-09-01" },
+        { "text": "Lead follow-up text sent to Kevin B.", "date": "2026-08-31" },
+        { "text": "Review request sent to Angela P.", "date": "2026-08-30" },
+        { "text": "New 5-star review from Sofia M.", "date": "2026-08-29" }
+      ]
+    },
+    "projection": {
+      "label": "Typical results · illustrative",
+      "text": "Clients in your area typically see 20 to 40 new leads a month once the full system is running.",
+      "sub": "A typical range for roofers in comparable DFW markets, shown for illustration only. It is not a guarantee, a promise, or a forecast of specific results for Summit Ridge Roofing."
+    }
   },
   "_theme_comment": "Roofing-appropriate palette: deep slate-blue brand tile (#24344d) with a warm amber accent for pop. Distinct from Hero's navy/red. Dark mode uses a lifted amber so it stays legible on the dark ground; light mode drops to a deeper amber for contrast on white.",
   "theme": {

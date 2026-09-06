@@ -30,7 +30,7 @@ const go = (href: string) => { window.location.href = href; };
 // ── The registry ─────────────────────────────────────────────────────
 // Both lists come from lib/nav.ts, the single nav definition. Shell views are
 // the flattened NAV tree (groups + sub-tabs, with per-sub keywords). Sub ids
-// that nav.ts lists in EXTERNAL_SUB_LINKS (sequences, automations, calls) are
+// with in-shell views (including automations/sequences/calls since 2026-09-05) are
 // still dispatched via os:navigate — the shell's handler redirects those
 // itself, so one path covers both.
 function buildCommands(): Command[] {

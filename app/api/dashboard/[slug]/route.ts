@@ -364,7 +364,8 @@ export async function GET(
   // must stay ahead of every fetch below.
   const key = new URL(req.url).searchParams.get("k");
   const staff = (await getOsSession()) !== null || (await hasLegacyAuth());
-  if (!staff && !(await verifyClientKey(slug, key))) {
+  const keyed = await verifyClientKey(slug, key);
+  if (!staff && !keyed) {
     return NextResponse.json(
       { error: "unauthorized", message: "missing or invalid access key" },
       { status: 401 }
@@ -429,6 +430,17 @@ export async function GET(
           .filter((l) => l.url),
       })).filter((g) => g.links.length),
     },
-    { headers: { "Cache-Control": "public, s-maxage=1800, stale-while-revalidate=3600" } }
+    // Cache-key trap: the CDN caches by URL, not cookie. A staff request to the
+    // BARE url (no ?k=) marked `public` would seed a cache entry any anonymous
+    // visitor could then read for 30 minutes, bypassing the key gate above. So
+    // only key-authorized requests (key in the URL = part of the cache key) may
+    // be publicly cached; session-authorized ones are private.
+    {
+      headers: {
+        "Cache-Control": keyed
+          ? "public, s-maxage=1800, stale-while-revalidate=3600"
+          : "private, no-store",
+      },
+    }
   );
 }

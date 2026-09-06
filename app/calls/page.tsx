@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import SignalLinks from "./SignalLinks";
 
@@ -180,7 +181,7 @@ export default function TodayDashboard() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
       <div>
-        <h1 style={{ fontSize: 24, fontWeight: 800, letterSpacing: -0.5 }}>Today</h1>
+        <h1 style={{ fontSize: 24, fontWeight: 800, letterSpacing: -0.5 }}>Today in the Call Room</h1>
         <p style={{ ...muted, marginTop: 4 }}>
           {totalDial} dialable {totalDial === 1 ? "lead" : "leads"} in the room
           {d.excluded !== null && d.excluded > 0
@@ -193,7 +194,7 @@ export default function TodayDashboard() {
       <section>
         <div style={sectionHead}>
           <h2 style={{ ...h2, marginBottom: 0 }}>Owed a call back right now</h2>
-          <a href="/calls/callbacks" style={btnGhost}>All callbacks</a>
+          <Link href="/calls/callbacks" style={btnGhost}>All callbacks</Link>
         </div>
         {d.callbacks.length === 0 ? (
           <div style={{ ...card, color: "var(--text-muted)", fontSize: 13 }}>
@@ -248,7 +249,7 @@ export default function TodayDashboard() {
       <section>
         <div style={sectionHead}>
           <h2 style={{ ...h2, marginBottom: 0 }}>Call these next</h2>
-          <a href="/calls/list" style={btnGhost}>Open the dial list</a>
+          <Link href="/calls/list" style={btnGhost}>Open the dial list</Link>
         </div>
         {d.next.length === 0 ? (
           <div style={{ ...card, color: "var(--text-muted)", fontSize: 13 }}>

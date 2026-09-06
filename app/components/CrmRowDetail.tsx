@@ -184,7 +184,7 @@ export default function CrmRowDetail({
   onClose: () => void;
   /** Optional decision controls, rendered at the top of the panel so the
    *  action is the first thing in reach rather than the last. Omitted by the
-   *  surfaces that only read (CrmBoard passes nothing and is unchanged). */
+   *  surfaces that only read (read-only callers pass nothing; CrmBoard, the original such caller, was deleted 2026-09-05). */
   actions?: React.ReactNode;
 }) {
   const ev = it.evidence;

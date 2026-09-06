@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 // /sequences — the list. Plain English everywhere: a sequence is "a series of
@@ -184,7 +185,7 @@ export default function SequencesPage() {
       <div style={{ display: "grid", gap: 10 }}>
         {items?.map((s) => (
           <div key={s.id} style={{ ...card, display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-            <a href={`/sequences/${s.id}`} style={{ textDecoration: "none", color: "inherit", flex: "1 1 260px" }}>
+            <Link href={`/sequences/${s.id}`} style={{ textDecoration: "none", color: "inherit", flex: "1 1 260px" }}>
               <div style={{ fontWeight: 700, fontSize: 15 }}>{s.name}</div>
               <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 3 }}>
                 {s.stepCount === 0
@@ -195,7 +196,7 @@ export default function SequencesPage() {
                   ? "nobody in it yet"
                   : `${s.enrolledActive} of ${s.enrolledTotal} ${s.enrolledTotal === 1 ? "person" : "people"} in it still getting emails`}
               </div>
-            </a>
+            </Link>
             <StatusPill status={s.status} />
             {s.status === "active" ? (
               <button onClick={() => setStatus(s.id, "paused")} disabled={busy === s.id} style={btn}>
@@ -211,9 +212,9 @@ export default function SequencesPage() {
                 Activate
               </button>
             )}
-            <a href={`/sequences/${s.id}`} style={{ ...btn, textDecoration: "none" }}>
+            <Link href={`/sequences/${s.id}`} style={{ ...btn, textDecoration: "none" }}>
               Edit
-            </a>
+            </Link>
           </div>
         ))}
       </div>

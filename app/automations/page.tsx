@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 import { EVENT_LABELS, EVENT_TYPES, type EventType, type WorkflowRow } from "@/lib/automations/types";
 import {
@@ -29,6 +30,7 @@ type Item = WorkflowRow & {
 };
 
 export default function AutomationsPage() {
+  const router = useRouter();
   const [items, setItems] = useState<Item[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -72,7 +74,7 @@ export default function AutomationsPage() {
     setBusy("create");
     try {
       const d = await api<{ workflow: WorkflowRow }>("/api/automations", jsonInit("POST", { name, trigger_type: newTrigger }));
-      window.location.href = `/automations/${d.workflow.id}`;
+      router.push(`/automations/${d.workflow.id}`);
     } catch (e) {
       setNotice({ kind: "warn", text: errText(e) });
       setBusy(null);

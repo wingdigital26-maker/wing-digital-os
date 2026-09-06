@@ -4,12 +4,34 @@ import dynamic from "next/dynamic";
 import { motion, MotionConfig } from "motion/react";
 import { Bolt, Users, Cpu, Bulb, Calendar, Note, Sparkles, Home as HomeIcon, Call, Route, Radar, Logout, More } from "reicon-react";
 import StartHere, { TodayStrip } from "./components/StartHere";
+import NewIntelBanner from "./components/NewIntelBanner";
 import { staggerContainer, riseItem, hoverSpring, cardHover, cardHoverPassive, cardTap } from "./components/motion";
 import { Sparkline, Delta, buildDailySeries } from "./components/Charts";
 import { StatTiles, MissionPanels, MissionStyles, Selection, StatTile, WatchdogBanner, WatchdogData, MissionData } from "./components/MissionControlCore";
 import { sfx } from "./lib/sounds";
 import SfxMuteButton from "./components/SfxMuteButton";
-import { NAV_TREE, LEGACY_VIEW_ALIAS, EXTERNAL_SUB_LINKS } from "./lib/nav";
+import Link from "next/link";
+import { NAV_TREE, LEGACY_VIEW_ALIAS, EXTERNAL_SUB_LINKS, ROUTED_PAGES } from "./lib/nav";
+
+// Sub-pages of a routed section, as a pill strip above its in-shell view. The
+// routed layouts own these tabs but never render in-shell, so without this
+// Forms/Runs/Tasks/Booked etc. were reachable only through Ctrl+K.
+function SectionSubTabs({ prefix }: { prefix: string }) {
+  const subs = ROUTED_PAGES.filter(p => p.href.startsWith(prefix + "/"));
+  if (!subs.length) return null;
+  return (
+    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", margin: "0 0 14px" }}>
+      {subs.map(p => (
+        <Link key={p.href} href={p.href} style={{
+          padding: "5px 12px", borderRadius: 999, fontSize: 12, fontWeight: 600,
+          textDecoration: "none", color: "var(--text-muted)",
+          border: "1px solid var(--border)", minHeight: 32,
+          display: "inline-flex", alignItems: "center",
+        }}>{p.label}</Link>
+      ))}
+    </div>
+  );
+}
 
 type IconType = React.ComponentType<{ size?: number; color?: string }>;
 
@@ -450,10 +472,10 @@ export default function Home() {
           {visited.has("competitors") && <div className="app-view" style={{ display: active === "competitors" ? "block" : "none" }}><CompetitorIntel onSendToAI={sendToAI} /></div>}
           {visited.has("knowledge") && <div className="app-view" style={{ display: active === "knowledge" ? "block" : "none" }}><KnowledgeBase initialPath={openNotePath} onSendToAI={sendToAI} /></div>}
           {visited.has("agent") && <div className="app-view" style={{ display: active === "agent" ? "block" : "none" }}><MissionOps /></div>}
-          {visited.has("automations") && <div className="app-view" style={{ display: active === "automations" ? "block" : "none" }}><div style={{ maxWidth: 1080, margin: "0 auto", padding: "8px 4px" }}><AutomationsList /></div></div>}
-          {visited.has("sequences") && <div className="app-view" style={{ display: active === "sequences" ? "block" : "none" }}><div style={{ maxWidth: 1080, margin: "0 auto", padding: "8px 4px" }}><SequencesList /></div></div>}
+          {visited.has("automations") && <div className="app-view" style={{ display: active === "automations" ? "block" : "none" }}><div style={{ maxWidth: 1080, margin: "0 auto", padding: "8px 4px" }}><SectionSubTabs prefix="/automations" /><AutomationsList /></div></div>}
+          {visited.has("sequences") && <div className="app-view" style={{ display: active === "sequences" ? "block" : "none" }}><div style={{ maxWidth: 1080, margin: "0 auto", padding: "8px 4px" }}><SectionSubTabs prefix="/sequences" /><SequencesList /></div></div>}
           {visited.has("seo") && <div className="app-view" style={{ display: active === "seo" ? "block" : "none" }}><SeoBoard /></div>}
-          {visited.has("calls") && <div className="app-view" style={{ display: active === "calls" ? "block" : "none" }}><div style={{ maxWidth: 1080, margin: "0 auto", padding: "8px 4px" }}><CallsToday /></div></div>}
+          {visited.has("calls") && <div className="app-view" style={{ display: active === "calls" ? "block" : "none" }}><div style={{ maxWidth: 1080, margin: "0 auto", padding: "8px 4px" }}><SectionSubTabs prefix="/calls" /><CallsToday /></div></div>}
           {/* Jack-only views never mount for a restricted session, even when a
               stale `visited` entry exists from before the role resolved. */}
           {fullAccess && visited.has("personal") && <div className="app-view" style={{ display: active === "personal" ? "block" : "none" }}><PersonalSection /></div>}
@@ -827,6 +849,9 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
       {/* Start here + Today: the map and the numbers that change what you do
           next, before anything else. Built for someone who is not Jack. */}
       <StartHere />
+      {/* New-video notification: shows once per new batch of creator intel,
+          dismiss remembers the newest id so it only returns for newer videos. */}
+      <NewIntelBanner />
       <TodayStrip />
 
       {/* Watchdog banner: compact when all clear, loud when something is wrong.

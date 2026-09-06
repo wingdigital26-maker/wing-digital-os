@@ -36,7 +36,7 @@ const TYPE_COLORS: Record<string, string> = {
 
 function fmtDate(d: string): string {
   const t = new Date(d);
-  if (isNaN(t.getTime())) return d;
+  if (!d || isNaN(t.getTime())) return "undated";
   return t.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
@@ -48,6 +48,9 @@ export default function SeoBoard() {
   const [clientFilter, setClientFilter] = useState<string | null>(null);
 
   const load = useCallback(() => {
+    // Reset to the loading skeleton so Refresh gives feedback and stale
+    // error/failure banners never outlive the run that produced them.
+    setFeeds(CLIENT_SLUGS.map(slug => ({ slug, name: slug, site: "", state: "loading", items: [], failedSources: 0 })));
     CLIENT_SLUGS.forEach(async slug => {
       try {
         const r = await fetch(`/api/dashboard/${slug}`, { cache: "no-store" });
@@ -82,7 +85,9 @@ export default function SeoBoard() {
     .flatMap(f => f.items.map(it => ({ ...it, client: f.name, clientSlug: f.slug })))
     .filter(it => (typeFilter ? it.type === typeFilter : true))
     .filter(it => (clientFilter ? it.clientSlug === clientFilter : true))
-    .sort((a, b) => (a.date < b.date ? 1 : -1));
+    // ISO date strings compare lexically; undated rows sink to the bottom and
+    // the title tiebreak keeps order stable across refreshes.
+    .sort((a, b) => (b.date || "").localeCompare(a.date || "") || a.title.localeCompare(b.title));
 
   const typesPresent = Array.from(new Set(okFeeds.flatMap(f => f.items.map(i => i.type))));
 

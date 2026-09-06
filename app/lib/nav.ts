@@ -178,20 +178,23 @@ export const ROUTED_PAGES: RoutedPage[] = [
   // "/" is a strip pill but never a palette page entry — the palette reaches
   // it through the shell views (view:command) instead.
   { href: "/", label: "Home", inStrip: true, inPalette: false },
-  { href: "/calls", label: "Call Room", keywords: "cold calling dialer", inStrip: true },
+  // The three section roots are inPalette:false — their shell VIEW entries
+  // (view:calls etc.) cover the palette, so listing the page too showed every
+  // one twice with identical labels.
+  { href: "/calls", label: "Call Room", keywords: "cold calling dialer", inStrip: true, inPalette: false },
   { href: "/calls/booked", label: "Booked Calls", keywords: "appointments" },
   { href: "/calls/callbacks", label: "Callbacks" },
   { href: "/calls/schedule", label: "Call Schedule" },
   { href: "/calls/list", label: "Call List" },
   { href: "/calls/sources", label: "Call Sources" },
   { href: "/calls/team", label: "Call Team" },
-  { href: "/sequences", label: "Sequences", inStrip: true },
+  { href: "/sequences", label: "Sequences", inStrip: true, inPalette: false },
   { href: "/sequences/people", label: "Sequence People" },
   // /email dropped from the strip 2026-09-05: "Email" appeared twice in one
   // header pointing at two different screens. Composing now lives inside
   // CRM > Email (Compose pill); /email itself still works and cross-links.
   { href: "/email", label: "Email", keywords: "compose send" },
-  { href: "/automations", label: "Automations", keywords: "workflows", inStrip: true },
+  { href: "/automations", label: "Automations", keywords: "workflows", inStrip: true, inPalette: false },
   { href: "/automations/forms", label: "Forms" },
   { href: "/automations/runs", label: "Automation Runs" },
   { href: "/automations/tasks", label: "Automation Tasks" },
@@ -222,7 +225,16 @@ export function flattenShellViews(): { id: string; label: string; group: string;
  *  each remaining sub as "/#view=<id>"; the routed sections already have their
  *  own strip pills, so listing them here would show everything twice. */
 export function shellGroups(): { label: string; subs: { id: string; label: string }[] }[] {
+  // These three became in-shell views on 2026-09-05, but the routed sections
+  // keep their strip pills, so the menu still skips them to avoid listing the
+  // same destination twice in one header.
+  const STRIP_COVERED = new Set(["automations", "sequences", "calls"]);
   return NAV_TREE
-    .map(g => ({ label: g.label, subs: g.subs.filter(s => !(s.id in EXTERNAL_SUB_LINKS)).map(({ id, label }) => ({ id, label })) }))
+    .map(g => ({
+      label: g.label,
+      subs: g.subs
+        .filter(s => !(s.id in EXTERNAL_SUB_LINKS) && !STRIP_COVERED.has(s.id))
+        .map(({ id, label }) => ({ id, label })),
+    }))
     .filter(g => g.subs.length > 0);
 }

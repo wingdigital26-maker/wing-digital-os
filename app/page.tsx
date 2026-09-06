@@ -170,7 +170,6 @@ const LEGACY_VIEW_ALIAS: Record<string, string> = {
   messaging: "email",
   messages: "text",
   deliverability: "email",
-  log: "knowledge",
 };
 
 // Sub-tabs that are real routed pages rather than in-shell views. Clicking one
@@ -179,8 +178,11 @@ const LEGACY_VIEW_ALIAS: Record<string, string> = {
 const EXTERNAL_SUB_LINKS: Record<string, string> = {
   sequences: "/sequences",
   automations: "/automations",
-  forms: "/automations/forms",
   calls: "/calls",
+  // Old Activity Log links land on the run history, its honest successor
+  // (ActivityLog itself pointed users there). Was aliased to "knowledge",
+  // which shares no content with it.
+  log: "/automations/runs",
 };
 
 // which group owns a given view id
@@ -241,7 +243,7 @@ export default function Home() {
       .catch(() => setRole("staff"));
   }, []);
   const fullAccess = role === "legacy" || role === "admin" || role === "owner";
-  const hiddenViews: Set<string> = fullAccess ? new Set() : new Set(["personal", "school"]);
+  const hiddenViews: Set<string> = fullAccess ? new Set() : new Set(["personal"]);
   // Nav with Jack-only entries filtered out; a group with no visible subs
   // (School) disappears entirely.
   const nav = NAV
@@ -482,7 +484,9 @@ export default function Home() {
 
         {/* Sub-tabs for the active group (phone drops the secondary Intel views) */}
         {(() => {
-          const subs = groupOf(active).subs.filter(s => !hiddenViews.has(s.id) && !(isPhone && MOBILE_HIDDEN_SUBS.has(s.id)));
+          // A mobile-hidden sub stays in the strip while ACTIVE, so a palette
+          // or deep-link landing there is never trapped on a tab-less view.
+          const subs = groupOf(active).subs.filter(s => !hiddenViews.has(s.id) && !(isPhone && MOBILE_HIDDEN_SUBS.has(s.id) && s.id !== active));
           return subs.length > 1 && (
           <div style={{
             display: "flex", gap: 6, padding: "10px 24px 0 24px",

@@ -126,8 +126,9 @@ function HowItWorks() {
           </ul>
 
           <p style={rowText}>
-            <strong style={{ color: "var(--text-primary)" }}>Safety:</strong> nothing sends to a real
-            person unless Jack arms it; everything else is drafts.
+            <strong style={{ color: "var(--text-primary)" }}>Safety:</strong> no robot sends anything to a real
+            person unless Jack arms it; automations only make drafts. The one exception is you:
+            hitting Send on an email or text yourself sends it for real, right away.
           </p>
 
           <p style={rowText}>

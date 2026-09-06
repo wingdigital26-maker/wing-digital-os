@@ -14,19 +14,16 @@ export default function Search({ onOpenNote }: { onOpenNote: (path: string) => v
   const inputRef = useRef<HTMLInputElement>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  // Cmd+K / Ctrl+K to open
+  // Esc closes the Search modal (only bound while it is open).
+  // Ctrl/Cmd+K belongs to the global CommandPalette — no hotkey here.
   useEffect(() => {
+    if (!open) return;
     const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault();
-        setOpen(true);
-        setTimeout(() => inputRef.current?.focus(), 50);
-      }
       if (e.key === "Escape") setOpen(false);
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, []);
+  }, [open]);
 
   const search = useCallback((q: string) => {
     clearTimeout(timerRef.current);
@@ -51,7 +48,7 @@ export default function Search({ onOpenNote }: { onOpenNote: (path: string) => v
       borderRadius: 8, padding: "8px 14px", display: "flex", alignItems: "center", gap: 8,
       color: "var(--text-muted)", fontSize: 13, cursor: "pointer",
     }}>
-      <span>🔍</span><span>Search... ⌘K</span>
+      <span>🔍</span><span>Search...</span>
     </button>
   );
 

@@ -16,6 +16,12 @@ type Command = {
 };
 
 const navigate = (subId: string) => {
+  // Off "/" nothing listens for os:navigate — go through the hash route
+  // (layout wires a hashchange listener on "/" so this works live too).
+  if (window.location.pathname !== "/") {
+    window.location.href = "/#view=" + subId;
+    return;
+  }
   window.dispatchEvent(new CustomEvent("os:navigate", { detail: subId }));
 };
 const go = (href: string) => { window.location.href = href; };
@@ -26,7 +32,8 @@ const go = (href: string) => { window.location.href = href; };
 // still dispatched via os:navigate — the shell's handler redirects those
 // itself, so one path covers both.
 const SHELL_VIEWS: { id: string; label: string; group: string; keywords?: string }[] = [
-  { id: "command", label: "Overview", group: "Command Center", keywords: "home dashboard today" },
+  { id: "command", label: "Overview", group: "Command Center", keywords: "home dashboard" },
+  { id: "today", label: "Today", group: "Command Center", keywords: "agenda daily" },
   { id: "personal", label: "Personal", group: "Command Center" },
   { id: "clients", label: "Clients", group: "Clients" },
   { id: "potential", label: "Potential clients", group: "Clients", keywords: "prospects" },
@@ -115,6 +122,7 @@ function saveRecent(id: string) {
 
 export default function CommandPalette() {
   const [open, setOpen] = useState(false);
+  const [enabled, setEnabled] = useState(false);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(0);
   const [recents, setRecents] = useState<string[]>([]);
@@ -129,8 +137,19 @@ export default function CommandPalette() {
     setOpen(true);
   }, []);
 
+  // Public-path guard: the palette is mounted globally (layout.tsx), but must
+  // stay inert on public/client-facing routes.
+  useEffect(() => {
+    const p = window.location.pathname;
+    const isPublic = ["/login", "/book", "/portal", "/d"].some(
+      prefix => p === prefix || p.startsWith(prefix + "/")
+    );
+    setEnabled(!isPublic);
+  }, []);
+
   // Global hotkey — self-registered so mounting the component is the wiring.
   useEffect(() => {
+    if (!enabled) return;
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
@@ -142,7 +161,7 @@ export default function CommandPalette() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [enabled]);
 
   useEffect(() => {
     if (open) inputRef.current?.focus();
@@ -185,6 +204,10 @@ export default function CommandPalette() {
       if (cmd) execute(cmd);
     } else if (e.key === "Escape") {
       e.preventDefault();
+      // Don't let Esc leak to listeners behind the palette (fullscreen
+      // calendar, other modals).
+      e.stopPropagation();
+      e.nativeEvent.stopImmediatePropagation();
       setOpen(false);
     }
   };
@@ -200,11 +223,13 @@ export default function CommandPalette() {
     setSelected(s => Math.min(s, Math.max(results.length - 1, 0)));
   }, [results.length]);
 
+  if (!enabled) return null;
+
   return (
     <>
       <style>{`
         .cp-overlay {
-          position: fixed; inset: 0; z-index: 900;
+          position: fixed; inset: 0; z-index: 10010;
           background: rgba(0,0,0,0.45);
           display: flex; align-items: flex-start; justify-content: center;
           padding: 12vh 16px 16px;
@@ -252,14 +277,12 @@ export default function CommandPalette() {
           display: none; align-items: center; justify-content: center;
         }
         @media (max-width: 768px) {
-          /* FAB: stacked directly ABOVE the Jarvis FAB (which sits at
-             bottom: calc(72px + safe-area), right: 16px, 56px tall), so it
-             clears the fixed bottom tab bar, Jarvis, and the Da Boss chip
-             (bottom-left). */
+          /* FAB: just above the MobileNav bottom tab bar. The Jarvis FAB is
+             display:none on mobile, so nothing else occupies this corner. */
           .cp-fab {
             display: flex;
             right: 16px;
-            bottom: calc(140px + env(safe-area-inset-bottom, 0px));
+            bottom: calc(76px + env(safe-area-inset-bottom, 0px));
           }
           /* Near-fullscreen sheet on phone instead of a tiny centered box. */
           .cp-overlay {

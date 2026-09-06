@@ -64,7 +64,7 @@ export const NAV_TREE: NavGroupDef[] = [
       // ledger, and email health as internal pills. See EmailHub.tsx.
       { id: "email", label: "Email", keywords: "messaging deliverability" },
       // Text: the SMS conversations and the texting-line status, on their
-      // own. Same MessagesBoard, locked to the sms channel.
+      // own. Same MessageLedger, locked to the sms channel.
       { id: "text", label: "Text", keywords: "sms messages" },
       // Reply Inbox (2026-09-01): every inbound cold-email reply, hot first,
       // with the thread and an editable draft. Read/draft only; never sends.

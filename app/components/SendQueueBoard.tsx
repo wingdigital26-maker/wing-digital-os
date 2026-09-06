@@ -1,8 +1,9 @@
+// Renamed 2026-09-05: formerly MessagingBoard.tsx (send-queue QA board, not the ledger).
 "use client";
 import { useCallback, useEffect, useState } from "react";
 
 // ───────────────────────────────────────────────────────────────────────────
-// MessagingBoard — the automated-sending QA surface.
+// SendQueueBoard — the automated-sending QA surface.
 //
 // The CRM's "Everything" tab covers drafts written FOR clients. This tab
 // answers the other question Jack asked: who is the AUTOMATED engine going to
@@ -137,7 +138,7 @@ function MessageBody({ title, subject, body }: { title: string; subject: string 
   );
 }
 
-export default function MessagingBoard() {
+export default function SendQueueBoard() {
   const [data, setData] = useState<Payload | null>(null);
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(true);

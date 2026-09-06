@@ -26,11 +26,11 @@ const PotentialClientsBoard = dynamic(() => import("./components/PotentialClient
 // it is a default filter now, not a screen. Pipeline is folded in as two record
 // types; no record and no field was dropped.
 const CrmWorkspace = dynamic(() => import("./components/CrmWorkspace"), { ssr: false });
-// Email hub (2026-09-01): MessagingBoard + MessagesBoard + DeliverabilityBoard
+// Email hub (2026-09-01): SendQueueBoard + MessageLedger + DeliverabilityBoard
 // behind one tab with internal pills. The three boards moved there untouched.
 const EmailHub = dynamic(() => import("./components/EmailHub"), { ssr: false });
 // Text tab (2026-09-04): the same message ledger locked to the sms channel.
-const MessagesBoard = dynamic(() => import("./components/MessagesBoard"), { ssr: false });
+const MessageLedger = dynamic(() => import("./components/MessageLedger"), { ssr: false });
 // CrmBoard / ClientInbox / PipelineBoard / SchoolBoard are no longer mounted
 // here. Files kept on disk as fallbacks; School was removed from the nav
 // 2026-09-01 (classes still show as the school lane on the Calendar).
@@ -434,7 +434,7 @@ export default function Home() {
           {visited.has("potential") && <div className="app-view" style={{ display: active === "potential" ? "block" : "none" }}><PotentialClientsBoard /></div>}
           {visited.has("crm") && <div className="app-view" style={{ display: active === "crm" ? "block" : "none" }}><CrmWorkspace /></div>}
           {visited.has("email") && <div className="app-view" style={{ display: active === "email" ? "block" : "none" }}><EmailHub /></div>}
-          {visited.has("text") && <div className="app-view" style={{ display: active === "text" ? "block" : "none" }}><MessagesBoard channel="sms" /></div>}
+          {visited.has("text") && <div className="app-view" style={{ display: active === "text" ? "block" : "none" }}><MessageLedger channel="sms" /></div>}
           {visited.has("replies") && <div className="app-view" style={{ display: active === "replies" ? "block" : "none" }}><ReplyInboxBoard /></div>}
           {visited.has("storms") && <div className="app-view" style={{ display: active === "storms" ? "block" : "none" }}><StormBoard /></div>}
           {visited.has("social") && <div className="app-view" style={{ display: active === "social" ? "block" : "none" }}><SocialBoard /></div>}

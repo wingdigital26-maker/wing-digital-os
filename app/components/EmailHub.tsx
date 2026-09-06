@@ -2,8 +2,8 @@
 import { useState } from "react";
 import dynamic from "next/dynamic";
 
-const MessagingBoard = dynamic(() => import("./MessagingBoard"), { ssr: false });
-const MessagesBoard = dynamic(() => import("./MessagesBoard"), { ssr: false });
+const SendQueueBoard = dynamic(() => import("./SendQueueBoard"), { ssr: false });
+const MessageLedger = dynamic(() => import("./MessageLedger"), { ssr: false });
 const DeliverabilityBoard = dynamic(() => import("./DeliverabilityBoard"), { ssr: false });
 const EmailComposer = dynamic(() => import("../email/EmailComposer"), { ssr: false });
 
@@ -58,8 +58,8 @@ export default function EmailHub() {
           </button>
         ))}
       </div>
-      {visited.has("queue") && <div style={{ display: active === "queue" ? "block" : "none" }}><MessagingBoard /></div>}
-      {visited.has("ledger") && <div style={{ display: active === "ledger" ? "block" : "none" }}><MessagesBoard channel="email" /></div>}
+      {visited.has("queue") && <div style={{ display: active === "queue" ? "block" : "none" }}><SendQueueBoard /></div>}
+      {visited.has("ledger") && <div style={{ display: active === "ledger" ? "block" : "none" }}><MessageLedger channel="email" /></div>}
       {visited.has("health") && <div style={{ display: active === "health" ? "block" : "none" }}><DeliverabilityBoard /></div>}
       {visited.has("compose") && <div style={{ display: active === "compose" ? "block" : "none", maxWidth: 760 }}><EmailComposer embedded /></div>}
     </div>

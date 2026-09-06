@@ -1,8 +1,9 @@
+// Renamed 2026-09-05: formerly MessagesBoard.tsx (sent-message ledger, not the send queue).
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 // ───────────────────────────────────────────────────────────────────────────
-// MessagesBoard — the unified sent-message tracking surface.
+// MessageLedger — the unified sent-message tracking surface.
 //
 // Three views:
 //  * Conversations — per-contact threads, newest activity first, unread on
@@ -374,7 +375,7 @@ function TwilioPanel() {
  *  Email tab passes "email"; without it the board is the old all-channel
  *  ledger with its own channel filter. Presentation only: the same
  *  /api/messages query runs, with the channel filter fixed. */
-export default function MessagesBoard({ channel: lockedChannel }: { channel?: "sms" | "email" } = {}) {
+export default function MessageLedger({ channel: lockedChannel }: { channel?: "sms" | "email" } = {}) {
   const [data, setData] = useState<Payload | null>(null);
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(true);

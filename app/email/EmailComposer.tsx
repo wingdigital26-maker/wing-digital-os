@@ -18,7 +18,7 @@ import { useMemo, useState } from "react";
 // ───────────────────────────────────────────────────────────────────────────
 
 // Shared visual language, colors only through var(--token) so it works in
-// light and dark. Mirrors app/automations/_ui and MessagesBoard.
+// light and dark. Mirrors app/automations/_ui and MessageLedger.
 const card: React.CSSProperties = {
   background: "var(--bg-card)",
   border: "1px solid var(--border)",

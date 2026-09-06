@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import JarvisButton from "./components/JarvisButton";
 import SwRegister from "./components/SwRegister";
+import CommandPalette from "./components/CommandPalette";
 
 export const metadata: Metadata = {
   title: "Wing Digital OS",
@@ -42,6 +43,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="h-full">
         {children}
         <JarvisButton />
+        {/* Ctrl+K everywhere staff pages render; the component itself skips
+            public paths (/book, /portal, /login, /d). */}
+        <CommandPalette />
         <SwRegister />
       </body>
     </html>

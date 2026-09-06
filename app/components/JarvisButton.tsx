@@ -458,7 +458,7 @@ export default function JarvisButton() {
         @keyframes jarvis-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(61,107,240,0.6); } 50% { box-shadow: 0 0 0 12px rgba(61,107,240,0); } }
         @keyframes jarvis-dots { 0%, 80%, 100% { opacity: 0; transform: scale(0.6); } 40% { opacity: 1; transform: scale(1); } }
         @keyframes jarvis-speak { 0%, 100% { transform: scaleY(0.4); opacity: 0.6; } 50% { transform: scaleY(1); opacity: 1; } }
-        .jarvis-panel { position: fixed; bottom: 92px; right: 24px; width: 380px; height: 560px; }
+        .jarvis-panel { position: fixed; bottom: 112px; right: 20px; width: 380px; height: 560px; }
         @media (max-width: 480px) {
           .jarvis-panel { left: 8px; right: 8px; bottom: 84px; width: auto; height: min(70vh, 560px); }
         }

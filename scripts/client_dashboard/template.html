@@ -180,6 +180,13 @@ section{padding:44px 0 0}
 .more{margin-top:20px;padding:10px 18px;border-radius:var(--r-sm);border:1px solid var(--border);
   font-size:.84rem;font-weight:600;color:var(--t2);transition:color .15s,border-color .15s}
 .more:hover{color:var(--t1);border-color:var(--border-hi)}
+.oplink{display:inline-flex;align-items:center;gap:8px;margin:2px 0 4px;padding:11px 18px;
+  border-radius:999px;border:1px solid var(--accent);background:var(--accent-bg);
+  color:var(--accent-ink);font:inherit;font-size:.92rem;font-weight:600;cursor:pointer;
+  transition:background .15s,transform .15s}
+.oplink:hover{background:rgba(39,87,230,.2);transform:translateY(-1px)}
+.oplink-c{display:inline-block;transition:transform .2s;font-size:1.15rem;line-height:1}
+.oplink.on .oplink-c{transform:rotate(90deg)}
 .empty{padding:28px 4px;font-size:.87rem;color:var(--t3)}
 
 /* referral partners -- the "who sends you work" section. Reuses the page's
@@ -793,7 +800,16 @@ const DATA = __DATA__;
   $('#outn').textContent = sent.length
     ? sent.length + ' sent' : '';
 
-  $('#chans').innerHTML = chans.length ? chans.map(c => {
+  /* HOUSE RULE: never announce an absence. A channel that simply is not part
+     of this client's setup is left out entirely rather than rendered as "Not
+     connected" or "Not in your plan" -- a client should not open their
+     dashboard and read a list of things they do not have. States that need the
+     CLIENT to act (awaiting approval, needs access) are kept, because those are
+     requests of them, not confessions of a gap. */
+  const HIDE_STATES = ['not_connected', 'not_in_plan'];
+  const shownChans = chans.filter(c => HIDE_STATES.indexOf(c.state) === -1);
+
+  $('#chans').innerHTML = shownChans.length ? shownChans.map(c => {
     const live = c.state === 'live';
     const body = live
       ? '<div class="chan-v">'+c._items.length+'</div>'
@@ -816,7 +832,7 @@ const DATA = __DATA__;
   } else {
     $('#outlist').innerHTML = '';
   }
-  if (!chans.length) $('#out-sec').hidden = true;
+  if (!shownChans.length) $('#out-sec').hidden = true;
 
   /* ── other pages: only what is NOT already listed above ──── */
   const listed = new Set(ITEMS.map(i => i.url).filter(Boolean));
@@ -841,11 +857,11 @@ const DATA = __DATA__;
   // A client can be configured with no pending list at all. Drop the whole
   // section rather than leaving an empty "Not connected yet" card, which reads
   // worse than not raising the subject.
-  const PEND = DATA.pendingMetrics || [];
-  if (!PEND.length) $('#pending-sec').hidden = true;
-  $('#pending').innerHTML = PEND.map(p =>
-    '<div class="prow"><span class="pd"></span><div><div class="pn">'+esc(p.name)+'</div>'+
-    '<div class="pw">'+esc(p.why)+'</div></div></div>').join('');
+  // HOUSE RULE (see the outreach section): never hand a client a list of what
+  // they do not have. This section existed to name un-wired metrics; it now
+  // stays hidden on every dashboard. The configs keep their pendingMetrics so
+  // the data is not lost, and flipping this back on is a one-line change.
+  $('#pending-sec').hidden = true;
 
   /* ── the live site check ─────────────────────────────────────
      Every OUTCOME metric a client wants (search clicks, calls, form leads) sits
@@ -980,31 +996,48 @@ const DATA = __DATA__;
     $('#op-plan').innerHTML = (OP.plan||[]).map(p =>
       '<div class="pp">'+esc(p)+'</div>').join('');
 
-    // Templates
-    $('#op-tpl-label').textContent = 'The emails, word for word';
+    // The emails themselves stay folded away behind one link. A client wants to
+    // know outreach is going out and to be able to look if they choose; a wall
+    // of template copy on the page reads like homework, not like work done.
     const cats = OP.categories;
-    if (cats === null || cats === undefined) {
-      $('#op-cats').innerHTML = '<div class="empty">The email templates are not available yet. '+
-        'They will appear here before anything is sent.</div>';
+    if (!cats || !cats.length) {
+      // Nothing to show and nothing to apologise for: no label, no empty state.
+      $('#op-tpl-label').closest('.mgroup').hidden = true;
+      $('#op-cats').innerHTML = '';
     } else {
-      $('#op-cats').innerHTML = cats.map(c =>
+      const mailCount = cats.reduce((n, c) => n + (c.emails || []).length, 0);
+      $('#op-tpl-label').textContent = 'What goes out';
+      const body = cats.map(c =>
         '<div class="op-cat"><div class="mgroup"><div class="mlabel">'+esc(c.name)+'</div></div>'+
         '<div class="op-mails">'+c.emails.map(e =>
           '<div class="op-mail"><div class="op-stage">'+esc(e.stage)+'</div>'+
           '<div class="op-subj"><span>Subject</span>'+esc(e.subject)+'</div>'+
           '<div class="op-body">'+esc(e.body)+'</div></div>').join('')+
-        '</div></div>').join('');
-      if (OP.templatesNote) $('#op-cats').innerHTML +=
-        '<div class="op-note">'+esc(OP.templatesNote)+'</div>';
+        '</div></div>').join('') +
+        (OP.templatesNote ? '<div class="op-note">'+esc(OP.templatesNote)+'</div>' : '');
+      $('#op-cats').innerHTML =
+        '<button class="oplink" id="op-tpl-toggle" aria-expanded="false" aria-controls="op-tpl-body">'+
+        'Read the ' + mailCount + ' ' + (mailCount === 1 ? 'email' : 'emails') + ' we send' +
+        '<span class="oplink-c">&rsaquo;</span></button>' +
+        '<div id="op-tpl-body" hidden>' + body + '</div>';
+      const tBtn = $('#op-tpl-toggle'), tBody = $('#op-tpl-body');
+      tBtn.addEventListener('click', () => {
+        const open = tBody.hidden;
+        tBody.hidden = !open;
+        tBtn.setAttribute('aria-expanded', String(open));
+        tBtn.classList.toggle('on', open);
+        tBtn.firstChild.textContent = open
+          ? 'Hide the emails'
+          : 'Read the ' + mailCount + ' ' + (mailCount === 1 ? 'email' : 'emails') + ' we send';
+      });
     }
 
     // Queue
     $('#op-q-label').textContent = 'Who would receive them';
     const Q = OP.queue;
     if (!Q || !Q.length) {
-      $('#op-q-sd').textContent = (Q && !Q.length)
-        ? 'The send list is empty right now.'
-        : 'The send list is not available yet. It will appear here before anything is sent.';
+      // House rule: say nothing rather than announce an empty list.
+      $('#op-q-label').closest('.mgroup').hidden = true;
       return;
     }
     $('#op-n').textContent = Q.length + ' businesses queued, 0 sent';
@@ -1012,7 +1045,9 @@ const DATA = __DATA__;
     $('#op-q-card').hidden = false;
     const catLabel = s => { s = String(s||'').replace(/-/g,' ');
       return s.charAt(0).toUpperCase() + s.slice(1); };
-    let qShown = 25;
+    // The full list is the point: this is the reach we built for them, so it is
+    // easy to page through all of it in one click.
+    let qShown = 50;
     function drawQ(){
       $('#op-q-table').innerHTML =
         '<thead><tr><th>Company</th><th>Type</th><th>City</th><th>Email</th></tr></thead>'+
@@ -1025,9 +1060,15 @@ const DATA = __DATA__;
         '. Addresses are partly hidden here on purpose; we hold the full list.';
       const left = Q.length - qShown;
       $('#op-q-more').hidden = left <= 0;
-      $('#op-q-more').textContent = 'Show '+Math.min(left,25)+' more';
+      $('#op-q-more').textContent = left > 100
+        ? 'Show 100 more of ' + left.toLocaleString() + ' remaining'
+        : 'Show the remaining ' + left.toLocaleString();
     }
-    $('#op-q-more').addEventListener('click', ()=>{ qShown += 25; drawQ(); });
+    $('#op-q-more').addEventListener('click', ()=>{
+      const left = Q.length - qShown;
+      qShown += left > 100 ? 100 : left;
+      drawQ();
+    });
     drawQ();
   })();
 
@@ -1041,7 +1082,7 @@ const DATA = __DATA__;
     var slug = P.get('c') || 'heros-junk';
     if (!key) return;
 
-    var LD = null, LCAT = 'all', LSHOWN = 40;
+    var LD = null, LCAT = 'all', LSHOWN = 100;
 
     fetch('/api/leads/' + encodeURIComponent(slug) + '?k=' + encodeURIComponent(key),
           {cache:'no-store'})
@@ -1083,12 +1124,12 @@ const DATA = __DATA__;
         var p = e.target.closest('.lpill'); if (!p) return;
         Array.prototype.forEach.call(document.querySelectorAll('.lpill'),
           function(x){ x.classList.remove('on'); });
-        p.classList.add('on'); LCAT = p.dataset.c; LSHOWN = 40; drawLeads();
+        p.classList.add('on'); LCAT = p.dataset.c; LSHOWN = 100; drawLeads();
       });
       ['#lq','#lsort','#lhas'].forEach(function(s){
-        $(s).addEventListener('input', function(){ LSHOWN = 40; drawLeads(); });
+        $(s).addEventListener('input', function(){ LSHOWN = 100; drawLeads(); });
       });
-      $('#leadmore').addEventListener('click', function(){ LSHOWN += 40; drawLeads(); });
+      $('#leadmore').addEventListener('click', function(){ LSHOWN += 200; drawLeads(); });
       drawLeads();
     }
 
@@ -1163,7 +1204,7 @@ const DATA = __DATA__;
       var m = $('#leadmore');
       m.hidden = rows.length <= LSHOWN;
       if (!m.hidden) m.textContent = 'Show ' +
-        Math.min(40, rows.length - LSHOWN) + ' more of ' + n(rows.length);
+        Math.min(200, rows.length - LSHOWN) + ' more of ' + n(rows.length);
     }
   })();
 

@@ -14,6 +14,7 @@ type IconType = React.ComponentType<{ size?: number; color?: string }>;
 
 const VaultGraph = dynamic(() => import("./components/VaultGraph"), { ssr: false });
 const CommandPalette = dynamic(() => import("./components/CommandPalette"), { ssr: false });
+const TodayBoard = dynamic(() => import("./components/TodayBoard"), { ssr: false });
 const Search = dynamic(() => import("./components/Search"), { ssr: false });
 // ActivityLog is no longer mounted (removed from the Intel group 2026-09-04);
 // the file stays on disk.
@@ -57,6 +58,9 @@ const NAV: NavGroup[] = [
     hint: "Today's numbers, briefing, and quick actions",
     subs: [
       { id: "command", label: "Overview" },
+      // Today (2026-09-05): the attention-first board — what needs Jack now,
+      // aggregated from the OS's own APIs with honest per-source states.
+      { id: "today", label: "Today" },
       { id: "personal", label: "Personal" },
     ],
   },
@@ -525,6 +529,7 @@ export default function Home() {
           {/* Keep-alive views: each visited section stays mounted; only the
               active one is shown. Switching is instant, no reload/refetch. */}
           {visited.has("command") && <div className="app-view" style={{ display: active === "command" ? "block" : "none" }}><CommandCenter data={revenueData} loading={loading} onSendToAI={sendToAI} /></div>}
+          {visited.has("today") && <div className="app-view" style={{ display: active === "today" ? "block" : "none" }}><TodayBoard /></div>}
           {visited.has("clients") && <div className="app-view" style={{ display: active === "clients" ? "block" : "none" }}><ClientsBoard /></div>}
           {visited.has("sonar") && <div className="app-view" style={{ display: active === "sonar" ? "block" : "none" }}><SonarBoard /></div>}
           {visited.has("potential") && <div className="app-view" style={{ display: active === "potential" ? "block" : "none" }}><PotentialClientsBoard /></div>}

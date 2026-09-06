@@ -191,6 +191,10 @@ export const ROUTED_PAGES: RoutedPage[] = [
   { href: "/automations/runs", label: "Automation Runs" },
   { href: "/automations/tasks", label: "Automation Tasks" },
   { href: "/automations/phone", label: "Phone Automations" },
+  // The full-page fleet monitor. Same data as the shell's Mission Control view
+  // but the complete read-only layout; was only reachable from watchdog
+  // finding links before 2026-09-05.
+  { href: "/mission", label: "Mission (full page)", keywords: "fleet monitor agents watchdog" },
 ];
 
 /** Routed sections shown in SectionChrome's top switcher strip. */

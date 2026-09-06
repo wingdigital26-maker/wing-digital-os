@@ -40,6 +40,17 @@ function buildCommands(): Command[] {
     { id: "act:add-contact", label: "Add contact", group: "Actions", keywords: "new contact crm create", run: () => navigate("crm") },
     { id: "act:compose-email", label: "Compose email", group: "Actions", keywords: "send new message", run: () => go("/email") },
     { id: "act:new-automation", label: "New automation", group: "Actions", keywords: "workflow create", run: () => go("/automations") },
+    // /book is the PUBLIC prospect-facing booking page; staff never open it,
+    // they send it. Clipboard write is try/caught: on failure fall back to
+    // opening the page so the URL is still copyable by hand.
+    {
+      id: "act:copy-booking-link", label: "Copy booking link", group: "Actions",
+      keywords: "book appointment share prospect url",
+      run: () => {
+        const url = `${location.origin}/book`;
+        try { navigator.clipboard.writeText(url); } catch { location.href = "/book"; }
+      },
+    },
   );
   for (const v of flattenShellViews()) {
     cmds.push({ id: `view:${v.id}`, label: v.label, group: v.group, keywords: v.keywords, run: () => navigate(v.id) });

@@ -1,0 +1,169 @@
+{
+  "_comment": "Renewal Health (Lynette Wing, RN/HHP). Static site in seo-factory/renewal-health/_deploy, deployed via GitHub Pages (renewal-health-preview repo, renewalhealth.life). Publish dates come from the first commit that ADDED each file. Health/YMYL client: nothing in this dashboard may imply diagnose/treat/cure claims. Content cadence is 2 posts/week via the renewal-content-engine skill (Mon 7:40am).",
+  "brand": {
+    "name": "Renewal Health",
+    "initials": "RH",
+    "site": "https://renewalhealth.life",
+    "kicker": "Marketing dashboard",
+    "headline": "Everything Wing Digital is building for Renewal Health",
+    "subhead": "A live record of the pages and posts running on renewalhealth.life. Click anything to open it on the real site."
+  },
+  "_theme_comment": "Real brand tokens read off the live stylesheet (_deploy/assets/v2.css): plum #4b2e5a (deep #372145), sage #8fae85 / #5f8155, lilac #b79cc9, cream #faf7f2, gold #c9a24b. Dark mode lifts the sage and lilac so they stay legible on a dark ground.",
+  "theme": {
+    "accent": "#a8c49e",
+    "accent2": "#c9b3da",
+    "accent_bg": "rgba(168,196,158,.13)",
+    "accent_glow": "rgba(168,196,158,.20)",
+    "accent_light": "#5f8155",
+    "accent2_light": "#4b2e5a",
+    "accent_bg_light": "rgba(95,129,85,.09)",
+    "accent_glow_light": "rgba(75,46,90,.10)",
+    "mark_bg": "#4b2e5a",
+    "mark_fg": "#faf7f2"
+  },
+  "engines": [
+    {
+      "name": "Blog engine",
+      "detail": "2 posts a week, published Mondays",
+      "icon": "pen"
+    },
+    {
+      "name": "Service pages",
+      "detail": "Detox, gut health, hormones, inflammation, weight, neurodivergent care, emotional overwhelm",
+      "icon": "map"
+    },
+    {
+      "name": "On-page SEO",
+      "detail": "Titles, schema, internal links",
+      "icon": "search"
+    },
+    {
+      "name": "Internal linking",
+      "detail": "New posts wired to service pages and old posts",
+      "icon": "link"
+    }
+  ],
+  "types": {
+    "blog": {
+      "label": "Blog post",
+      "color": "#8fae85"
+    },
+    "service": {
+      "label": "Service page",
+      "color": "#b79cc9"
+    },
+    "core": {
+      "label": "Core page",
+      "color": "#c9a24b"
+    },
+    "other": {
+      "label": "Other",
+      "color": "#8a7f93"
+    }
+  },
+  "_outreach_comment": "HONESTY RULE: the content engine is genuinely live and scheduled; booking, social, and review systems are NOT wired up, and the cards must say so plainly rather than show zeros.",
+  "outreach": {
+    "intro": "What runs automatically for Renewal Health, and what is not wired up yet. Nothing is emailed or texted on your behalf.",
+    "channels": [
+      {
+        "name": "Weekly content engine",
+        "icon": "pen",
+        "types": ["blog"],
+        "state": "live",
+        "note": "Live and scheduled: two new blog posts every Monday morning (7:40am), each image-checked and reviewed against health-claim rules before it publishes."
+      },
+      {
+        "name": "Online booking",
+        "icon": "chat",
+        "types": [],
+        "state": "not_connected",
+        "note": "No booking or scheduling system is wired up yet. Consult requests come through the site's contact page for now."
+      },
+      {
+        "name": "Social posting",
+        "icon": "share",
+        "types": [],
+        "state": "not_connected",
+        "note": "Not connected. Nothing is posted to social accounts on your behalf."
+      },
+      {
+        "name": "Review requests",
+        "icon": "star",
+        "types": [],
+        "state": "not_connected",
+        "note": "No review request system is wired up yet. This becomes an option once a Google Business Profile is connected."
+      }
+    ]
+  },
+  "sources": [
+    {
+      "kind": "git_repo",
+      "repo": "C:\\Users\\wjack\\seo-factory\\renewal-health\\_deploy",
+      "base_url": "https://renewalhealth.life",
+      "globs": [
+        {
+          "glob": "blog/*.html",
+          "type": "blog",
+          "skip": ["index.html"]
+        },
+        {
+          "glob": "*.html",
+          "type": "service",
+          "skip": [
+            "index.html",
+            "home.html",
+            "about.html",
+            "about-lynette-wing-renewal-health.html",
+            "contact-renewal-health.html",
+            "blog.html",
+            "cart.html",
+            "resources.html",
+            "testimonials.html",
+            "services.html",
+            "programs-packages.html"
+          ]
+        }
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "group": "Blog posts live on your site",
+      "icon": "pen",
+      "repo": "C:\\Users\\wjack\\seo-factory\\renewal-health\\_deploy",
+      "base_url": "https://renewalhealth.life",
+      "dir": "blog",
+      "skip": ["index.html"]
+    },
+    {
+      "group": "Service and core pages",
+      "icon": "globe",
+      "repo": "C:\\Users\\wjack\\seo-factory\\renewal-health\\_deploy",
+      "base_url": "https://renewalhealth.life",
+      "dir": "",
+      "skip": ["home.html", "cart.html"]
+    }
+  ],
+  "pendingMetrics": [
+    {
+      "name": "Google Search clicks and impressions",
+      "why": "Needs Search Console for renewalhealth.life connected to the reporting account",
+      "state": "needs access"
+    },
+    {
+      "name": "Keyword rankings",
+      "why": "Comes online with the same Search Console connection",
+      "state": "needs access"
+    },
+    {
+      "name": "Bookings and consult requests",
+      "why": "No booking system is wired up yet, so no consult count here would be trustworthy",
+      "state": "not connected"
+    },
+    {
+      "name": "Google Business Profile views",
+      "why": "Needs a Google Business Profile connected with manager access",
+      "state": "needs access"
+    }
+  ]
+}

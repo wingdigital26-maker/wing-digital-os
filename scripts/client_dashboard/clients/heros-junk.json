@@ -1,5 +1,5 @@
 {
-  "_comment": "Hero's Junk Removal. Static site in its own repo, deployed by Cloudflare Pages. Publish dates come from the first commit that ADDED each file, so they are real. NO outbound email for this client, ever -- nothing in this dashboard should imply outreach.",
+  "_comment": "Hero's Junk Removal. Static site in its own repo, deployed by Cloudflare Pages. Publish dates come from the first commit that ADDED each file, so they are real. UPDATE 2026-09-06: a B2B referral email program now exists (ghl-cli/heros_outreach) but NOTHING sends until Nash approves it -- this dashboard's outreach preview section exists precisely so he can review it first.",
   "brand": {
     "name": "Hero's Junk Removal",
     "initials": "HJ",
@@ -66,16 +66,16 @@
       "color": "#7a8ba3"
     }
   },
-  "_outreach_comment": "HARD RULE: no outbound email for this client, ever. The email card must say that is deliberate, never that it is broken or pending -- a 'not connected' there would read as a missing service they are paying for.",
+  "_outreach_comment": "UPDATED 2026-09-06: a B2B referral email program is built and queued (see outreachPreview below) but nothing sends until Nash approves. The email card must say pending approval, never live and never broken.",
   "outreach": {
-    "intro": "Everything we send out under your name, and what is not running yet. Your plan is search-led, so nothing is being emailed on your behalf.",
+    "intro": "Everything we send out under your name, and what is not running yet. Nothing is being emailed on your behalf today.",
     "channels": [
       {
-        "name": "Email campaigns",
+        "name": "Email introductions",
         "icon": "mail",
         "types": [],
-        "state": "not_in_plan",
-        "note": "By design. Your plan wins work through search, not inbox outreach, so we do not send email under your name."
+        "state": "pending_approval",
+        "note": "A referral outreach program to local partner businesses is built and ready. Nothing has been sent. Review every email and every recipient in the preview section below; sending starts only after your approval."
       },
       {
         "name": "Google Business posts",
@@ -99,6 +99,21 @@
         "note": "No review request system is wired up yet. This is the fastest lever once the Google profile is connected."
       }
     ]
+  },
+  "_outreachPreview_comment": "The pending B2B referral email program, surfaced for Nash's review BEFORE anything sends. Templates and queue are read off the real program files at build time; emails are masked and internal score columns dropped in build.py. No pricing, trailer-size, or resale language may ever appear here.",
+  "outreachPreview": {
+    "banner": "Nothing has been sent yet. Sending starts only after your approval.",
+    "intro": "We built a program that introduces Hero's Junk Removal to local businesses that regularly need junk hauled: realtors, property managers, apartment communities, estate sale companies, remodelers, and storage facilities. Every email it would send, and every business it would go to, is laid out below so you can read it all before a single one goes out.",
+    "plan": [
+      "Starts at 15 emails a day and ramps gradually to 40 a day.",
+      "Weekday business hours only. Nothing on nights or weekends.",
+      "Every email is signed by you and includes a simple opt-out; anyone who says no thanks is never emailed again.",
+      "One short follow-up a few days later, then we stop unless they reply."
+    ],
+    "templates_md": "C:\\Users\\wjack\\ghl-cli\\heros_outreach\\templates.md",
+    "templates_note": "The name, company, and city fields fill in per recipient. What you read here is otherwise exactly what would be sent.",
+    "queue_csv": "C:\\Users\\wjack\\ghl-cli\\heros_outreach\\send_queue.csv",
+    "queue_note": "Local businesses we researched that regularly hire junk haulers. Each would get the intro email for its type, and one follow-up."
   },
   "sources": [
     {

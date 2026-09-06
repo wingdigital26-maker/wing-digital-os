@@ -15,6 +15,9 @@ type IconType = React.ComponentType<{ size?: number; color?: string }>;
 
 const VaultGraph = dynamic(() => import("./components/VaultGraph"), { ssr: false });
 const TodayBoard = dynamic(() => import("./components/TodayBoard"), { ssr: false });
+// The /automations LIST rendered in-shell (2026-09-05, Jack: no second
+// screen). Workflow detail/forms/runs stay routed pages.
+const AutomationsList = dynamic(() => import("./automations/page"), { ssr: false });
 const Search = dynamic(() => import("./components/Search"), { ssr: false });
 // ActivityLog is no longer mounted (removed from the Intel group 2026-09-04);
 // the file stays on disk.
@@ -444,6 +447,7 @@ export default function Home() {
           {visited.has("competitors") && <div className="app-view" style={{ display: active === "competitors" ? "block" : "none" }}><CompetitorIntel onSendToAI={sendToAI} /></div>}
           {visited.has("knowledge") && <div className="app-view" style={{ display: active === "knowledge" ? "block" : "none" }}><KnowledgeBase initialPath={openNotePath} onSendToAI={sendToAI} /></div>}
           {visited.has("agent") && <div className="app-view" style={{ display: active === "agent" ? "block" : "none" }}><MissionOps /></div>}
+          {visited.has("automations") && <div className="app-view" style={{ display: active === "automations" ? "block" : "none" }}><div style={{ maxWidth: 1080, margin: "0 auto", padding: "8px 4px" }}><AutomationsList /></div></div>}
           {/* Jack-only views never mount for a restricted session, even when a
               stale `visited` entry exists from before the role resolved. */}
           {fullAccess && visited.has("personal") && <div className="app-view" style={{ display: active === "personal" ? "block" : "none" }}><PersonalSection /></div>}

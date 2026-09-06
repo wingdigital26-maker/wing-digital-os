@@ -89,9 +89,12 @@ export const NAV_TREE: NavGroupDef[] = [
     // review request after a job closes and tracks the star ratings that
     // come back. Both are draft-only, same as the rest of the OS.
     id: "marketing", label: "Marketing",
-    hint: "Social posts to schedule and reviews to request",
+    hint: "Social posts, reviews, and the SEO content feed",
     subs: [
       { id: "social", label: "Social", keywords: "posts schedule" },
+      // SEO (2026-09-05, Jack): every page/post shipped on client sites, one
+      // feed, read from the same public sources their dashboards use.
+      { id: "seo", label: "SEO", keywords: "blog posts content pages published" },
       { id: "reviews", label: "Reviews" },
       { id: "customers", label: "Customers" },
     ],

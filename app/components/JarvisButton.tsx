@@ -335,7 +335,7 @@ export default function JarvisButton() {
       let s = document.querySelector('script[data-zephyr]') as HTMLScriptElement | null;
       if (!s) {
         s = document.createElement("script");
-        s.src = "/mascot/wing-mascot.js?v=8";
+        s.src = "/mascot/wing-mascot.js?v=9";
         s.dataset.zephyr = "1";
         document.head.appendChild(s);
       }

@@ -275,7 +275,7 @@
       if (!bubbleEl) {
         bubbleEl = document.createElement('div');
         bubbleEl.setAttribute('role', 'status');
-        bubbleEl.style.cssText = 'position:fixed;z-index:80;max-width:240px;padding:10px 13px;' +
+        bubbleEl.style.cssText = 'position:fixed;z-index:60;max-width:240px;padding:10px 13px;' +
           'background:rgba(13,15,22,.97);color:#eaf0ff;border:1px solid rgba(125,155,255,.4);' +
           'border-radius:12px 12px 3px 12px;font:13px/1.45 Inter,system-ui,sans-serif;' +
           'box-shadow:0 8px 30px rgba(39,87,230,.3);opacity:0;transition:opacity .4s;pointer-events:none';
@@ -293,9 +293,13 @@
       clearTimeout(bubbleTimer);
       bubbleTimer = setTimeout(function () { bubbleEl.style.opacity = '0'; }, ms || 7000);
     }
+    function hideBubble() {
+      clearTimeout(bubbleTimer);
+      if (bubbleEl) bubbleEl.style.opacity = '0';
+    }
     return {
       blink: blink, flare: flare, setState: setState, pin: pin, unpin: unpin,
-      pulse: pulse, bubble: bubble, destroy: destroy, el: root,
+      pulse: pulse, bubble: bubble, hideBubble: hideBubble, destroy: destroy, el: root,
       getPinned: function () { return pinned; }
     };
   }
@@ -433,7 +437,7 @@
     function toggle(force) {
       var open = typeof force === 'boolean' ? force : !p.classList.contains('open');
       p.classList.toggle('open', open);
-      if (open) { mascot.flare(); say(opts.greeting || 'Hey, I am Zephyr. What do you want to know?'); renderQuestions(); }
+      if (open) { if (mascot.hideBubble) mascot.hideBubble(); mascot.flare(); say(opts.greeting || 'Hey, I am Zephyr. What do you want to know?'); renderQuestions(); }
     }
     /* Knowledge base: entries of {k:[keywords], a:'answer html'} from opts.kb or
      * window.ZEPHYR_KB. Pure client-side keyword scoring; unknown questions get

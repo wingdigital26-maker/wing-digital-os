@@ -350,7 +350,7 @@ def build(slug):
             js = fh.read().replace("</script>", "<\\/script>")
         for tag in ('<script src="/mascot/%s"></script>' % fname,
                     '<script src="/mascot/%s?v=1"></script>' % fname,
-                    '<script src="/mascot/%s?v=8"></script>' % fname):
+                    '<script src="/mascot/%s?v=9"></script>' % fname):
             art = art.replace(tag, "<script>\n%s\n</script>" % js)
     # In the Artifact gallery the title is the page's NAME, sat beside dozens of
     # others -- so it carries the client, not the word "dashboard" twice over.

@@ -1,0 +1,113 @@
+{
+  "_comment": "SAMPLE / PREVIEW DATA ONLY. Summit Ridge Roofing is a fictional DFW roofing prospect used as a sales demo. None of these pages exist; the URLs are illustrative. This file mirrors the real content-engine state format so the demo dashboard renders exactly like a live client's.",
+
+  "2026-05-11": [
+    {"type": "core", "title": "Summit Ridge Roofing | DFW Roofing Contractor", "status": "published", "url": "https://summitridgeroofing.com/"},
+    {"type": "core", "title": "About Summit Ridge Roofing", "status": "published", "url": "https://summitridgeroofing.com/about"},
+    {"type": "core", "title": "Contact Us", "status": "published", "url": "https://summitridgeroofing.com/contact"}
+  ],
+  "2026-05-13": [
+    {"type": "service", "title": "Roof Replacement", "status": "published", "url": "https://summitridgeroofing.com/services/roof-replacement"},
+    {"type": "blog", "title": "How to Spot Hail Damage on a DFW Roof", "status": "published", "url": "https://summitridgeroofing.com/blog/spot-hail-damage-dfw-roof"}
+  ],
+  "2026-05-15": [
+    {"type": "service", "title": "Storm Damage Roof Repair", "status": "published", "url": "https://summitridgeroofing.com/services/storm-damage-roof-repair"},
+    {"type": "blog", "title": "What a DFW Roof Replacement Actually Costs in 2026", "status": "published", "url": "https://summitridgeroofing.com/blog/dfw-roof-replacement-cost-2026"}
+  ],
+  "2026-05-20": [
+    {"type": "service", "title": "Residential Roof Repair", "status": "published", "url": "https://summitridgeroofing.com/services/residential-roof-repair"},
+    {"type": "blog", "title": "Asphalt Shingles vs. Metal Roofing in Texas Heat", "status": "published", "url": "https://summitridgeroofing.com/blog/asphalt-vs-metal-roofing-texas"}
+  ],
+  "2026-05-22": [
+    {"type": "blog", "title": "5 Signs Your Roof Needs Replacing Before Storm Season", "status": "published", "url": "https://summitridgeroofing.com/blog/signs-roof-needs-replacing"},
+    {"type": "city", "title": "Roof Replacement in Frisco TX", "status": "published", "url": "https://summitridgeroofing.com/roofing/frisco-tx"}
+  ],
+  "2026-05-27": [
+    {"type": "service", "title": "Commercial Roofing", "status": "published", "url": "https://summitridgeroofing.com/services/commercial-roofing"},
+    {"type": "blog", "title": "Do You Really Need a New Roof, or Just a Repair?", "status": "published", "url": "https://summitridgeroofing.com/blog/new-roof-vs-repair"}
+  ],
+  "2026-05-29": [
+    {"type": "city", "title": "Roof Replacement in Plano TX", "status": "published", "url": "https://summitridgeroofing.com/roofing/plano-tx"},
+    {"type": "blog", "title": "How Long Does a Roof Last in North Texas?", "status": "published", "url": "https://summitridgeroofing.com/blog/how-long-roof-lasts-north-texas"}
+  ],
+  "2026-06-03": [
+    {"type": "service", "title": "Roof Inspections", "status": "published", "url": "https://summitridgeroofing.com/services/roof-inspections"},
+    {"type": "blog", "title": "Filing a Roof Insurance Claim After a DFW Hail Storm", "status": "published", "url": "https://summitridgeroofing.com/blog/roof-insurance-claim-dfw-hail"}
+  ],
+  "2026-06-05": [
+    {"type": "city", "title": "Roof Replacement in McKinney TX", "status": "published", "url": "https://summitridgeroofing.com/roofing/mckinney-tx"},
+    {"type": "blog", "title": "The Real Timeline of a Roof Replacement Project", "status": "published", "url": "https://summitridgeroofing.com/blog/roof-replacement-timeline"}
+  ],
+  "2026-06-10": [
+    {"type": "blog", "title": "What Roofing Warranty Actually Covers (and What It Doesn't)", "status": "published", "url": "https://summitridgeroofing.com/blog/roofing-warranty-explained"},
+    {"type": "city", "title": "Storm Damage Roof Repair in Allen TX", "status": "published", "url": "https://summitridgeroofing.com/roofing/allen-tx"}
+  ],
+  "2026-06-12": [
+    {"type": "service", "title": "Gutter Installation & Repair", "status": "published", "url": "https://summitridgeroofing.com/services/gutter-installation"},
+    {"type": "blog", "title": "Why Ventilation Is the Most Overlooked Part of Your Roof", "status": "published", "url": "https://summitridgeroofing.com/blog/roof-ventilation-guide"}
+  ],
+  "2026-06-17": [
+    {"type": "blog", "title": "How to Choose a Roofing Contractor in DFW You Can Trust", "status": "published", "url": "https://summitridgeroofing.com/blog/choose-roofing-contractor-dfw"},
+    {"type": "city", "title": "Roof Replacement in Prosper TX", "status": "published", "url": "https://summitridgeroofing.com/roofing/prosper-tx"}
+  ],
+  "2026-06-24": [
+    {"type": "blog", "title": "Impact-Resistant Shingles: Are They Worth It in Texas?", "status": "published", "url": "https://summitridgeroofing.com/blog/impact-resistant-shingles-texas"},
+    {"type": "city", "title": "Roof Replacement in Little Elm TX", "status": "published", "url": "https://summitridgeroofing.com/roofing/little-elm-tx"}
+  ],
+  "2026-07-01": [
+    {"type": "service", "title": "Emergency Roof Tarping", "status": "published", "url": "https://summitridgeroofing.com/services/emergency-roof-tarping"},
+    {"type": "blog", "title": "What to Do in the First 24 Hours After Roof Storm Damage", "status": "published", "url": "https://summitridgeroofing.com/blog/first-24-hours-roof-storm-damage"}
+  ],
+  "2026-07-08": [
+    {"type": "blog", "title": "Metal Roofing Cost in DFW: A Homeowner's Breakdown", "status": "published", "url": "https://summitridgeroofing.com/blog/metal-roofing-cost-dfw"},
+    {"type": "city", "title": "Roof Replacement in Celina TX", "status": "published", "url": "https://summitridgeroofing.com/roofing/celina-tx"}
+  ],
+  "2026-07-15": [
+    {"type": "blog", "title": "How to Read Your Roofing Estimate Line by Line", "status": "published", "url": "https://summitridgeroofing.com/blog/read-roofing-estimate"},
+    {"type": "city", "title": "Storm Damage Roof Repair in Denton TX", "status": "published", "url": "https://summitridgeroofing.com/roofing/denton-tx"}
+  ],
+  "2026-07-22": [
+    {"type": "blog", "title": "Roof Maintenance Checklist for Texas Homeowners", "status": "published", "url": "https://summitridgeroofing.com/blog/roof-maintenance-checklist-texas"},
+    {"type": "service", "title": "Skylight Installation", "status": "published", "url": "https://summitridgeroofing.com/services/skylight-installation"}
+  ],
+  "2026-07-29": [
+    {"type": "blog", "title": "Should You Repair or Replace a Roof After Hail?", "status": "published", "url": "https://summitridgeroofing.com/blog/repair-or-replace-roof-after-hail"},
+    {"type": "city", "title": "Roof Replacement in The Colony TX", "status": "published", "url": "https://summitridgeroofing.com/roofing/the-colony-tx"}
+  ],
+  "2026-08-05": [
+    {"type": "blog", "title": "Tile Roofing in North Texas: Pros, Cons, and Cost", "status": "published", "url": "https://summitridgeroofing.com/blog/tile-roofing-north-texas"},
+    {"type": "city", "title": "Roof Replacement in Wylie TX", "status": "published", "url": "https://summitridgeroofing.com/roofing/wylie-tx"}
+  ],
+  "2026-08-08": [
+    {"type": "blog", "title": "How Insurance Adjusters Really Assess Roof Damage", "status": "published", "url": "https://summitridgeroofing.com/blog/how-adjusters-assess-roof-damage"}
+  ],
+  "2026-08-12": [
+    {"type": "blog", "title": "The DFW Storm Season Roofing Survival Guide", "status": "published", "url": "https://summitridgeroofing.com/blog/dfw-storm-season-survival-guide"},
+    {"type": "city", "title": "Storm Damage Roof Repair in Richardson TX", "status": "published", "url": "https://summitridgeroofing.com/roofing/richardson-tx"}
+  ],
+  "2026-08-15": [
+    {"type": "blog", "title": "What Causes Roof Leaks (and How We Find Them)", "status": "published", "url": "https://summitridgeroofing.com/blog/what-causes-roof-leaks"}
+  ],
+  "2026-08-19": [
+    {"type": "blog", "title": "Flat Roof vs. Sloped Roof: Which Is Right for Your Home?", "status": "published", "url": "https://summitridgeroofing.com/blog/flat-vs-sloped-roof"},
+    {"type": "city", "title": "Roof Replacement in Carrollton TX", "status": "published", "url": "https://summitridgeroofing.com/roofing/carrollton-tx"}
+  ],
+  "2026-08-22": [
+    {"type": "blog", "title": "How Much Does a Roof Inspection Cost in DFW?", "status": "published", "url": "https://summitridgeroofing.com/blog/roof-inspection-cost-dfw"}
+  ],
+  "2026-08-26": [
+    {"type": "blog", "title": "Roofing Financing Options for Texas Homeowners", "status": "published", "url": "https://summitridgeroofing.com/blog/roofing-financing-options-texas"},
+    {"type": "city", "title": "Roof Replacement in Rockwall TX", "status": "published", "url": "https://summitridgeroofing.com/roofing/rockwall-tx"}
+  ],
+  "2026-08-29": [
+    {"type": "blog", "title": "Signs of a Bad Roofing Job (and How to Avoid One)", "status": "published", "url": "https://summitridgeroofing.com/blog/signs-of-a-bad-roofing-job"}
+  ],
+  "2026-09-02": [
+    {"type": "blog", "title": "Preparing Your Roof for a Texas Winter", "status": "published", "url": "https://summitridgeroofing.com/blog/prepare-roof-texas-winter"},
+    {"type": "service", "title": "Roof Ventilation & Attic Airflow", "status": "published", "url": "https://summitridgeroofing.com/services/roof-ventilation"}
+  ],
+  "2026-09-04": [
+    {"type": "blog", "title": "How to Get the Most From Your Roof Insurance Claim", "status": "published", "url": "https://summitridgeroofing.com/blog/most-from-roof-insurance-claim"},
+    {"type": "city", "title": "Roof Replacement in Melissa TX", "status": "published", "url": "https://summitridgeroofing.com/roofing/melissa-tx"}
+  ]
+}

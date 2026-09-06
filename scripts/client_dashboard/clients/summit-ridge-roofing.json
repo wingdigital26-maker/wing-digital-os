@@ -1,0 +1,108 @@
+{
+  "_comment": "SALES DEMO / PREVIEW. Summit Ridge Roofing is a FICTIONAL DFW roofing prospect. This config drives a preview dashboard that mirrors what a real Wing client (Hero's, Jackson) receives, so a prospect on a Zoom pitch can see the exact deliverable. There is no git repo and no live site: content comes from a hand-authored demo state file (summit-ridge-roofing.state.json) and every URL is illustrative. The brand subhead states plainly that this is a sample so no one mistakes it for delivered work.",
+  "brand": {
+    "name": "Summit Ridge Roofing",
+    "initials": "SR",
+    "site": "https://summitridgeroofing.com",
+    "kicker": "Sample dashboard · preview",
+    "headline": "What your Summit Ridge Roofing dashboard would look like",
+    "subhead": "This is a SAMPLE preview built with example content to show the exact dashboard a Summit Ridge account would get. The pages, posts and figures below are illustrative demo data, not work delivered on a live site."
+  },
+  "_theme_comment": "Roofing-appropriate palette: deep slate-blue brand tile (#24344d) with a warm amber accent for pop. Distinct from Hero's navy/red. Dark mode uses a lifted amber so it stays legible on the dark ground; light mode drops to a deeper amber for contrast on white.",
+  "theme": {
+    "accent": "#eba14e",
+    "accent2": "#f2c07f",
+    "accent_bg": "rgba(235,161,78,.13)",
+    "accent_glow": "rgba(235,161,78,.20)",
+    "accent_light": "#c9762a",
+    "accent2_light": "#e0964a",
+    "accent_bg_light": "rgba(201,118,42,.09)",
+    "accent_glow_light": "rgba(201,118,42,.13)",
+    "mark_bg": "#24344d",
+    "mark_fg": "#ffffff"
+  },
+  "engines": [
+    { "name": "Blog engine", "detail": "4 to 5 posts a week", "icon": "pen" },
+    { "name": "Service pages", "detail": "One page per job you do", "icon": "map" },
+    { "name": "City pages", "detail": "A page for every DFW town you serve", "icon": "map" },
+    { "name": "On-page SEO", "detail": "Titles, schema, internal links", "icon": "search" },
+    { "name": "Internal linking", "detail": "New posts wired to old ones", "icon": "link" },
+    { "name": "Review engine", "detail": "Turns finished jobs into Google reviews", "icon": "star" }
+  ],
+  "_types_comment": "Drawn from the slate-blue / amber / evergreen roofing palette rather than a generic chart set. Each hue means the same thing in the chart, the mix bar and the list.",
+  "types": {
+    "blog":    { "label": "Blog post",    "color": "#3f6ea5" },
+    "service": { "label": "Service page", "color": "#c9762a" },
+    "city":    { "label": "City page",    "color": "#2f8f6f" },
+    "core":    { "label": "Core page",    "color": "#4a5f7a" },
+    "other":   { "label": "Other",        "color": "#7a8ba3" }
+  },
+  "_outreach_comment": "PREVIEW: shows the outreach lanes a roofing client can turn on. Nothing is actually sending -- states make clear what is live vs. what needs access, exactly as a real dashboard would on day one.",
+  "outreach": {
+    "intro": "Sample view of the outreach and social lanes a Summit Ridge account can switch on. In this preview nothing is sending yet -- each card shows what it would take to go live.",
+    "channels": [
+      {
+        "name": "Google Business posts",
+        "icon": "star",
+        "types": [],
+        "state": "needs_access",
+        "note": "Ready to run weekly once we have manager access to your Google Business Profile -- the fastest lever for a roofer in a hail market."
+      },
+      {
+        "name": "Review requests",
+        "icon": "chat",
+        "types": [],
+        "state": "needs_access",
+        "note": "Automated review asks after every completed job. Connects with your CRM or job list so happy customers turn into Google reviews."
+      },
+      {
+        "name": "Facebook and Instagram",
+        "icon": "share",
+        "types": [],
+        "state": "needs_access",
+        "note": "Storm-season posts and finished-job photos, scheduled for you. Needs access to your pages before we can post or report."
+      },
+      {
+        "name": "Email campaigns",
+        "icon": "mail",
+        "types": [],
+        "state": "not_connected",
+        "note": "Seasonal homeowner tips and past-customer touch-ups. Wired up once your list and a sending domain are in place."
+      }
+    ]
+  },
+  "sources": [
+    {
+      "kind": "state_file",
+      "path": "clients/summit-ridge-roofing.state.json"
+    }
+  ],
+  "pages_from_items": [
+    { "group": "Blog posts", "icon": "pen", "types": ["blog"] },
+    { "group": "Service pages", "icon": "map", "types": ["service"] },
+    { "group": "City pages", "icon": "map", "types": ["city"] },
+    { "group": "Core site pages", "icon": "globe", "types": ["core"] }
+  ],
+  "pendingMetrics": [
+    {
+      "name": "Google Search clicks and impressions",
+      "why": "Turns on the day we connect Search Console for summitridgeroofing.com to the reporting account",
+      "state": "needs access"
+    },
+    {
+      "name": "Keyword rankings",
+      "why": "Comes online with the same Search Console connection -- track every DFW city + service term as it climbs",
+      "state": "needs access"
+    },
+    {
+      "name": "Google Business Profile views and calls",
+      "why": "Needs manager access to the Google Business Profile",
+      "state": "needs access"
+    },
+    {
+      "name": "Calls and form leads",
+      "why": "Wire your contact form and call tracking to us and every lead lands here, attributed to the page that earned it",
+      "state": "not connected"
+    }
+  ]
+}

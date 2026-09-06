@@ -21,24 +21,39 @@
     '<linearGradient id="wmComet" x1="0" y1="0" x2="1" y2="0">' +
     '<stop offset="0%" stop-color="#c9d6ff" stop-opacity="0"/><stop offset="70%" stop-color="#9db4ff" stop-opacity=".9"/><stop offset="100%" stop-color="#eaf0ff"/>' +
     '</linearGradient>' +
+    '<linearGradient id="wmRing" x1="0" y1="0" x2="1" y2="1">' +
+    '<stop offset="0%" stop-color="#c9d6ff"/><stop offset="55%" stop-color="#5f82f5"/><stop offset="100%" stop-color="#2757E6" stop-opacity=".35"/>' +
+    '</linearGradient>' +
+    '<radialGradient id="wmSheen" cx="50%" cy="50%" r="50%">' +
+    '<stop offset="0%" stop-color="#ffffff" stop-opacity=".5"/><stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>' +
+    '</radialGradient>' +
+    '<radialGradient id="wmAtmo" cx="50%" cy="42%" r="60%">' +
+    '<stop offset="72%" stop-color="#7d9bff" stop-opacity="0"/><stop offset="94%" stop-color="#7d9bff" stop-opacity=".5"/><stop offset="100%" stop-color="#c9d6ff" stop-opacity=".8"/>' +
+    '</radialGradient>' +
     '</defs>' +
     '<g class="wm-rig">' +
     '<circle class="wm-glow" cx="100" cy="96" r="74" fill="url(#wmHalo)"/>' +
+    '<circle class="wm-glow2" cx="100" cy="96" r="52" fill="url(#wmHalo)"/>' +
     '<circle class="wm-core" cx="100" cy="96" r="40" fill="url(#wmCore)"/>' +
+    '<circle class="wm-atmo" cx="100" cy="96" r="41.5" fill="url(#wmAtmo)"/>' +
+    '<ellipse class="wm-sheenspot" cx="88" cy="80" rx="16" ry="11" fill="url(#wmSheen)" transform="rotate(-24 88 80)"/>' +
     '<g class="wm-eyes">' +
     '<g class="wm-eye-open"><rect x="84" y="82" width="11" height="24" rx="5.5" fill="#eaf0ff"/><rect x="105" y="82" width="11" height="24" rx="5.5" fill="#eaf0ff"/></g>' +
     '<g class="wm-eye-happy" opacity="0"><path d="M84 98 q5.5 -9 11 0" fill="none" stroke="#eaf0ff" stroke-width="5" stroke-linecap="round"/><path d="M105 98 q5.5 -9 11 0" fill="none" stroke="#eaf0ff" stroke-width="5" stroke-linecap="round"/></g>' +
     '</g>' +
     '<g class="wm-ring wm-r1">' +
-    '<ellipse cx="100" cy="96" rx="62" ry="20" fill="none" stroke="#7d9bff" stroke-width="1.4" opacity=".55" transform="rotate(-18 100 96)"/>' +
-    '<circle cx="162" cy="96" r="4" fill="#c9d6ff" transform="rotate(-18 100 96)"/>' +
+    '<ellipse cx="100" cy="96" rx="62" ry="20" fill="none" stroke="url(#wmRing)" stroke-width="1.6" opacity=".75" transform="rotate(-18 100 96)"/>' +
+    '<circle cx="162" cy="96" r="6" fill="#7d9bff" opacity=".35" transform="rotate(-18 100 96)"/>' +
+    '<circle cx="162" cy="96" r="3.6" fill="#eaf0ff" transform="rotate(-18 100 96)"/>' +
     '</g>' +
     '<g class="wm-ring wm-r2">' +
-    '<ellipse cx="100" cy="96" rx="56" ry="26" fill="none" stroke="#2757E6" stroke-width="1.2" opacity=".5" transform="rotate(24 100 96)"/>' +
-    '<circle cx="44" cy="96" r="3" fill="#7d9bff" transform="rotate(24 100 96)"/>' +
+    '<ellipse cx="100" cy="96" rx="56" ry="26" fill="none" stroke="url(#wmRing)" stroke-width="1.2" opacity=".45" transform="rotate(24 100 96)"/>' +
+    '<circle cx="44" cy="96" r="4.6" fill="#7d9bff" opacity=".3" transform="rotate(24 100 96)"/>' +
+    '<circle cx="44" cy="96" r="2.8" fill="#c9d6ff" transform="rotate(24 100 96)"/>' +
     '</g>' +
     '<g class="wm-comet">' +
-    '<circle cx="100" cy="70" r="3.4" fill="#eaf0ff" transform="rotate(-18 100 96)"/>' +
+    '<circle cx="100" cy="70" r="5.6" fill="#eaf0ff" opacity=".3" transform="rotate(-18 100 96)"/>' +
+    '<circle cx="100" cy="70" r="3.2" fill="#ffffff" transform="rotate(-18 100 96)"/>' +
     '</g>' +
     '<g class="wm-props">' +
     '<g class="wm-p wm-p-think">' +
@@ -74,6 +89,9 @@
     '@keyframes wm-pulse{0%,100%{opacity:.55}50%{opacity:1}}' +
     '.wm-core{transition:filter .4s;transform-origin:100px 96px;animation:wm-breathe 3.2s ease-in-out infinite}' +
     '@keyframes wm-breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.035)}}' +
+    '.wm-glow2{transform-origin:100px 96px;animation:wm-pulse 3.2s ease-in-out infinite;animation-delay:-1.6s;opacity:.5}' +
+    '.wm-atmo{transform-origin:100px 96px;animation:wm-breathe 3.2s ease-in-out infinite;pointer-events:none}' +
+    '.wm-sheenspot{pointer-events:none}' +
     '.wm-comet{transform-origin:100px 96px;animation:wm-comet 5.5s linear infinite;opacity:.9}' +
     '@keyframes wm-comet{to{transform:rotate(360deg)}}' +
     '.wm-root:hover .wm-comet,.wm-excited .wm-comet{animation-duration:1.6s}' +
@@ -136,7 +154,7 @@
     '@keyframes wm-flarek{0%{opacity:1;transform:scale(1)}40%{opacity:1;transform:scale(1.25)}100%{opacity:.55;transform:scale(1)}}' +
     '.wm-intro{animation:wm-arrive 1.6s cubic-bezier(.22,.9,.3,1) both}' +
     '@keyframes wm-arrive{0%{transform:translateY(-36px) scale(.5);opacity:0}60%{opacity:1}100%{transform:none;opacity:1}}' +
-    '@media (prefers-reduced-motion:reduce){.wm-rig,.wm-glow,.wm-eyes,.wm-eye-open,.wm-ring,.wm-comet,.wm-core,.wm-intro,.wm-flare .wm-glow{animation:none !important}}' +
+    '@media (prefers-reduced-motion:reduce){.wm-rig,.wm-glow,.wm-glow2,.wm-atmo,.wm-eyes,.wm-eye-open,.wm-ring,.wm-comet,.wm-core,.wm-intro,.wm-flare .wm-glow{animation:none !important}}' +
 '@media (prefers-reduced-motion:reduce){.wm-excited .wm-rig,.wm-dim .wm-rig,.wm-alert .wm-rig,.wm-thinking .wm-rig,.wm-sleepy .wm-rig,.wm-party .wm-rig{animation:none !important}' +
 '.wm-td,.wm-p-alert,.wm-z,.wm-cf,.wm-sp,.wm-p-dim{animation:none !important}.wm-z,.wm-cf,.wm-sp{opacity:.8}}';
 
@@ -333,13 +351,14 @@
  * like an AI you can talk to. No backend needed; swap answerFn for a real
  * API route later without touching the UI. */
 (function () {
-  var PANEL_CSS = '.wmp{position:fixed;right:18px;bottom:96px;z-index:70;width:min(320px,calc(100vw - 36px));' +
-    'background:rgba(13,15,22,.98);border:1px solid rgba(125,155,255,.35);' +
-    'border-radius:16px;box-shadow:0 12px 48px rgba(39,87,230,.35);color:#eaf0ff;' +
+  var PANEL_CSS = '.wmp{position:fixed;right:18px;bottom:96px;z-index:70;width:min(340px,calc(100vw - 36px));' +
+    'background:linear-gradient(170deg,#141a30 0%,#0d0f16 34%);border:1px solid rgba(125,155,255,.45);' +
+    'border-radius:18px;box-shadow:0 2px 0 rgba(255,255,255,.06) inset,0 18px 60px rgba(39,87,230,.4);color:#eaf0ff;' +
     'font-family:Inter,system-ui,sans-serif;font-size:14px;overflow:hidden;' +
     'opacity:0;pointer-events:none;transition:opacity .35s}' +
     '.wmp.open{opacity:1;pointer-events:auto}' +
-    '.wmp-head{display:flex;align-items:center;gap:9px;padding:12px 14px;border-bottom:1px solid rgba(125,155,255,.2)}' +
+    '.wmp-head{display:flex;align-items:center;gap:9px;padding:12px 14px;border-bottom:1px solid rgba(125,155,255,.25);' +
+    'background:linear-gradient(135deg,rgba(39,87,230,.22),rgba(39,87,230,0) 70%)}' +
     '.wmp-head b{font-weight:600}' +
     '.wmp-head .dot{width:8px;height:8px;border-radius:50%;background:#7d9bff;box-shadow:0 0 8px #7d9bff;animation:wmpulse 2s infinite}' +
     '@keyframes wmpulse{50%{opacity:.4}}' +
@@ -347,16 +366,19 @@
     '.wmp-body{padding:14px;min-height:72px;line-height:1.55;color:#c9d6ff}' +
     '.wmp-body a{color:#9db4ff}' +
     '.wmp-q{display:flex;flex-direction:column;gap:7px;padding:0 14px 14px}' +
-    '.wmp-q button{text-align:left;background:rgba(39,87,230,.16);border:1px solid rgba(125,155,255,.3);' +
-    'color:#eaf0ff;border-radius:10px;padding:9px 12px;font:inherit;cursor:pointer;transition:background .15s}' +
-    '.wmp-q button:hover{background:rgba(39,87,230,.34)}' +
+    '.wmp-q button{text-align:left;background:rgba(39,87,230,.14);border:1px solid rgba(125,155,255,.3);' +
+    'color:#eaf0ff;border-radius:11px;padding:9px 12px;font:inherit;cursor:pointer;' +
+    'transition:background .15s,transform .15s,border-color .15s}' +
+    '.wmp-q button:hover{background:rgba(39,87,230,.34);border-color:#7d9bff;transform:translateX(3px)}' +
+    '.wmp-body{max-height:190px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(125,155,255,.4) transparent}' +
     '.wmp-ask{display:flex;gap:7px;padding:0 14px 14px}' +
     '.wmp-ask input{flex:1;min-width:0;background:rgba(255,255,255,.07);border:1px solid rgba(125,155,255,.3);' +
     'border-radius:10px;padding:9px 12px;color:#eaf0ff;font:inherit}' +
     '.wmp-ask input::placeholder{color:#8fa3d8}' +
     '.wmp-ask input:focus{outline:none;border-color:#7d9bff}' +
-    '.wmp-ask button{background:#2757E6;border:0;color:#fff;border-radius:10px;padding:9px 14px;font:inherit;font-weight:600;cursor:pointer}' +
-    '.wmp-ask button:hover{background:#3D6BF0}' +
+    '.wmp-ask button{background:linear-gradient(135deg,#3D6BF0,#1E44B8);border:0;color:#fff;border-radius:10px;' +
+    'padding:9px 14px;font:inherit;font-weight:600;cursor:pointer;transition:filter .15s}' +
+    '.wmp-ask button:hover{filter:brightness(1.18)}' +
     '@media(prefers-reduced-motion:reduce){.wmp{transition:none}.wmp-head .dot{animation:none}}';
 
   function attachChat(mascot, opts) {
@@ -442,7 +464,7 @@
           mascot.setState && mascot.setState('calm');
           mascot.flare();
           if (best && bestScore >= 2) say(best.a);
-          else say('That one is past what I know off the top of my head. The contact form reaches a real person at Wing Digital fast, and they will have the answer.');
+          else say(opts.fallback || 'That one is past what I know off the top of my head. The contact form reaches a real person at Wing Digital fast, and they will have the answer.');
         }, 650);
       }
       askBtn.addEventListener('click', answer);

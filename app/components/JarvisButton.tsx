@@ -283,6 +283,8 @@ export default function JarvisButton() {
     if (!target?.pending || streaming) return;
     const token = target.pending.id;
     const history = messages.map((m, i) => (i === idx ? { ...m, pendingState: "done" as const } : m));
+    // A confirmed action deserves a little celebration from Zephyr.
+    [orbRef.current, headerOrbRef.current].forEach((o) => o?.pulse?.("party", 3500));
     // Keep the assistant's lead-in text as history; the server runs the
     // signed action and narrates the outcome in a fresh assistant turn.
     await runTurn(history, token);
@@ -333,7 +335,7 @@ export default function JarvisButton() {
       let s = document.querySelector('script[data-zephyr]') as HTMLScriptElement | null;
       if (!s) {
         s = document.createElement("script");
-        s.src = "/mascot/wing-mascot.js?v=7";
+        s.src = "/mascot/wing-mascot.js?v=8";
         s.dataset.zephyr = "1";
         document.head.appendChild(s);
       }

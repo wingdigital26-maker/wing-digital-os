@@ -1280,7 +1280,7 @@ const DATA = __DATA__;
 <div id="wing-helper" title="Zephyr, from Wing Digital"
   style="position:fixed;right:16px;bottom:14px;z-index:60;opacity:0;pointer-events:none;transition:opacity .8s"></div>
 <script src="/mascot/zephyr-kb.js?v=1"></script>
-<script src="/mascot/wing-mascot.js?v=7"></script>
+<script src="/mascot/wing-mascot.js?v=8"></script>
 <script>
 (function(){
   if (!window.WingMascot) return;
@@ -1293,6 +1293,53 @@ const DATA = __DATA__;
   try {
     isSample = !!(DATA.brand && (DATA.brand.leadsFeed || /sample/i.test(DATA.brand.subhead || '')));
   } catch (e) {}
+  // Data-aware answers: Zephyr can answer questions about THIS dashboard from
+  // its own DATA blob, so counts, dates, and titles are always the real ones.
+  var kbLocal = [];
+  try {
+    var nowK = Date.now(), latestK = [], wk = 0, mo = 0, byType = {};
+    (DATA.items || []).forEach(function (it) {
+      if (!it.date) return;
+      latestK.push(it);
+      var age = (nowK - new Date(it.date + 'T12:00:00').getTime()) / 86400000;
+      if (age <= 7) wk++;
+      if (age <= 30) mo++;
+      byType[it.type] = (byType[it.type] || 0) + 1;
+    });
+    latestK.sort(function (a, b) { return a.date < b.date ? 1 : -1; });
+    var total = latestK.length;
+    var sampleNote = isSample ? ' (illustrative sample data, not delivered work)' : '';
+    var typeParts = Object.keys(byType).map(function (t) {
+      var label = (DATA.types && DATA.types[t] && DATA.types[t].label) ? DATA.types[t].label : t;
+      return byType[t] + ' ' + label.toLowerCase();
+    });
+    kbLocal.push({
+      k: ['how many', 'count', 'total', 'published', 'this week', 'this month', 'so far', 'numbers', 'stats'],
+      a: total + ' pieces are on this dashboard' + sampleNote + ': ' + (typeParts.join(', ') || 'no breakdown yet') +
+         '. ' + wk + ' went live in the last 7 days and ' + mo + ' in the last 30.'
+    });
+    if (latestK.length) {
+      var recent = latestK.slice(0, 3).map(function (it) { return it.title + ' (' + it.date + ')'; });
+      kbLocal.push({
+        k: ['latest', 'most recent', 'newest', 'last published', 'what published', 'recent work', 'new pages', 'new posts'],
+        a: 'Most recent' + sampleNote + ': ' + recent.join('; ') + '. Every row in the list below links to the live page.'
+      });
+    }
+    if (DATA.dataThrough) kbLocal.push({
+      k: ['current', 'updated', 'fresh', 'up to date', 'as of', 'when was this'],
+      a: 'This record is current through ' + DATA.dataThrough + '. It refreshes when Wing publishes new work.'
+    });
+    kbLocal.push({
+      k: ['blog post', 'what is a blog', 'city page', 'what is a city', 'service page', 'difference between'],
+      a: 'Blog posts answer the questions your customers search. Service pages sell one specific job you do. City pages get you found in a specific town. Together they are why Google starts showing your business.'
+    });
+    kbLocal.push({
+      k: ['open my site', 'my website', 'see it live', 'visit'],
+      a: 'Click any row in the published list and it opens that exact page on your live site in a new tab.'
+    });
+  } catch (e) {}
+  var dashFallback = 'I do not have that one. I can tell you what published and when, how current this record is, or anything general about Wing Digital. For everything else a real person answers fast through wingdigital.co.';
+
   var chatOpts = isSample ? {
     greeting: 'Hey, I am Zephyr from Wing Digital. This is a sample dashboard; ask me how the real one works.',
     items: [
@@ -1308,6 +1355,8 @@ const DATA = __DATA__;
       { q: 'I want more of something', a: 'Tell us. Reply to any email from Wing Digital or use the contact page on wingdigital.co and we will point the engine where you want it.' }
     ]
   };
+  chatOpts.kb = kbLocal.concat(window.ZEPHYR_KB || []);
+  chatOpts.fallback = dashFallback;
   if (WingMascot.chat) WingMascot.chat(z, chatOpts);
   setTimeout(function(){ slot.style.opacity = 1; slot.style.pointerEvents = 'auto'; z.flare(); }, 1200);
   // Arrival reaction: Zephyr greets the client based on what REALLY happened.

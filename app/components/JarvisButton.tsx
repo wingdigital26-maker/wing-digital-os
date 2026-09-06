@@ -335,6 +335,9 @@ export default function JarvisButton() {
       } else {
         restAll();
       }
+      // Whatever the branch did, make sure no mood can stick: an older cached
+      // build of the mascot has no pulse(), so its timers never fire.
+      setTimeout(restAll, 4600);
     }
   }, [conversationId, speak, expressAll, restAll, cue]);
 
@@ -353,9 +356,9 @@ export default function JarvisButton() {
     if (!target?.pending || streaming) return;
     const token = target.pending.id;
     const history = messages.map((m, i) => (i === idx ? { ...m, pendingState: "done" as const } : m));
-    // Immediate acknowledgement of the click. Whether the action really
-    // succeeded is decided by the tool_done event inside runTurn.
-    expressAll((orb) => orb.pulse?.("party", 3500));
+    // Acknowledge the click without claiming an outcome: the celebration is
+    // earned later, only by a tool_done that reports the write actually ran.
+    expressAll((orb) => { orb.setState?.("thinking"); orb.flare?.(); });
     // Keep the assistant's lead-in text as history; the server runs the
     // signed action and narrates the outcome in a fresh assistant turn.
     await runTurn(history, token);
@@ -436,6 +439,13 @@ export default function JarvisButton() {
     WM.autoMood?.(orb);
     // Catch the mini orb up to the mood the floating one is already in.
     orb.setState?.(streaming ? "thinking" : (orb.getPinned?.() || "calm"));
+    // Closing the panel unmounts the slot, so the orb must be destroyed with
+    // it. Without this the ref stayed set, the reopened panel showed an empty
+    // box, and the orb's window listeners leaked for the rest of the session.
+    return () => {
+      try { headerOrbRef.current?.destroy?.(); } catch { /* already gone */ }
+      headerOrbRef.current = null;
+    };
   }, [open, streaming]);
 
   // Zephyr thinks while a turn is in flight. He does NOT reset to calm here:

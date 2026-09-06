@@ -448,6 +448,7 @@ async function runConfirmed(opts: {
   const v = verifyAction(opts.token);
   if ("error" in v) {
     opts.send({ text: `I did not run that: ${v.error}` });
+    opts.send({ error: "confirmation_rejected" });
     return;
   }
   opts.send({ tool: v.tool, detail: "", line: toolActivityLine(v.tool, v.args) });
@@ -458,7 +459,10 @@ async function runConfirmed(opts: {
   } catch {
     parsed = null;
   }
-  const ok = !(parsed && ("error" in parsed || parsed.pcRequired));
+  // A confirmed write only counts as done when the tool answered with
+  // structured output carrying no error. Unparseable output is not a receipt,
+  // so it is reported as not ok rather than celebrated as a success.
+  const ok = !!parsed && !("error" in parsed) && !parsed.pcRequired;
   opts.send({ tool_done: v.tool, ok, links: out.links ?? [], result: parsed ?? out.content.slice(0, 500) });
 
   if (!opts.apiKey) {
@@ -540,7 +544,13 @@ function runClaudeCode(opts: { cli: string; userText: string; conversationId: st
     const kill = () => { try { child.kill(); } catch { /* dead */ } };
     const onAbort = () => kill();
     signal.addEventListener("abort", onAbort);
-    const timer = setTimeout(() => { if (committed) send({ text: "\n\n(Jarvis timed out after 180s. The CLI task was stopped.)" }); kill(); }, CLAUDE_CODE_TIMEOUT_MS);
+    const timer = setTimeout(() => {
+      if (committed) {
+        send({ text: "\n\n(Zephyr timed out after 180s. The CLI task was stopped.)" });
+        send({ error: "claude_code_timeout" });
+      }
+      kill();
+    }, CLAUDE_CODE_TIMEOUT_MS);
     const handleLine = (line: string) => {
       let ev: Record<string, unknown>;
       try { ev = JSON.parse(line); } catch { return; }
@@ -573,7 +583,10 @@ function runClaudeCode(opts: { cli: string; userText: string; conversationId: st
       if (buffer.trim()) handleLine(buffer.trim());
       if (!committed) { finish(false); return; }
       if (!anyText && resultText) send({ text: resultText });
-      else if (!anyText && code !== 0 && !signal.aborted) send({ text: "(Jarvis/Claude Code exited without a reply. Try again.)" });
+      else if (!anyText && code !== 0 && !signal.aborted) {
+        send({ text: "(Zephyr could not finish that one. Try again.)" });
+        send({ error: "claude_code_no_reply" });
+      }
       finish(true);
     });
   });

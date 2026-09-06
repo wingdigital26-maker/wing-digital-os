@@ -145,11 +145,11 @@ export const LEGACY_VIEW_ALIAS: Record<string, string> = {
 // navigates instead of switching the mounted view. The os:navigate handler
 // honors these too, so a panel dispatching "sequences" still lands somewhere.
 export const EXTERNAL_SUB_LINKS: Record<string, string> = {
-  sequences: "/sequences",
-  // "automations" left this map 2026-09-05 (Jack: clicking it must not drag
-  // into a second screen). The workflow LIST now mounts in-shell as a
-  // keep-alive view; only opening one workflow goes to /automations/[id].
-  calls: "/calls",
+  // "automations", "sequences" and "calls" left this map 2026-09-05 (Jack:
+  // clicking them must not drag into a second screen). Their LIST/Today
+  // screens mount in-shell as keep-alive views; detail pages (a workflow, a
+  // sequence editor, booked/callbacks/etc.) stay routed, and /calls remains a
+  // standalone page because caller-role users land there directly.
   // Old Activity Log links land on the run history, its honest successor
   // (ActivityLog itself pointed users there). Was aliased to "knowledge",
   // which shares no content with it.

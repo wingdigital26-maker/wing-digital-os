@@ -1428,12 +1428,12 @@ const DATA = __DATA__;
   /* ── Demo activity: Leads / Messages+Reviews / typical-client band ──────────
      Renders ONLY when the client payload carries the demo objects, which live
      under DATA.brand so they pass through build.py unchanged (nested there
-     deliberately -- build.py copies the brand object whole). Real clients
-     (Hero's, Jackson) have none of these keys, so every section below stays
+     deliberately, since build.py copies the brand object whole). A real
+     client's config has none of these keys, so every section below stays
      hidden and empty and NO lead, review or message figure is fabricated for
      them. All visible text is injected here, so a real client's HTML contains
-     none of this section's copy at all. The Summit Ridge preview states at the
-     top of the page that its content is illustrative sample data. */
+     none of this section's copy at all. A sample preview states at the top of
+     the page that its content is illustrative. */
   (function demoActivity(){
     const D = DATA.brand || {};
     const statTile = (v, l) =>
@@ -1620,7 +1620,9 @@ const DATA = __DATA__;
   });
   kbLocal.push({
     k: ['contact', 'talk to someone', 'reach you', 'question', 'help', 'change something', 'more of'],
-    a: 'Reply to any email from Wing Digital, or use the contact page on wingdigital.co. A real person answers fast and can point the work wherever you want it.'
+    // No web address here on purpose: wingdigital.co does not resolve, and a
+    // dead domain in a client-facing answer is worse than no domain at all.
+    a: 'Reply to any email or text from Wing Digital. A real person answers fast and can point the work wherever you want it.'
   });
   kbLocal.push({
     k: ['how often', 'schedule', 'cadence', 'how much work', 'every week'],

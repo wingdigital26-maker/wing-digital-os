@@ -13,6 +13,7 @@ import SfxMuteButton from "./components/SfxMuteButton";
 type IconType = React.ComponentType<{ size?: number; color?: string }>;
 
 const VaultGraph = dynamic(() => import("./components/VaultGraph"), { ssr: false });
+const CommandPalette = dynamic(() => import("./components/CommandPalette"), { ssr: false });
 const Search = dynamic(() => import("./components/Search"), { ssr: false });
 // ActivityLog is no longer mounted (removed from the Intel group 2026-09-04);
 // the file stays on disk.
@@ -306,6 +307,14 @@ export default function Home() {
       if (NAV.some(g => g.subs.some(s => s.id === id))) setActive(id);
     };
     window.addEventListener("os:navigate", onNav);
+    // Routed pages (SectionChrome) can deep-link into a shell view with
+    // "/#view=<subId>" — honor it once on mount, then clear the hash so a
+    // reload lands on the same view without re-triggering.
+    const m = window.location.hash.match(/^#view=([\w-]+)$/);
+    if (m) {
+      onNav(new CustomEvent("os:navigate", { detail: m[1] }));
+      history.replaceState(null, "", window.location.pathname + window.location.search);
+    }
     return () => window.removeEventListener("os:navigate", onNav);
   }, []);
 
@@ -546,6 +555,9 @@ export default function Home() {
 
       {/* Global Da Boss status — visible on every section, like Jarvis */}
       <GlobalDaBoss />
+
+      {/* Ctrl+K / Cmd+K jump-anywhere palette; self-registers its own listener */}
+      <CommandPalette />
     </div>
     </MotionConfig>
   );

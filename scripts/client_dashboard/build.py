@@ -289,6 +289,9 @@ def build(slug):
     # Reporting "as of today" on a state file nobody has written in three weeks
     # tells the client the silence is real when it is just a stale file.
     data = {
+        # Who this dashboard belongs to. The referral-partner lookup keys off it,
+        # so a dashboard can only ever ask for its OWN client's list.
+        "slug": slug,
         "generated": date.today().isoformat(),
         "dataThrough": min(SOURCE_MTIMES) if SOURCE_MTIMES else None,
         "generatedAt": datetime.now().isoformat(timespec="seconds"),
@@ -297,6 +300,10 @@ def build(slug):
         "types": cfg.get("types", {}),
         "outreach": cfg.get("outreach", {}),
         "outreachPreview": collect_outreach_preview(cfg),
+        # Optional, generic: a forward-looking "what happens next" block.
+        # Intentions only -- the template renders no counts or results from
+        # it, and it disappears entirely when a config omits the key.
+        "plan": cfg.get("plan"),
         "pendingMetrics": cfg.get("pendingMetrics", []),
         # Optional REAL numbers only (e.g. {"emailsSent30d": 120, "asOf": "2026-09-06"}).
         # Zephyr's arrival reaction reads these; leaving it absent is always

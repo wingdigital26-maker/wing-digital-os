@@ -68,7 +68,7 @@
   },
   "_outreach_comment": "UPDATED 2026-09-06: a B2B referral email program is built and queued (see outreachPreview below) but nothing sends until Nash approves. The email card must say pending approval, never live and never broken.",
   "outreach": {
-    "intro": "Everything we send out under your name, and what is not running yet. Nothing is being emailed on your behalf today.",
+    "intro": "Everything that goes out under your name. Below is what is ready and what it takes to switch each one on.",
     "channels": [
       {
         "name": "Email introductions",

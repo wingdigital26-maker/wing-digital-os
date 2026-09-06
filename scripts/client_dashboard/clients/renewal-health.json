@@ -63,12 +63,14 @@
   },
   "_outreach_comment": "HONESTY RULE: the content engine is genuinely live and scheduled; booking, social, and review systems are NOT wired up, and the cards must say so plainly rather than show zeros.",
   "outreach": {
-    "intro": "What runs automatically for Renewal Health, and what is not wired up yet. Nothing is emailed or texted on your behalf.",
+    "intro": "What runs automatically for Renewal Health each week.",
     "channels": [
       {
         "name": "Weekly content engine",
         "icon": "pen",
-        "types": ["blog"],
+        "types": [
+          "blog"
+        ],
         "state": "live",
         "note": "Live and scheduled: two new blog posts every Monday morning (7:40am), each image-checked and reviewed against health-claim rules before it publishes."
       },
@@ -104,7 +106,9 @@
         {
           "glob": "blog/*.html",
           "type": "blog",
-          "skip": ["index.html"]
+          "skip": [
+            "index.html"
+          ]
         },
         {
           "glob": "*.html",
@@ -133,7 +137,9 @@
       "repo": "C:\\Users\\wjack\\seo-factory\\renewal-health\\_deploy",
       "base_url": "https://renewalhealth.life",
       "dir": "blog",
-      "skip": ["index.html"]
+      "skip": [
+        "index.html"
+      ]
     },
     {
       "group": "Service and core pages",
@@ -141,7 +147,10 @@
       "repo": "C:\\Users\\wjack\\seo-factory\\renewal-health\\_deploy",
       "base_url": "https://renewalhealth.life",
       "dir": "",
-      "skip": ["home.html", "cart.html"]
+      "skip": [
+        "home.html",
+        "cart.html"
+      ]
     }
   ],
   "pendingMetrics": [

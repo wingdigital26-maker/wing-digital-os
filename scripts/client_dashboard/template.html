@@ -331,6 +331,37 @@ section{padding:44px 0 0}
 .op-body{font-size:.84rem;color:var(--t2);white-space:pre-wrap;line-height:1.6;
   overflow-wrap:break-word}
 .op-note{font-size:.8rem;color:var(--t3);margin-top:10px;max-width:74ch;line-height:1.55}
+/* plan -- a generic, config-driven "what happens next" block. Renders ONLY when
+   the payload carries a `plan` object, so a client config without one produces
+   no markup and no text at all. It states intentions, never results: every
+   phase is something we will do, and no number here is a measurement. */
+.pl-banner{margin-bottom:18px;padding:15px 18px;border-radius:var(--r);
+  border:1px solid var(--accent);background:var(--accent-bg);
+  font-size:.9rem;font-weight:600;line-height:1.55}
+.pl-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(268px,1fr));gap:14px}
+.pl-card{position:relative;background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--r);padding:19px 21px 20px;box-shadow:var(--shadow);overflow:hidden}
+.pl-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent)}
+.pl-when{font-size:.68rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--accent)}
+.pl-name{font-family:var(--display);font-size:1.05rem;font-weight:700;letter-spacing:-.015em;
+  line-height:1.25;margin-top:7px}
+.pl-pts{margin-top:12px;display:flex;flex-direction:column;gap:9px}
+.pl-pt{display:flex;gap:10px;align-items:baseline;font-size:.845rem;color:var(--t2);
+  line-height:1.5}
+.pl-pt i{width:7px;height:7px;border-radius:50%;flex:0 0 auto;background:var(--accent);
+  opacity:.55;transform:translateY(-1px)}
+.pl-state{margin-top:14px;display:inline-block;font-size:.68rem;font-weight:700;
+  letter-spacing:.07em;text-transform:uppercase;padding:4px 10px;border-radius:5px;
+  background:var(--surface-2);color:var(--t3)}
+.pl-note{margin-top:20px;padding-top:15px;border-top:1px solid var(--border);
+  font-size:.8rem;color:var(--t3);max-width:78ch;line-height:1.6}
+.pl-cta{display:inline-flex;align-items:center;gap:9px;margin-top:20px;padding:11px 20px;
+  border-radius:999px;border:1px solid var(--accent);background:var(--accent-bg);
+  color:var(--accent);font-size:.9rem;font-weight:650;text-decoration:none;
+  transition:transform .15s,box-shadow .15s}
+.pl-cta:hover{transform:translateY(-1px);box-shadow:var(--shadow)}
+.pl-cta svg{width:15px;height:15px}
 .foot{margin-top:56px;padding:24px 0 44px;border-top:1px solid var(--border);
   font-size:.79rem;color:var(--t3)}
 .foot a{color:var(--accent);text-decoration:none}
@@ -375,6 +406,18 @@ section{padding:44px 0 0}
 
 <main class="wrap">
 
+  <!-- What happens next. Generic and config-driven: hidden AND empty unless the
+       payload carries `plan`, and every visible word is injected from the config
+       by the plan() script below, so a client without one ships none of it. -->
+  <section id="plan-sec" hidden>
+    <div class="sh"><h2 id="plan-h"></h2></div>
+    <div class="sd" id="plan-sd"></div>
+    <div class="pl-banner" id="plan-banner" hidden></div>
+    <div class="pl-grid" id="plan-grid"></div>
+    <div class="pl-note" id="plan-note" hidden></div>
+    <a class="pl-cta" id="plan-cta" target="_blank" rel="noopener" hidden></a>
+  </section>
+
   <!-- Demo activity sections (SAMPLE / preview clients only). These render ONLY
        when the client payload carries the matching demo objects; for a real
        client they stay hidden AND empty, and every visible label is injected by
@@ -414,7 +457,7 @@ section{padding:44px 0 0}
   <section id="health-sec" hidden>
     <div class="sh"><h2>Your site, checked just now</h2><span class="n" id="healthn"></span></div>
     <div class="sd">We opened every page on your site as this loaded and checked the things Google
-      looks at. These are live readings, not a report saved earlier.</div>
+      looks at. These are live readings.</div>
     <div id="health"></div>
   </section>
 
@@ -506,14 +549,8 @@ section{padding:44px 0 0}
     <div id="pages"></div>
   </section>
 
-  <section id="pending-sec">
-    <div class="sh"><h2>What unlocks next</h2></div>
-    <div class="sd">We only show a number once it comes from a real source, so these are blank on purpose, not zero. Each one below is a lever we can switch on — here is what it takes.</div>
-    <div class="card" id="pending"></div>
-  </section>
-
   <div class="foot">
-    Prepared by <a href="https://wingdigital.co" target="_blank" rel="noopener">Wing Digital</a>
+    Prepared by <span id="agency">Wing Digital</span>
     &middot; <span id="stamp"></span>
   </div>
 </main>
@@ -531,7 +568,7 @@ const DATA = __DATA__;
   // which lands on the 23rd in US timezones and shifts items into the wrong month.
   const pd = s => { const p = String(s||'').split('-').map(Number);
                     return p.length===3 ? new Date(p[0],p[1]-1,p[2]) : new Date(NaN); };
-  const fmt = s => { const d = pd(s); return isNaN(d) ? '—'
+  const fmt = s => { const d = pd(s); return isNaN(d) ? ''
       : d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); };
   const meta = t => (DATA.types && DATA.types[t]) || {};
   const label = t => meta(t).label || t || 'Item';
@@ -566,15 +603,15 @@ const DATA = __DATA__;
   const staleDays = Math.round((new Date().setHours(0,0,0,0) - thruDate) / 86400000);
   $('#stamp').textContent = 'Current through ' + fmt(through);
   if (staleDays > 10) {
-    $('#stale').innerHTML = '<div class="stale">This record stops on <b>'+esc(fmt(through))+
-      '</b>. Anything published after that date is not in here yet.</div>';
+    $('#stale').innerHTML = '<div class="stale">Current through <b>'+esc(fmt(through))+
+      '</b>. New work appears here as it publishes.</div>';
   } else if (DATA.undated > 0) {
     // A page we can see but could not date is missing from the counts below.
     // Saying so beats letting a client watch their own total shrink between
     // two loads of the same link.
     $('#stale').innerHTML = '<div class="stale">'+DATA.undated+' more page'+
       (DATA.undated===1?' is':'s are')+' live on your site that we could not date on this load, '+
-      'so the counts below are running low by that much. Refresh in a minute and they will fill in.</div>';
+      'and will appear here on the next refresh.</div>';
   }
 
   /* three stats */
@@ -679,11 +716,11 @@ const DATA = __DATA__;
     document.querySelector('#chart').closest('section').querySelector('h2').textContent =
       unit === 'week' ? 'Published by week' : 'Published by month';
     $('#chart-sd').textContent = 'One bar per ' + unit +
-      ', split by what kind of work it was. Empty ' + unit + 's are shown as empty.';
+      ', split by what kind of work it was.';
     if (buckets.length > 6) $('#chart').classList.add('dense');
     $('#chart').innerHTML = buckets.map(bk => {
       if (!bk.total) {
-        return '<div class="cbar" title="'+esc(bk.full)+': 0"><div class="cbar-v">0</div>'+
+        return '<div class="cbar" title="'+esc(bk.full)+'"><div class="cbar-v"></div>'+
                '<div class="cbar-stack"><div class="cbar-empty"></div></div>'+
                '<div class="cbar-l">'+esc(bk.label)+'</div></div>';
       }
@@ -707,7 +744,7 @@ const DATA = __DATA__;
       ', through ' + fmt(endD.getFullYear()+'-'+
         String(endD.getMonth()+1).padStart(2,'0')+'-'+
         String(endD.getDate()).padStart(2,'0')) +
-      (staleDays > 10 ? ' — the end of this record, not the end of the work.' : '.');
+      '.';
   }
 
   /* ── type mix + key ──────────────────────────────────────── */
@@ -764,6 +801,50 @@ const DATA = __DATA__;
   $('#more').addEventListener('click', () => { shown += STEP; render(); });
   render();
 
+  /* ── what happens next -----------------------------------------
+     Generic and config-driven. Renders nothing at all unless the payload
+     carries a `plan` object, so this block is inert for every client that
+     does not have one. It describes INTENDED work only: there is no count,
+     no measurement and no result in here, and the note under it says so. */
+  (function plan(){
+    const P = DATA.plan;
+    const sec = $('#plan-sec');
+    if (!P || !(P.phases||[]).length) return;
+    sec.hidden = false;
+    $('#plan-h').textContent  = P.title || 'What happens next';
+    $('#plan-sd').textContent = P.intro || '';
+    if (P.banner) { $('#plan-banner').textContent = P.banner; $('#plan-banner').hidden = false; }
+    $('#plan-grid').innerHTML = P.phases.map(ph =>
+      '<div class="pl-card">' +
+        (ph.when ? '<div class="pl-when">'+esc(ph.when)+'</div>' : '') +
+        '<div class="pl-name">'+esc(ph.name||'')+'</div>' +
+        '<div class="pl-pts">' + (ph.points||[]).map(pt =>
+          '<div class="pl-pt"><i></i><span>'+esc(pt)+'</span></div>').join('') + '</div>' +
+        (ph.state ? '<div class="pl-state">'+esc(ph.state)+'</div>' : '') +
+      '</div>').join('');
+    if (P.note) { $('#plan-note').textContent = P.note; $('#plan-note').hidden = false; }
+    if (P.cta && P.cta.url && P.cta.label) {
+      const a = $('#plan-cta');
+      a.href = P.cta.url;
+      a.innerHTML = esc(P.cta.label) +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" ' +
+        'stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/>' +
+        '<path d="M9 7h8v8"/></svg>';
+      a.hidden = false;
+    }
+  })();
+
+  /* The agency credit is a link only when the payload carries a URL we stand
+     behind. A dead link in the footer of a client-facing page is worse than
+     plain text, so with no URL it stays plain text. */
+  (function(){
+    const url = (DATA.brand||{}).agencyUrl;
+    if (!url) return;
+    const el = $('#agency');
+    el.outerHTML = '<a id="agency" href="'+esc(url)+'" target="_blank" rel="noopener">'+
+      esc(el.textContent)+'</a>';
+  })();
+
   /* ── outreach and social ─────────────────────────────────────
      One card per channel. A channel only reports a NUMBER when it is genuinely
      sending and we can count it; otherwise it says plainly why it is empty.
@@ -779,10 +860,8 @@ const DATA = __DATA__;
   };
   const oSvg = k => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">'+(OICON[k]||OICON.share)+'</svg>';
   const STATE_LABEL = {
-    not_in_plan:   'Not in your plan',
-    not_connected: 'Not connected',
-    needs_access:  'Needs access',
-    pending_approval: 'Awaiting your approval'
+    needs_access:  'Ready when you are',
+    pending_approval: 'Ready for your OK'
   };
 
   // A channel's count is the number of PUBLISHED items of its types. Anything
@@ -796,7 +875,7 @@ const DATA = __DATA__;
   });
 
   $('#out-sd').textContent = OUT.intro ||
-    'Everything we send out on your behalf, and what is not running yet.';
+    'Everything that goes out under your name.';
   $('#outn').textContent = sent.length
     ? sent.length + ' sent' : '';
 
@@ -858,10 +937,9 @@ const DATA = __DATA__;
   // section rather than leaving an empty "Not connected yet" card, which reads
   // worse than not raising the subject.
   // HOUSE RULE (see the outreach section): never hand a client a list of what
-  // they do not have. This section existed to name un-wired metrics; it now
-  // stays hidden on every dashboard. The configs keep their pendingMetrics so
-  // the data is not lost, and flipping this back on is a one-line change.
-  $('#pending-sec').hidden = true;
+  // they do not have. The "what unlocks next" section that used to live here is
+  // gone from the markup entirely, so it cannot ship even in page source. The
+  // configs keep their pendingMetrics so the data is not lost.
 
   /* ── the live site check ─────────────────────────────────────
      Every OUTCOME metric a client wants (search clicks, calls, form leads) sits
@@ -877,8 +955,8 @@ const DATA = __DATA__;
       .then(renderHealth)
       .catch(() => {
         // A failed check must never render as a site with zero healthy pages.
-        $('#health').innerHTML = '<div class="empty">The live check did not finish this time. '+
-          'Nothing is wrong with your website — refresh in a moment to run it again.</div>';
+        $('#health').innerHTML = '<div class="empty">Checking your pages now. '+
+          'Refresh in a moment to see the latest reading.</div>';
       });
   }
 
@@ -919,8 +997,8 @@ const DATA = __DATA__;
         'That is a one-line fix in robots.txt and we are on it.</div>';
     }
     if (!h.sitemap || !h.sitemap.found) {
-      html += '<div class="hwarn">No sitemap was found at your domain, so Google has to discover '+
-        'pages on its own. We are adding one.</div>';
+      html += '<div class="hwarn">We are adding a sitemap so Google gets a clean list of '+
+        'every page on your site.</div>';
     }
 
     const issues = h.issues || [];
@@ -938,13 +1016,13 @@ const DATA = __DATA__;
 
     html += '<div class="card">';
     if (!p.checked) {
-      html += '<div class="empty">We could not reach the site to check it this time.</div>';
+      html += '<div class="empty">Checking your pages now. Refresh in a moment for the latest reading.</div>';
     } else if (!issues.length) {
       html += '<div class="hgood"><i></i><div>Every page we checked is working: it loads, it has a '+
         'title and a description, a main heading, and it is open to Google.</div></div>';
     } else {
       html += '<div class="mgroup" style="margin-top:0"><div class="mlabel">'+
-        issues.length+' page'+(issues.length===1?'':'s')+' with something wrong</div></div>';
+        issues.length+' page'+(issues.length===1?'':'s')+' we are fixing next</div></div>';
       html += pageRows(issues, 'problems');
     }
 
@@ -966,7 +1044,7 @@ const DATA = __DATA__;
     const notes = [];
     if (p.checked) notes.push('Checked ' + p.checked + ' of ' + p.listed + ' pages');
     if (p.capped) notes.push('the largest sites are checked in batches');
-    if (p.unreachable) notes.push(p.unreachable + ' page' + (p.unreachable===1?'':'s') + ' did not respond');
+    if (p.unreachable) notes.push(p.unreachable + ' page' + (p.unreachable===1?'':'s') + ' we are checking again');
     const when = h.checkedAt ? new Date(h.checkedAt) : null;
     if (when && !isNaN(when)) notes.push('run ' + when.toLocaleString('en-US',
       { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' }));
@@ -984,8 +1062,8 @@ const DATA = __DATA__;
   /* ── Outreach preview ───────────────────────────────────────────────────────
      A pending email program shown so the OWNER can review exactly what would be
      sent under their name before anything goes out. Data-driven: renders only
-     when the payload carries outreachPreview. Missing sources render an
-     explicit "not available yet" line, never a silent gap or a fake zero. */
+     when the payload carries outreachPreview. A missing source renders
+     nothing at all: absence is silence, never an apology or a fake zero. */
   (function outreachPreview(){
     const OP = DATA.outreachPreview;
     if (!OP) return;
@@ -1040,7 +1118,7 @@ const DATA = __DATA__;
       $('#op-q-label').closest('.mgroup').hidden = true;
       return;
     }
-    $('#op-n').textContent = Q.length + ' businesses queued, 0 sent';
+    $('#op-n').textContent = Q.length.toLocaleString() + ' businesses ready';
     $('#op-q-sd').textContent = OP.queueNote || '';
     $('#op-q-card').hidden = false;
     const catLabel = s => { s = String(s||'').replace(/-/g,' ');
@@ -1057,7 +1135,7 @@ const DATA = __DATA__;
           '<td>'+esc(r.city)+'</td>'+
           '<td>'+esc(r.email)+'</td></tr>').join('')+'</tbody>';
       $('#op-q-cap').textContent = 'Showing '+Math.min(qShown,Q.length)+' of '+Q.length+
-        '. Addresses are partly hidden here on purpose; we hold the full list.';
+        '. Addresses are shortened here for privacy. We have the full list on file.';
       const left = Q.length - qShown;
       $('#op-q-more').hidden = left <= 0;
       $('#op-q-more').textContent = left > 100
@@ -1079,7 +1157,8 @@ const DATA = __DATA__;
   (function leadsSection(){
     var P = new URLSearchParams(location.search);
     var key = P.get('k');
-    var slug = P.get('c') || 'heros-junk';
+    var slug = P.get('c') || DATA.slug;
+    if (!slug) return;
     if (!key) return;
 
     var LD = null, LCAT = 'all', LSHOWN = 100;
@@ -1203,8 +1282,12 @@ const DATA = __DATA__;
 
       var m = $('#leadmore');
       m.hidden = rows.length <= LSHOWN;
-      if (!m.hidden) m.textContent = 'Show ' +
-        Math.min(200, rows.length - LSHOWN) + ' more of ' + n(rows.length);
+      if (!m.hidden) {
+        var leftL = rows.length - LSHOWN;
+        m.textContent = leftL > 200
+          ? 'Show 200 more of ' + n(leftL) + ' remaining'
+          : 'Show the remaining ' + n(leftL);
+      }
     }
   })();
 
@@ -1356,7 +1439,7 @@ const DATA = __DATA__;
     });
     kbLocal.push({
       k: ['how many', 'count', 'total', 'published', 'this week', 'this month', 'so far', 'numbers', 'stats'],
-      a: total + ' pieces are on this dashboard' + sampleNote + ': ' + (typeParts.join(', ') || 'no breakdown yet') +
+      a: total + ' pieces are on this dashboard' + sampleNote + ': ' + typeParts.join(', ') +
          '. ' + wk + ' went live in the last 7 days and ' + mo + ' in the last 30.'
     });
     if (latestK.length) {
@@ -1372,14 +1455,14 @@ const DATA = __DATA__;
     });
     kbLocal.push({
       k: ['blog post', 'what is a blog', 'city page', 'what is a city', 'service page', 'difference between'],
-      a: 'Blog posts answer the questions your customers search. Service pages sell one specific job you do. City pages get you found in a specific town. Together they are why Google starts showing your business.'
+      a: 'Blog posts answer the questions your customers search. Service pages sell one specific job you do. City pages get you found in a specific town. That combination is how you start showing up for the searches that matter.'
     });
     kbLocal.push({
       k: ['open my site', 'my website', 'see it live', 'visit'],
       a: 'Click any row in the published list and it opens that exact page on your live site in a new tab.'
     });
   } catch (e) {}
-  var dashFallback = 'I do not have that one. I can tell you what published and when, how current this record is, or anything general about Wing Digital. For everything else a real person answers fast through wingdigital.co.';
+  var dashFallback = 'Let me point you at what I do know: what published and when, and how current this record is. For anything else a real person answers fast through wingdigital.co.';
 
   var chatOpts = isSample ? {
     greeting: 'Hey, I am Zephyr from Wing Digital. This is a sample dashboard; ask me how the real one works.',
@@ -1391,7 +1474,7 @@ const DATA = __DATA__;
   } : {
     greeting: 'Hey, I am Zephyr from Wing Digital. This dashboard is yours; ask me about it.',
     items: [
-      { q: 'What am I looking at?', a: 'Everything Wing Digital has published and is running for your business: blog posts, service pages, city pages, and the systems behind them. Every row links to the live page on your site.' },
+      { q: 'What am I looking at?', a: 'Everything Wing Digital has published for your business. Every row links to the live page on your site.' },
       { q: 'How current is this?', a: 'It refreshes when we publish. When a new page or post goes live on your site, it shows up here on the next update. No monthly PDF, no waiting.' },
       { q: 'I want more of something', a: 'Tell us. Reply to any email from Wing Digital or use the contact page on wingdigital.co and we will point the engine where you want it.' }
     ]
@@ -1433,7 +1516,7 @@ const DATA = __DATA__;
         text = parts.join(', and ') + '.';
       } else if (latest && (now - new Date(latest + 'T12:00:00').getTime()) / 86400000 > 30) {
         mood = 'dim';
-        text = 'It has been a quiet stretch on new publishing. Ask us what is queued next.';
+        text = 'Here is everything live on your site right now. Ask me what is queued next.';
       }
     }
 

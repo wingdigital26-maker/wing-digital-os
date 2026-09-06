@@ -1280,13 +1280,13 @@ const DATA = __DATA__;
 <div id="wing-helper" title="Zephyr, from Wing Digital"
   style="position:fixed;right:16px;bottom:14px;z-index:60;opacity:0;pointer-events:none;transition:opacity .8s"></div>
 <script src="/mascot/zephyr-kb.js?v=1"></script>
-<script src="/mascot/wing-mascot.js?v=6"></script>
+<script src="/mascot/wing-mascot.js?v=7"></script>
 <script>
 (function(){
   if (!window.WingMascot) return;
   var slot = document.getElementById('wing-helper');
   if (!slot) return;
-  var z = WingMascot.mount(slot, { size: 58 });
+  var z = WingMascot.mount(slot, { size: 78 });
   // A sample/preview dashboard carries demo-only brand keys and says SAMPLE in
   // its subhead; Zephyr must never claim demo rows are delivered work.
   var isSample = false;
@@ -1310,29 +1310,52 @@ const DATA = __DATA__;
   };
   if (WingMascot.chat) WingMascot.chat(z, chatOpts);
   setTimeout(function(){ slot.style.opacity = 1; slot.style.pointerEvents = 'auto'; z.flare(); }, 1200);
-  // Emotions follow the client's REAL record, never invented feelings:
-  // published within 2 days -> party then excited; within 7 -> excited;
-  // silent for 30+ days (real clients only) -> dim, because pretending
-  // otherwise would be lying. Otherwise calm, with ambient sleepy/wake.
+  // Arrival reaction: Zephyr greets the client based on what REALLY happened.
+  // Signals are computed from the dashboard's own data (published items) plus
+  // optional real metrics build.py passed through (e.g. emailsSent30d). Tiers:
+  // big week -> party, activity -> excited, 30+ silent days -> pinned dim with
+  // an honest line, otherwise calm. Nothing is ever invented to look busy.
   try {
-    var latest = null;
+    var now = Date.now(), latest = null, week = 0, month = 0;
     (DATA.items || []).forEach(function (it) {
-      if (it.date && (!latest || it.date > latest)) latest = it.date;
+      if (!it.date) return;
+      if (!latest || it.date > latest) latest = it.date;
+      var age = (now - new Date(it.date + 'T12:00:00').getTime()) / 86400000;
+      if (age <= 7) week++;
+      if (age <= 30) month++;
     });
-    if (latest && !isSample) {
-      var days = (Date.now() - new Date(latest + 'T12:00:00').getTime()) / 86400000;
-      if (days <= 2) {
-        setTimeout(function () {
-          z.pulse('party', 5000);
-          setTimeout(function () { z.pulse('excited', 5000); }, 5200);
-        }, 1600);
-      } else if (days <= 7) {
-        setTimeout(function () { z.pulse('excited', 6000); }, 1600);
-      } else if (days > 30) {
-        setTimeout(function () { z.pin('dim'); }, 1600);
+    var emails = (DATA.metrics && typeof DATA.metrics.emailsSent30d === 'number')
+      ? DATA.metrics.emailsSent30d : 0;
+    var mood = null, hold = 0, text = '';
+
+    if (isSample) {
+      mood = 'excited'; hold = 5000;
+      text = 'This is a sample preview. A real dashboard fills in with your own published work.';
+    } else {
+      var parts = [];
+      if (week >= 1) parts.push(week + (week === 1 ? ' new piece' : ' new pieces') + ' went live on your site this week');
+      else if (month >= 1) parts.push(month + (month === 1 ? ' piece' : ' pieces') + ' published in the last 30 days');
+      if (emails >= 25) parts.push(emails + ' emails went out on your behalf this month');
+      var big = week >= 5 || emails >= 100;
+      if (week >= 1 || emails >= 25) {
+        mood = big ? 'party' : 'excited';
+        hold = big ? 5000 : 6000;
+        text = parts.join(', and ') + '.';
+      } else if (latest && (now - new Date(latest + 'T12:00:00').getTime()) / 86400000 > 30) {
+        mood = 'dim';
+        text = 'It has been a quiet stretch on new publishing. Ask us what is queued next.';
       }
-    } else if (isSample) {
-      setTimeout(function () { z.pulse('excited', 5000); }, 1600);
+    }
+
+    if (mood) {
+      setTimeout(function () {
+        if (mood === 'dim') z.pin('dim');
+        else if (mood === 'party') {
+          z.pulse('party', hold);
+          setTimeout(function () { z.pulse('excited', 5000); }, hold + 200);
+        } else z.pulse(mood, hold);
+        if (text && z.bubble) z.bubble(text, 9000);
+      }, 1800);
     }
   } catch (e) {}
   if (WingMascot.autoMood) WingMascot.autoMood(z);

@@ -324,7 +324,7 @@ export default function JarvisButton() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const WM = (window as any).WingMascot;
       if (orbCancelled || orbRef.current || !orbSlotRef.current || !WM) return;
-      orbRef.current = WM.mount(orbSlotRef.current, { size: 56 });
+      orbRef.current = WM.mount(orbSlotRef.current, { size: 76 });
       setOrbOn(true);
     };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -333,7 +333,7 @@ export default function JarvisButton() {
       let s = document.querySelector('script[data-zephyr]') as HTMLScriptElement | null;
       if (!s) {
         s = document.createElement("script");
-        s.src = "/mascot/wing-mascot.js?v=6";
+        s.src = "/mascot/wing-mascot.js?v=7";
         s.dataset.zephyr = "1";
         document.head.appendChild(s);
       }
@@ -353,7 +353,7 @@ export default function JarvisButton() {
     if (!open || headerOrbRef.current || !headerSlotRef.current) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const WM = (window as any).WingMascot;
-    if (WM) headerOrbRef.current = WM.mount(headerSlotRef.current, { size: 30 });
+    if (WM) headerOrbRef.current = WM.mount(headerSlotRef.current, { size: 38 });
   }, [open]);
 
   // Zephyr's face mirrors what the assistant is doing.
@@ -469,7 +469,7 @@ export default function JarvisButton() {
         title="Zephyr"
         aria-label="Open Zephyr"
         style={{
-          position: "fixed", bottom: 20, right: 20, width: 64, height: 64, borderRadius: "50%",
+          position: "fixed", bottom: 18, right: 18, width: 84, height: 84, borderRadius: "50%",
           background: orbOn ? "transparent" : (listening ? "#5f82f5" : ACCENT),
           border: "none", cursor: "pointer",
           display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999,
@@ -481,7 +481,7 @@ export default function JarvisButton() {
         onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
       >
         {/* Zephyr himself; the plain glyph only shows until his script mounts */}
-        <div ref={orbSlotRef} style={{ width: 56, height: 56, display: orbOn ? "block" : "none", pointerEvents: "none" }} aria-hidden="true" />
+        <div ref={orbSlotRef} style={{ width: 76, height: 76, display: orbOn ? "block" : "none", pointerEvents: "none" }} aria-hidden="true" />
         {!orbOn && (
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <circle cx="12" cy="12" r="8.5" stroke="white" strokeWidth="1.4" strokeOpacity="0.55" />
@@ -509,7 +509,7 @@ export default function JarvisButton() {
           {/* Header */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", borderBottom: "1px solid rgba(61,107,240,0.15)", background: "#0d1117", gap: 8 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-              <div ref={headerSlotRef} style={{ width: 30, height: 30, flexShrink: 0 }} aria-hidden="true" />
+              <div ref={headerSlotRef} style={{ width: 38, height: 38, flexShrink: 0 }} aria-hidden="true" />
               <span style={{ color: ACCENT, fontWeight: 700, fontSize: 15, fontFamily: "Space Grotesk, sans-serif" }}>Zephyr</span>
               {speaking && (
                 <button onClick={stopAudio} title="Stop speaking" style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "rgba(61,107,240,0.12)", border: "1px solid rgba(61,107,240,0.4)", borderRadius: 6, padding: "2px 7px", cursor: "pointer" }}>

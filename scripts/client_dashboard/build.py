@@ -298,6 +298,10 @@ def build(slug):
         "outreach": cfg.get("outreach", {}),
         "outreachPreview": collect_outreach_preview(cfg),
         "pendingMetrics": cfg.get("pendingMetrics", []),
+        # Optional REAL numbers only (e.g. {"emailsSent30d": 120, "asOf": "2026-09-06"}).
+        # Zephyr's arrival reaction reads these; leaving it absent is always
+        # honest, inventing a number here never is.
+        "metrics": cfg.get("metrics", {}),
         "items": items,
         "pages": collect_pages(cfg, items),
     }
@@ -346,7 +350,7 @@ def build(slug):
             js = fh.read().replace("</script>", "<\\/script>")
         for tag in ('<script src="/mascot/%s"></script>' % fname,
                     '<script src="/mascot/%s?v=1"></script>' % fname,
-                    '<script src="/mascot/%s?v=6"></script>' % fname):
+                    '<script src="/mascot/%s?v=7"></script>' % fname):
             art = art.replace(tag, "<script>\n%s\n</script>" % js)
     # In the Artifact gallery the title is the page's NAME, sat beside dozens of
     # others -- so it carries the client, not the word "dashboard" twice over.

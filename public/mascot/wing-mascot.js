@@ -249,9 +249,35 @@
       clearTimeout(pulseTimer);
       pulseTimer = setTimeout(function () { setState(pinned || 'calm'); }, ms || 4000);
     }
+    /* bubble: a small speech balloon near the orb, for arrival greetings.
+     * Plain text only; fades out after ms (default 7s). */
+    var bubbleEl = null, bubbleTimer = null;
+    function bubble(text, ms) {
+      if (!text) return;
+      if (!bubbleEl) {
+        bubbleEl = document.createElement('div');
+        bubbleEl.setAttribute('role', 'status');
+        bubbleEl.style.cssText = 'position:fixed;z-index:80;max-width:240px;padding:10px 13px;' +
+          'background:rgba(13,15,22,.97);color:#eaf0ff;border:1px solid rgba(125,155,255,.4);' +
+          'border-radius:12px 12px 3px 12px;font:13px/1.45 Inter,system-ui,sans-serif;' +
+          'box-shadow:0 8px 30px rgba(39,87,230,.3);opacity:0;transition:opacity .4s;pointer-events:none';
+        document.body.appendChild(bubbleEl);
+      }
+      bubbleEl.textContent = text;
+      var r = root.getBoundingClientRect();
+      bubbleEl.style.visibility = 'hidden';
+      bubbleEl.style.opacity = '0';
+      bubbleEl.style.left = 'auto';
+      bubbleEl.style.right = Math.max(8, window.innerWidth - r.right) + 'px';
+      bubbleEl.style.bottom = Math.max(8, window.innerHeight - r.top + 10) + 'px';
+      bubbleEl.style.visibility = 'visible';
+      requestAnimationFrame(function () { bubbleEl.style.opacity = '1'; });
+      clearTimeout(bubbleTimer);
+      bubbleTimer = setTimeout(function () { bubbleEl.style.opacity = '0'; }, ms || 7000);
+    }
     return {
       blink: blink, flare: flare, setState: setState, pin: pin, unpin: unpin,
-      pulse: pulse, destroy: destroy, el: root,
+      pulse: pulse, bubble: bubble, destroy: destroy, el: root,
       getPinned: function () { return pinned; }
     };
   }

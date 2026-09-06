@@ -132,6 +132,101 @@ def page_title(path, fallback_name):
 SOURCES = {"state_file": from_state_file, "git_repo": from_git_repo}
 
 
+# ── outreach preview (client-approval view of a pending email program) ───────
+def parse_outreach_templates(path):
+    """Parse an outreach templates.md into per-category email blocks.
+
+    Expected shape (generic, not client-specific): "## <n>. Category" headings,
+    each holding one or more "**Stage**" blocks that start with "Subject: ..."
+    followed by the body. Sections without such blocks (variant lists, reply
+    snippets) are skipped. Missing file -> None, so the page can say so.
+    """
+    if not os.path.exists(path):
+        print("    ! outreach templates missing: %s" % path)
+        return None
+    note_mtime(path)
+    with open(path, encoding="utf-8") as fh:
+        text = fh.read()
+    cats = []
+    for sec in re.split(r"^## +", text, flags=re.M)[1:]:
+        lines = sec.splitlines()
+        name = re.sub(r"^\d+\.\s*", "", lines[0]).strip()
+        emails, stage, subject, body = [], None, None, []
+        def flush():
+            if stage and subject:
+                emails.append({"stage": stage, "subject": subject,
+                               "body": "\n".join(body).strip()})
+        for ln in lines[1:]:
+            m = re.match(r"^\*\*(.+?)\*\*\s*$", ln.strip())
+            if m:
+                flush()
+                stage, subject, body = m.group(1), None, []
+                continue
+            if stage and subject is None:
+                sm = re.match(r"^Subject:\s*(.+)$", ln.strip())
+                if sm:
+                    subject = sm.group(1).strip()
+                continue
+            if stage and subject is not None:
+                if ln.strip() == "---":
+                    break
+                body.append(ln)
+        flush()
+        if emails:
+            cats.append({"name": name, "emails": emails})
+    return cats
+
+
+def mask_email(addr):
+    """j***@domain.com -- the client sees who, never a harvestable address."""
+    addr = (addr or "").strip()
+    if "@" not in addr:
+        return ""
+    local, domain = addr.split("@", 1)
+    return (local[:1] or "*") + "***@" + domain
+
+
+def load_send_queue(path):
+    """Send-queue CSV -> client-safe rows: company, category, city, masked email.
+    Internal scoring/status columns are deliberately not carried across."""
+    if not os.path.exists(path):
+        print("    ! send queue missing: %s" % path)
+        return None
+    note_mtime(path)
+    import csv
+    rows = []
+    # utf-8-sig: a BOM would otherwise hide the first column behind "﻿email"
+    with open(path, encoding="utf-8-sig", newline="") as fh:
+        for r in csv.DictReader(fh):
+            rows.append({
+                "company": (r.get("company") or "").strip(),
+                "category": (r.get("category") or "").strip(),
+                "city": (r.get("city") or "").strip(),
+                "email": mask_email(r.get("email")),
+            })
+    return rows
+
+
+def collect_outreach_preview(cfg):
+    op = cfg.get("outreachPreview")
+    if not op:
+        return None
+    data = {
+        "intro": op.get("intro", ""),
+        "banner": op.get("banner", ""),
+        "plan": op.get("plan", []),
+        "templatesNote": op.get("templates_note", ""),
+        "queueNote": op.get("queue_note", ""),
+        "categories": None,
+        "queue": None,
+    }
+    if op.get("templates_md"):
+        data["categories"] = parse_outreach_templates(op["templates_md"])
+    if op.get("queue_csv"):
+        data["queue"] = load_send_queue(op["queue_csv"])
+    return data
+
+
 def collect_pages(cfg, items):
     """Live-page groups for the Pages tab, read off the real site repo."""
     out = []
@@ -201,6 +296,7 @@ def build(slug):
         "engines": cfg.get("engines", []),
         "types": cfg.get("types", {}),
         "outreach": cfg.get("outreach", {}),
+        "outreachPreview": collect_outreach_preview(cfg),
         "pendingMetrics": cfg.get("pendingMetrics", []),
         "items": items,
         "pages": collect_pages(cfg, items),
@@ -240,6 +336,18 @@ def build(slug):
                 "<head>", "</head>", "<body>", "</body>"):
         art = art.replace(tag, "")
     art = "\n".join(ln for ln in art.splitlines() if ln.strip() != "")
+    # The Artifact CSP blocks non-CDN external scripts, so the root-relative
+    # /mascot/wing-mascot.js tag would silently never load there. Inline it.
+    for fname in ("zephyr-kb.js", "wing-mascot.js"):
+        src = os.path.join(HERE, "..", "..", "public", "mascot", fname)
+        if not os.path.exists(src):
+            continue
+        with open(src, encoding="utf-8") as fh:
+            js = fh.read().replace("</script>", "<\\/script>")
+        for tag in ('<script src="/mascot/%s"></script>' % fname,
+                    '<script src="/mascot/%s?v=1"></script>' % fname,
+                    '<script src="/mascot/%s?v=6"></script>' % fname):
+            art = art.replace(tag, "<script>\n%s\n</script>" % js)
     # In the Artifact gallery the title is the page's NAME, sat beside dozens of
     # others -- so it carries the client, not the word "dashboard" twice over.
     art = art.replace("<title>%s</title>" % subs["__TITLE__"],

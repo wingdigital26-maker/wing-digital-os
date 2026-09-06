@@ -311,7 +311,7 @@ export default function Home() {
         }}>
           <div style={{
             width: 32, height: 32, borderRadius: 8,
-            background: "linear-gradient(135deg, #22d3ee, #0e7490)",
+            background: "linear-gradient(135deg, #3D6BF0, #1E44B8)",
             display: "flex", alignItems: "center", justifyContent: "center",
             fontSize: 16, flexShrink: 0, fontWeight: 700,
           }}>W</div>
@@ -542,7 +542,7 @@ function MobileNav({ active, onNavigate, newLeadCount }: {
         })}
         <button className="mobile-nav-btn jarvis" onClick={() => { setMoreOpen(false); sfx.play("nav"); window.dispatchEvent(new CustomEvent("jarvis:open")); }}>
           <span className="mobile-nav-ico"><Sparkles size={21} /></span>
-          <span>Jarvis</span>
+          <span>Zephyr</span>
         </button>
         <button className={`mobile-nav-btn${moreOpen || moreGroups.has(activeGroup) ? " on" : ""}`} aria-expanded={moreOpen}
           onClick={() => { sfx.play(moreOpen ? "toggle-off" : "toggle-on"); setMoreOpen(o => !o); }}>
@@ -597,7 +597,7 @@ function AccountMenu({ role, email }: { role: string | null; email: string | nul
       <button className="header-avatar" onClick={() => setOpen(o => !o)} aria-haspopup="menu" aria-expanded={open}
         title="Account" style={{
           width: 34, height: 34, borderRadius: "50%", border: "none", cursor: "pointer",
-          background: "linear-gradient(135deg, #22d3ee, #0e7490)", color: "#fff",
+          background: "linear-gradient(135deg, #3D6BF0, #1E44B8)", color: "#fff",
           display: "flex", alignItems: "center", justifyContent: "center",
           fontSize: 14, fontWeight: 700, minHeight: 0, padding: 0,
         }}>{initial}</button>
@@ -873,7 +873,7 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
       {/* Morning Briefing — skeleton while the dashboard loads so it never looks blank */}
       {loading && (
         <div style={{
-          borderRadius: 20, border: "1px solid rgba(34,211,238,0.15)", padding: "24px 28px",
+          borderRadius: 20, border: "1px solid rgba(61, 107, 240,0.15)", padding: "24px 28px",
           background: "linear-gradient(180deg, var(--bg-card), var(--bg-card))",
         }}>
           <div className="skel" style={{ height: 12, width: 220, marginBottom: 20 }} />
@@ -892,15 +892,15 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
       {!loading && (
         <motion.div className="briefing-hero" variants={riseItem} style={{
           position: "relative",
-          background: "linear-gradient(120deg, rgba(34,211,238,0.10), rgba(167,139,250,0.08) 55%, var(--bg-card))",
-          border: "1px solid rgba(34,211,238,0.25)",
+          background: "linear-gradient(120deg, rgba(61, 107, 240,0.10), rgba(167,139,250,0.08) 55%, var(--bg-card))",
+          border: "1px solid rgba(61, 107, 240,0.25)",
           borderRadius: 20, padding: "24px 28px",
           boxShadow: "0 16px 48px var(--bg-hover), inset 0 1px 0 rgba(255,255,255,0.06)",
           overflow: "hidden",
         }}>
           <div style={{
             position: "absolute", top: -60, right: -40, width: 240, height: 240,
-            background: "radial-gradient(circle, rgba(34,211,238,0.14), transparent 65%)",
+            background: "radial-gradient(circle, rgba(61, 107, 240,0.14), transparent 65%)",
             pointerEvents: "none",
           }} />
           <p style={{
@@ -918,7 +918,7 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
                 {(() => {
                   const todaySent = sentToday ?? camp?.by_day?.[new Date().toLocaleDateString("en-CA")];
                   return typeof todaySent === "number" ? (
-                    <p style={{ fontSize: 36, fontWeight: 800, color: "var(--accent)", lineHeight: 1, textShadow: "0 0 24px rgba(34,211,238,0.35)", fontFamily: "'Space Grotesk', sans-serif" }}><CountUp value={todaySent} /></p>
+                    <p style={{ fontSize: 36, fontWeight: 800, color: "var(--accent)", lineHeight: 1, textShadow: "0 0 24px rgba(61, 107, 240,0.35)", fontFamily: "'Space Grotesk', sans-serif" }}><CountUp value={todaySent} /></p>
                   ) : (
                     <p style={{ fontSize: 22, fontWeight: 700, color: "var(--text-muted)", lineHeight: 1.4, fontFamily: "'Space Grotesk', sans-serif" }}>no data</p>
                   );
@@ -1079,7 +1079,7 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
                     <span style={{
                       fontSize: 10, fontWeight: 700, padding: "2px 9px", borderRadius: 999, whiteSpace: "nowrap",
                       color: d.why.includes("callback") ? "var(--accent-2)" : d.why === "redial" ? "var(--orange)" : "var(--accent)",
-                      background: d.why.includes("callback") ? "rgba(167,139,250,0.12)" : d.why === "redial" ? "rgba(251,191,36,0.10)" : "rgba(34,211,238,0.08)",
+                      background: d.why.includes("callback") ? "rgba(167,139,250,0.12)" : d.why === "redial" ? "rgba(251,191,36,0.10)" : "rgba(61, 107, 240,0.08)",
                     }}>{d.why}</span>
                     <a href={`tel:${d.phone}`} onClick={e => e.stopPropagation()}
                       style={{ fontSize: 12, fontWeight: 700, color: "var(--accent)", textDecoration: "none", whiteSpace: "nowrap", width: 130, textAlign: "right" }}>
@@ -1228,7 +1228,7 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
           boxShadow: "0 8px 24px var(--bg-hover), inset 0 1px 0 rgba(255,255,255,0.04)",
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-            <span className="live-dot" style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--accent)", boxShadow: "0 0 8px #22d3ee" }} />
+            <span className="live-dot" style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--accent)", boxShadow: "0 0 8px #3D6BF0" }} />
             <p style={{ fontSize: 12, fontWeight: 700, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.07em" }}>Active Clients</p>
           </div>
           {loading ? <Spinner /> : (data?.activeClients?.length ? (
@@ -1747,7 +1747,7 @@ function PersonalSection() {
             <input value={newTask} onChange={e => setNewTask(e.target.value)}
               onKeyDown={e => e.key === "Enter" && addTask()}
               placeholder="Add a task..." style={{ flex: 1, background: "var(--bg-hover)", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 12px", color: "var(--text-primary)", fontSize: 13, outline: "none" }} />
-            <button onClick={addTask} style={{ background: "linear-gradient(135deg, var(--accent), var(--accent-2))", border: "none", borderRadius: 999, width: 34, height: 34, color: "#07080f", cursor: "pointer", fontSize: 16, fontWeight: 800, boxShadow: "0 2px 10px rgba(34,211,238,0.35)" }}>+</button>
+            <button onClick={addTask} style={{ background: "linear-gradient(135deg, var(--accent), var(--accent-2))", border: "none", borderRadius: 999, width: 34, height: 34, color: "#07080f", cursor: "pointer", fontSize: 16, fontWeight: 800, boxShadow: "0 2px 10px rgba(61, 107, 240,0.35)" }}>+</button>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {tasks.length === 0 && <p style={{ color: "var(--text-muted)", fontSize: 13 }}>No tasks yet. Add one above.</p>}
@@ -1774,7 +1774,7 @@ function PersonalSection() {
             <input value={newGoal} onChange={e => setNewGoal(e.target.value)}
               onKeyDown={e => e.key === "Enter" && addGoal()}
               placeholder="Add a goal..." style={{ flex: 1, background: "var(--bg-hover)", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 12px", color: "var(--text-primary)", fontSize: 13, outline: "none" }} />
-            <button onClick={addGoal} style={{ background: "linear-gradient(135deg, #34d399, #22d3ee)", border: "none", borderRadius: 999, width: 34, height: 34, color: "#07080f", cursor: "pointer", fontSize: 16, fontWeight: 800, boxShadow: "0 2px 10px rgba(52,211,153,0.35)" }}>+</button>
+            <button onClick={addGoal} style={{ background: "linear-gradient(135deg, #34d399, #3D6BF0)", border: "none", borderRadius: 999, width: 34, height: 34, color: "#07080f", cursor: "pointer", fontSize: 16, fontWeight: 800, boxShadow: "0 2px 10px rgba(52,211,153,0.35)" }}>+</button>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {goals.length === 0 && <p style={{ color: "var(--text-muted)", fontSize: 13 }}>No goals yet. Add one above.</p>}

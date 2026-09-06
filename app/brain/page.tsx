@@ -240,7 +240,7 @@ export default function BrainPage() {
             />
             <button onClick={send} disabled={sending || !input.trim()} style={{
               padding: "12px 20px", borderRadius: 12, border: "none",
-              background: sending || !input.trim() ? "var(--border)" : "linear-gradient(135deg, #22d3ee, #0e7490)",
+              background: sending || !input.trim() ? "var(--border)" : "linear-gradient(135deg, #3D6BF0, #1E44B8)",
               color: "#07080f", fontWeight: 700, fontSize: 13,
               cursor: sending || !input.trim() ? "default" : "pointer",
             }}>Send</button>

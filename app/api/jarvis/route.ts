@@ -20,7 +20,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // ───────────────────────────────────────────────────────────────────────────
-// Jarvis: Wing Digital's operator assistant.
+// Zephyr (formerly Jarvis): Wing Digital's operator assistant.
 //
 // ENGINES
 //   api      Anthropic Messages API tool loop (default when ANTHROPIC_API_KEY
@@ -124,11 +124,11 @@ async function usageRpc(fn: string, args: Record<string, unknown>): Promise<unkn
 }
 
 const BUDGET_WORDS: Record<string, string> = {
-  burst: "Jarvis is being asked too much too fast. Give it a minute.",
-  ip_daily: "This device has used up today's Jarvis allowance.",
-  global_daily: "Jarvis has used today's call allowance. It resets at midnight UTC.",
-  spend: "Jarvis has hit today's spend ceiling. It resets at midnight UTC.",
-  backend: "Jarvis could not reach the spend counter, so it refused to spend. Try again shortly.",
+  burst: "Zephyr is being asked too much too fast. Give it a minute.",
+  ip_daily: "This device has used up today's Zephyr allowance.",
+  global_daily: "Zephyr has used today's call allowance. It resets at midnight UTC.",
+  spend: "Zephyr has hit today's spend ceiling. It resets at midnight UTC.",
+  backend: "Zephyr could not reach the spend counter, so it refused to spend. Try again shortly.",
 };
 
 async function reserveJarvis(ip: string, limits: Limits, est: number): Promise<Reservation> {
@@ -216,7 +216,7 @@ function centralNow(): string {
   }).format(new Date());
 }
 
-const SYSTEM_PROMPT = `You are Jarvis, the operator assistant inside Wing Digital OS. Wing Digital is a DFW marketing agency run by Jack Wing. You work for Jack and his staff; you are talking to one of them now.
+const SYSTEM_PROMPT = `You are Zephyr, the operator assistant inside Wing Digital OS. You are warm, quick, and a little playful, never stiff or robotic. Wing Digital is a DFW marketing agency run by Jack Wing. You work for Jack and his staff; you are talking to one of them now.
 
 WHAT THE OS CONTAINS
 The OS is Wing Digital's own system, built after GoHighLevel was retired in August 2026. Everything lives in the OS database and you reach it through tools:
@@ -475,7 +475,7 @@ async function runConfirmed(opts: {
 
 // ── Claude Code CLI engine (PC only, opt-in) ─────────────────────────────────
 const CLI_STYLE_PROMPT =
-  "You are Jarvis, Jack Wing's voice assistant for Wing Digital OS. Your reply is read aloud by TTS. " +
+  "You are Zephyr, Jack Wing's voice assistant for Wing Digital OS. Your reply is read aloud by TTS. Sound young, warm, and lightly playful, never robotic or grave. " +
   "Hard style rules: lead with the answer; 2-4 short sentences by default; no bullet lists, headers, markdown symbols, emojis, or decorative unicode; " +
   "give numbers plainly; if more depth exists, offer it briefly instead of dumping it. No em dashes. Sound like a competent chief of staff.";
 const CLAUDE_CODE_TIMEOUT_MS = 180_000;

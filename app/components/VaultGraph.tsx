@@ -83,7 +83,7 @@ const GROUP_COLORS: Record<string, string> = {
   campaigns: "#fbbf24", seo: "#f59e0b", outreach: "#fb923c", business: "#fcd34d",
   clients: "#34d399", partners: "#2dd4bf",
   automations: "#a78bfa", agents: "#8b5cf6", state: "#c4b5fd",
-  wiki: "#38bdf8", concepts: "#7dd3fc", syntheses: "#22d3ee", personas: "#67e8f9", inbox: "#93c5fd",
+  wiki: "#38bdf8", concepts: "#7dd3fc", syntheses: "#3D6BF0", personas: "#67e8f9", inbox: "#93c5fd",
   root: "#94a3b8",
 };
 const FAMILY_COLOR: Record<string, string> = {

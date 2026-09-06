@@ -300,7 +300,7 @@ const input: React.CSSProperties = {
 };
 const btnPrimary: React.CSSProperties = {
   padding: "10px 18px", borderRadius: 10, border: "none",
-  background: "linear-gradient(135deg,#22d3ee,#0e7490)", color: "#fff",
+  background: "linear-gradient(135deg,#3D6BF0,#1E44B8)", color: "#fff",
   fontSize: 13, fontWeight: 700, cursor: "pointer",
 };
 const btnGhost: React.CSSProperties = {

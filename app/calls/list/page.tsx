@@ -253,7 +253,7 @@ export default function CallRoom() {
             return (
               <button key={f.key} onClick={() => setFilter(f.key)} style={{
                 ...chip,
-                background: on ? "linear-gradient(135deg,#22d3ee,#0e7490)" : "var(--bg-card)",
+                background: on ? "linear-gradient(135deg,#3D6BF0,#1E44B8)" : "var(--bg-card)",
                 borderColor: on ? "transparent" : "var(--border)",
                 color: on ? "#fff" : "var(--text-muted)",
                 fontWeight: on ? 700 : 500,
@@ -565,7 +565,7 @@ const btnPrimary: React.CSSProperties = {
   padding: "12px 18px", minHeight: 44,
   display: "inline-flex", alignItems: "center", justifyContent: "center",
   borderRadius: 10, border: "none",
-  background: "linear-gradient(135deg,#22d3ee,#0e7490)", color: "#fff",
+  background: "linear-gradient(135deg,#3D6BF0,#1E44B8)", color: "#fff",
   fontSize: 13, fontWeight: 700, cursor: "pointer",
 };
 const btnGhost: React.CSSProperties = {

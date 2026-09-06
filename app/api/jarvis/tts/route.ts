@@ -8,9 +8,11 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-// Voice: "George" (ElevenLabs premade) — warm, calm, confident British male.
-// Picked for the assistant vibe: composed and capable, not theatrical.
-const VOICE_ID = "JBFqnCBsd6RMkjVDRZzb";
+// Voice: "Will" (ElevenLabs premade) — young, warm, conversational male.
+// Picked for Zephyr: friendly and a little playful, nothing robotic or grave.
+// Livelier settings than the old butler voice: lower stability lets the
+// delivery bounce, higher style leans into personality.
+const VOICE_ID = "bIHbv24MWmeRgasZH58o";
 const MODEL_ID = "eleven_turbo_v2_5"; // low latency, good quality
 const MAX_CHARS = 800;
 
@@ -55,7 +57,7 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         text: clean,
         model_id: MODEL_ID,
-        voice_settings: { stability: 0.5, similarity_boost: 0.75, style: 0.15 },
+        voice_settings: { stability: 0.35, similarity_boost: 0.75, style: 0.45 },
       }),
     }
   );

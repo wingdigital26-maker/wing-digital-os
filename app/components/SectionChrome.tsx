@@ -248,16 +248,20 @@ export default function SectionChrome({ title, tabs, isTabActive, extras, childr
       >
         <div className="sc-top">
           <Link href="/" className="sc-brand" aria-label="Wing Digital OS home">
-            <span
+            {/* The sigil is the logo: the wing mark with its breathing glow */}
+            <img
+              src="/wing-mark.png"
+              alt=""
+              width={30}
+              height={30}
               style={{
-                width: 32, height: 32, borderRadius: 9, flexShrink: 0,
-                background: "linear-gradient(135deg,#22d3ee,#0e7490)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 14, fontWeight: 800, color: "#fff",
+                flexShrink: 0, display: "block",
+                filter: "drop-shadow(0 0 7px rgba(61,107,240,.6))",
+                animation: "sc-sigil 4.5s ease-in-out infinite",
               }}
-            >
-              W
-            </span>
+            />
+            <style>{`@keyframes sc-sigil{0%,100%{filter:drop-shadow(0 0 5px rgba(61,107,240,.4));transform:translateY(0)}50%{filter:drop-shadow(0 0 11px rgba(61,107,240,.75));transform:translateY(-2px)}}
+@media(prefers-reduced-motion:reduce){.sc-brand img{animation:none!important}}`}</style>
             <span className="sc-brand-text">
               <span className="sc-brand-os">Wing Digital OS</span>
               <span className="sc-brand-title">{title}</span>

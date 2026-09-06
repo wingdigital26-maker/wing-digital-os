@@ -48,12 +48,9 @@ export default function Login() {
         boxShadow: "0 24px 60px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05)",
         display: "flex", flexDirection: "column", gap: 18, textAlign: "center",
       }}>
-        <div style={{
-          width: 52, height: 52, borderRadius: 14, margin: "0 auto",
-          background: "linear-gradient(135deg, #22d3ee, #0e7490)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: 24, fontWeight: 800, color: "#fff",
-        }}>W</div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/wing-mark.png" alt="" width={48} height={48}
+          style={{ margin: "0 auto", display: "block", filter: "drop-shadow(0 0 9px rgba(61,107,240,.6))" }} />
         <div>
           <p style={{ fontSize: 18, fontWeight: 700 }}>Wing Digital OS</p>
           <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>Sign in to continue</p>
@@ -90,7 +87,7 @@ export default function Login() {
         )}
         <button onClick={submit} disabled={loading || !pw} style={{
           padding: "12px 0", borderRadius: 10, border: "none", cursor: "pointer",
-          background: "linear-gradient(135deg, #22d3ee, #0e7490)", color: "#fff",
+          background: "linear-gradient(135deg, #3D6BF0, #1E44B8)", color: "#fff",
           fontSize: 14, fontWeight: 700, opacity: loading || !pw ? 0.6 : 1,
         }}>
           {loading ? "Checking..." : "Enter"}

@@ -56,7 +56,11 @@ a{color:var(--accent-ink)}
 /* header, mirrors the dashboard .hdr */
 .hdr{background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:30}
 .hdr-in{max-width:1000px;margin:0 auto;padding:14px 24px;display:flex;align-items:center;gap:12px}
-.mark{width:34px;height:34px;border-radius:8px;object-fit:contain;display:block;flex:0 0 auto}
+.mark{width:34px;height:34px;border-radius:8px;object-fit:contain;display:block;flex:0 0 auto;
+  filter:drop-shadow(0 0 7px rgba(39,87,230,.55))}
+@media(prefers-reduced-motion:no-preference){.mark{animation:sigil-idle 4.5s ease-in-out infinite,sigil-bob 5.5s ease-in-out infinite}}
+@keyframes sigil-idle{0%,100%{filter:drop-shadow(0 0 5px rgba(39,87,230,.4))}50%{filter:drop-shadow(0 0 11px rgba(39,87,230,.75))}}
+@keyframes sigil-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-2.5px)}}
 .hdr b{font-family:var(--display);font-weight:700;font-size:1.05rem;letter-spacing:-.01em}
 .hdr .spacer{flex:1}
 .hdr .btn{padding:9px 15px;font-size:.9rem}
@@ -179,6 +183,20 @@ details p{margin:0 0 18px;color:var(--t2);font-size:.95rem}
 .foot .brandline{display:flex;align-items:center;gap:9px}
 .foot .brandline b{font-family:var(--display);color:var(--t1)}
 
+/* Halo, the Wing entity */
+#wing-entity{position:absolute;top:46px;right:48px;pointer-events:auto;z-index:2}
+@media(max-width:900px){#wing-entity{display:none}}
+#wing-helper{position:fixed;right:18px;bottom:16px;z-index:40;opacity:0;pointer-events:none;transition:opacity .8s;cursor:pointer}
+#wing-helper.on{pointer-events:auto}
+#wing-helper.on{opacity:1}
+.hero .mote{position:absolute;bottom:-8px;width:5px;height:5px;border-radius:50%;background:var(--accent);opacity:0;pointer-events:none}
+@media(prefers-reduced-motion:no-preference){
+  .hero .mote{animation:mote-rise 9s linear infinite}
+  .hero .mote:nth-child(2){left:22%;animation-delay:3s;width:4px;height:4px}
+  .hero .mote:nth-child(3){left:64%;animation-delay:6s;width:3px;height:3px}
+  .hero .mote:first-child{left:38%}
+  @keyframes mote-rise{0%{transform:translateY(0);opacity:0}12%{opacity:.35}70%{opacity:.14}100%{transform:translateY(-540px);opacity:0}}
+}
 @media(prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
 
@@ -195,7 +213,9 @@ details p{margin:0 0 18px;color:var(--t2);font-size:.95rem}
 </header>
 
 <div class="hero" id="top">
+  <span class="mote"></span><span class="mote"></span><span class="mote"></span>
   <div class="hero-in">
+    <div id="wing-entity"></div>
     <div class="eyebrow">The growth engine for home-service businesses</div>
     <h1>Everything we are building to get you found, chosen, and booked.</h1>
     <p class="sub">This is the whole system we run for you: SEO content, landing pages, reviews, automated follow-up, and a live dashboard that shows you every piece of it working. Here is what is in motion, and where to watch it.</p>
@@ -322,7 +342,7 @@ details p{margin:0 0 18px;color:var(--t2);font-size:.95rem}
         <div class="who"><span class="badge" style="background:#0a2342">HJ</span><div><div class="nm">Hero's Junk Removal</div><div class="tr">Junk removal, DFW</div></div></div>
         <div class="cstats">
           <div class="cs"><div class="n">100s</div><div class="lbl">of posts and pages published</div></div>
-          <div class="cs"><div class="n">1,000s</div><div class="lbl">of local leads found</div></div>
+          <div class="cs"><div class="n">1,000s</div><div class="lbl">of local leads found across our clients</div></div>
         </div>
         <p>A full content and SEO program running on their site, tracked on a live dashboard they can open any time.</p>
       </div>
@@ -379,5 +399,42 @@ details p{margin:0 0 18px;color:var(--t2);font-size:.95rem}
 </footer>
 
 
+<div id="wing-helper" title="Zephyr, from Wing Digital"></div>
+<script src="/mascot/zephyr-kb.js?v=1"></script>
+<script src="/mascot/wing-mascot.js?v=6"></script>
+<script>
+(function(){
+  if (!window.WingMascot) return;
+  var slot = document.getElementById('wing-entity');
+  var chatItems = {
+    greeting: 'Hey, I am Zephyr. I watch over everything Wing builds for you. Ask away.',
+    items: [
+      { q: 'What exactly are you building for me?', a: 'SEO content, service and city pages, review requests, and automated follow-up, all running for you. The services section below walks through every piece.' },
+      { q: 'Where do I see it working?', a: 'Your live dashboard. Every page and post we publish shows up there the moment it goes live. <a href="#dashboard">Jump to the dashboard preview</a>.' },
+      { q: 'When does it start?', a: 'Within the first week you will see pages publishing and your dashboard turn on. It compounds every week after that.' },
+      { q: 'Who do I talk to with questions?', a: 'Just reply to the email that sent you here. A real person answers, fast.' }
+    ]
+  };
+  var helperSlot = document.getElementById('wing-helper');
+  if (!helperSlot) return;
+  var helper = WingMascot.mount(helperSlot, { size: 68 });
+  var chat = WingMascot.chat(helper, chatItems);
+  // One shared panel: the hero entity opens the same chat, and it only
+  // mounts when the hero slot is actually visible (hidden under 900px).
+  if (slot && window.matchMedia('(min-width: 900px)').matches) {
+    var hero = WingMascot.mount(slot, { size: 170, intro: true });
+    hero.el.addEventListener('click', function () { chat.toggle(); });
+    if (WingMascot.autoMood) WingMascot.autoMood(hero);
+  }
+  if (WingMascot.autoMood) WingMascot.autoMood(helper);
+  // The helper appears once the hero entity scrolls out of view.
+  var shown = false;
+  window.addEventListener('scroll', function () {
+    var past = window.scrollY > 420;
+    if (past && !shown) { shown = true; helperSlot.classList.add('on'); helper.flare(); }
+    if (!past && shown) { shown = false; helperSlot.classList.remove('on'); }
+  }, { passive: true });
+})();
+</script>
 </body>
 </html>

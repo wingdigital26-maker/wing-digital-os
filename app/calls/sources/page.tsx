@@ -370,7 +370,7 @@ function Bar({ item, max }: { item: Counted; max: number }) {
           style={{
             width: `${Math.round((item.count / max) * 100)}%`,
             height: "100%",
-            background: "linear-gradient(135deg,#22d3ee,#0e7490)",
+            background: "linear-gradient(135deg,#3D6BF0,#1E44B8)",
           }}
         />
       </div>

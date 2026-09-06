@@ -54,7 +54,7 @@ type Stats = {
 };
 
 const STAGES: { key: string; label: string; tone: string }[] = [
-  { key: "new", label: "Not called yet", tone: "#22d3ee" },
+  { key: "new", label: "Not called yet", tone: "#3D6BF0" },
   { key: "contacted", label: "Spoken to", tone: "#38bdf8" },
   { key: "callback", label: "Call backs", tone: "#eab308" },
   { key: "booked", label: "Booked", tone: "#22c55e" },
@@ -457,7 +457,7 @@ const btnPrimary: React.CSSProperties = {
   justifyContent: "center",
   borderRadius: 10,
   border: "none",
-  background: "linear-gradient(135deg,#22d3ee,#0e7490)",
+  background: "linear-gradient(135deg,#3D6BF0,#1E44B8)",
   color: "#fff",
   fontSize: 13,
   fontWeight: 700,

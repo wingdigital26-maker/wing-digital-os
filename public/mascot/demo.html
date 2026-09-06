@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Zephyr demo</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600&display=swap">
+<style>
+  :root{--blue:#2757E6;--deep:#1E44B8;--paper:#FBFBF9;--ink:#0B0C10;--muted:#5a5e6b;--line:#e4e2da}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:Inter,system-ui,sans-serif}
+  .wrap{max-width:900px;margin:0 auto;padding:48px 24px 120px}
+  h1{font-family:Fraunces,Georgia,serif;font-weight:600;font-size:40px;margin:0 0 6px}
+  p{color:var(--muted);line-height:1.6;max-width:64ch}
+  .row{display:flex;gap:32px;flex-wrap:wrap;margin-top:32px}
+  .panel{flex:1;min-width:280px;background:#fff;border:1px solid var(--line);border-radius:16px;padding:24px}
+  .panel h2{font-family:Fraunces,Georgia,serif;font-weight:600;font-size:22px;margin:0 0 4px}
+  .panel small{color:var(--muted)}
+  .stage{height:260px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+  #helper{position:fixed;right:20px;bottom:20px;z-index:50}
+  .filler{height:60vh}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Zephyr, two ways</h1>
+  <p>Left: the Lottie JSON played by lottie-web (idle loop; hover to excite). Right: the zero-dependency SVG component with eyes, hover spin-up, and scroll flare. The fixed helper in the corner is the persistent-mascot mode for the pitch page and dashboards. Scroll fast to see the flare reaction.</p>
+  <div class="row">
+    <div class="panel">
+      <h2>Lottie</h2><small>halo.lottie.json via lottie-web (cdnjs)</small>
+      <div class="stage" id="lottie-stage"></div>
+    </div>
+    <div class="panel">
+      <h2>SVG component</h2><small>wing-mascot.js, no dependencies</small>
+      <div class="stage" id="svg-stage"></div>
+    </div>
+  </div>
+  <div class="filler"></div>
+  <p>End of page. The helper stayed with you.</p>
+</div>
+<div id="helper"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bodymovin/5.12.2/lottie.min.js"></script>
+<script src="wing-mascot.js?v=6"></script>
+<script>
+  var reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var anim = lottie.loadAnimation({
+    container: document.getElementById('lottie-stage'),
+    renderer: 'svg', autoplay: false, loop: false, path: 'halo.lottie.json'
+  });
+  anim.addEventListener('DOMLoaded', function () {
+    if (reduced) { anim.goToAndStop(0, true); return; }
+    anim.playSegments([0, 180], true);
+    anim.loop = true;
+  });
+  document.getElementById('lottie-stage').addEventListener('mouseenter', function () {
+    if (reduced) return;
+    anim.loop = false;
+    anim.playSegments([180, 240], true);
+    anim.addEventListener('complete', function onDone() {
+      anim.removeEventListener('complete', onDone);
+      anim.loop = true;
+      anim.playSegments([0, 180], true);
+    });
+  });
+
+  WingMascot.mount(document.getElementById('svg-stage'), { size: 190 });
+  WingMascot.mount(document.getElementById('helper'), { size: 84, intro: true });
+</script>
+</body>
+</html>

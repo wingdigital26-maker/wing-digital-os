@@ -30,7 +30,7 @@ type Feed = {
 };
 
 const PERSON_COLOR: Record<string, string> = {
-  jack: "#22d3ee",
+  jack: "#3D6BF0",
   grant: "#a78bfa",
   maddox: "#22c55e",
   team: "#94a3b8",
@@ -221,7 +221,7 @@ export default function TeamSchedule() {
           <button onClick={() => shiftWeek(1)} style={btn} disabled={busy}>Next →</button>
           <button
             onClick={() => setFormOpen((v) => !v)}
-            style={{ ...btn, background: "#22d3ee", color: "#04222a", border: "1px solid #22d3ee" }}
+            style={{ ...btn, background: "#3D6BF0", color: "#fff", border: "1px solid #3D6BF0" }}
             disabled={busy}
           >
             {formOpen ? "Close" : "+ Add"}
@@ -327,14 +327,14 @@ export default function TeamSchedule() {
               <div
                 key={d.key}
                 style={{
-                  border: `1px solid ${isToday ? "#22d3ee" : "var(--border)"}`,
+                  border: `1px solid ${isToday ? "#3D6BF0" : "var(--border)"}`,
                   borderRadius: 12,
                   padding: 8,
                   minHeight: 90,
-                  background: isToday ? "color-mix(in srgb, #22d3ee 6%, transparent)" : "transparent",
+                  background: isToday ? "color-mix(in srgb, #3D6BF0 6%, transparent)" : "transparent",
                 }}
               >
-                <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 6, color: isToday ? "#22d3ee" : "var(--text-muted)" }}>
+                <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 6, color: isToday ? "#3D6BF0" : "var(--text-muted)" }}>
                   {d.label}
                   {isToday ? " · today" : ""}
                 </div>

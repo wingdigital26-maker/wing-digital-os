@@ -26,7 +26,7 @@ const SUGGESTED = [
   "Add acmeroofing.com as a potential client",
 ];
 
-const ACCENT = "#10C0F0";
+const ACCENT = "#3D6BF0";
 const FONT = "Inter, sans-serif";
 
 function newConversationId(): string {
@@ -68,6 +68,14 @@ export default function JarvisButton() {
   const [engine, setEngine] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  // Zephyr orb: the shared mascot component (vanilla) mounted into the FAB.
+  const orbSlotRef = useRef<HTMLDivElement>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const orbRef = useRef<any>(null);
+  const [orbOn, setOrbOn] = useState(false);
+  const headerSlotRef = useRef<HTMLDivElement>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const headerOrbRef = useRef<any>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null);
   const listeningRef = useRef(false);
@@ -107,12 +115,13 @@ export default function JarvisButton() {
     const pick = () => {
       const voices = window.speechSynthesis.getVoices();
       if (!voices.length) return;
+      // Zephyr sounds young and friendly, so prefer natural US voices and
+      // never the stately British assistant set.
       const prefer = [
-        (v: SpeechSynthesisVoice) => /ryan/i.test(v.name) && v.lang.startsWith("en"),
-        (v: SpeechSynthesisVoice) => /google uk english male/i.test(v.name),
-        (v: SpeechSynthesisVoice) => /george|daniel|arthur|brian/i.test(v.name) && v.lang.startsWith("en"),
-        (v: SpeechSynthesisVoice) => v.lang === "en-GB" && /male/i.test(v.name),
-        (v: SpeechSynthesisVoice) => v.lang === "en-GB",
+        (v: SpeechSynthesisVoice) => /aria|jenny|guy|natural/i.test(v.name) && v.lang.startsWith("en-US"),
+        (v: SpeechSynthesisVoice) => /google us english/i.test(v.name),
+        (v: SpeechSynthesisVoice) => /samantha|alex|zira|david/i.test(v.name) && v.lang.startsWith("en"),
+        (v: SpeechSynthesisVoice) => v.lang === "en-US",
         (v: SpeechSynthesisVoice) => v.lang.startsWith("en"),
       ];
       for (const p of prefer) {
@@ -136,7 +145,7 @@ export default function JarvisButton() {
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(clean);
     if (chosenVoiceRef.current) u.voice = chosenVoiceRef.current;
-    u.rate = 1.02; u.pitch = 0.85; u.volume = 1;
+    u.rate = 1.05; u.pitch = 1.08; u.volume = 1;
     u.onend = () => setSpeaking(false);
     u.onerror = () => setSpeaking(false);
     setSpeaking(true);
@@ -309,11 +318,52 @@ export default function JarvisButton() {
     };
     window.addEventListener("jarvis:open", onOpen);
     window.addEventListener("jarvis:ask", onAsk);
+    // Mount the Zephyr orb into the FAB (loads the shared mascot script once).
+    let orbCancelled = false;
+    const mountOrb = () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const WM = (window as any).WingMascot;
+      if (orbCancelled || orbRef.current || !orbSlotRef.current || !WM) return;
+      orbRef.current = WM.mount(orbSlotRef.current, { size: 56 });
+      setOrbOn(true);
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if ((window as any).WingMascot) mountOrb();
+    else {
+      let s = document.querySelector('script[data-zephyr]') as HTMLScriptElement | null;
+      if (!s) {
+        s = document.createElement("script");
+        s.src = "/mascot/wing-mascot.js?v=6";
+        s.dataset.zephyr = "1";
+        document.head.appendChild(s);
+      }
+      s.addEventListener("load", mountOrb);
+    }
     return () => {
+      orbCancelled = true;
       window.removeEventListener("jarvis:open", onOpen);
       window.removeEventListener("jarvis:ask", onAsk);
+      if (orbRef.current?.destroy) { orbRef.current.destroy(); orbRef.current = null; }
     };
   }, [openPanel]);
+
+  // A mini Zephyr lives in the panel header (the only avatar on mobile,
+  // where the bottom tab bar replaces the floating orb).
+  useEffect(() => {
+    if (!open || headerOrbRef.current || !headerSlotRef.current) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const WM = (window as any).WingMascot;
+    if (WM) headerOrbRef.current = WM.mount(headerSlotRef.current, { size: 30 });
+  }, [open]);
+
+  // Zephyr's face mirrors what the assistant is doing.
+  useEffect(() => {
+    [orbRef.current, headerOrbRef.current].forEach((orb) => {
+      if (!orb) return;
+      if (streaming) orb.setState("thinking");
+      else { orb.setState("calm"); orb.flare?.(); }
+    });
+  }, [streaming]);
 
   useEffect(() => { sendMessageRef.current = sendMessage; }, [sendMessage]);
 
@@ -396,14 +446,14 @@ export default function JarvisButton() {
   };
 
   const smallBtn: React.CSSProperties = {
-    background: "none", border: "1px solid rgba(16,192,240,0.25)", borderRadius: 6,
+    background: "none", border: "1px solid rgba(61,107,240,0.25)", borderRadius: 6,
     color: "#8ab", cursor: "pointer", fontSize: 10, padding: "2px 8px", fontFamily: FONT,
   };
 
   return (
     <>
       <style>{`
-        @keyframes jarvis-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(16,192,240,0.6); } 50% { box-shadow: 0 0 0 12px rgba(16,192,240,0); } }
+        @keyframes jarvis-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(61,107,240,0.6); } 50% { box-shadow: 0 0 0 12px rgba(61,107,240,0); } }
         @keyframes jarvis-dots { 0%, 80%, 100% { opacity: 0; transform: scale(0.6); } 40% { opacity: 1; transform: scale(1); } }
         @keyframes jarvis-speak { 0%, 100% { transform: scaleY(0.4); opacity: 0.6; } 50% { transform: scaleY(1); opacity: 1; } }
         .jarvis-panel { position: fixed; bottom: 92px; right: 24px; width: 380px; height: 560px; }
@@ -416,27 +466,33 @@ export default function JarvisButton() {
       <button
         className="jarvis-fab"
         onClick={() => { sfx.play(open ? "close" : "chime"); if (open) setOpen(false); else openPanel(); }}
-        title="Jarvis"
-        aria-label="Open Jarvis"
+        title="Zephyr"
+        aria-label="Open Zephyr"
         style={{
-          position: "fixed", bottom: 24, right: 24, width: 56, height: 56, borderRadius: "50%",
-          background: listening ? "#0ea5e9" : ACCENT, border: "none", cursor: "pointer",
+          position: "fixed", bottom: 20, right: 20, width: 64, height: 64, borderRadius: "50%",
+          background: orbOn ? "transparent" : (listening ? "#5f82f5" : ACCENT),
+          border: "none", cursor: "pointer",
           display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999,
-          boxShadow: "0 4px 24px rgba(16,192,240,0.4)",
+          boxShadow: orbOn ? "none" : "0 4px 24px rgba(61,107,240,0.4)",
           animation: listening ? "jarvis-pulse 1s infinite" : "none",
           transition: "background 0.2s, transform 0.15s",
         }}
         onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.08)")}
         onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
       >
-        {listening ? (
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><rect x="3" y="3" width="18" height="18" rx="3"/></svg>
-        ) : (
+        {/* Zephyr himself; the plain glyph only shows until his script mounts */}
+        <div ref={orbSlotRef} style={{ width: 56, height: 56, display: orbOn ? "block" : "none", pointerEvents: "none" }} aria-hidden="true" />
+        {!orbOn && (
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <circle cx="12" cy="12" r="8.5" stroke="white" strokeWidth="1.4" strokeOpacity="0.55" />
             <path d="M12 6.2c.35 2.9 1.9 4.45 4.8 4.8-2.9.35-4.45 1.9-4.8 4.8-.35-2.9-1.9-4.45-4.8-4.8 2.9-.35 4.45-1.9 4.8-4.8Z" fill="white" />
             <circle cx="17" cy="7" r="1.15" fill="white" fillOpacity="0.9" />
           </svg>
+        )}
+        {listening && (
+          <span style={{ position: "absolute", bottom: 2, right: 2, width: 18, height: 18, borderRadius: 6, background: "#e5484d", display: "flex", alignItems: "center", justifyContent: "center" }} aria-hidden="true">
+            <span style={{ width: 8, height: 8, borderRadius: 2, background: "#fff" }} />
+          </span>
         )}
       </button>
 
@@ -445,25 +501,25 @@ export default function JarvisButton() {
           className="jarvis-panel"
           data-testid="jarvis-panel"
           style={{
-            background: "#0d1117", border: "1px solid rgba(16,192,240,0.25)", borderRadius: 16,
+            background: "#0d1117", border: "1px solid rgba(61,107,240,0.25)", borderRadius: 16,
             display: "flex", flexDirection: "column", zIndex: 9998,
             boxShadow: "0 8px 40px rgba(0,0,0,0.6)", overflow: "hidden",
           }}
         >
           {/* Header */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", borderBottom: "1px solid rgba(16,192,240,0.15)", background: "#0d1117", gap: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", borderBottom: "1px solid rgba(61,107,240,0.15)", background: "#0d1117", gap: 8 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-              <div style={{ width: 8, height: 8, borderRadius: "50%", background: ACCENT, boxShadow: `0 0 6px ${ACCENT}`, flexShrink: 0 }}/>
-              <span style={{ color: ACCENT, fontWeight: 700, fontSize: 15, fontFamily: "Space Grotesk, sans-serif" }}>Jarvis</span>
+              <div ref={headerSlotRef} style={{ width: 30, height: 30, flexShrink: 0 }} aria-hidden="true" />
+              <span style={{ color: ACCENT, fontWeight: 700, fontSize: 15, fontFamily: "Space Grotesk, sans-serif" }}>Zephyr</span>
               {speaking && (
-                <button onClick={stopAudio} title="Stop speaking" style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "rgba(16,192,240,0.12)", border: "1px solid rgba(16,192,240,0.4)", borderRadius: 6, padding: "2px 7px", cursor: "pointer" }}>
+                <button onClick={stopAudio} title="Stop speaking" style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "rgba(61,107,240,0.12)", border: "1px solid rgba(61,107,240,0.4)", borderRadius: 6, padding: "2px 7px", cursor: "pointer" }}>
                   {[0, 1, 2].map((n) => (
                     <span key={n} style={{ width: 3, height: 10, borderRadius: 2, background: ACCENT, display: "inline-block", animation: "jarvis-speak 0.9s infinite ease-in-out", animationDelay: `${n * 0.15}s` }} />
                   ))}
                 </button>
               )}
               {engine && (
-                <span style={{ color: engine === "limited" ? "var(--orange)" : "#556", fontSize: 10, fontFamily: FONT, border: `1px solid ${engine === "limited" ? "rgba(251,146,60,0.4)" : "rgba(16,192,240,0.2)"}`, borderRadius: 6, padding: "1px 6px", whiteSpace: "nowrap" }}>
+                <span style={{ color: engine === "limited" ? "var(--orange)" : "#556", fontSize: 10, fontFamily: FONT, border: `1px solid ${engine === "limited" ? "rgba(251,146,60,0.4)" : "rgba(61,107,240,0.2)"}`, borderRadius: 6, padding: "1px 6px", whiteSpace: "nowrap" }}>
                   {engine === "claude-code" ? "via Claude Code" : engine === "limited" ? "limited mode" : "via API"}
                 </span>
               )}
@@ -487,7 +543,7 @@ export default function JarvisButton() {
                 <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 10 }}>
                   {SUGGESTED.map((q) => (
                     <button key={q} className="jarvis-chip" onClick={() => sendMessageRef.current(q)} style={{
-                      background: "rgba(16,192,240,0.06)", border: "1px solid rgba(16,192,240,0.22)",
+                      background: "rgba(61,107,240,0.06)", border: "1px solid rgba(61,107,240,0.22)",
                       borderRadius: 10, color: "#9bc", cursor: "pointer", fontSize: 12, textAlign: "left",
                       padding: "8px 12px", fontFamily: FONT, transition: "border-color 0.15s, color 0.15s",
                     }}>{q}</button>
@@ -515,7 +571,7 @@ export default function JarvisButton() {
                       borderRadius: isUser ? "14px 14px 4px 14px" : "14px 14px 14px 4px",
                       background: isUser ? ACCENT : "#161b22", color: isUser ? "#000" : "#e0e0e0",
                       fontSize: 13, lineHeight: 1.5, fontFamily: FONT,
-                      border: isUser ? "none" : "1px solid rgba(16,192,240,0.1)", whiteSpace: "pre-wrap",
+                      border: isUser ? "none" : "1px solid rgba(61,107,240,0.1)", whiteSpace: "pre-wrap",
                     }}>
                       {showTyping ? (
                         <div style={{ display: "flex", gap: 6, alignItems: "center", padding: "2px 0" }}>
@@ -532,12 +588,12 @@ export default function JarvisButton() {
                   {/* pending action card */}
                   {!isUser && msg.pending && (
                     <div data-testid="jarvis-pending" style={{
-                      maxWidth: "92%", border: `1px solid ${msg.pendingState === "open" ? "rgba(251,191,36,0.55)" : "rgba(16,192,240,0.15)"}`,
+                      maxWidth: "92%", border: `1px solid ${msg.pendingState === "open" ? "rgba(251,191,36,0.55)" : "rgba(61,107,240,0.15)"}`,
                       background: msg.pendingState === "open" ? "rgba(251,191,36,0.06)" : "#11151c",
                       borderRadius: 12, padding: "10px 12px", fontFamily: FONT,
                     }}>
                       <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em", color: msg.pendingState === "open" ? "var(--orange)" : "#556", marginBottom: 4 }}>
-                        {msg.pendingState === "open" ? "Jarvis wants to" : msg.pendingState === "done" ? "Confirmed" : msg.pendingState === "expired" ? "Expired, not run" : "Cancelled, not run"}
+                        {msg.pendingState === "open" ? "Zephyr wants to" : msg.pendingState === "done" ? "Confirmed" : msg.pendingState === "expired" ? "Expired, not run" : "Cancelled, not run"}
                       </div>
                       <div style={{ fontSize: 13, color: "#e0e0e0", lineHeight: 1.45 }}>{msg.pending.human_summary}</div>
                       {msg.pendingState === "open" && (
@@ -547,7 +603,7 @@ export default function JarvisButton() {
                             fontSize: 12, fontWeight: 700, cursor: streaming ? "default" : "pointer", fontFamily: FONT,
                           }}>Do it</button>
                           <button onClick={() => cancelAction(i)} disabled={streaming} style={{
-                            background: "none", color: "#9bc", border: "1px solid rgba(16,192,240,0.3)", borderRadius: 8,
+                            background: "none", color: "#9bc", border: "1px solid rgba(61,107,240,0.3)", borderRadius: 8,
                             padding: "6px 14px", fontSize: 12, cursor: streaming ? "default" : "pointer", fontFamily: FONT,
                           }}>Cancel</button>
                         </div>
@@ -559,7 +615,7 @@ export default function JarvisButton() {
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6, paddingLeft: 2 }}>
                       {msg.links!.map((l, k) => (
                         <button key={k} className="jarvis-chip" onClick={() => openLink(l)} style={{
-                          background: "none", border: "1px solid rgba(16,192,240,0.25)", borderRadius: 99,
+                          background: "none", border: "1px solid rgba(61,107,240,0.25)", borderRadius: 99,
                           color: "#8ab", cursor: "pointer", fontSize: 10, padding: "2px 9px", fontFamily: FONT,
                         }}>{l.label}</button>
                       ))}
@@ -570,7 +626,7 @@ export default function JarvisButton() {
             })}
             {speaking && (
               <div style={{ display: "flex", justifyContent: "flex-start" }}>
-                <button onClick={stopAudio} title="Stop reading this reply" style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "none", border: "1px solid rgba(16,192,240,0.3)", borderRadius: 99, color: ACCENT, cursor: "pointer", fontSize: 10, padding: "2px 9px", fontFamily: FONT }}>
+                <button onClick={stopAudio} title="Stop reading this reply" style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "none", border: "1px solid rgba(61,107,240,0.3)", borderRadius: 99, color: ACCENT, cursor: "pointer", fontSize: 10, padding: "2px 9px", fontFamily: FONT }}>
                   <svg width="8" height="8" viewBox="0 0 24 24" fill={ACCENT}><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
                   stop voice
                 </button>
@@ -580,17 +636,17 @@ export default function JarvisButton() {
           </div>
 
           {/* Input */}
-          <form onSubmit={handleSubmit} style={{ display: "flex", gap: 8, padding: "10px 12px", borderTop: "1px solid rgba(16,192,240,0.15)", background: "#0d1117" }}>
+          <form onSubmit={handleSubmit} style={{ display: "flex", gap: 8, padding: "10px 12px", borderTop: "1px solid rgba(61,107,240,0.15)", background: "#0d1117" }}>
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
               disabled={listening || streaming}
               placeholder={listening ? "Listening..." : hasSpeechAPI ? "Type or tap mic..." : "Type a message..."}
-              aria-label="Message Jarvis"
-              style={{ flex: 1, minWidth: 0, background: "#161b22", border: "1px solid rgba(16,192,240,0.2)", borderRadius: 10, color: "#e0e0e0", padding: "8px 12px", fontSize: 13, fontFamily: FONT, outline: "none" }}
+              aria-label="Message Zephyr"
+              style={{ flex: 1, minWidth: 0, background: "#161b22", border: "1px solid rgba(61,107,240,0.2)", borderRadius: 10, color: "#e0e0e0", padding: "8px 12px", fontSize: 13, fontFamily: FONT, outline: "none" }}
             />
             {hasSpeechAPI && (
-              <button type="button" onClick={listening ? stopListening : startListening} disabled={streaming} title={listening ? "Stop" : "Speak"} style={{ width: 36, height: 36, borderRadius: "50%", background: listening ? "#ef4444" : "rgba(16,192,240,0.15)", border: "1px solid rgba(16,192,240,0.3)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "background 0.2s" }}>
+              <button type="button" onClick={listening ? stopListening : startListening} disabled={streaming} title={listening ? "Stop" : "Speak"} style={{ width: 36, height: 36, borderRadius: "50%", background: listening ? "#ef4444" : "rgba(61,107,240,0.15)", border: "1px solid rgba(61,107,240,0.3)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "background 0.2s" }}>
                 {listening ? (
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="white"><rect x="3" y="3" width="18" height="18" rx="3"/></svg>
                 ) : (
@@ -600,7 +656,7 @@ export default function JarvisButton() {
                 )}
               </button>
             )}
-            <button type="submit" disabled={!input.trim() || streaming || listening} aria-label="Send" style={{ width: 36, height: 36, borderRadius: "50%", background: input.trim() && !streaming ? ACCENT : "rgba(16,192,240,0.1)", border: "none", cursor: input.trim() && !streaming ? "pointer" : "default", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "background 0.2s" }}>
+            <button type="submit" disabled={!input.trim() || streaming || listening} aria-label="Send" style={{ width: 36, height: 36, borderRadius: "50%", background: input.trim() && !streaming ? ACCENT : "rgba(61,107,240,0.1)", border: "none", cursor: input.trim() && !streaming ? "pointer" : "default", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "background 0.2s" }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={input.trim() && !streaming ? "#000" : "#444"} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
               </svg>

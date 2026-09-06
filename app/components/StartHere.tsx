@@ -46,6 +46,106 @@ export function goToView(id: string) {
   window.dispatchEvent(new CustomEvent("os:navigate", { detail: id }));
 }
 
+// ── How this OS works: a plain-English guide for someone with zero context ──
+const GUIDE_KEY = "wingos.guideCollapsed";
+
+function readGuideCollapsed(): boolean {
+  try { return window.localStorage.getItem(GUIDE_KEY) === "1"; } catch { return false; }
+}
+function writeGuideCollapsed(v: boolean) {
+  try {
+    if (v) window.localStorage.setItem(GUIDE_KEY, "1");
+    else window.localStorage.removeItem(GUIDE_KEY);
+  } catch { /* storage blocked: the choice just does not persist */ }
+}
+
+function ViewLink({ view, children }: { view: string; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={() => goToView(view)}
+      style={{
+        background: "none", border: "none", padding: 0, minHeight: 0, cursor: "pointer",
+        font: "inherit", fontWeight: 700, color: "var(--accent)", textDecoration: "underline",
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+const GUIDE_SECTIONS: { name: string; blurb: string; view?: string; href?: string }[] = [
+  { view: "clients", name: "Clients", blurb: "who pays us and how their sites are doing." },
+  { view: "crm", name: "CRM", blurb: "everyone we talk to; emails and texts live here." },
+  { href: "/automations", name: "Automations", blurb: "the robots; they draft, you approve." },
+  { view: "agent", name: "Agents", blurb: "what ran overnight and whether it worked." },
+];
+
+function HowItWorks() {
+  const [collapsed, setCollapsed] = useState<boolean | null>(null);
+  useEffect(() => { setCollapsed(readGuideCollapsed()); }, []);
+  if (collapsed === null) return null;
+
+  const rowText: React.CSSProperties = { fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.55 };
+
+  return (
+    <div style={{ marginTop: 14, borderTop: "1px solid var(--border)", paddingTop: 10 }}>
+      <button
+        type="button"
+        aria-expanded={!collapsed}
+        onClick={() => { const next = !collapsed; writeGuideCollapsed(next); setCollapsed(next); }}
+        style={{
+          background: "none", border: "none", padding: 0, minHeight: 0, cursor: "pointer",
+          display: "flex", alignItems: "center", gap: 6,
+          fontSize: 12, fontWeight: 700, color: "var(--text-primary)",
+        }}
+      >
+        <span aria-hidden style={{ fontSize: 10, color: "var(--text-muted)" }}>{collapsed ? "▸" : "▾"}</span>
+        How this OS works
+      </button>
+
+      {!collapsed && (
+        <div style={{ marginTop: 8, display: "grid", gap: 8 }}>
+          <p style={rowText}>
+            Wing Digital runs marketing for its clients. This OS is the one screen where all of that
+            gets watched and approved: what the clients are getting, who we are talking to, and what
+            the automated helpers did while nobody was looking.
+          </p>
+
+          <ul style={{ ...rowText, margin: 0, paddingLeft: 18, display: "grid", gap: 3 }}>
+            {GUIDE_SECTIONS.map((g) => (
+              <li key={g.name}>
+                {g.view ? (
+                  <ViewLink view={g.view}>{g.name}</ViewLink>
+                ) : (
+                  <a href={g.href} style={{ fontWeight: 700, color: "var(--accent)", textDecoration: "underline" }}>{g.name}</a>
+                )}
+                : {g.blurb}
+              </li>
+            ))}
+          </ul>
+
+          <p style={rowText}>
+            <strong style={{ color: "var(--text-primary)" }}>Safety:</strong> nothing sends to a real
+            person unless Jack arms it; everything else is drafts.
+          </p>
+
+          <p style={rowText}>
+            <strong style={{ color: "var(--text-primary)" }}>Three things to check daily:</strong>{" "}
+            the <ViewLink view="today">Today board</ViewLink>, the{" "}
+            <ViewLink view="replies">Reply Inbox</ViewLink>, and the{" "}
+            <ViewLink view="clients">health board</ViewLink>.
+          </p>
+
+          <p style={{ ...rowText, color: "var(--text-muted)" }}>
+            Tip: press Ctrl+K to jump anywhere.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function StartHere() {
   // null until mounted so the server render and first client render agree.
   const [hidden, setHidden] = useState<boolean | null>(null);
@@ -118,6 +218,8 @@ export default function StartHere() {
           );
         })}
       </div>
+
+      <HowItWorks />
     </section>
   );
 }

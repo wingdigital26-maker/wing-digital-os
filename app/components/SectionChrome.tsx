@@ -17,60 +17,21 @@ import type { CSSProperties, ReactNode } from "react";
 // going Home first. Those links use "/#view=<subId>": the shell's os:navigate
 // CustomEvent only works once "/" is mounted, so a plain link can't use it —
 // page.tsx reads the hash on mount instead (see SHELL_GROUPS below).
+import { STRIP_SECTIONS, shellGroups } from "../lib/nav";
 
 export type SectionTab = { href: string; label: string; exact?: boolean };
 
-const SECTIONS: { href: string; label: string }[] = [
-  { href: "/", label: "Home" },
-  { href: "/calls", label: "Call Room" },
-  { href: "/sequences", label: "Sequences" },
-  // /email dropped from the strip 2026-09-05: "Email" appeared twice in one
-  // header pointing at two different screens. Composing now lives inside
-  // CRM > Email (Compose pill); /email itself still works and cross-links.
-  { href: "/automations", label: "Automations" },
-];
+// The switcher pills come from lib/nav.ts (ROUTED_PAGES entries flagged
+// inStrip). /email was dropped from the strip 2026-09-05: "Email" appeared
+// twice in one header pointing at two different screens; composing now lives
+// inside CRM > Email (Compose pill) and /email itself still works.
+const SECTIONS_STRIP = STRIP_SECTIONS;
 
-// Mirror of the shell's NAV in app/page.tsx (groups that live inside "/").
-// Each sub links to "/#view=<subId>"; the shell honors the hash on mount and
-// plain "/" still works as before. Keep the ids in sync with page.tsx NAV.
-const SHELL_GROUPS: { label: string; subs: { id: string; label: string }[] }[] = [
-  { label: "Command Center", subs: [{ id: "command", label: "Overview" }, { id: "today", label: "Today" }, { id: "personal", label: "Personal" }] },
-  {
-    label: "Clients",
-    subs: [
-      { id: "clients", label: "Clients" },
-      { id: "potential", label: "Potential clients" },
-      { id: "sonar", label: "Sonar Leads" },
-      { id: "storms", label: "Storm Response" },
-    ],
-  },
-  {
-    label: "CRM",
-    subs: [
-      { id: "crm", label: "Everything" },
-      { id: "email", label: "Email" },
-      { id: "text", label: "Text" },
-      { id: "replies", label: "Reply Inbox" },
-    ],
-  },
-  {
-    label: "Marketing",
-    subs: [
-      { id: "social", label: "Social" },
-      { id: "reviews", label: "Reviews" },
-      { id: "customers", label: "Customers" },
-    ],
-  },
-  { label: "Calendar", subs: [{ id: "calendar", label: "Calendar" }] },
-  { label: "Agents", subs: [{ id: "agent", label: "Mission Control" }] },
-  {
-    label: "Intel",
-    subs: [
-      { id: "knowledge", label: "Knowledge Base" },
-      { id: "competitors", label: "Competitor Intel" },
-    ],
-  },
-];
+// The shell's NAV (groups that live inside "/"), derived from lib/nav.ts with
+// the routed-page subs (the Automations group) filtered out — those already
+// have strip pills above. Each sub links to "/#view=<subId>"; the shell honors
+// the hash on mount and plain "/" still works as before.
+const SHELL_GROUPS = shellGroups();
 
 type Props = {
   /** Bold section name shown next to the logo, e.g. "Call Room". */
@@ -304,7 +265,7 @@ export default function SectionChrome({ title, tabs, isTabActive, extras, childr
           </Link>
 
           <nav className="sc-switch" aria-label="Sections">
-            {SECTIONS.map((s) => (
+            {SECTIONS_STRIP.map((s) => (
               <Link
                 key={s.href}
                 href={s.href}

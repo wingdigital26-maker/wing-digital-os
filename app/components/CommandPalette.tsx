@@ -3,9 +3,10 @@
 // keydown listener, so wiring is one line: <CommandPalette /> anywhere in the
 // shell. Navigation goes through the same paths the shell already honors —
 // window "os:navigate" CustomEvents for in-shell views, location.href for
-// routed pages. No data is fabricated: every entry below is a real NAV sub
-// from app/page.tsx or a real routed page under app/.
+// routed pages. No data is fabricated: every entry comes from lib/nav.ts —
+// a real NAV sub of the shell or a real routed page under app/.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { flattenShellViews, PALETTE_ROUTED_PAGES } from "../lib/nav";
 
 type Command = {
   id: string;          // stable id (also the recents key)
@@ -27,47 +28,11 @@ const navigate = (subId: string) => {
 const go = (href: string) => { window.location.href = href; };
 
 // ── The registry ─────────────────────────────────────────────────────
-// Shell views mirror NAV in app/page.tsx (groups + sub-tabs). Sub ids that
-// page.tsx lists in EXTERNAL_SUB_LINKS (sequences, automations, calls) are
+// Both lists come from lib/nav.ts, the single nav definition. Shell views are
+// the flattened NAV tree (groups + sub-tabs, with per-sub keywords). Sub ids
+// that nav.ts lists in EXTERNAL_SUB_LINKS (sequences, automations, calls) are
 // still dispatched via os:navigate — the shell's handler redirects those
 // itself, so one path covers both.
-const SHELL_VIEWS: { id: string; label: string; group: string; keywords?: string }[] = [
-  { id: "command", label: "Overview", group: "Command Center", keywords: "home dashboard" },
-  { id: "today", label: "Today", group: "Command Center", keywords: "agenda daily" },
-  { id: "personal", label: "Personal", group: "Command Center" },
-  { id: "clients", label: "Clients", group: "Clients" },
-  { id: "potential", label: "Potential clients", group: "Clients", keywords: "prospects" },
-  { id: "sonar", label: "Sonar Leads", group: "Clients", keywords: "leads" },
-  { id: "storms", label: "Storm Response", group: "Clients", keywords: "hail" },
-  { id: "crm", label: "Everything", group: "CRM", keywords: "contacts pipeline inbox outbound" },
-  { id: "email", label: "Email", group: "CRM", keywords: "messaging deliverability" },
-  { id: "text", label: "Text", group: "CRM", keywords: "sms messages" },
-  { id: "replies", label: "Reply Inbox", group: "CRM", keywords: "inbound" },
-  { id: "automations", label: "Automations", group: "Automations", keywords: "workflows" },
-  { id: "sequences", label: "Sequences", group: "Automations" },
-  { id: "calls", label: "Call Room", group: "Automations", keywords: "cold calling dialer" },
-  { id: "social", label: "Social", group: "Marketing", keywords: "posts schedule" },
-  { id: "reviews", label: "Reviews", group: "Marketing" },
-  { id: "customers", label: "Customers", group: "Marketing" },
-  { id: "calendar", label: "Calendar", group: "Calendar", keywords: "schedule invoices" },
-  { id: "agent", label: "Mission Control", group: "Agents", keywords: "agents" },
-  { id: "knowledge", label: "Knowledge Base", group: "Intel", keywords: "notes vault" },
-  { id: "competitors", label: "Competitor Intel", group: "Intel", keywords: "research" },
-];
-
-const ROUTED_PAGES: { href: string; label: string; keywords?: string }[] = [
-  { href: "/calls", label: "Call Room", keywords: "cold calling dialer" },
-  { href: "/calls/booked", label: "Booked Calls", keywords: "appointments" },
-  { href: "/calls/callbacks", label: "Callbacks" },
-  { href: "/calls/schedule", label: "Call Schedule" },
-  { href: "/sequences", label: "Sequences" },
-  { href: "/email", label: "Email", keywords: "compose send" },
-  { href: "/automations", label: "Automations", keywords: "workflows" },
-  { href: "/automations/forms", label: "Forms" },
-  { href: "/automations/runs", label: "Automation Runs" },
-  { href: "/automations/tasks", label: "Automation Tasks" },
-];
-
 function buildCommands(): Command[] {
   const cmds: Command[] = [];
   // Quick actions first
@@ -76,10 +41,10 @@ function buildCommands(): Command[] {
     { id: "act:compose-email", label: "Compose email", group: "Actions", keywords: "send new message", run: () => go("/email") },
     { id: "act:new-automation", label: "New automation", group: "Actions", keywords: "workflow create", run: () => go("/automations") },
   );
-  for (const v of SHELL_VIEWS) {
+  for (const v of flattenShellViews()) {
     cmds.push({ id: `view:${v.id}`, label: v.label, group: v.group, keywords: v.keywords, run: () => navigate(v.id) });
   }
-  for (const p of ROUTED_PAGES) {
+  for (const p of PALETTE_ROUTED_PAGES) {
     cmds.push({ id: `page:${p.href}`, label: p.label, group: `Page ${p.href}`, keywords: p.keywords, run: () => go(p.href) });
   }
   return cmds;

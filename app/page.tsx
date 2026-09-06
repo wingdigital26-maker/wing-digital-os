@@ -9,6 +9,7 @@ import { Sparkline, Delta, buildDailySeries } from "./components/Charts";
 import { StatTiles, MissionPanels, MissionStyles, Selection, StatTile, WatchdogBanner, WatchdogData, MissionData } from "./components/MissionControlCore";
 import { sfx } from "./lib/sounds";
 import SfxMuteButton from "./components/SfxMuteButton";
+import { NAV_TREE, LEGACY_VIEW_ALIAS, EXTERNAL_SUB_LINKS } from "./lib/nav";
 
 type IconType = React.ComponentType<{ size?: number; color?: string }>;
 
@@ -51,138 +52,25 @@ type NavGroup = {
   subs: { id: string; label: string }[];
 };
 
-const NAV: NavGroup[] = [
-  {
-    id: "command", label: "Command Center", icon: Bolt,
-    hint: "Today's numbers, briefing, and quick actions",
-    subs: [
-      { id: "command", label: "Overview" },
-      // Today (2026-09-05): the attention-first board — what needs Jack now,
-      // aggregated from the OS's own APIs with honest per-source states.
-      { id: "today", label: "Today" },
-      { id: "personal", label: "Personal" },
-    ],
-  },
-  {
-    id: "clients", label: "Clients", icon: Users,
-    hint: "Your clients, new leads, and storm alerts",
-    subs: [
-      { id: "clients", label: "Clients" },
-      // Potential clients (2026-09-04): paste a website, the OS researches it
-      // and files it as a prospect to work toward signing.
-      { id: "potential", label: "Potential clients" },
-      { id: "sonar", label: "Sonar Leads" },
-      // Storm Response (2026-09-01): SPC hail events near DFW with the drafts
-      // Wing WOULD fire (FB post, ad plan, Nextdoor). Demo build: draft-only,
-      // nothing posts, nothing spends.
-      { id: "storms", label: "Storm Response" },
-    ],
-  },
-  {
-    // ONE CRM surface. Inbox, Outbound and Pipeline were merged 2026-08-30:
-    // three tabs for one workflow meant the source post lived in one tab and
-    // the draft in another, so a draft had nothing to click through to.
-    // Pipeline's data (Wing's own book of business, the GoHighLevel
-    // replacement) is folded in as a category, never deleted.
-    id: "crm", label: "CRM", icon: Note,
-    hint: "Contacts, outreach emails, texts and replies",
-    // Exactly four tabs (2026-09-04, Jack): Everything, Email, Text, Reply
-    // Inbox. Sequences and Automations moved to their own group below.
-    subs: [
-      { id: "crm", label: "Everything" },
-      // Email: the automated-send queue, the email side of the message
-      // ledger, and email health as internal pills. See EmailHub.tsx.
-      { id: "email", label: "Email" },
-      // Text: the SMS conversations and the texting-line status, on their
-      // own. Same MessagesBoard, locked to the sms channel.
-      { id: "text", label: "Text" },
-      // Reply Inbox (2026-09-01): every inbound cold-email reply, hot first,
-      // with the thread and an editable draft. Read/draft only; never sends.
-      { id: "replies", label: "Reply Inbox" },
-    ],
-  },
-  {
-    // Automations (2026-09-04): sequences and automations out of the CRM tab
-    // and onto the left rail as their own thing. Every sub is a routed page
-    // (see EXTERNAL_SUB_LINKS), so clicking the group icon navigates too.
-    id: "automate", label: "Automations", icon: Route,
-    hint: "Automations, email sequences, and the call room",
-    subs: [
-      { id: "automations", label: "Automations" },
-      { id: "sequences", label: "Sequences" },
-      { id: "calls", label: "Call Room" },
-    ],
-  },
-  {
-    // Marketing (2026-09-05): the client-facing growth surfaces. Social is a
-    // draft/schedule board that never auto-publishes; Reviews queues a
-    // review request after a job closes and tracks the star ratings that
-    // come back. Both are draft-only, same as the rest of the OS.
-    id: "marketing", label: "Marketing", icon: Sparkles,
-    hint: "Social posts to schedule and reviews to request",
-    subs: [
-      { id: "social", label: "Social" },
-      { id: "reviews", label: "Reviews" },
-      { id: "customers", label: "Customers" },
-    ],
-  },
-  {
-    // One sub only. The section owns its own Calendar/Invoices tabs, so listing
-    // them here too showed everything twice.
-    id: "calendar", label: "Calendar", icon: Calendar,
-    hint: "Your schedule, plus invoices one tab over",
-    subs: [{ id: "calendar", label: "Calendar" }],
-  },
-  // School section removed 2026-09-01 (Jack: "get rid of the school schedule
-  // completely"). Classes still show as the school lane on the Calendar; the
-  // legacy alias below keeps old links landing there.
-  {
-    id: "agent", label: "Agents", icon: Cpu,
-    hint: "What the automated agents are doing right now",
-    subs: [{ id: "agent", label: "Mission Control" }],
-  },
-  {
-    id: "intel", label: "Intel", icon: Bulb,
-    hint: "Saved notes, competitor research, and activity history",
-    subs: [
-      { id: "knowledge", label: "Knowledge Base" },
-      { id: "competitors", label: "Competitor Intel" },
-      // Activity Log removed from the nav 2026-09-04 (Jack). The component
-      // stays on disk; the legacy alias below lands old links on the
-      // Knowledge Base.
-    ],
-  },
-];
-
-// Views that existed before the 2026-08-30 restructure. Old deep links and any
-// panel still dispatching the old id land on the merged view instead of a dead
-// screen. Keep these entries; removing one silently breaks a bookmark.
-const LEGACY_VIEW_ALIAS: Record<string, string> = {
-  inbox: "crm",
-  pipeline: "crm",
-  money: "calendar",
-  invoices: "calendar",
-  // 2026-09-01 consolidation: School folded into Calendar, three email tabs
-  // folded into the Email hub.
-  school: "calendar",
-  // 2026-09-04: the message ledger split by channel. Texts have their own tab.
-  messaging: "email",
-  messages: "text",
-  deliverability: "email",
+// The nav tree itself (ids, labels, hints, legacy aliases, external links)
+// lives in lib/nav.ts — the ONE definition shared with SectionChrome and the
+// command palette. Icons are React components, so the assignment stays here.
+const NAV_ICONS: Record<string, IconType> = {
+  command: Bolt,
+  clients: Users,
+  crm: Note,
+  automate: Route,
+  marketing: Sparkles,
+  calendar: Calendar,
+  agent: Cpu,
+  intel: Bulb,
 };
 
-// Sub-tabs that are real routed pages rather than in-shell views. Clicking one
-// navigates instead of switching the mounted view. The os:navigate handler
-// honors these too, so a panel dispatching "sequences" still lands somewhere.
-const EXTERNAL_SUB_LINKS: Record<string, string> = {
-  sequences: "/sequences",
-  automations: "/automations",
-  calls: "/calls",
-  // Old Activity Log links land on the run history, its honest successor
-  // (ActivityLog itself pointed users there). Was aliased to "knowledge",
-  // which shares no content with it.
-  log: "/automations/runs",
-};
+const NAV: NavGroup[] = NAV_TREE.map(g => ({
+  id: g.id, label: g.label, hint: g.hint,
+  icon: NAV_ICONS[g.id] ?? Bolt,
+  subs: g.subs.map(({ id, label }) => ({ id, label })),
+}));
 
 // which group owns a given view id
 function groupOf(viewId: string): NavGroup {

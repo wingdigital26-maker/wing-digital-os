@@ -24,7 +24,9 @@ const SECTIONS: { href: string; label: string }[] = [
   { href: "/", label: "Home" },
   { href: "/calls", label: "Call Room" },
   { href: "/sequences", label: "Sequences" },
-  { href: "/email", label: "Email" },
+  // /email dropped from the strip 2026-09-05: "Email" appeared twice in one
+  // header pointing at two different screens. Composing now lives inside
+  // CRM > Email (Compose pill); /email itself still works and cross-links.
   { href: "/automations", label: "Automations" },
 ];
 
@@ -32,7 +34,7 @@ const SECTIONS: { href: string; label: string }[] = [
 // Each sub links to "/#view=<subId>"; the shell honors the hash on mount and
 // plain "/" still works as before. Keep the ids in sync with page.tsx NAV.
 const SHELL_GROUPS: { label: string; subs: { id: string; label: string }[] }[] = [
-  { label: "Command Center", subs: [{ id: "command", label: "Overview" }, { id: "personal", label: "Personal" }] },
+  { label: "Command Center", subs: [{ id: "command", label: "Overview" }, { id: "today", label: "Today" }, { id: "personal", label: "Personal" }] },
   {
     label: "Clients",
     subs: [

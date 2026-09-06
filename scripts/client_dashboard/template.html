@@ -283,6 +283,22 @@ section{padding:44px 0 0}
 .dband .dbt{font-size:.95rem;font-weight:550;color:var(--t1);line-height:1.5;max-width:66ch}
 .dband .dbs{font-size:.8rem;color:var(--t3);margin-top:7px;max-width:74ch;line-height:1.55}
 
+/* contact database (SAMPLE / preview clients only) -- a sample table showing the
+   VOLUME of enriched contacts Wing builds. Sits only on a config that carries
+   the demo payload; hidden and empty for real clients. Scrolls horizontally on
+   narrow screens so the page body never scrolls sideways. */
+.ctbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.ctbl{width:100%;border-collapse:collapse;font-size:.85rem;min-width:520px}
+.ctbl th{text-align:left;font-size:.72rem;font-weight:700;letter-spacing:.07em;
+  text-transform:uppercase;color:var(--t3);padding:0 14px 10px 0;
+  border-bottom:1px solid var(--border);white-space:nowrap}
+.ctbl td{padding:11px 14px 11px 0;border-bottom:1px solid var(--border);
+  color:var(--t2);white-space:nowrap}
+.ctbl tr:last-child td{border-bottom:none}
+.ctbl td.cnm{color:var(--t1);font-weight:550}
+.ctbl-cap{margin-top:14px;padding-top:12px;border-top:1px solid var(--border);
+  font-size:.78rem;color:var(--t3)}
+
 .foot{margin-top:56px;padding:24px 0 44px;border-top:1px solid var(--border);
   font-size:.79rem;color:var(--t3)}
 .foot a{color:var(--accent);text-decoration:none}
@@ -350,6 +366,16 @@ section{padding:44px 0 0}
     <div class="card">
       <div class="mgroup" style="margin-top:0"><div class="mlabel" id="demo-msg-recent-label"></div></div>
       <div id="demo-msg-list"></div>
+    </div>
+  </section>
+
+  <section id="demo-contacts-sec" hidden>
+    <div class="sh"><h2 id="demo-contacts-h"></h2><span class="n" id="demo-contactsn"></span></div>
+    <div class="sd" id="demo-contacts-sd"></div>
+    <div class="dstats" id="demo-contacts-stats"></div>
+    <div class="card">
+      <div class="ctbl-wrap"><table class="ctbl" id="demo-contacts-table"></table></div>
+      <div class="ctbl-cap" id="demo-contacts-cap"></div>
     </div>
   </section>
 
@@ -1109,6 +1135,32 @@ const DATA = __DATA__;
           '<div class="row-d">'+(r.date ? fmt(r.date) : '')+'</div></div>').join('');
       }
       $('#demo-msg-sec').hidden = false;
+    }
+
+    // Contact database -- a sample of the enriched contact volume Wing builds.
+    // Numbers and rows are illustrative sample data (555-range phone numbers so
+    // no real person is implied); the caption says so plainly.
+    const cd = D.contacts;
+    if (cd && Array.isArray(cd.sample) && cd.sample.length) {
+      $('#demo-contacts-h').textContent = 'Contact database';
+      if (typeof cd.count === 'number')
+        $('#demo-contactsn').textContent = cd.count.toLocaleString() + ' contacts';
+      $('#demo-contacts-sd').textContent = cd.note ||
+        'A sample of the enriched contact database Wing builds for you.';
+      const tiles = [];
+      if (typeof cd.count === 'number')
+        tiles.push(statTile(cd.count.toLocaleString(), 'Contacts in your database'));
+      $('#demo-contacts-stats').innerHTML = tiles.join('');
+      const head = '<thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>City</th></tr></thead>';
+      const body = '<tbody>' + cd.sample.map(x =>
+        '<tr><td class="cnm">'+esc(x.name)+'</td>'+
+        '<td>'+esc(x.email)+'</td>'+
+        '<td>'+esc(x.phone)+'</td>'+
+        '<td>'+esc(x.city)+'</td></tr>').join('') + '</tbody>';
+      $('#demo-contacts-table').innerHTML = head + body;
+      $('#demo-contacts-cap').textContent = cd.caption ||
+        'Sample data shown for illustration. Real contacts are built and enriched for your account.';
+      $('#demo-contacts-sec').hidden = false;
     }
   })();
 })();

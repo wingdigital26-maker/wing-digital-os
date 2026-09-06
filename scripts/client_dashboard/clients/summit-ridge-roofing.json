@@ -47,6 +47,28 @@
       "label": "Typical results · illustrative",
       "text": "Clients in your area typically see 20 to 40 new leads a month once the full system is running.",
       "sub": "A typical range for roofers in comparable DFW markets, shown for illustration only. It is not a guarantee, a promise, or a forecast of specific results for Summit Ridge Roofing."
+    },
+    "contacts": {
+      "count": 1535,
+      "note": "A sample of the enriched contact database Wing builds and maintains for your account -- homeowners and referral partners across your DFW service area, each with verified contact details. In a live account this grows automatically as we scrape, enrich and dedupe new records.",
+      "caption": "Sample data shown for illustration only -- names and details are examples, and phone numbers use the reserved 555 range so no real person is implied. Real contacts are built and enriched for your account.",
+      "sample": [
+        { "name": "Marcus Delgado", "email": "marcus.delgado@gmail.com", "phone": "(214) 555-0142", "city": "Frisco" },
+        { "name": "Dana Whitfield", "email": "dana.whitfield@gmail.com", "phone": "(469) 555-0178", "city": "McKinney" },
+        { "name": "Kevin Barrera", "email": "kevin.barrera@yahoo.com", "phone": "(972) 555-0109", "city": "Plano" },
+        { "name": "Sofia Marchetti", "email": "sofia.marchetti@gmail.com", "phone": "(214) 555-0233", "city": "Allen" },
+        { "name": "Terrell Jennings", "email": "terrell.jennings@outlook.com", "phone": "(469) 555-0187", "city": "Prosper" },
+        { "name": "Angela Pruitt", "email": "angela.pruitt@gmail.com", "phone": "(972) 555-0164", "city": "Frisco" },
+        { "name": "Brandon Lockhart", "email": "brandon.lockhart@gmail.com", "phone": "(214) 555-0291", "city": "Little Elm" },
+        { "name": "Priya Nair", "email": "priya.nair@gmail.com", "phone": "(469) 555-0118", "city": "Celina" },
+        { "name": "Chris Donovan", "email": "chris.donovan@yahoo.com", "phone": "(972) 555-0155", "city": "Wylie" },
+        { "name": "Monica Salas", "email": "monica.salas@gmail.com", "phone": "(214) 555-0176", "city": "Melissa" },
+        { "name": "Derek Winslow", "email": "derek.winslow@gmail.com", "phone": "(469) 555-0203", "city": "Frisco" },
+        { "name": "Hannah Koenig", "email": "hannah.koenig@outlook.com", "phone": "(972) 555-0147", "city": "McKinney" },
+        { "name": "Jordan Vasquez", "email": "jordan.vasquez@gmail.com", "phone": "(214) 555-0128", "city": "Anna" },
+        { "name": "Lauren Chapman", "email": "lauren.chapman@gmail.com", "phone": "(469) 555-0192", "city": "Plano" },
+        { "name": "Elliot Ramsey", "email": "elliot.ramsey@gmail.com", "phone": "(972) 555-0136", "city": "Frisco" }
+      ]
     }
   },
   "_theme_comment": "Roofing-appropriate palette: deep slate-blue brand tile (#24344d) with a warm amber accent for pop. Distinct from Hero's navy/red. Dark mode uses a lifted amber so it stays legible on the dark ground; light mode drops to a deeper amber for contrast on white.",

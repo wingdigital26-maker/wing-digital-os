@@ -10,10 +10,8 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"FAQPage","mainEntity":[
-{"@type":"Question","name":"How fast do we see something live?","acceptedAnswer":{"@type":"Answer","text":"Usually within the first week. After a short kickoff we start publishing pages and turn on your dashboard so you can watch the work go live."}},
-{"@type":"Question","name":"What do you need from me?","acceptedAnswer":{"@type":"Answer","text":"A short call, access to your website, and manager access to your Google Business Profile. From there most of it runs without you."}},
-{"@type":"Question","name":"Do the systems keep running if my computer is off?","acceptedAnswer":{"@type":"Answer","text":"Yes. Everything runs in the cloud on its own schedule, so content, reviews and follow-up keep going whether you are at a job site or asleep."}},
-{"@type":"Question","name":"How do I know it is working?","acceptedAnswer":{"@type":"Answer","text":"Every client gets a live dashboard showing exactly what has been published and what is running, with a link to open each page on your own site."}}
+{"@type":"Question","name":"How fast do we see something live?","acceptedAnswer":{"@type":"Answer","text":"Usually within the first week. We start publishing pages and turn on your dashboard so you can watch the work go live."}},
+{"@type":"Question","name":"How do I know it is working?","acceptedAnswer":{"@type":"Answer","text":"Your live dashboard shows exactly what has been published and what is running, with a link to open each page on your own site."}}
 ]}
 </script>
 <style>
@@ -144,7 +142,10 @@ h2{font-size:clamp(1.6rem,1.25rem+1.5vw,2.3rem);margin:0 0 .3em}
 .client-card .nm{font-weight:600}
 .client-card .tr{font-size:.79rem;color:var(--t3)}
 .client-card .big{font-family:var(--display);font-weight:700;font-size:2.2rem;line-height:1}
-.client-card p{margin:8px 0 0;color:var(--t2);font-size:.93rem}
+.cstats{display:flex;gap:22px;flex-wrap:wrap}
+.cs .n{font-family:var(--display);font-weight:700;font-size:1.9rem;line-height:1;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.cs .lbl{font-size:.8rem;color:var(--t2);margin-top:5px;max-width:16ch}
+.client-card p{margin:14px 0 0;color:var(--t2);font-size:.93rem}
 .proofnote{margin-top:18px;color:var(--t3);font-size:.85rem;max-width:72ch}
 
 /* steps */
@@ -200,14 +201,14 @@ details p{margin:0 0 18px;color:var(--t2);font-size:.95rem}
       <a class="btn outline" href="#services">What we are building</a>
     </div>
     <div class="microtrust">
-      <span><span class="d"></span> Runs with your PC off</span>
       <span><span class="d"></span> DFW home-service focused</span>
       <span><span class="d"></span> You see everything, live</span>
+      <span><span class="d"></span> Built, run, and reported for you</span>
     </div>
     <div class="stats">
       <div class="stat"><div class="v">250+</div><div class="l">Website visits generated for Jackson Roofing</div></div>
-      <div class="stat"><div class="v">100s</div><div class="l">SEO blog posts and service pages published across our clients</div></div>
-      <div class="stat"><div class="v">24/7</div><div class="l">Systems running in the cloud, on their own</div></div>
+      <div class="stat"><div class="v">100s</div><div class="l">SEO blog posts and service pages published</div></div>
+      <div class="stat"><div class="v">1,000s</div><div class="l">Local leads found for our clients</div></div>
     </div>
   </div>
 </div>
@@ -308,13 +309,19 @@ details p{margin:0 0 18px;color:var(--t2);font-size:.95rem}
     <div class="clients">
       <div class="client-card">
         <div class="who"><span class="badge" style="background:#2f6db0">JR</span><div><div class="nm">Jackson Roofing</div><div class="tr">Roofing, DFW</div></div></div>
-        <div class="big">250+</div>
-        <p>website visits generated from the SEO content engine and local pages, with new blog posts, service pages and city pages going up every week.</p>
+        <div class="cstats">
+          <div class="cs"><div class="n">250+</div><div class="lbl">website visits generated</div></div>
+          <div class="cs"><div class="n">100s</div><div class="lbl">of posts and pages published</div></div>
+        </div>
+        <p>New blog posts, service pages and city pages going up every week, all from the SEO content engine.</p>
       </div>
       <div class="client-card">
         <div class="who"><span class="badge" style="background:#0a2342">HJ</span><div><div class="nm">Hero's Junk Removal</div><div class="tr">Junk removal, DFW</div></div></div>
-        <div class="big">Live</div>
-        <p>a full content and SEO program running on their site, tracked on a live dashboard they can open any time. It is linked in the section above.</p>
+        <div class="cstats">
+          <div class="cs"><div class="n">100s</div><div class="lbl">of posts and pages published</div></div>
+          <div class="cs"><div class="n">1,000s</div><div class="lbl">of local leads found</div></div>
+        </div>
+        <p>A full content and SEO program running on their site, tracked on a live dashboard they can open any time.</p>
       </div>
     </div>
     <p class="proofnote">Across all of our clients we have published hundreds of blog posts and service pages. Figures shown are real client results, and we are glad to walk through the live dashboards on a call.</p>
@@ -343,10 +350,8 @@ details p{margin:0 0 18px;color:var(--t2);font-size:.95rem}
       <h2>The things owners ask us first</h2>
     </div>
     <div class="faq">
-      <details><summary>How fast do we see something live?</summary><p>Usually within the first week. After a short kickoff we start publishing pages and turn on your dashboard so you can watch the work go live.</p></details>
-      <details><summary>What do you need from me?</summary><p>A short call, access to your website, and manager access to your Google Business Profile. From there most of it runs without you.</p></details>
-      <details><summary>Do the systems keep running if my computer is off?</summary><p>Yes. Everything runs in the cloud on its own schedule, so content, reviews and follow-up keep going whether you are at a job site or asleep.</p></details>
-      <details><summary>How do I know it is working?</summary><p>Every client gets a live dashboard showing exactly what has been published and what is running, with a link to open each page on your own site.</p></details>
+      <details><summary>How fast do we see something live?</summary><p>Usually within the first week. We start publishing pages and turn on your dashboard so you can watch the work go live.</p></details>
+      <details><summary>How do I know it is working?</summary><p>Your live dashboard shows exactly what has been published and what is running, with a link to open each page on your own site, updated as we go.</p></details>
     </div>
   </div>
 </section>

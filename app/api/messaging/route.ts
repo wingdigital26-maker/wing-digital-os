@@ -147,46 +147,56 @@ const PEST_D7 =
   "time that works and I will be there. If not, no worries at all and I wish you a great " +
   "rest of the season.\n\nThanks,\nJack";
 
+// B2B lane, resynced 2026-09-05 to mirror the live Instantly value sequence:
+// each email explains one pillar in plain language (lead gen + SEO, then the
+// CRM and how it all fits) instead of leaning on reviews, with real proof.
 const B2B_D1 =
   "{greeting}\n\n" +
-  "I am Jack with Wing Digital. We build the growth engine for local businesses: lead " +
-  "generation, custom software, SEO and AEO to get you found in Google and in AI answers.\n\n" +
-  "For an operation like {company}, the math is different. One new commercial account can be " +
-  "worth more than a year of small jobs, so we focus on two things: getting you in front of " +
-  "the companies already searching for what you do, then building the systems that turn those " +
-  "inquiries into signed contracts.\n\n" +
-  "That means qualified leads coming in steadily, custom tools that handle your follow-up, and " +
-  "a presence that makes a serious business trust you with a contract.\n\n" +
-  "Would you be open to a quick 10 to 15 minute call this week? Whatever day works for you " +
-  "works for me. Just reply and I will make it happen.\n\nThanks,\nJack";
+  "I am Jack with Wing Digital. We help local companies like {company} win more work by fixing " +
+  "the two things that quietly cost the most jobs: being hard to find online, and being slow to " +
+  "follow up on the leads you do get.\n\n" +
+  "We build and run the whole system for that. Getting you found on Google, bringing in a steady " +
+  "flow of leads, and setting up one place that captures every lead and follows up automatically " +
+  "so none of them slip through.\n\n" +
+  "One example, we took a DFW roofing company past 250 website visits by publishing local pages " +
+  "and content that rank, with new work going up every week.\n\n" +
+  "Would you be open to a quick look at what that could mean for {company}? Just reply and I will " +
+  "send a short walkthrough.\n\nThanks,\nJack";
 
 const B2B_D3 =
   "{greeting}\n\n" +
-  "Following up on my note from earlier this week.\n\n" +
-  "The businesses winning the best commercial accounts in DFW are usually not the biggest. " +
-  "They are the ones a buyer finds first, the ones that answer fast, the ones with systems " +
-  "doing the follow-up so nothing slips. That is a visibility problem, a lead gen problem, a " +
-  "software problem, all fixable.\n\n" +
-  "For {company}, we build the whole stack: SEO and AEO so you show up first in search, lead " +
-  "gen that keeps qualified inquiries coming in, custom tools that follow up for you. Open to " +
-  "a quick call to walk through it? Name any day that works and I will fit your schedule." +
-  "\n\nThanks,\nJack";
+  "Following up with the part most owners never get a straight answer on: how customers actually " +
+  "find you.\n\n" +
+  "Two pieces do the heavy lifting. SEO means showing up near the top when someone in your area " +
+  "searches for what you do, without paying for every click. Lead generation means turning that " +
+  "visibility into a steady stream of real people reaching out, instead of a random spike here " +
+  "and there.\n\n" +
+  "We build both for {company}: a page for every service and every town you cover, content that " +
+  "answers what your customers are searching for, and the technical setup that makes Google and " +
+  "even AI answers trust your site. It compounds over time, so the leads keep coming without you " +
+  "chasing them.\n\n" +
+  "Want me to show you the exact searches {company} could be winning? Reply and I will put them " +
+  "together.\n\nThanks,\nJack";
 
 const B2B_D7 =
   "{greeting}\n\n" +
-  "I have reached out a couple of times now so I will keep this short.\n\n" +
-  "One commercial contract can carry a whole year. The businesses that keep landing them are " +
-  "easy to find, quick to respond, backed by systems that never drop a lead. That is exactly " +
-  "what we build: lead generation, custom software, SEO and AEO, all working together.\n\n" +
-  "If you want to see what that looks like for {company}, reply with any day that works and I " +
-  "will be there. If not, no worries at all, and I wish you a strong rest of the year." +
-  "\n\nThanks,\nJack";
+  "I will keep this one short.\n\n" +
+  "Here is where a lot of good companies quietly lose money, the leads they already have. A CRM " +
+  "is simply one place that holds every lead and customer, so nothing lives in a text thread or " +
+  "someone's memory, and it does the follow-up for you: a missed call gets an instant text back, " +
+  "a new lead hears from you within minutes, past customers get reminded when it is time to come " +
+  "back.\n\n" +
+  "Put together with getting found on Google, that is one system: you get seen, those visitors " +
+  "turn into leads, every lead lands in one place, and the follow-up happens on its own. You also " +
+  "get a live dashboard to see it all.\n\n" +
+  "If you want to see what it would look like for {company}, reply with a day that works and I " +
+  "will walk you through it. If not, no worries at all.\n\nThanks,\nJack";
 
 const TEMPLATE_SOURCE =
-  "Rendered by this dashboard from a port of wing-outreach-cloud/daily_outreach.py's " +
-  "templates (all four wired verticals, ported 2026-08-31). The sender renders from that " +
-  "Python file at send time, so if it changed since the port the live email could differ " +
-  "from this preview.";
+  "The B2B lane shown here mirrors the live Instantly value sequence (resynced 2026-09-05): it " +
+  "explains lead gen, SEO and the CRM in plain terms rather than leaning on reviews. The roofing, " +
+  "plumbing and pest lanes are the older port of wing-outreach-cloud/daily_outreach.py. Whichever " +
+  "sender runs a given lane renders its own copy at send time, so treat this as the QA preview.";
 
 // Per-vertical routing, mirroring VERTICAL_ROUTING in daily_outreach.py.
 // requireFirst=false only for b2b (company-inbox greeting via {greeting}).
@@ -301,11 +311,13 @@ function renderFor(r: QueueRow): { message: RenderedMessage; flags: QaFlag[] } {
       ported: true,
       note: TEMPLATE_SOURCE,
       subjects: [
-        `quick idea for ${company}`,
-        routing.requireFirst
+        trade === "b2b" ? `the two things costing ${company} jobs` : `quick idea for ${company}`,
+        trade === "b2b"
+          ? `how customers actually find a company like ${company}`
+          : routing.requireFirst
           ? `noticed a couple things, ${first}`
           : `a couple things on ${company}`,
-        `last note on ${company}`,
+        trade === "b2b" ? `where most ${company} leads quietly disappear` : `last note on ${company}`,
       ],
       bodies: { d1, d3, d7 },
     },

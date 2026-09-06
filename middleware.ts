@@ -19,6 +19,10 @@ function isPublicPath(pathname: string): boolean {
     // is self-contained: the client's own published content, no secrets, no API
     // calls. Public by design so a client can open the link without a login.
     pathname.startsWith("/dashboards/") ||
+    // The Wing capabilities one-pager sent to signed clients. Static, no secrets;
+    // public so a client can open the link without an OS login.
+    pathname === "/pitch.html" ||
+    pathname === "/pitch" ||
     // Clean path-style dashboard link /d/<slug>/<key>. Public like /dashboards/:
     // it only 302-redirects to the dashboard page, and the /api/dashboard/ gate
     // still enforces the key. Without this the OS login shadows the link.

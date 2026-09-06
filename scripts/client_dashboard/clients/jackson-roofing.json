@@ -1,5 +1,5 @@
 {
-  "_comment": "Jackson Roofing (Chris Jackson, Plano TX). WIN-BACK PITCH, rebuilt 2026-09-06 on top of the dashboard published 2026-08-28, so the same link keeps working and now carries the full record. HONESTY DECISIONS, all deliberate: (1) The 11 blog posts are REAL work published on jacksonroofingco.com during the engagement, carried over verbatim from the 08-28 dashboard. jacksonroofingco.com now Cloudflare-blocks our IP (403 from curl and from a real browser), so we CANNOT re-verify those URLs today and this page never claims we did. They carry their real 2026-07 and 2026-08 dates and sit under a group that names the period, so nothing reads as work happening now. Chris can open every one of them from his own network. (2) Every wingdigital26-maker.github.io link on this page was curl-verified 200 on 2026-09-06. (3) Nothing has published since 2026-08-28 and this config claims nothing has. The gap is visible in the chart as an empty September bar, on purpose, and the plan section is what explains it. (4) No traffic, ranking, call, lead or revenue number appears anywhere; pendingMetrics records why for each one. (5) The one measured fact we hold on this account is that social produced no leads, and the social card says exactly that instead of selling social. GoHighLevel is retired and is referenced nowhere in this file. No em dashes or en dashes in any client-facing string.",
+  "_comment": "Jackson Roofing (Chris Jackson, Plano TX). WIN-BACK PITCH, rebuilt 2026-09-06 on top of the dashboard published 2026-08-28, so the same link keeps working and now carries the full record. HONESTY DECISIONS, all deliberate: (1) The 12 blog posts are REAL work published on jacksonroofingco.com during the engagement, reconciled 2026-09-06 against the content-engine state file (see history/jackson-roofing-legacy.json for the full reconciliation): one post was logged twice under the same URL and is now listed once at its first publish date, and a twelfth post that published with no URL recorded is listed as a non-linked row. Two non-blog rows from 2026-07-20 (a Google Business post and a round of review requests) are carried under their own types so they read as the actions they were. jacksonroofingco.com now Cloudflare-blocks our IP (403 from curl and from a real browser), so we CANNOT re-verify those URLs today and this page never claims we did. They carry their real 2026-07 and 2026-08 dates and sit under a group that names the period, so nothing reads as work happening now. Chris can open every one of them from his own network. (2) Every wingdigital26-maker.github.io link on this page was curl-verified 200 on 2026-09-06. (3) Nothing has published since 2026-08-28 and this config claims nothing has. The gap is visible in the chart as an empty September bar, on purpose, and the plan section is what explains it. (4) No traffic, ranking, call, lead or revenue number appears anywhere; pendingMetrics records why for each one. (5) The one measured fact we hold on this account is that social produced no leads, and the social card says exactly that instead of selling social. GoHighLevel is retired and is referenced nowhere in this file. No em dashes or en dashes in any client-facing string.",
 
   "_brand_comment": "brand.site is the GitHub Pages build because that is the deploy we can verify and every site link on this page points there. The subhead states the record plainly: work was published, it stopped, and the plan says what restarts.",
   "brand": {
@@ -8,7 +8,7 @@
     "site": "https://wingdigital26-maker.github.io/jackson-roofing/",
     "kicker": "Marketing dashboard",
     "headline": "Here is everything we built. Here is what turns back on.",
-    "subhead": "Eleven articles went live on your site through July and August, and the rebuilt Jackson Roofing site is up right now. Publishing stopped at the end of August and nothing is posting or emailing on your behalf today. The plan below is what starts again on day one."
+    "subhead": "Twelve articles went live on your site through July and August, and the rebuilt Jackson Roofing site is up right now. We also built you a list of 1,020 North Texas businesses who could send you work, and not one of them has ever been contacted. Publishing stopped at the end of August and nothing is posting or emailing on your behalf today. The plan below is what starts again on day one."
   },
 
   "_theme_comment": "Read off the live site stylesheet on 2026-09-06: --cyan #1bc0ff (their exact logo cyan), --cyan-deep #0aa7e6, --cyan-ink #06809f, --ink #0b0f14 (their black logo plate). The template pins itself to the light ground by design, so the light accent is the deeper #06809f for readable contrast on white, while the badge keeps the real black-plate-and-cyan pairing.",
@@ -31,6 +31,8 @@
     "blog":    { "label": "Blog post",    "color": "#1bc0ff" },
     "service": { "label": "Service page", "color": "#06809f" },
     "city":    { "label": "City page",    "color": "#33414f" },
+    "gbp":     { "label": "Google Business post", "color": "#0d6f8a" },
+    "reviews": { "label": "Review requests", "color": "#4a5c6b" },
     "other":   { "label": "Other",        "color": "#7a8a9a" }
   },
 
@@ -38,7 +40,7 @@
   "plan": {
     "banner": "Publishing stopped at the end of August and nothing on this page is running today. Everything below restarts the week we begin.",
     "title": "What $1,000 a month turns on",
-    "intro": "The honest diagnosis first. You have a rebuilt site and eleven articles already live, and right now nothing is feeding any of it. When we measured social for this account it produced no leads, so we are not going to sell you social. Search, your Google profile and storm damage are the three levers that actually move roofing work in North Texas, and none of them are switched on today. That is what the plan below goes after.",
+    "intro": "The honest diagnosis first. You have a rebuilt site, twelve articles already live and a list of 1,020 businesses who could refer you work, and right now nothing is feeding any of it. When we measured social for this account it produced no leads, so we are not going to sell you social. Search, your Google profile and storm damage are the three levers that actually move roofing work in North Texas, and none of them are switched on today. That is what the plan below goes after.",
     "phases": [
       {
         "when": "Week one",
@@ -92,6 +94,36 @@
     }
   },
 
+
+  "_referralPartners_comment": "The referral partner asset. Sourced live at build time from ghl-cli/jackson_roofing_leads.db (table leads), so every number on the page is a straight count of rows and nothing is transcribed by hand. HONESTY DECISIONS: (1) emailMask is on, so build.py part hides every address before it reaches the HTML. A texted dashboard link is effectively public and 460 harvestable business addresses must not be published; Chris gets the full file directly. (2) hiddenCategories drops insurance-adjuster (151 rows) from the VISIBLE category breakdown while keeping it inside the headline total, because Texas Insurance Code Chapter 4102 restricts roofers acting as public adjusters and roofer to adjuster outreach is legally sensitive. hidden_note says so on the page, out loud, so the 869 visible plus 151 held back still adds to 1,020 for anyone who checks. Flip this key to an empty list to show them. (3) status is 'staged' on every row in the table, so the claim that nothing has been sent is literally true. (4) No response rate, conversion rate or revenue projection appears anywhere; none exists in the source.",
+  "referralPartners": {
+    "db": "C:\\Users\\wjack\\ghl-cli\\jackson_roofing_leads.db",
+    "table": "leads",
+    "emailMask": {
+      "keep": 1,
+      "fill": "•••"
+    },
+    "hiddenCategories": [
+      "insurance-adjuster"
+    ],
+    "hidden_note": "One more group sits inside the 1,020 total and is deliberately not broken out above: 151 insurance adjusters. Texas Insurance Code Chapter 4102 restricts a roofer from acting as a public adjuster, and roofer to adjuster outreach is legally sensitive ground. Those records stay in the list and in the total, but we are not going to hand you an adjuster outreach lane as if it were routine. If you want them worked, that is a conversation to have with your attorney first, and we would follow whatever line you draw.",
+    "categoryLabels": {
+      "general-contractor": "General contractors",
+      "property-manager": "Property managers",
+      "real-estate-inspector": "Home and property inspectors",
+      "restoration-company": "Restoration and water damage companies",
+      "hoa-management": "HOA management companies",
+      "insurance-adjuster": "Insurance adjusters"
+    },
+    "sampleSize": 10,
+    "topCities": 8,
+    "title": "Who could send you work",
+    "intro": "Roofing jobs come from people who hit a roof problem while doing their own job. During the engagement we built you a list of those people across North Texas: general contractors, property managers, inspectors, restoration firms and HOA managers. It is finished, it is enriched with real phone numbers and addresses, and it has been sitting untouched.",
+    "banner": "Nothing has been sent to a single business on this list. No email, no call, no text. It is built and it is parked, and it stays parked until you say otherwise.",
+    "sample_note": "Real rows out of the list, shown as stored. Email addresses are part hidden on purpose: this page gets forwarded, and a page anyone can open holding hundreds of full business addresses is a list anyone can take. You get the complete unmasked file.",
+    "note": "What this is, exactly: a built list, enriched where the source allowed it, and never contacted. There is no response rate, no conversion rate and no dollar figure anywhere in this section, because nothing has gone out and any number here would be invented. If we restart, we agree the message with you first, start small, and you see every reply."
+  },
+
   "_outreach_comment": "Three cards, all honestly blocked on access, all phrased as forward plans rather than as excuses. Storm and hail targeting is deliberately NOT a card: it needs nothing from Chris, it needs the engagement to restart, so it lives in the plan instead of pretending to be a lane waiting on his login. The social card states the measured result rather than selling the channel.",
   "outreach": {
     "intro": "Nothing is being posted, sent or emailed on your behalf today. These are the lanes we would switch on, and what each one needs from you first.",
@@ -120,6 +152,11 @@
     ]
   },
 
+  "_notes_comment": "Overrides the generic subhead on the published list. It names the two places the work lives and, critically, dates the blog posts to the past instead of letting a reader assume they went up this week. It does not claim the posts were checked today, because jacksonroofingco.com blocks us and they were not.",
+  "notes": {
+    "published": "Everything Wing Digital put live for you. Twelve blog posts went up on jacksonroofingco.com through July and August 2026. Eleven of them are links you can click; the twelfth published without a URL being recorded on our side, so it is listed here plainly rather than pointed at a guess. The two July items that are not articles were real one-off actions from the same period. The site pages sit on the rebuilt site. Click any title that is a link to open it."
+  },
+
   "_sources_comment": "Two sources. (1) git_repo: the real site repo, fast-forwarded to origin/main on 2026-09-06 so it matches the live deploy byte for byte; dates are the first commit that ADDED each file, so 2026-08-10 is a real publish date and not a build stamp. All four URLs curl-verified 200 on 2026-09-06. (2) items_file: the 11 articles published on jacksonroofingco.com, lifted verbatim from the dashboard published 2026-08-28. Their dates are the real publish dates. They CANNOT be curl-verified because that domain Cloudflare-blocks our IP, and nothing on this page claims otherwise.",
   "sources": [
     {
@@ -135,6 +172,12 @@
       "path": "history/jackson-roofing-legacy.json",
       "key": "blog_posts",
       "type": "blog",
+      "status": "published"
+    },
+    {
+      "kind": "items_file",
+      "path": "history/jackson-roofing-legacy.json",
+      "key": "actions",
       "status": "published"
     }
   ],
@@ -152,7 +195,7 @@
   ],
   "pages_from_items": [
     {
-      "group": "Blog posts we published on your site, July to August 2026",
+      "group": "Blog posts you can open on your site, July to August 2026",
       "icon": "file",
       "types": ["blog"]
     }

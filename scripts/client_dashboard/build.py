@@ -216,13 +216,27 @@ def parse_outreach_templates(path):
     return cats
 
 
-def mask_email(addr):
-    """j***@domain.com -- the client sees who, never a harvestable address."""
+def mask_email(addr, mask=None):
+    """j***@domain.com -- the client sees who, never a harvestable address.
+
+    A dashboard link gets texted and forwarded, so it is effectively public. Any
+    section that shows contacts runs its addresses through here first; a full
+    address must never reach the built HTML. Shape is config-driven via an
+    optional {"keep": <chars of the local part>, "fill": "<what replaces the
+    rest>"} block, so a section can choose its own look without a second copy of
+    this function existing anywhere.
+    """
     addr = (addr or "").strip()
     if "@" not in addr:
         return ""
+    mask = mask or {}
+    keep = max(0, int(mask.get("keep", 1)))
+    fill = mask.get("fill", "***")
     local, domain = addr.split("@", 1)
-    return (local[:1] or "*") + "***@" + domain
+    head = local[:keep]
+    if not head:
+        head = "*"
+    return head + fill + "@" + domain
 
 
 def load_send_queue(path):
@@ -264,6 +278,112 @@ def collect_outreach_preview(cfg):
     if op.get("queue_csv"):
         data["queue"] = load_send_queue(op["queue_csv"])
     return data
+
+
+# ── referral partners (a staged, never-contacted list, summarised) ───────────
+def collect_referral_partners(cfg):
+    """Summarise a staged partner list out of a SQLite table.
+
+    Generic on purpose: the config names the database, the table and the column
+    map, so any client with a list of businesses who could send them work gets
+    the same section. Returns None when the config omits the key, and the
+    template then renders nothing at all.
+
+    Three honesty rules are enforced here rather than left to the template:
+      * Every address is masked (see mask_email). The built page is texted, so a
+        full address in it is a published address.
+      * `hiddenCategories` are dropped from the VISIBLE breakdown but stay in
+        the headline total, and the payload reports how many were held back so
+        the page can say so out loud instead of quietly losing rows.
+      * Nothing here is a projection. Only counts that come straight off the
+        table are emitted; response, conversion and revenue figures do not
+        exist in the source and are not invented on the way out.
+    """
+    rp = cfg.get("referralPartners")
+    if not rp:
+        return None
+    import sqlite3
+    path = rp["db"]
+    if not os.path.exists(path):
+        print("    ! partner db missing: %s" % path)
+        return None
+    note_mtime(path)
+    table = rp.get("table", "leads")
+    mask = rp.get("emailMask")
+    hidden = set(rp.get("hiddenCategories", []))
+    labels = rp.get("categoryLabels", {})
+
+    con = sqlite3.connect(path)
+    con.row_factory = sqlite3.Row
+    rows = [dict(r) for r in con.execute("SELECT * FROM %s" % table)]
+    con.close()
+
+    def has(r, col):
+        return bool((r.get(col) or "").strip())
+
+    total = len(rows)
+    visible = [r for r in rows if (r.get("category") or "") not in hidden]
+
+    cats = {}
+    for r in visible:
+        c = r.get("category") or "other"
+        cats[c] = cats.get(c, 0) + 1
+    categories = [{"key": k, "label": labels.get(k, k.replace("-", " ").title()),
+                   "count": v}
+                  for k, v in sorted(cats.items(), key=lambda kv: -kv[1])]
+
+    city_counts = {}
+    for r in visible:
+        if has(r, "email") and (r.get("city") or "").strip():
+            city_counts[r["city"].strip()] = city_counts.get(r["city"].strip(), 0) + 1
+    cities = [{"city": c, "count": n}
+              for c, n in sorted(city_counts.items(), key=lambda kv: (-kv[1], kv[0]))
+              ][: int(rp.get("topCities", 8))]
+
+    # Sample rows: real records, spread across the visible categories so the
+    # sample is not eight of the same thing. Verified addresses first.
+    pool = [r for r in visible if (r.get("email_status") or "") == "ok" and has(r, "email")]
+    if len(pool) < int(rp.get("sampleSize", 10)):
+        pool = [r for r in visible if has(r, "email") or has(r, "phone")]
+    by_cat = {}
+    for r in sorted(pool, key=lambda r: (-(r.get("reviews") or 0), r.get("name") or "")):
+        by_cat.setdefault(r.get("category") or "other", []).append(r)
+    sample, order = [], [c["key"] for c in categories if c["key"] in by_cat]
+    while order and len(sample) < int(rp.get("sampleSize", 10)):
+        for c in list(order):
+            if not by_cat[c]:
+                order.remove(c)
+                continue
+            sample.append(by_cat[c].pop(0))
+            if len(sample) >= int(rp.get("sampleSize", 10)):
+                break
+    sample = [{
+        "name": (r.get("name") or "").strip(),
+        "category": labels.get(r.get("category") or "", (r.get("category") or "").replace("-", " ").title()),
+        "city": (r.get("city") or "").strip(),
+        "email": mask_email(r.get("email"), mask),
+        "phone": (r.get("phone") or "").strip(),
+    } for r in sample]
+
+    return {
+        "title": rp.get("title", "Who could send you work"),
+        "intro": rp.get("intro", ""),
+        "banner": rp.get("banner", ""),
+        "note": rp.get("note", ""),
+        "sampleNote": rp.get("sample_note", ""),
+        "hiddenNote": rp.get("hidden_note", ""),
+        "total": total,
+        "hiddenCount": total - len(visible),
+        "unique": sum(1 for r in rows if (r.get("status") or "") != "duplicate-org"),
+        "withEmail": sum(1 for r in rows if has(r, "email")),
+        "verifiedEmail": sum(1 for r in rows if (r.get("email_status") or "") == "ok"),
+        "withPhone": sum(1 for r in rows if has(r, "phone")),
+        "namedContact": sum(1 for r in rows if has(r, "contact_name")),
+        "cityCount": len({(r.get("city") or "").strip() for r in rows if (r.get("city") or "").strip()}),
+        "categories": categories,
+        "cities": cities,
+        "sample": sample,
+    }
 
 
 def collect_pages(cfg, items):
@@ -322,7 +442,23 @@ def build(slug):
         key = (it["date"], it["title"].lower())
         if key not in merged or (it.get("url") and not merged[key].get("url")):
             merged[key] = it
-    items = sorted(merged.values(), key=lambda i: i["date"], reverse=True)
+    items = sorted(merged.values(), key=lambda i: i["date"])
+
+    # De-dupe on URL as well. A scheduler that re-ran the same piece writes the
+    # same URL under two dates; listing it twice inflates the count and the
+    # client can catch it by clicking both rows. Keep the FIRST publish date,
+    # which is the one that is true.
+    by_url, out = {}, []
+    for it in items:
+        u = (it.get("url") or "").strip().rstrip("/").lower()
+        if not u:
+            out.append(it)
+            continue
+        if u in by_url:
+            continue
+        by_url[u] = it
+        out.append(it)
+    items = sorted(out, key=lambda i: i["date"], reverse=True)
 
     # The content record is only as current as the OLDEST source feeding it.
     # Reporting "as of today" on a state file nobody has written in three weeks
@@ -343,7 +479,12 @@ def build(slug):
         # Intentions only -- the template renders no counts or results from
         # it, and it disappears entirely when a config omits the key.
         "plan": cfg.get("plan"),
-        "pendingMetrics": cfg.get("pendingMetrics", []),
+        # Optional, generic: a staged partner list summarised from a database.
+        # Absent key -> no section at all. Addresses are masked before they get
+        # anywhere near the HTML.
+        "referralPartners": collect_referral_partners(cfg),
+        # Optional, generic: per-section copy overrides (see template).
+        "notes": cfg.get("notes", {}),
         # Optional REAL numbers only (e.g. {"emailsSent30d": 120, "asOf": "2026-09-06"}).
         # Zephyr's arrival reaction reads these; leaving it absent is always
         # honest, inventing a number here never is.
@@ -388,7 +529,9 @@ def build(slug):
     art = "\n".join(ln for ln in art.splitlines() if ln.strip() != "")
     # The Artifact CSP blocks non-CDN external scripts, so the root-relative
     # /mascot/wing-mascot.js tag would silently never load there. Inline it.
-    for fname in ("zephyr-kb.js", "wing-mascot.js"):
+    # Only the mascot component. The public marketing knowledge base names
+    # other Wing clients, so it must never be inlined into a client page.
+    for fname in ("wing-mascot.js",):
         src = os.path.join(HERE, "..", "..", "public", "mascot", fname)
         if not os.path.exists(src):
             continue
@@ -396,7 +539,7 @@ def build(slug):
             js = fh.read().replace("</script>", "<\\/script>")
         for tag in ('<script src="/mascot/%s"></script>' % fname,
                     '<script src="/mascot/%s?v=1"></script>' % fname,
-                    '<script src="/mascot/%s?v=10"></script>' % fname):
+                    '<script src="/mascot/%s?v=11"></script>' % fname):
             art = art.replace(tag, "<script>\n%s\n</script>" % js)
     # In the Artifact gallery the title is the page's NAME, sat beside dozens of
     # others -- so it carries the client, not the word "dashboard" twice over.

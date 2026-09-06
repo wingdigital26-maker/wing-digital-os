@@ -341,6 +341,13 @@
       alive = false;
       if (onMove) window.removeEventListener('mousemove', onMove);
       if (onScroll) window.removeEventListener('scroll', onScroll);
+      clearTimeout(pulseTimer);
+      clearTimeout(bubbleTimer);
+      /* the bubble lives on document.body, so it has to be taken with him:
+         an orphaned role="status" node is still announced by screen readers */
+      if (bubbleEl) { bubbleEl.remove(); bubbleEl = null; }
+      var chat = root._wmChat;
+      if (chat && chat.destroy) chat.destroy();
       root.remove();
     }
     /* pulse: hold a mood for ms, then return to the pinned mood if the page
@@ -405,7 +412,12 @@
     if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     var idleMs = 150000, idleTimer = null, dozing = false;
     function isNight() { var h = new Date().getHours(); return h >= 23 || h < 6; }
-    function doze() { dozing = true; m.setState('sleepy'); }
+    function doze() {
+      // He is allowed to get sleepy, but never while he is visibly working.
+      if (m.getState && m.getState() === 'thinking') { armIdle(); return; }
+      dozing = true;
+      m.setState('sleepy');
+    }
     function armIdle() {
       clearTimeout(idleTimer);
       idleTimer = setTimeout(doze, isNight() ? 45000 : idleMs);
@@ -448,8 +460,8 @@
     'background:linear-gradient(170deg,#141a30 0%,#0d0f16 34%);border:1px solid rgba(125,155,255,.45);' +
     'border-radius:18px;box-shadow:0 2px 0 rgba(255,255,255,.06) inset,0 18px 60px rgba(39,87,230,.4);color:#eaf0ff;' +
     'font-family:Inter,system-ui,sans-serif;font-size:14px;overflow:hidden;' +
-    'opacity:0;pointer-events:none;transition:opacity .35s}' +
-    '.wmp.open{opacity:1;pointer-events:auto}' +
+    'opacity:0;visibility:hidden;pointer-events:none;transition:opacity .35s,visibility .35s}' +
+    '.wmp.open{opacity:1;visibility:visible;pointer-events:auto}' +
     '.wmp-head{display:flex;align-items:center;gap:9px;padding:12px 14px;border-bottom:1px solid rgba(125,155,255,.25);' +
     'background:linear-gradient(135deg,rgba(39,87,230,.22),rgba(39,87,230,0) 70%)}' +
     '.wmp-head b{font-weight:600}' +
@@ -479,6 +491,7 @@
     '@media(prefers-reduced-motion:reduce){.wmp{transition:none}.wmp-head .dot{animation:none}}';
 
   function attachChat(mascot, opts) {
+    opts = opts || {};
     if (mascot.el._wmChat) return mascot.el._wmChat;
     if (!attachChat._css) {
       var s = document.createElement('style');
@@ -571,6 +584,10 @@
         renderQuestions();
       } else if (was) {
         sound.play('hush');
+        /* stop typing into a panel nobody is looking at, and let his face
+           settle back instead of pondering an answer that was dismissed */
+        clearInterval(typeTimer);
+        if (mascot.setState) mascot.setState(restMood());
       }
     }
     var sndBtn = p.querySelector('.wmp-snd');
@@ -628,12 +645,21 @@
       input.addEventListener('keydown', function (e) { if (e.key === 'Enter') answer(); });
     }
     p.querySelector('.wmp-x').addEventListener('click', function () { toggle(false); });
-    document.addEventListener('keydown', function (e) {
+    function onEsc(e) {
       if (e.key === 'Escape' && p.classList.contains('open')) toggle(false);
-    });
+    }
+    document.addEventListener('keydown', onEsc);
     mascot.el.addEventListener('click', function () { toggle(); });
     mascot.el.style.cursor = 'pointer';
-    var api = { toggle: toggle, say: say, el: p };
+    var api = {
+      toggle: toggle, say: say, el: p,
+      destroy: function () {
+        clearInterval(typeTimer);
+        document.removeEventListener('keydown', onEsc);
+        p.remove();
+        if (mascot.el) mascot.el._wmChat = null;
+      }
+    };
     mascot.el._wmChat = api;
     return api;
   }

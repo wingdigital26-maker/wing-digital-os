@@ -354,6 +354,24 @@ section{padding:34px 0 0}
 .pl-state{margin-top:14px;display:inline-block;font-size:.68rem;font-weight:700;
   letter-spacing:.07em;text-transform:uppercase;padding:4px 10px;border-radius:5px;
   background:var(--surface-2);color:var(--t3)}
+/* referral partner asset -- a generic, config-driven summary of a staged list
+   of businesses who could send the client work. Renders ONLY when the payload
+   carries `referralPartners`, so a client config without one ships none of it.
+   It shows counts read straight off the source and a sample of real rows; there
+   is no response rate, conversion rate or revenue figure anywhere in it,
+   because no such number exists in the source. */
+.rp-bars{display:grid;gap:9px;margin-bottom:6px}
+.rp-bar{display:grid;grid-template-columns:1fr auto;gap:4px 12px;align-items:baseline}
+.rp-bar .rpn{font-size:.88rem;color:var(--t1);font-weight:550}
+.rp-bar .rpc{font-size:.85rem;color:var(--t2);font-variant-numeric:tabular-nums}
+.rp-bar .rpt{grid-column:1/-1;height:6px;border-radius:999px;background:var(--surface-2);
+  overflow:hidden}
+.rp-bar .rpt i{display:block;height:100%;border-radius:999px;background:var(--accent);
+  width:0;transition:width .6s cubic-bezier(.22,1,.36,1)}
+.rp-hidden{margin-top:14px;padding:13px 16px;border-radius:var(--r-sm);
+  border:1px solid var(--border);background:var(--surface-2);font-size:.83rem;
+  color:var(--t2);line-height:1.6;max-width:76ch}
+.rp-mask{color:var(--t3);font-variant-numeric:tabular-nums}
 .pl-note{margin-top:20px;padding-top:15px;border-top:1px solid var(--border);
   font-size:.8rem;color:var(--t3);max-width:78ch;line-height:1.6}
 .pl-cta{display:inline-flex;align-items:center;gap:9px;margin-top:20px;padding:11px 20px;
@@ -418,6 +436,25 @@ section{padding:34px 0 0}
     <a class="pl-cta" id="plan-cta" target="_blank" rel="noopener" hidden></a>
   </section>
 
+  <!-- Referral partners. Generic and config-driven: this whole section exists
+       only when the payload carries `referralPartners`, and every visible word
+       is injected by the referralPartners() script below. -->
+  <section id="rp-sec" hidden>
+    <div class="sh"><h2 id="rp-h"></h2><span class="n" id="rp-n"></span></div>
+    <div class="sd" id="rp-sd"></div>
+    <div class="pl-banner" id="rp-banner" hidden></div>
+    <div class="lstats" id="rp-stats"></div>
+    <div class="mgroup" style="margin-top:0"><div class="mlabel" id="rp-cat-label"></div></div>
+    <div class="rp-bars" id="rp-cats"></div>
+    <div class="rp-hidden" id="rp-hidden" hidden></div>
+    <div class="mgroup"><div class="mlabel" id="rp-city-label"></div></div>
+    <div class="lpills" id="rp-cities"></div>
+    <div class="mgroup"><div class="mlabel" id="rp-sample-label"></div></div>
+    <div id="rp-sample"></div>
+    <div class="ctbl-cap" id="rp-cap"></div>
+    <div class="pl-note" id="rp-note" hidden></div>
+  </section>
+
   <!-- Demo activity sections (SAMPLE / preview clients only). These render ONLY
        when the client payload carries the matching demo objects; for a real
        client they stay hidden AND empty, and every visible label is injected by
@@ -472,7 +509,7 @@ section{padding:34px 0 0}
 
   <section>
     <div class="sh"><h2>What we published</h2><span class="n" id="pubn"></span></div>
-    <div class="sd">Colours match the chart above. Click any title to open it on your site.</div>
+    <div class="sd" id="pub-sd">Colours match the chart above. Click any title to open it on your site.</div>
     <div class="card" style="margin-bottom:14px">
       <div class="mix" id="mix"></div>
       <div class="keys" id="keys"></div>
@@ -499,7 +536,7 @@ section{padding:34px 0 0}
   <section id="op-sec" hidden>
     <div class="sh"><h2 id="op-h"></h2><span class="n" id="op-n"></span></div>
     <div class="sd" id="op-sd"></div>
-    <div class="hstats" id="op-reach"></div>
+    <div id="op-reach"></div>
     <div class="op-banner" id="op-banner" hidden></div>
     <div class="op-plan" id="op-plan"></div>
     <div class="mgroup" style="margin-top:0"><div class="mlabel" id="op-tpl-label"></div></div>
@@ -557,7 +594,7 @@ section{padding:34px 0 0}
 </main>
 
 <script>
-const DATA = {"slug":"jackson-roofing","generated":"2026-09-06","dataThrough":"2026-09-06","generatedAt":"2026-09-06T18:41:49","brand":{"name":"Jackson Roofing","initials":"JR","site":"https://wingdigital26-maker.github.io/jackson-roofing/","kicker":"Marketing dashboard","headline":"Here is everything we built. Here is what turns back on.","subhead":"Eleven articles went live on your site through July and August, and the rebuilt Jackson Roofing site is up right now. Publishing stopped at the end of August and nothing is posting or emailing on your behalf today. The plan below is what starts again on day one."},"engines":[],"types":{"core":{"label":"Site page","color":"#0aa7e6"},"blog":{"label":"Blog post","color":"#1bc0ff"},"service":{"label":"Service page","color":"#06809f"},"city":{"label":"City page","color":"#33414f"},"other":{"label":"Other","color":"#7a8a9a"}},"outreach":{"intro":"Nothing is being posted, sent or emailed on your behalf today. These are the lanes we would switch on, and what each one needs from you first.","channels":[{"name":"Google Business posts","icon":"star","types":[],"state":"needs_access","note":"Weekly posts to your Google Business Profile, ready to start as soon as you add us as a manager. For a roofer in a hail market this is the fastest lever there is."},{"name":"Review requests","icon":"chat","types":[],"state":"needs_access","note":"An automatic review ask after every finished job. We need your job list or a phone export to connect it, then the asks go out on their own."},{"name":"Facebook and Instagram","icon":"share","types":[],"state":"needs_access","note":"Straight answer: we measured social for your account and it brought in no leads. We will keep the pages current so anyone checking you out sees a live business, but we are not going to tell you it is where the work comes from."}]},"outreachPreview":null,"plan":{"banner":"Publishing stopped at the end of August and nothing on this page is running today. Everything below restarts the week we begin.","title":"What $1,000 a month turns on","intro":"The honest diagnosis first. You have a rebuilt site and eleven articles already live, and right now nothing is feeding any of it. When we measured social for this account it produced no leads, so we are not going to sell you social. Search, your Google profile and storm damage are the three levers that actually move roofing work in North Texas, and none of them are switched on today. That is what the plan below goes after.","phases":[{"when":"Week one","name":"Turn the lights back on","points":["Four blog posts a week begin again, written for what Plano homeowners actually type into Google.","Google Business Profile connected and posting every week.","Search Console connected, so the numbers on this dashboard become real readings instead of guesses.","Review requests wired to your job list, so finished jobs turn into Google reviews."],"state":"Starts on day one"},{"when":"Month one","name":"Pages that can rank","points":["A page for every service you sell: replacement, repair, storm and hail, inspection, commercial.","A page for every town you work: Plano, Rockwall, McKinney, and out from there.","On-page SEO and internal linking across the whole site, so new pages lift the older ones.","Roughly sixteen more posts live by the end of the month, all on your site, all clickable from here."],"state":"Included every month"},{"when":"Month two","name":"Storm targeting","points":["NOAA hail history mapped against your service area, so we know which streets took damage and when.","Storm and hail pages aimed at those neighborhoods while the damage is still fresh.","Google posts timed to the storms instead of to the calendar.","This is the one lever in North Texas roofing that does not come down to outspending somebody."],"state":"The seasonal lever"},{"when":"Every month","name":"You watch all of it","points":["This dashboard stays live and fills in as work goes out.","Every page and post is a link you can click and read for yourself.","A short monthly readout: what went live, what moved, what is next.","Anything we have no real source for stays blank instead of being filled in with a number."],"state":"Ongoing"}],"note":"No lead volume, ranking position or revenue result is promised on this page. What is committed is the work, the pace it goes out at, and a page like this one where you can check it yourself at any time.","cta":{"label":"Open your live site","url":"https://wingdigital26-maker.github.io/jackson-roofing/"}},"pendingMetrics":[{"name":"Google Search clicks and impressions","why":"Needs Search Console access for the site connected to the reporting account","state":"needs access"},{"name":"Keyword rankings","why":"Comes online with the same Search Console connection","state":"needs access"},{"name":"Google Business Profile views and calls","why":"Needs manager access to the Google Business Profile","state":"needs access"},{"name":"Calls and form leads","why":"The contact form does not report back to us, so any lead count here would be a guess","state":"not connected"}],"metrics":{},"items":[{"date":"2026-08-28","type":"blog","title":"How to Choose a Roofer in Allen Without Getting Burned","status":"published","url":"https://jacksonroofingco.com/how-to-choose-a-roofer-allen/"},{"date":"2026-08-28","type":"blog","title":"Getting Your North Texas Roof Ready for Hail Season","status":"published","url":"https://jacksonroofingco.com/roof-hail-season-prep/"},{"date":"2026-08-14","type":"blog","title":"How to Choose a Roofer in McKinney Without Getting Burned","status":"published","url":"https://jacksonroofingco.com/how-to-choose-a-roofer-mckinney/"},{"date":"2026-08-10","type":"core","title":"About Jackson Roofing & What We Do","status":"published","url":"https://wingdigital26-maker.github.io/jackson-roofing/about-services.html"},{"date":"2026-08-10","type":"core","title":"Schedule Your Free Roof Inspection Today","status":"published","url":"https://wingdigital26-maker.github.io/jackson-roofing/contact.html"},{"date":"2026-08-10","type":"core","title":"Our Work","status":"published","url":"https://wingdigital26-maker.github.io/jackson-roofing/gallery.html"},{"date":"2026-08-10","type":"core","title":"Expert Roofing for Homes and Businesses","status":"published","url":"https://wingdigital26-maker.github.io/jackson-roofing/index.html"},{"date":"2026-08-07","type":"blog","title":"Do Your Gutters Need Attention Before the Next Big Rain?","status":"published","url":"https://jacksonroofingco.com/gutters-before-the-next-big-rain/"},{"date":"2026-08-04","type":"blog","title":"How Much Does a New Roof Cost in Plano in 2026?","status":"published","url":"https://jacksonroofingco.com/new-roof-cost-plano/"},{"date":"2026-07-30","type":"blog","title":"Signs You Need a New Roof: A Plano Roofer Checklist","status":"published","url":"https://jacksonroofingco.com/signs-you-need-a-new-roof/"},{"date":"2026-07-27","type":"blog","title":"What to Do After a North Texas Hailstorm","status":"published","url":"https://jacksonroofingco.com/what-to-do-after-a-hailstorm/"},{"date":"2026-07-24","type":"blog","title":"Repair or Replace? A North Texas Roofer Honest Guide","status":"published","url":"https://jacksonroofingco.com/repair-or-replace-roof/"},{"date":"2026-07-22","type":"blog","title":"What Actually Happens During a Free Roof Inspection","status":"published","url":"https://jacksonroofingco.com/free-roof-inspection-explained/"},{"date":"2026-07-22","type":"blog","title":"Hail Damage vs Roof Wear: How to Tell the Difference","status":"published","url":"https://jacksonroofingco.com/hail-damage-vs-roof-wear/"},{"date":"2026-07-22","type":"blog","title":"Do You Need a Roof Permit in Richardson, TX?","status":"published","url":"https://jacksonroofingco.com/roof-permit-richardson-tx/"}],"pages":[{"group":"Core site pages, live now","icon":"globe","links":[{"title":"About Jackson Roofing & What We Do","url":"https://wingdigital26-maker.github.io/jackson-roofing/about-services.html"},{"title":"Schedule Your Free Roof Inspection Today","url":"https://wingdigital26-maker.github.io/jackson-roofing/contact.html"},{"title":"Our Work","url":"https://wingdigital26-maker.github.io/jackson-roofing/gallery.html"},{"title":"Expert Roofing for Homes and Businesses","url":"https://wingdigital26-maker.github.io/jackson-roofing/index.html"}]},{"group":"Blog posts we published on your site, July to August 2026","icon":"file","links":[{"title":"How to Choose a Roofer in Allen Without Getting Burned","url":"https://jacksonroofingco.com/how-to-choose-a-roofer-allen/"},{"title":"Getting Your North Texas Roof Ready for Hail Season","url":"https://jacksonroofingco.com/roof-hail-season-prep/"},{"title":"How to Choose a Roofer in McKinney Without Getting Burned","url":"https://jacksonroofingco.com/how-to-choose-a-roofer-mckinney/"},{"title":"Do Your Gutters Need Attention Before the Next Big Rain?","url":"https://jacksonroofingco.com/gutters-before-the-next-big-rain/"},{"title":"How Much Does a New Roof Cost in Plano in 2026?","url":"https://jacksonroofingco.com/new-roof-cost-plano/"},{"title":"Signs You Need a New Roof: A Plano Roofer Checklist","url":"https://jacksonroofingco.com/signs-you-need-a-new-roof/"},{"title":"What to Do After a North Texas Hailstorm","url":"https://jacksonroofingco.com/what-to-do-after-a-hailstorm/"},{"title":"Repair or Replace? A North Texas Roofer Honest Guide","url":"https://jacksonroofingco.com/repair-or-replace-roof/"},{"title":"What Actually Happens During a Free Roof Inspection","url":"https://jacksonroofingco.com/free-roof-inspection-explained/"},{"title":"Hail Damage vs Roof Wear: How to Tell the Difference","url":"https://jacksonroofingco.com/hail-damage-vs-roof-wear/"},{"title":"Do You Need a Roof Permit in Richardson, TX?","url":"https://jacksonroofingco.com/roof-permit-richardson-tx/"}]}]};
+const DATA = {"slug":"jackson-roofing","generated":"2026-09-06","dataThrough":"2026-09-06","generatedAt":"2026-09-06T18:52:11","brand":{"name":"Jackson Roofing","initials":"JR","site":"https://wingdigital26-maker.github.io/jackson-roofing/","kicker":"Marketing dashboard","headline":"Here is everything we built. Here is what turns back on.","subhead":"Twelve articles went live on your site through July and August, and the rebuilt Jackson Roofing site is up right now. We also built you a list of 1,020 North Texas businesses who could send you work, and not one of them has ever been contacted. Publishing stopped at the end of August and nothing is posting or emailing on your behalf today. The plan below is what starts again on day one."},"engines":[],"types":{"core":{"label":"Site page","color":"#0aa7e6"},"blog":{"label":"Blog post","color":"#1bc0ff"},"service":{"label":"Service page","color":"#06809f"},"city":{"label":"City page","color":"#33414f"},"gbp":{"label":"Google Business post","color":"#0d6f8a"},"reviews":{"label":"Review requests","color":"#4a5c6b"},"other":{"label":"Other","color":"#7a8a9a"}},"outreach":{"intro":"Nothing is being posted, sent or emailed on your behalf today. These are the lanes we would switch on, and what each one needs from you first.","channels":[{"name":"Google Business posts","icon":"star","types":[],"state":"needs_access","note":"Weekly posts to your Google Business Profile, ready to start as soon as you add us as a manager. For a roofer in a hail market this is the fastest lever there is."},{"name":"Review requests","icon":"chat","types":[],"state":"needs_access","note":"An automatic review ask after every finished job. We need your job list or a phone export to connect it, then the asks go out on their own."},{"name":"Facebook and Instagram","icon":"share","types":[],"state":"needs_access","note":"Straight answer: we measured social for your account and it brought in no leads. We will keep the pages current so anyone checking you out sees a live business, but we are not going to tell you it is where the work comes from."}]},"outreachPreview":null,"plan":{"banner":"Publishing stopped at the end of August and nothing on this page is running today. Everything below restarts the week we begin.","title":"What $1,000 a month turns on","intro":"The honest diagnosis first. You have a rebuilt site, twelve articles already live and a list of 1,020 businesses who could refer you work, and right now nothing is feeding any of it. When we measured social for this account it produced no leads, so we are not going to sell you social. Search, your Google profile and storm damage are the three levers that actually move roofing work in North Texas, and none of them are switched on today. That is what the plan below goes after.","phases":[{"when":"Week one","name":"Turn the lights back on","points":["Four blog posts a week begin again, written for what Plano homeowners actually type into Google.","Google Business Profile connected and posting every week.","Search Console connected, so the numbers on this dashboard become real readings instead of guesses.","Review requests wired to your job list, so finished jobs turn into Google reviews."],"state":"Starts on day one"},{"when":"Month one","name":"Pages that can rank","points":["A page for every service you sell: replacement, repair, storm and hail, inspection, commercial.","A page for every town you work: Plano, Rockwall, McKinney, and out from there.","On-page SEO and internal linking across the whole site, so new pages lift the older ones.","Roughly sixteen more posts live by the end of the month, all on your site, all clickable from here."],"state":"Included every month"},{"when":"Month two","name":"Storm targeting","points":["NOAA hail history mapped against your service area, so we know which streets took damage and when.","Storm and hail pages aimed at those neighborhoods while the damage is still fresh.","Google posts timed to the storms instead of to the calendar.","This is the one lever in North Texas roofing that does not come down to outspending somebody."],"state":"The seasonal lever"},{"when":"Every month","name":"You watch all of it","points":["This dashboard stays live and fills in as work goes out.","Every page and post is a link you can click and read for yourself.","A short monthly readout: what went live, what moved, what is next.","Anything we have no real source for stays blank instead of being filled in with a number."],"state":"Ongoing"}],"note":"No lead volume, ranking position or revenue result is promised on this page. What is committed is the work, the pace it goes out at, and a page like this one where you can check it yourself at any time.","cta":{"label":"Open your live site","url":"https://wingdigital26-maker.github.io/jackson-roofing/"}},"referralPartners":{"title":"Who could send you work","intro":"Roofing jobs come from people who hit a roof problem while doing their own job. During the engagement we built you a list of those people across North Texas: general contractors, property managers, inspectors, restoration firms and HOA managers. It is finished, it is enriched with real phone numbers and addresses, and it has been sitting untouched.","banner":"Nothing has been sent to a single business on this list. No email, no call, no text. It is built and it is parked, and it stays parked until you say otherwise.","note":"What this is, exactly: a built list, enriched where the source allowed it, and never contacted. There is no response rate, no conversion rate and no dollar figure anywhere in this section, because nothing has gone out and any number here would be invented. If we restart, we agree the message with you first, start small, and you see every reply.","sampleNote":"Real rows out of the list, shown as stored. Email addresses are part hidden on purpose: this page gets forwarded, and a page anyone can open holding hundreds of full business addresses is a list anyone can take. You get the complete unmasked file.","hiddenNote":"One more group sits inside the 1,020 total and is deliberately not broken out above: 151 insurance adjusters. Texas Insurance Code Chapter 4102 restricts a roofer from acting as a public adjuster, and roofer to adjuster outreach is legally sensitive ground. Those records stay in the list and in the total, but we are not going to hand you an adjuster outreach lane as if it were routine. If you want them worked, that is a conversation to have with your attorney first, and we would follow whatever line you draw.","total":1020,"hiddenCount":151,"unique":1017,"withEmail":460,"verifiedEmail":230,"withPhone":947,"namedContact":173,"cityCount":18,"categories":[{"key":"general-contractor","label":"General contractors","count":363},{"key":"property-manager","label":"Property managers","count":274},{"key":"real-estate-inspector","label":"Home and property inspectors","count":97},{"key":"restoration-company","label":"Restoration and water damage companies","count":86},{"key":"hoa-management","label":"HOA management companies","count":49}],"cities":[{"city":"Frisco","count":51},{"city":"McKinney","count":45},{"city":"Richardson","count":43},{"city":"Plano","count":42},{"city":"Allen","count":36},{"city":"Coppell","count":34},{"city":"Wylie","count":29},{"city":"Garland","count":21}],"sample":[{"name":"Henry Company","category":"General contractors","city":"Garland","email":"c\u2022\u2022\u2022@henry.com","phone":"(972)276-7948"},{"name":"Westshore Realty LLC","category":"Property managers","city":"Garland","email":"m\u2022\u2022\u2022@memrealty.com","phone":"(972)914-1248"},{"name":"Allen Building Inspections","category":"Home and property inspectors","city":"Allen","email":"c\u2022\u2022\u2022@allentx.gov","phone":"(214)509-4130"},{"name":"1-800 Water Damage of McKinney & Frisco","category":"Restoration and water damage companies","city":"McKinney","email":"m\u2022\u2022\u2022@1800waterdamage.com","phone":"(972)888-6013"},{"name":"Bridgewater Residential Community, Inc. (HOA Management Office)","category":"HOA management companies","city":"Wylie","email":"c\u2022\u2022\u2022@insightam.com","phone":"(972)993-6790"},{"name":"Wolf Builders Group","category":"General contractors","city":"Plano","email":"w\u2022\u2022\u2022@gmail.com","phone":"(469)278-1774"},{"name":"Accolade Property Management","category":"Property managers","city":"Coppell","email":"m\u2022\u2022\u2022@gmail.com","phone":"(214)496-0600"},{"name":"Ally Certified Home Inspections Rowlett","category":"Home and property inspectors","city":"Garland","email":"a\u2022\u2022\u2022@gmail.com","phone":"(972)900-1088"},{"name":"B-Line Flood Restoration","category":"Restoration and water damage companies","city":"McKinney","email":"b\u2022\u2022\u2022@gmail.com","phone":"(469)247-1720"},{"name":"Crown Ridge Community","category":"HOA management companies","city":"Frisco","email":"j\u2022\u2022\u2022@gmail.com","phone":""}]},"notes":{"published":"Everything Wing Digital put live for you. Twelve blog posts went up on jacksonroofingco.com through July and August 2026. Eleven of them are links you can click; the twelfth published without a URL being recorded on our side, so it is listed here plainly rather than pointed at a guess. The two July items that are not articles were real one-off actions from the same period. The site pages sit on the rebuilt site. Click any title that is a link to open it."},"metrics":{},"items":[{"date":"2026-08-28","type":"blog","title":"How to Choose a Roofer in Allen Without Getting Burned","status":"published","url":"https://jacksonroofingco.com/how-to-choose-a-roofer-allen/"},{"date":"2026-08-14","type":"blog","title":"How to Choose a Roofer in McKinney Without Getting Burned","status":"published","url":"https://jacksonroofingco.com/how-to-choose-a-roofer-mckinney/"},{"date":"2026-08-11","type":"blog","title":"Getting Your North Texas Roof Ready for Hail Season","status":"published","url":"https://jacksonroofingco.com/roof-hail-season-prep/"},{"date":"2026-08-10","type":"core","title":"About Jackson Roofing & What We Do","status":"published","url":"https://wingdigital26-maker.github.io/jackson-roofing/about-services.html"},{"date":"2026-08-10","type":"core","title":"Schedule Your Free Roof Inspection Today","status":"published","url":"https://wingdigital26-maker.github.io/jackson-roofing/contact.html"},{"date":"2026-08-10","type":"core","title":"Our Work","status":"published","url":"https://wingdigital26-maker.github.io/jackson-roofing/gallery.html"},{"date":"2026-08-10","type":"core","title":"Expert Roofing for Homes and Businesses","status":"published","url":"https://wingdigital26-maker.github.io/jackson-roofing/index.html"},{"date":"2026-08-07","type":"blog","title":"Do Your Gutters Need Attention Before the Next Big Rain?","status":"published","url":"https://jacksonroofingco.com/gutters-before-the-next-big-rain/"},{"date":"2026-08-04","type":"blog","title":"How Much Does a New Roof Cost in Plano in 2026?","status":"published","url":"https://jacksonroofingco.com/new-roof-cost-plano/"},{"date":"2026-07-30","type":"blog","title":"Signs You Need a New Roof: A Plano Roofer Checklist","status":"published","url":"https://jacksonroofingco.com/signs-you-need-a-new-roof/"},{"date":"2026-07-27","type":"blog","title":"What to Do After a North Texas Hailstorm","status":"published","url":"https://jacksonroofingco.com/what-to-do-after-a-hailstorm/"},{"date":"2026-07-24","type":"blog","title":"Repair or Replace? A North Texas Roofer Honest Guide","status":"published","url":"https://jacksonroofingco.com/repair-or-replace-roof/"},{"date":"2026-07-22","type":"blog","title":"What Actually Happens During a Free Roof Inspection","status":"published","url":"https://jacksonroofingco.com/free-roof-inspection-explained/"},{"date":"2026-07-22","type":"blog","title":"Hail Damage vs Roof Wear: How to Tell the Difference","status":"published","url":"https://jacksonroofingco.com/hail-damage-vs-roof-wear/"},{"date":"2026-07-22","type":"blog","title":"Do You Need a Roof Permit in Richardson, TX?","status":"published","url":"https://jacksonroofingco.com/roof-permit-richardson-tx/"},{"date":"2026-07-21","type":"blog","title":"How Long Does a Roof Last in North Texas?","status":"published","url":""},{"date":"2026-07-20","type":"gbp","title":"Google Business post with a fresh job photo","status":"published","url":""},{"date":"2026-07-20","type":"reviews","title":"Review requests sent out to recent jobs","status":"published","url":""}],"pages":[{"group":"Core site pages, live now","icon":"globe","links":[{"title":"About Jackson Roofing & What We Do","url":"https://wingdigital26-maker.github.io/jackson-roofing/about-services.html"},{"title":"Schedule Your Free Roof Inspection Today","url":"https://wingdigital26-maker.github.io/jackson-roofing/contact.html"},{"title":"Our Work","url":"https://wingdigital26-maker.github.io/jackson-roofing/gallery.html"},{"title":"Expert Roofing for Homes and Businesses","url":"https://wingdigital26-maker.github.io/jackson-roofing/index.html"}]},{"group":"Blog posts you can open on your site, July to August 2026","icon":"file","links":[{"title":"How to Choose a Roofer in Allen Without Getting Burned","url":"https://jacksonroofingco.com/how-to-choose-a-roofer-allen/"},{"title":"How to Choose a Roofer in McKinney Without Getting Burned","url":"https://jacksonroofingco.com/how-to-choose-a-roofer-mckinney/"},{"title":"Getting Your North Texas Roof Ready for Hail Season","url":"https://jacksonroofingco.com/roof-hail-season-prep/"},{"title":"Do Your Gutters Need Attention Before the Next Big Rain?","url":"https://jacksonroofingco.com/gutters-before-the-next-big-rain/"},{"title":"How Much Does a New Roof Cost in Plano in 2026?","url":"https://jacksonroofingco.com/new-roof-cost-plano/"},{"title":"Signs You Need a New Roof: A Plano Roofer Checklist","url":"https://jacksonroofingco.com/signs-you-need-a-new-roof/"},{"title":"What to Do After a North Texas Hailstorm","url":"https://jacksonroofingco.com/what-to-do-after-a-hailstorm/"},{"title":"Repair or Replace? A North Texas Roofer Honest Guide","url":"https://jacksonroofingco.com/repair-or-replace-roof/"},{"title":"What Actually Happens During a Free Roof Inspection","url":"https://jacksonroofingco.com/free-roof-inspection-explained/"},{"title":"Hail Damage vs Roof Wear: How to Tell the Difference","url":"https://jacksonroofingco.com/hail-damage-vs-roof-wear/"},{"title":"Do You Need a Roof Permit in Richardson, TX?","url":"https://jacksonroofingco.com/roof-permit-richardson-tx/"}]}]};
 
 (function(){
   'use strict';
@@ -760,6 +797,10 @@ const DATA = {"slug":"jackson-roofing","generated":"2026-09-06","dataThrough":"2
     '<span class="kn">'+esc(label(t))+'</span><span class="kv">'+counts[t]+'</span></div>').join('');
 
   /* ── the list ────────────────────────────────────────────── */
+  // Optional, generic: a config may replace this section subhead when the plain
+  // sentence is not the honest one (e.g. a record that spans a retired host).
+  if (DATA.notes && DATA.notes.published) $('#pub-sd').textContent = DATA.notes.published;
+
   const STEP = 12;
   let shown = STEP, query = '';
 
@@ -833,6 +874,80 @@ const DATA = {"slug":"jackson-roofing","generated":"2026-09-06","dataThrough":"2
         '<path d="M9 7h8v8"/></svg>';
       a.hidden = false;
     }
+  })();
+
+  /* ── referral partners ─────────────────────────────────────────
+     Generic and config-driven. Renders nothing unless the payload carries
+     `referralPartners`. Every number below is a straight count of rows in the
+     source list; the section states what has and has not been done with that
+     list and stops there. Addresses arrive already masked from the build. */
+  (function referralPartners(){
+    const R = DATA.referralPartners;
+    if (!R || !R.total) return;
+    const sec = $('#rp-sec');
+    sec.hidden = false;
+    const num = x => (x||0).toLocaleString('en-US');
+
+    $('#rp-h').textContent  = R.title || 'Who could send you work';
+    $('#rp-n').textContent  = num(R.total) + ' businesses';
+    $('#rp-sd').textContent = R.intro || '';
+    if (R.banner) { $('#rp-banner').textContent = R.banner; $('#rp-banner').hidden = false; }
+
+    const tiles = [
+      [R.total,         'businesses on the list'],
+      [R.withPhone,     'with a phone number'],
+      [R.withEmail,     'with an email address'],
+      [R.verifiedEmail, 'with a verified email'],
+      [R.namedContact,  'with a named contact'],
+      [R.cityCount,     'cities covered']
+    ];
+    $('#rp-stats').innerHTML = tiles.map(t =>
+      '<div class="lstat"><b>'+num(t[0])+'</b><span>'+esc(t[1])+'</span></div>').join('');
+
+    const cats = R.categories || [];
+    if (cats.length) {
+      $('#rp-cat-label').textContent = 'What kind of business they are';
+      const max = Math.max.apply(null, cats.map(c=>c.count));
+      $('#rp-cats').innerHTML = cats.map(c =>
+        '<div class="rp-bar"><div class="rpn">'+esc(c.label)+'</div>'+
+        '<div class="rpc">'+num(c.count)+'</div>'+
+        '<div class="rpt"><i data-w="'+((c.count/max)*100).toFixed(1)+'"></i></div></div>').join('');
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{
+        document.querySelectorAll('#rp-cats .rpt i').forEach(b=>{ b.style.width = b.dataset.w+'%'; });
+      }));
+    }
+    if (R.hiddenNote && R.hiddenCount) {
+      $('#rp-hidden').textContent = R.hiddenNote;
+      $('#rp-hidden').hidden = false;
+    }
+
+    const cities = R.cities || [];
+    if (cities.length) {
+      // Counted across the VISIBLE categories only, so this list and the
+      // breakdown above are always describing the same set of businesses.
+      $('#rp-city-label').textContent =
+        'Top cities among the types above, counting the ones with an email address';
+      $('#rp-cities').innerHTML = cities.map(c =>
+        '<span class="lpill">'+esc(c.city)+' <i>'+num(c.count)+'</i></span>').join('');
+    }
+
+    const S = R.sample || [];
+    if (S.length) {
+      // Rows, not a table. A four-column table on a 375px phone hides the
+      // contact column behind a sideways swipe, and the contact is the whole
+      // point of showing a sample at all.
+      $('#rp-sample-label').textContent = 'A sample of the actual list';
+      $('#rp-sample').innerHTML = S.map(x => {
+        const meta = [x.category, x.city].filter(Boolean).map(esc).join(' &middot; ');
+        const ct = x.email || x.phone || '';
+        return '<div class="lrow"><div class="lnm">'+esc(x.name)+'</div>'+
+          '<div class="lmt">'+meta+'</div>'+
+          (ct ? '<div class="lcts"><span class="lct lmail rp-mask">'+esc(ct)+'</span></div>' : '')+
+          '</div>';
+      }).join('');
+      $('#rp-cap').textContent = R.sampleNote || '';
+    }
+    if (R.note) { $('#rp-note').textContent = R.note; $('#rp-note').hidden = false; }
   })();
 
   /* The agency credit is a link only when the payload carries a URL we stand
@@ -1122,9 +1237,10 @@ const DATA = {"slug":"jackson-roofing","generated":"2026-09-06","dataThrough":"2
       rt.push('<div class="hstat"><div class="hstat-v">'+QR.length.toLocaleString()+'</div>'+
               '<div class="hstat-l">Businesses on your list</div></div>');
       if (cats.size) rt.push('<div class="hstat"><div class="hstat-v">'+cats.size+'</div>'+
-              '<div class="hstat-l">Types of partner we reach</div></div>');
+              '<div class="hstat-l">Types of partner on your list</div></div>');
       if (cities.size) rt.push('<div class="hstat"><div class="hstat-v">'+cities.size+'</div>'+
-              '<div class="hstat-l">Cities covered</div></div>');
+              '<div class="hstat-l">Cities on your list</div></div>');
+      $('#op-reach').className = 'hstats';
       $('#op-reach').innerHTML = rt.join('');
     }
 
@@ -1421,8 +1537,7 @@ const DATA = {"slug":"jackson-roofing","generated":"2026-09-06","dataThrough":"2
 </script>
 <div id="wing-helper" title="Zephyr, from Wing Digital"
   style="position:fixed;right:16px;bottom:14px;z-index:60;opacity:0;pointer-events:none;transition:opacity .8s"></div>
-<script src="/mascot/zephyr-kb.js?v=1"></script>
-<script src="/mascot/wing-mascot.js?v=10"></script>
+<script src="/mascot/wing-mascot.js?v=11"></script>
 <script>
 (function(){
   if (!window.WingMascot) return;
@@ -1497,7 +1612,21 @@ const DATA = {"slug":"jackson-roofing","generated":"2026-09-06","dataThrough":"2
       { q: 'I want more of something', a: 'Tell us. Reply to any email or text from Wing Digital and we will point the engine where you want it.' }
     ]
   };
-  chatOpts.kb = kbLocal.concat(window.ZEPHYR_KB || []);
+  // Client-safe general answers. Nothing here names another client, quotes a
+  // cross-client figure, or claims a service this dashboard cannot evidence.
+  kbLocal.push({
+    k: ['what is wing', 'who are you', 'what do you do', 'about wing', 'company'],
+    a: 'Wing Digital builds and runs the marketing behind your business: your website, the content that gets you found on Google, and the systems that follow up. This dashboard is the live record of that work.'
+  });
+  kbLocal.push({
+    k: ['contact', 'talk to someone', 'reach you', 'question', 'help', 'change something', 'more of'],
+    a: 'Reply to any email from Wing Digital, or use the contact page on wingdigital.co. A real person answers fast and can point the work wherever you want it.'
+  });
+  kbLocal.push({
+    k: ['how often', 'schedule', 'cadence', 'how much work', 'every week'],
+    a: 'Work publishes on a steady weekly rhythm. The chart above shows the real pace, one bar per period, so you can see it rather than take our word for it.'
+  });
+  chatOpts.kb = kbLocal;
   chatOpts.fallback = dashFallback;
   if (WingMascot.chat) WingMascot.chat(z, chatOpts);
   setTimeout(function(){ slot.style.opacity = 1; slot.style.pointerEvents = 'auto'; z.flare(); }, 1200);

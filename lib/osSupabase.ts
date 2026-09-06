@@ -69,6 +69,43 @@ export async function sbSelect<T = any>({
   }
 }
 
+// Strict variant of sbSelect: distinguishes real data from failure instead of
+// collapsing every error into []. Callers that must not fake an all-clear
+// (e.g. /api/alerts) use this. sbSelect's behavior is unchanged.
+export type SbStrictResult<T> =
+  | { ok: true; rows: T[] }
+  | { ok: false; rows: []; error: string };
+
+export async function sbSelectStrict<T = any>({
+  table,
+  select = "*",
+  query = "",
+  service = false,
+}: SbQuery): Promise<SbStrictResult<T>> {
+  const url = sbUrl();
+  const key = service ? sbService() : sbAnon();
+  if (!url || !key) {
+    return { ok: false, rows: [], error: "Supabase env not configured (OS_SUPABASE_URL / key missing)" };
+  }
+  const qs = `select=${encodeURIComponent(select)}${query ? `&${query}` : ""}`;
+  try {
+    const r = await fetch(`${url}/rest/v1/${table}?${qs}`, {
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+      cache: "no-store",
+    });
+    if (!r.ok) {
+      return { ok: false, rows: [], error: `Supabase HTTP ${r.status} reading ${table}` };
+    }
+    return { ok: true, rows: (await r.json()) as T[] };
+  } catch (e) {
+    return {
+      ok: false,
+      rows: [],
+      error: `Supabase unreachable reading ${table}: ${e instanceof Error ? e.message : "network error"}`,
+    };
+  }
+}
+
 // Insert one row via the service key and return the created row(s).
 export async function sbInsert<T = any>(
   table: string,

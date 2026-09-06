@@ -137,7 +137,12 @@ type AlertRow = {
   resolved_at: string | null;
 };
 type HeartbeatRow = { agent: string; status: string; message: string | null; last_beat: string };
-type AlertsPayload = { alerts: AlertRow[]; heartbeats: HeartbeatRow[] };
+type AlertsPayload = {
+  available?: boolean; // absent on old payloads = treated as available
+  reason?: string | null;
+  alerts: AlertRow[];
+  heartbeats: HeartbeatRow[];
+};
 
 type MessagingPayload = {
   lane?: { paused?: boolean | null; deliveryWarning?: string | null };
@@ -355,8 +360,10 @@ export default function TodayBoard() {
 
   const todayEvents = useMemo(() => {
     if (calendar.state !== "ok") return null;
-    const key = calendar.data.today || todayKey;
-    return calendar.data.events.filter((e) => isTodayEvent(e, key));
+    // Deliberately ignore the server's `today` (UTC on Vercel): event day keys
+    // are compared in browser-local time, so the filter key must be local too,
+    // or evening viewers see today's bookings vanish.
+    return calendar.data.events.filter((e) => isTodayEvent(e, todayKey));
   }, [calendar, todayKey]);
 
   const failedRuns = useMemo(() => {
@@ -365,12 +372,12 @@ export default function TodayBoard() {
   }, [runs]);
 
   const openAlerts = useMemo(() => {
-    if (alerts.state !== "ok" || !Array.isArray(alerts.data.alerts)) return null;
+    if (alerts.state !== "ok" || alerts.data.available === false || !Array.isArray(alerts.data.alerts)) return null;
     return alerts.data.alerts.filter((a) => !a.resolved_at);
   }, [alerts]);
 
   const badBeats = useMemo(() => {
-    if (alerts.state !== "ok" || !Array.isArray(alerts.data.heartbeats)) return null;
+    if (alerts.state !== "ok" || alerts.data.available === false || !Array.isArray(alerts.data.heartbeats)) return null;
     return alerts.data.heartbeats.filter((h) => h.status === "error");
   }, [alerts]);
 
@@ -465,6 +472,14 @@ export default function TodayBoard() {
               );
             })}
           {hotWarm && hotWarm.length > 8 && <Muted>+{hotWarm.length - 8} more in the inbox.</Muted>}
+          {replies.state === "ok" &&
+            replies.data.available &&
+            typeof replies.data.totalCount === "number" &&
+            replies.data.totalCount > replies.data.items.length && (
+              <Muted>
+                Showing {replies.data.items.length} of {replies.data.totalCount} triaged replies (fetch limit).
+              </Muted>
+            )}
         </Section>
 
         {/* ── Drafts awaiting approval ───────────────────────────────────── */}
@@ -482,7 +497,16 @@ export default function TodayBoard() {
           {replyDrafts === null && replies.state === "loading" ? (
             <Muted>Checking reply drafts…</Muted>
           ) : replyDrafts === null ? (
-            <SourceDown name="Reply drafts (/api/replies)" reason="not reachable" />
+            <SourceDown
+              name="Reply drafts (/api/replies)"
+              reason={
+                replies.state === "ok"
+                  ? replies.data.reason ?? "unavailable"
+                  : replies.state === "error"
+                  ? replies.reason
+                  : "unavailable"
+              }
+            />
           ) : (
             <button style={rowBtn} onClick={() => goView("replies")}>
               <span style={{ fontWeight: 600 }}>{replyDrafts.length}</span>
@@ -539,7 +563,13 @@ export default function TodayBoard() {
                 onClick={() => {
                   if (e.url) {
                     if (e.external) window.open(e.url, "_blank", "noopener");
-                    else location.href = e.url;
+                    else if (e.url.startsWith("#")) {
+                      // Legacy in-shell ids like "#invoices": location.href on a
+                      // bare hash does nothing. Dispatch through the shell's
+                      // os:navigate handler, which resolves legacy aliases
+                      // (e.g. invoices -> calendar) itself.
+                      window.dispatchEvent(new CustomEvent("os:navigate", { detail: e.url.slice(1) }));
+                    } else location.href = e.url;
                   } else goView("calendar");
                 }}
                 title={e.url ? "Open this item" : "Open the calendar"}
@@ -616,6 +646,9 @@ export default function TodayBoard() {
         >
           {alerts.state === "loading" && <Muted>Checking watchdog alerts…</Muted>}
           {alerts.state === "error" && <SourceDown name="Alerts (/api/alerts)" reason={alerts.reason} />}
+          {alerts.state === "ok" && alerts.data.available === false && (
+            <SourceDown name="Watchdog store (Supabase)" reason={alerts.data.reason ?? "unavailable"} />
+          )}
           {openAlerts && badBeats && openAlerts.length === 0 && badBeats.length === 0 && (
             <Muted>No open watchdog alerts; no agent heartbeat is reporting an error.</Muted>
           )}

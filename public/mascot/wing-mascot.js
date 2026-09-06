@@ -161,6 +161,84 @@
   var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var styleInjected = false;
 
+  /* Sound: tiny synthesized cue engine. No files, no libraries, CSP safe.
+   * Rules that keep a client dashboard quiet:
+   *  - default OFF, choice persisted in localStorage under zephyr:sound
+   *  - nothing ever plays until a real user gesture has happened on the page
+   *  - the AudioContext is built lazily inside that gesture, never at load
+   *  - silent under prefers-reduced-motion, silent if AudioContext is missing
+   *  - every cue is under 400ms and peaks at or below 0.09 gain */
+  var SOUND_KEY = 'zephyr:sound';
+  var sound = (function () {
+    var enabled = false, ctx = null, gestured = false;
+    try {
+      enabled = window.localStorage && window.localStorage.getItem(SOUND_KEY) === 'on';
+    } catch (e) { enabled = false; }
+
+    function markGesture() { gestured = true; }
+    if (window.document && document.addEventListener) {
+      document.addEventListener('pointerdown', markGesture, true);
+      document.addEventListener('click', markGesture, true);
+      document.addEventListener('keydown', markGesture, true);
+    }
+    function quiet() {
+      return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    }
+    function context() {
+      if (ctx) return ctx;
+      var C = window.AudioContext || window.webkitAudioContext;
+      if (!C) return null;
+      try { ctx = new C(); } catch (e) { ctx = null; }
+      return ctx;
+    }
+    /* one soft note: exponential attack and decay so there is no click */
+    function note(c, freq, delay, dur, peak, type) {
+      var t0 = c.currentTime + delay;
+      var o = c.createOscillator();
+      var g = c.createGain();
+      o.type = type || 'sine';
+      if (o.frequency && o.frequency.setValueAtTime) o.frequency.setValueAtTime(freq, t0);
+      if (g.gain && g.gain.setValueAtTime) {
+        g.gain.setValueAtTime(0.0001, t0);
+        g.gain.exponentialRampToValueAtTime(Math.min(peak, 0.09), t0 + 0.018);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      }
+      o.connect(g);
+      g.connect(c.destination);
+      o.start(t0);
+      o.stop(t0 + dur + 0.02);
+    }
+    var CUES = {
+      chime: function (c) { note(c, 660, 0, 0.16, 0.06); note(c, 880, 0.085, 0.19, 0.05); },
+      blip: function (c) { note(c, 760, 0, 0.07, 0.045, 'triangle'); },
+      pop: function (c) { note(c, 520, 0, 0.09, 0.05, 'triangle'); },
+      sparkle: function (c) { note(c, 660, 0, 0.12, 0.045); note(c, 880, 0.06, 0.12, 0.045); note(c, 1180, 0.12, 0.14, 0.04); },
+      hush: function (c) { note(c, 560, 0, 0.1, 0.05); note(c, 380, 0.07, 0.14, 0.04); }
+    };
+    function play(name) {
+      if (!enabled || !gestured) return false;
+      if (quiet()) return false;
+      var cue = CUES[name];
+      if (!cue) return false;
+      var c = context();
+      if (!c) return false;
+      try { if (c.state === 'suspended' && c.resume) c.resume(); } catch (e) { /* ignore */ }
+      try { cue(c); } catch (e) { return false; }
+      return true;
+    }
+    return {
+      play: play,
+      isEnabled: function () { return !!enabled; },
+      setEnabled: function (on) {
+        enabled = !!on;
+        try {
+          if (window.localStorage) window.localStorage.setItem(SOUND_KEY, enabled ? 'on' : 'off');
+        } catch (e) { /* storage can throw; the in-memory choice still holds */ }
+        return enabled;
+      }
+    };
+  })();
+
   function mount(el, opts) {
     opts = opts || {};
     if (!styleInjected) {
@@ -204,6 +282,12 @@
     function setState(state) {
       MOODS.forEach(function (m) { root.classList.remove('wm-' + m); });
       if (MOODS.indexOf(state) !== -1) root.classList.add('wm-' + state);
+    }
+    function getState() {
+      for (var i = 0; i < MOODS.length; i++) {
+        if (root.classList.contains('wm-' + MOODS[i])) return MOODS[i];
+      }
+      return 'calm';
     }
     function pin(state) { pinned = MOODS.indexOf(state) !== -1 ? state : null; setState(state); }
     function unpin() { pinned = null; setState('calm'); }
@@ -264,6 +348,7 @@
     var pulseTimer = null;
     function pulse(state, ms) {
       setState(state);
+      if (state === 'party') sound.play('sparkle');
       clearTimeout(pulseTimer);
       pulseTimer = setTimeout(function () { setState(pinned || 'calm'); }, ms || 4000);
     }
@@ -290,6 +375,9 @@
       bubbleEl.style.bottom = Math.max(8, window.innerHeight - r.top + 10) + 'px';
       bubbleEl.style.visibility = 'visible';
       requestAnimationFrame(function () { bubbleEl.style.opacity = '1'; });
+      /* pop is gated on sound being on AND a real gesture having happened, so
+       * the arrival greeting on page load stays silent. */
+      sound.play('pop');
       clearTimeout(bubbleTimer);
       bubbleTimer = setTimeout(function () { bubbleEl.style.opacity = '0'; }, ms || 7000);
     }
@@ -300,7 +388,8 @@
     return {
       blink: blink, flare: flare, setState: setState, pin: pin, unpin: unpin,
       pulse: pulse, bubble: bubble, hideBubble: hideBubble, destroy: destroy, el: root,
-      getPinned: function () { return pinned; }
+      getPinned: function () { return pinned; },
+      getState: getState
     };
   }
 
@@ -348,7 +437,7 @@
     };
   }
 
-  window.WingMascot = { mount: mount, autoMood: autoMood };
+  window.WingMascot = { mount: mount, autoMood: autoMood, sound: sound };
 })();
 
 /* Zephyr assistant panel: a guided, scripted Q&A that makes the entity feel
@@ -366,7 +455,11 @@
     '.wmp-head b{font-weight:600}' +
     '.wmp-head .dot{width:8px;height:8px;border-radius:50%;background:#7d9bff;box-shadow:0 0 8px #7d9bff;animation:wmpulse 2s infinite}' +
     '@keyframes wmpulse{50%{opacity:.4}}' +
-    '.wmp-x{margin-left:auto;background:none;border:0;color:#8fa3d8;font-size:16px;cursor:pointer;padding:2px 6px}' +
+    '.wmp-x{background:none;border:0;color:#8fa3d8;font-size:16px;cursor:pointer;padding:2px 6px}' +
+    '.wmp-snd{margin-left:auto;background:rgba(39,87,230,.16);border:1px solid rgba(125,155,255,.3);color:#8fa3d8;' +
+    'border-radius:8px;font-size:13px;line-height:1;cursor:pointer;padding:5px 7px;transition:color .15s,border-color .15s,background .15s}' +
+    '.wmp-snd:hover{color:#eaf0ff;border-color:#7d9bff;background:rgba(39,87,230,.32)}' +
+    '.wmp-snd[aria-pressed="true"]{color:#eaf0ff;border-color:#7d9bff}' +
     '.wmp-body{padding:14px;min-height:72px;line-height:1.55;color:#c9d6ff}' +
     '.wmp-body a{color:#9db4ff}' +
     '.wmp-q{display:flex;flex-direction:column;gap:7px;padding:0 14px 14px}' +
@@ -399,6 +492,7 @@
     p.setAttribute('aria-label', 'Zephyr assistant');
     p.innerHTML = '<div class="wmp-head"><span class="dot"></span><b>Zephyr</b>' +
       '<span style="color:#8fa3d8;font-size:12px">Wing Digital</span>' +
+      '<button class="wmp-snd" type="button" aria-pressed="false" aria-label="Turn Zephyr sound on"></button>' +
       '<button class="wmp-x" aria-label="Close">&times;</button></div>' +
       '<div class="wmp-body"></div><div class="wmp-q"></div>' +
       '<div class="wmp-ask" hidden><input type="text" maxlength="200" placeholder="Ask Zephyr anything..." aria-label="Ask Zephyr">' +
@@ -408,18 +502,35 @@
     var qwrap = p.querySelector('.wmp-q');
     var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     var typeTimer = null;
+    var sound = (window.WingMascot && window.WingMascot.sound) || { play: function () { return false; }, isEnabled: function () { return false; }, setEnabled: function () { return false; } };
 
+    /* the mood to fall back to once a temporary emotion is done: an honestly
+     * pinned mood always wins, so a dim dashboard never gets overwritten. */
+    function restMood() {
+      var pinnedMood = mascot.getPinned && mascot.getPinned();
+      if (pinnedMood) return pinnedMood;
+      var now = mascot.getState ? mascot.getState() : 'calm';
+      if (now === 'thinking' || now === 'excited' || now === 'party' || now === 'alert') return 'calm';
+      return now;
+    }
+    /* say: he thinks while he types, then settles back. */
     function say(html) {
       clearInterval(typeTimer);
-      if (reduced) { body.innerHTML = html; return; }
+      var back = restMood();
+      if (reduced) { body.innerHTML = html; if (mascot.setState) mascot.setState(back); return; }
       var tmp = document.createElement('div');
       tmp.innerHTML = html;
       var full = tmp.textContent, i = 0;
       body.textContent = '';
+      if (mascot.setState) mascot.setState('thinking');
       typeTimer = setInterval(function () {
         i += 2;
         body.textContent = full.slice(0, i);
-        if (i >= full.length) { clearInterval(typeTimer); body.innerHTML = html; }
+        if (i >= full.length) {
+          clearInterval(typeTimer);
+          body.innerHTML = html;
+          if (mascot.setState) mascot.setState(back);
+        }
       }, 14);
     }
     function renderQuestions() {
@@ -428,17 +539,53 @@
         var b = document.createElement('button');
         b.textContent = item.q;
         b.addEventListener('click', function () {
+          sound.play('blip');
           mascot.flare();
-          say(item.a);
+          /* a beat of excitement that someone asked, then he thinks it over */
+          if (mascot.setState && !reduced) mascot.setState('excited');
+          setTimeout(function () { say(item.a); }, reduced ? 0 : 260);
         });
         qwrap.appendChild(b);
       });
     }
+    var greetedKey = 'zephyr:greeted';
+    function firstOpenOfSession() {
+      try {
+        if (!window.sessionStorage) return false;
+        if (window.sessionStorage.getItem(greetedKey) === '1') return false;
+        window.sessionStorage.setItem(greetedKey, '1');
+        return true;
+      } catch (e) { return false; }
+    }
     function toggle(force) {
       var open = typeof force === 'boolean' ? force : !p.classList.contains('open');
+      var was = p.classList.contains('open');
       p.classList.toggle('open', open);
-      if (open) { if (mascot.hideBubble) mascot.hideBubble(); mascot.flare(); say(opts.greeting || 'Hey, I am Zephyr. What do you want to know?'); renderQuestions(); }
+      if (open) {
+        if (mascot.hideBubble) mascot.hideBubble();
+        sound.play('chime');
+        mascot.flare();
+        /* a greeting flourish the very first time he is opened this session */
+        if (firstOpenOfSession() && mascot.pulse && !reduced) mascot.pulse('party', 2200);
+        say(opts.greeting || 'Hey, I am Zephyr. What do you want to know?');
+        renderQuestions();
+      } else if (was) {
+        sound.play('hush');
+      }
     }
+    var sndBtn = p.querySelector('.wmp-snd');
+    function paintSound() {
+      var on = sound.isEnabled();
+      sndBtn.textContent = on ? 'Sound on' : 'Sound off';
+      sndBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      sndBtn.setAttribute('aria-label', on ? 'Turn Zephyr sound off' : 'Turn Zephyr sound on');
+    }
+    paintSound();
+    sndBtn.addEventListener('click', function () {
+      var on = sound.setEnabled(!sound.isEnabled());
+      paintSound();
+      if (on) sound.play('blip');
+    });
     /* Knowledge base: entries of {k:[keywords], a:'answer html'} from opts.kb or
      * window.ZEPHYR_KB. Pure client-side keyword scoring; unknown questions get
      * an honest fallback, never a made-up answer. */
@@ -463,12 +610,18 @@
           });
           if (score > bestScore) { bestScore = score; best = entry; }
         });
+        sound.play('blip');
         mascot.setState && mascot.setState('thinking');
         setTimeout(function () {
-          mascot.setState && mascot.setState('calm');
           mascot.flare();
-          if (best && bestScore >= 2) say(best.a);
-          else say(opts.fallback || 'That one is past what I know off the top of my head. The contact form reaches a real person at Wing Digital fast, and they will have the answer.');
+          if (best && bestScore >= 2) { say(best.a); }
+          else {
+            /* he reacts to not knowing, then hands off honestly */
+            var fb = opts.fallback || 'That one is past what I know off the top of my head. The contact form reaches a real person at Wing Digital fast, and they will have the answer.';
+            /* he reacts to not knowing before answering honestly */
+            if (mascot.setState && !reduced) mascot.setState('alert');
+            setTimeout(function () { say(fb); }, reduced ? 0 : 700);
+          }
         }, 650);
       }
       askBtn.addEventListener('click', answer);

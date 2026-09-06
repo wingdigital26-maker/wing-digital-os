@@ -1,9 +1,6 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Hero's Junk Removal | Client Dashboard</title>
+<title>Jackson Roofing Dashboard</title>
 <script>document.documentElement.setAttribute('data-theme','light');</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,7 +11,7 @@
 :root{
   --bg:#fbfaf8; --surface:#ffffff; --surface-2:#f4f2ee; --surface-3:#ebe8e2;
   --border:rgba(46,40,32,.12); --border-hi:rgba(46,40,32,.3);
-  --accent:#b22234; --accent-bg:rgba(178,34,52,.08); --accent-glow:rgba(178,34,52,.12);
+  --accent:#06809f; --accent-bg:rgba(6,128,159,.08); --accent-glow:rgba(6,128,159,.13);
   --t1:#1c1a17; --t2:#59544c; --t3:#8a837a;
   --ok:#2f7d55; --ok-bg:rgba(47,125,85,.11);
   --display:"Fraunces",Georgia,serif;
@@ -26,7 +23,7 @@
   :root:not([data-theme="light"]){
     --bg:#14120f; --surface:#1c1a16; --surface-2:#24211c; --surface-3:#2d2922;
     --border:rgba(214,204,190,.14); --border-hi:rgba(214,204,190,.32);
-    --accent:#e2586a; --accent-bg:rgba(226,88,106,.13); --accent-glow:rgba(226,88,106,.20);
+    --accent:#1bc0ff; --accent-bg:rgba(27,192,255,.13); --accent-glow:rgba(27,192,255,.20);
     --t1:#f3efe8; --t2:#a89f92; --t3:#7a7268;
     --ok:#4ac585; --ok-bg:rgba(74,197,133,.13);
     --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px -18px rgba(0,0,0,.7);
@@ -35,12 +32,11 @@
 :root[data-theme="dark"]{
   --bg:#14120f; --surface:#1c1a16; --surface-2:#24211c; --surface-3:#2d2922;
   --border:rgba(214,204,190,.14); --border-hi:rgba(214,204,190,.32);
-  --accent:#e2586a; --accent-bg:rgba(226,88,106,.13); --accent-glow:rgba(226,88,106,.20);
+  --accent:#1bc0ff; --accent-bg:rgba(27,192,255,.13); --accent-glow:rgba(27,192,255,.20);
   --t1:#f3efe8; --t2:#a89f92; --t3:#7a7268;
   --ok:#4ac585; --ok-bg:rgba(74,197,133,.13);
   --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px -18px rgba(0,0,0,.7);
 }
-
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:var(--font);background:var(--bg);color:var(--t1);
   line-height:1.55;-webkit-font-smoothing:antialiased}
@@ -48,7 +44,6 @@ a{color:inherit}
 button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
 .wrap{max-width:920px;margin:0 auto;padding:0 24px}
-
 /* header */
 .hdr{background:var(--surface);border-bottom:1px solid var(--border)}
 .hdr-in{max-width:920px;margin:0 auto;padding:16px 24px;display:flex;align-items:center;gap:13px}
@@ -60,7 +55,7 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
   /* var() with the build-time value as fallback: the static build has no
      --mark-bg set so the fallback wins, while the live page sets it per client
      from the API payload. One rule serves both. */
-  background:var(--mark-bg, #0a2342);color:var(--mark-fg, #ffffff)}
+  background:var(--mark-bg, #0b0f14);color:var(--mark-fg, #1bc0ff)}
 .hdr-name{font-size:1rem;font-weight:650;letter-spacing:-.012em}
 .hdr-sub{font-size:.76rem;color:var(--t3)}
 .hdr-r{margin-left:auto;display:flex;align-items:center;gap:9px}
@@ -75,7 +70,6 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
   :root:not([data-theme="light"]) .i-moon{display:none}
   :root:not([data-theme="light"]) .i-sun{display:block}
 }
-
 /* hero */
 .hero{position:relative;overflow:hidden;border-bottom:1px solid var(--border);
   background:var(--surface)}
@@ -88,7 +82,6 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 .hero h1{font-family:var(--display);font-size:clamp(1.75rem,4vw,2.35rem);font-weight:700;
   letter-spacing:-.02em;line-height:1.15;text-wrap:balance;max-width:20ch}
 .hero p{margin-top:11px;font-size:.97rem;color:var(--t2);max-width:56ch}
-
 /* stats */
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:30px}
 .stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
@@ -98,7 +91,6 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
   line-height:1;font-variant-numeric:tabular-nums}
 .stat-l{margin-top:8px;font-size:.79rem;color:var(--t2);line-height:1.4}
 @media(max-width:620px){.stats{grid-template-columns:1fr}}
-
 /* highlights -- a quick per-type breakdown of published work. Every number here
    is an honest count of PUBLISHED items of that type, read straight off the same
    data the list below renders. It is a summary, never a new claim. */
@@ -109,7 +101,6 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 .hl i{width:9px;height:9px;border-radius:3px;flex:0 0 auto;transform:translateY(1px)}
 .hl b{font-size:.92rem;font-weight:700;font-variant-numeric:tabular-nums;color:var(--t1)}
 .hl span{font-size:.82rem;color:var(--t2)}
-
 /* sections */
 section{padding:34px 0 0}
 .sh{display:flex;align-items:baseline;gap:11px;flex-wrap:wrap}
@@ -118,7 +109,6 @@ section{padding:34px 0 0}
 .sd{font-size:.85rem;color:var(--t2);margin-top:3px;margin-bottom:13px;max-width:62ch}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
   padding:20px 22px;box-shadow:var(--shadow)}
-
 /* monthly chart -- plain bars, value on top, month underneath */
 /* justify-content:center + a per-bar max-width keeps a short series (a new
    client with two months of history) looking deliberate instead of two thin
@@ -142,7 +132,6 @@ section{padding:34px 0 0}
 @media(max-width:560px){
   .chart.dense .cbar:nth-child(even) .cbar-l{visibility:hidden}
 }
-
 /* type mix */
 .mix{display:flex;height:9px;border-radius:6px;overflow:hidden;gap:2px;margin-bottom:11px}
 /* min-width keeps a 1-of-40 segment visible instead of vanishing to a hairline */
@@ -152,7 +141,6 @@ section{padding:34px 0 0}
 .key i{width:10px;height:10px;border-radius:3px;flex:0 0 auto;transform:translateY(1px)}
 .key .kn{color:var(--t2)}
 .key .kv{margin-left:auto;font-weight:650;font-variant-numeric:tabular-nums}
-
 /* search */
 .search{position:relative;margin-bottom:4px}
 .search svg{position:absolute;left:13px;top:50%;transform:translateY(-50%);
@@ -162,7 +150,6 @@ section{padding:34px 0 0}
   font-size:.89rem;outline:none;transition:border-color .15s}
 .search input:focus{border-color:var(--accent)}
 .search input::placeholder{color:var(--t3)}
-
 /* list */
 .mgroup{margin-top:26px;padding-bottom:8px;border-bottom:1px solid var(--border)}
 .mlabel{font-size:.72rem;font-weight:700;letter-spacing:.11em;text-transform:uppercase;
@@ -188,7 +175,6 @@ section{padding:34px 0 0}
 .oplink-c{display:inline-block;transition:transform .2s;font-size:1.15rem;line-height:1}
 .oplink.on .oplink-c{transform:rotate(90deg)}
 .empty{padding:28px 4px;font-size:.87rem;color:var(--t3)}
-
 /* referral partners -- the "who sends you work" section. Reuses the page's
    surface/border/text tokens so it reads as part of the dashboard rather than
    a bolted-on table. */
@@ -230,7 +216,6 @@ section{padding:34px 0 0}
 .ltag{font-size:.7rem;padding:3px 8px;border-radius:999px;
   border:1px solid var(--border);color:var(--t3)}
 @media(max-width:560px){.lrow-t{flex-direction:column}.lrk{text-align:left}}
-
 /* channels */
 .chans{display:grid;grid-template-columns:repeat(auto-fit,minmax(232px,1fr));gap:14px}
 .chan{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
@@ -253,7 +238,6 @@ section{padding:34px 0 0}
 .prow .pd{width:8px;height:8px;border-radius:50%;background:var(--t3);opacity:.5;flex:0 0 auto}
 .pn{font-size:.88rem;font-weight:600}
 .pw{font-size:.8rem;color:var(--t2);margin-top:3px;max-width:60ch}
-
 /* live site check -- measured against the real site at page load */
 .hstats{display:grid;grid-template-columns:repeat(auto-fit,minmax(178px,1fr));gap:14px;margin-bottom:18px}
 .hstat{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
@@ -273,7 +257,6 @@ section{padding:34px 0 0}
 .hwarn{margin-bottom:16px;padding:14px 17px;border-radius:var(--r);
   border:1px solid var(--accent);background:var(--accent-bg);font-size:.86rem;line-height:1.55}
 .hstamp{margin-top:15px;font-size:.78rem;color:var(--t3)}
-
 .stale{margin-top:20px;padding:14px 17px;border-radius:var(--r);
   border:1px solid var(--accent);background:var(--accent-bg);
   font-size:.86rem;line-height:1.55}
@@ -289,7 +272,6 @@ section{padding:34px 0 0}
   border-radius:999px;padding:3px 10px;margin-bottom:10px}
 .dband .dbt{font-size:.95rem;font-weight:550;color:var(--t1);line-height:1.5;max-width:66ch}
 .dband .dbs{font-size:.8rem;color:var(--t3);margin-top:7px;max-width:74ch;line-height:1.55}
-
 /* contact database (SAMPLE / preview clients only) -- a sample table showing the
    VOLUME of enriched contacts Wing builds. Sits only on a config that carries
    the demo payload; hidden and empty for real clients. Scrolls horizontally on
@@ -305,7 +287,6 @@ section{padding:34px 0 0}
 .ctbl td.cnm{color:var(--t1);font-weight:550}
 .ctbl-cap{margin-top:14px;padding-top:12px;border-top:1px solid var(--border);
   font-size:.78rem;color:var(--t3)}
-
 /* outreach preview -- a pending email program shown for the OWNER'S approval.
    Renders only when the payload carries outreachPreview; all copy is injected
    from data. Reuses the page's tokens so it reads as part of the dashboard. */
@@ -374,9 +355,6 @@ section{padding:34px 0 0}
   a{border-bottom:none!important}
 }
 </style>
-</head>
-<body>
-
 <header class="hdr">
   <div class="hdr-in">
     <div class="mark" id="mark"></div>
@@ -392,7 +370,6 @@ section{padding:34px 0 0}
     </div>
   </div>
 </header>
-
 <section class="hero">
   <div class="hero-in">
     <div class="eyebrow" id="eyebrow"></div>
@@ -403,9 +380,7 @@ section{padding:34px 0 0}
     <div id="stale"></div>
   </div>
 </section>
-
 <main class="wrap">
-
   <!-- What happens next. Generic and config-driven: hidden AND empty unless the
        payload carries `plan`, and every visible word is injected from the config
        by the plan() script below, so a client without one ships none of it. -->
@@ -417,7 +392,6 @@ section{padding:34px 0 0}
     <div class="pl-note" id="plan-note" hidden></div>
     <a class="pl-cta" id="plan-cta" target="_blank" rel="noopener" hidden></a>
   </section>
-
   <!-- Demo activity sections (SAMPLE / preview clients only). These render ONLY
        when the client payload carries the matching demo objects; for a real
        client they stay hidden AND empty, and every visible label is injected by
@@ -426,14 +400,12 @@ section{padding:34px 0 0}
   <section id="demo-projection-sec" hidden>
     <div class="dband" id="demo-projection"></div>
   </section>
-
   <section id="demo-leads-sec" hidden>
     <div class="sh"><h2 id="demo-lead-h"></h2><span class="n" id="demo-leadn"></span></div>
     <div class="sd" id="demo-lead-sd"></div>
     <div class="dstats" id="demo-lead-stats"></div>
     <div class="card"><div id="demo-lead-list"></div></div>
   </section>
-
   <section id="demo-msg-sec" hidden>
     <div class="sh"><h2 id="demo-msg-h"></h2></div>
     <div class="sd" id="demo-msg-sd"></div>
@@ -443,7 +415,6 @@ section{padding:34px 0 0}
       <div id="demo-msg-list"></div>
     </div>
   </section>
-
   <section id="demo-contacts-sec" hidden>
     <div class="sh"><h2 id="demo-contacts-h"></h2><span class="n" id="demo-contactsn"></span></div>
     <div class="sd" id="demo-contacts-sd"></div>
@@ -453,14 +424,12 @@ section{padding:34px 0 0}
       <div class="ctbl-cap" id="demo-contacts-cap"></div>
     </div>
   </section>
-
   <section id="health-sec" hidden>
     <div class="sh"><h2>Your site, checked just now</h2><span class="n" id="healthn"></span></div>
     <div class="sd">We opened every page on your site as this loaded and checked the things Google
       looks at. These are live readings.</div>
     <div id="health"></div>
   </section>
-
   <section>
     <div class="sh"><h2>Published by month</h2></div>
     <div class="sd" id="chart-sd"></div>
@@ -469,7 +438,6 @@ section{padding:34px 0 0}
       <div class="cnote" id="cnote"></div>
     </div>
   </section>
-
   <section>
     <div class="sh"><h2>What we published</h2><span class="n" id="pubn"></span></div>
     <div class="sd">Colours match the chart above. Click any title to open it on your site.</div>
@@ -484,14 +452,12 @@ section{padding:34px 0 0}
     <div id="list"></div>
     <button class="more" id="more" hidden></button>
   </section>
-
   <section id="out-sec">
     <div class="sh"><h2>Outreach and social</h2><span class="n" id="outn"></span></div>
     <div class="sd" id="out-sd"></div>
     <div class="chans" id="chans"></div>
     <div id="outlist"></div>
   </section>
-
   <!-- Outreach preview: a pending email program awaiting the owner's approval.
        Hidden and empty unless the payload carries outreachPreview; every
        visible label is injected by the outreachPreview() script, so other
@@ -512,7 +478,6 @@ section{padding:34px 0 0}
     </div>
     <button class="more" id="op-q-more" hidden></button>
   </section>
-
   <!-- Referral partners. Hidden unless the link carries the access key: the
        rest of this dashboard shows the client's own already-public website
        content, but this section is a few thousand enriched B2B contacts and
@@ -543,22 +508,18 @@ section{padding:34px 0 0}
     <div id="leads"></div>
     <button class="more" id="leadmore" hidden></button>
   </section>
-
   <section id="pages-sec">
     <div class="sh"><h2>Other pages we maintain</h2><span class="n" id="pagen"></span></div>
     <div class="sd">Pages on your site beyond the list above.</div>
     <div id="pages"></div>
   </section>
-
   <div class="foot">
     Prepared by <span id="agency">Wing Digital</span>
     &middot; <span id="stamp"></span>
   </div>
 </main>
-
 <script>
-const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-09-06","generatedAt":"2026-09-06T18:41:48","brand":{"name":"Hero's Junk Removal","initials":"HJ","site":"https://herosjunkremovaltx.com","kicker":"Marketing dashboard","headline":"Everything Wing Digital is building for Hero's Junk Removal","subhead":"A live record of the pages and posts running on your site. Click anything to open it on the real site."},"engines":[{"name":"Blog engine","detail":"4 to 5 posts a week","icon":"pen"},{"name":"Service pages","detail":"One page per job we haul","icon":"map"},{"name":"On-page SEO","detail":"Titles, schema, internal links","icon":"search"},{"name":"Internal linking","detail":"New posts wired to old ones","icon":"link"}],"types":{"blog":{"label":"Blog post","color":"#4a86e8"},"service":{"label":"Service page","color":"#c9384a"},"city":{"label":"City page","color":"#d9903c"},"core":{"label":"Core page","color":"#2c6ba8"},"other":{"label":"Other","color":"#7a8ba3"}},"outreach":{"intro":"Everything that goes out under your name. Below is what is ready and what it takes to switch each one on.","channels":[{"name":"Email introductions","icon":"mail","types":[],"state":"pending_approval","note":"A referral outreach program to local partner businesses is built and ready. Nothing has been sent. Review every email and every recipient in the preview section below; sending starts only after your approval."},{"name":"Google Business posts","icon":"star","types":[],"state":"needs_access","note":"Ready to run as soon as we have manager access to your Google Business Profile."},{"name":"Facebook and Instagram","icon":"share","types":[],"state":"needs_access","note":"Ready to run as soon as we have access to your pages. Send us an invite and posting starts that week."},{"name":"Review requests","icon":"chat","types":[],"state":"not_connected","note":"No review request system is wired up yet. This is the fastest lever once the Google profile is connected."}]},"outreachPreview":{"intro":"We built a program that introduces Hero's Junk Removal to local businesses that regularly need junk hauled: realtors, property managers, apartment communities, estate sale companies, remodelers, and storage facilities. Every email it would send, and every business it would go to, is laid out below so you can read it all before a single one goes out.","banner":"This lane is built and ready. Sending starts on your go-ahead.","plan":["Starts at 15 emails a day and ramps gradually to 40 a day.","Weekday business hours only. Nothing on nights or weekends.","Every email is signed by you and includes a simple opt-out; anyone who says no thanks is never emailed again.","One short follow-up a few days later, then we stop unless they reply."],"templatesNote":"The name, company, and city fields fill in per recipient. What you read here is otherwise exactly what would be sent.","queueNote":"Local businesses we researched that regularly hire junk haulers. Each would get the intro email for its type, and one follow-up.","categories":[{"name":"Realtor","emails":[{"stage":"Day 1","subject":"before the listing photos","body":"Hi {{first_name|there}},\n\nI run Hero's Junk Removal here in the DFW area. When you have a listing in {{city}} that needs\nto be cleared out before photos or staging, that is exactly the kind of job we handle, and we\nwork around your timeline, not ours.\n\nYou get a confirmed arrival window, a human who answers the phone, and a house that is actually\nempty when the photographer shows up. If it would help to have a hauler you can hand that off\nto, I would love a quick call.\n\nMore at herosjunkremovaltx.com if you want to look us over first.\n\nNash, Hero's Junk Removal\n{{postal_address}}\nIf you would rather not hear from me, just reply \"no thanks\" and I won't email again."},{"stage":"Follow-up (Day 4)","subject":"quick follow up","body":"Hi {{first_name|there}},\n\nFollowing up on my note from earlier this week. I know listing prep runs on deadlines, so the\nshort version is this: when a seller's house needs to be empty by a date, we show up when we\nsay we will and clear it out.\n\nIf {{company}} ever needs a cleanout partner in {{city}}, I am easy to reach by reply or phone.\nHappy to be the number you save for the next one, even if nothing is on the calendar today.\n\nNash, Hero's Junk Removal\n{{postal_address}}\nReply \"no thanks\" and I won't email again."}]},{"name":"Property manager","emails":[{"stage":"Day 1","subject":"tenant turnover cleanouts","body":"Hi {{first_name|there}},\n\nI run Hero's Junk Removal, my family's company, and we work all over the {{city}} area.\nTenant turnovers are a natural fit for us: whatever a tenant leaves behind, we haul it off so\nyour make-ready crew can get in and the unit can go back on the market.\n\nThe usual complaint about haulers is that they go quiet or do not show up. Our promise is the\nopposite: we answer the phone and arrive in the window we gave you. If it would be useful to\nhave us on file for {{company}}, reply here or give me a call.\n\nherosjunkremovaltx.com has the details.\n\nNash, Hero's Junk Removal\n{{postal_address}}\nIf this isn't relevant, reply \"no thanks\" and I won't email again."},{"stage":"Follow-up (Day 4)","subject":"one more on turnovers","body":"Hi {{first_name|there}},\n\nJust circling back once. I know the pain with abandoned-property removal is rarely the junk\nitself, it is chasing a hauler who goes quiet. We confirm the window, show up in it, and clear\nthe unit.\n\nIf {{company}} has a turn coming up in {{city}}, I would be glad to take one off your plate so\nyou can judge us on the work. A reply or a quick call is all it takes.\n\nNash, Hero's Junk Removal\n{{postal_address}}\nReply \"no thanks\" and I won't email again."}]},{"name":"Apartment complex","emails":[{"stage":"Day 1","subject":"move-out season help","body":"Hi {{first_name|there}},\n\nNash here with Hero's Junk Removal, my family's company in the DFW area. Move-out season\nleaves the same mess at most communities: furniture left in units, bulk trash piling up by\nthe compactor, and unit turns that cannot start until the junk is gone.\n\nWe schedule around your leasing office, confirm the arrival window, and handle the whole\ncleanout. If {{company}} could use a standing go-to for that in {{city}}, a short intro call\nis all I am asking for.\n\nherosjunkremovaltx.com if you want to see who we are first.\n\nNash, Hero's Junk Removal\n{{postal_address}}\nIf you'd rather not get these, reply \"no thanks\" and I won't email again."},{"stage":"Follow-up (Day 4)","subject":"following up, bulk pickup","body":"Hi {{first_name|there}},\n\nQuick follow up to my last note. Every complex has a corner where the abandoned couches and\nmattresses collect, and it usually gets dealt with only when someone complains.\n\nWe can clear it on a schedule or on a call, whichever suits how {{company}} runs. If a walk-by\nthis week turns up a pile in {{city}}, that is a perfect first job for us. Just reply or call.\n\nNash, Hero's Junk Removal\n{{postal_address}}\nReply \"no thanks\" and I won't email again."}]},{"name":"Estate sale company","emails":[{"stage":"Day 1","subject":"after the sale ends","body":"Hi {{first_name|there}},\n\nI run Hero's Junk Removal here in DFW. When your sale wraps and the family needs the house\ncleared of whatever did not sell, that last haul-off is the part we handle. You close out the\njob with an empty house instead of a leftover problem.\n\nThese are often hard weeks for the families involved, so we keep it simple: a confirmed time,\na respectful crew, and the whole haul-off handled. If {{company}} would like a reliable\ncleanout partner in {{city}}, I am glad to talk whenever suits you.\n\nherosjunkremovaltx.com for the basics.\n\nNash, Hero's Junk Removal\n{{postal_address}}\nIf this isn't a fit, reply \"no thanks\" and I won't email again."},{"stage":"Follow-up (Day 4)","subject":"quick follow up","body":"Hi {{first_name|there}},\n\nFollowing up once on my note about post-sale cleanouts. Your team handles the sale, we handle\nthe haul-off afterward, and the family gets the keys-ready house they were promised.\n\nIf you have a sale closing soon in {{city}}, try us on that one. We will confirm the pickup\ntime with you directly and show up in it. Reply here or call anytime.\n\nNash, Hero's Junk Removal\n{{postal_address}}\nReply \"no thanks\" and I won't email again."}]},{"name":"Remodeler / general contractor","emails":[{"stage":"Day 1","subject":"debris off your job site","body":"Hi {{first_name|there}},\n\nNash with Hero's Junk Removal in the DFW area. Every remodel ends with old cabinets, torn-out\nfixtures, and demo debris that somebody has to deal with. We come to the site, load it\nourselves, and haul it off, so there is no dumpster sitting in the client's driveway for weeks\nand your crew stays on the tools.\n\nWe work around your schedule and confirm the pickup window before we come. If {{company}} has\njobs running in {{city}}, I would like to be the haul-off call for them.\n\nherosjunkremovaltx.com has more.\n\nNash, Hero's Junk Removal\n{{postal_address}}\nNot interested? Reply \"no thanks\" and I won't email again."},{"stage":"Follow-up (Day 4)","subject":"following up, demo debris","body":"Hi {{first_name|there}},\n\nOne quick follow up. The offer is simple: when a demo day or a punch-out leaves a pile behind,\nyou text or call, we give you a confirmed window, and the pile is gone.\n\nNo account setup, no commitment, just a hauler who shows up when he says he will. If you have\na job wrapping in {{city}} soon, that is an easy way to test us out.\n\nNash, Hero's Junk Removal\n{{postal_address}}\nReply \"no thanks\" and I won't email again."}]},{"name":"Self-storage facility","emails":[{"stage":"Day 1","subject":"clearing abandoned units","body":"Hi {{first_name|there}},\n\nI run Hero's Junk Removal, my dad Todd's company, here in DFW. When a unit gets abandoned or\nan auction leaves leftovers behind, that unit is dead inventory until someone clears it. We\ncome out, empty it, and sweep it ready to re-rent.\n\nThe usual complaint about haulers in this business is that they do not show up. So we confirm\nthe window and keep you posted. If {{company}} in {{city}} ever has units in that state, keep\nus on file as the number to try first.\n\nherosjunkremovaltx.com for a look at us.\n\nNash, Hero's Junk Removal\n{{postal_address}}\nIf this isn't useful, reply \"no thanks\" and I won't email again."},{"stage":"Follow-up (Day 4)","subject":"quick follow up on units","body":"Hi {{first_name|there}},\n\nFollowing up once. Every week an abandoned unit sits full is a week it earns nothing, and\nclearing it is usually the only thing standing between you and re-renting it.\n\nWe can turn one around quickly and coordinate straight with your office. If you have even one\nunit like that right now in {{city}}, reply or call and we will get it handled.\n\nNash, Hero's Junk Removal\n{{postal_address}}\nReply \"no thanks\" and I won't email again."}]},{"name":"probate-attorney","emails":[{"stage":"Day 1","subject":"estate cleanouts on court timelines","body":"Hi {{first_name|there}},\n\nI run Hero's Junk Removal, my family's company here in DFW. When an estate has to be cleared and the executor lives out of state, or the court has set a date, the haul-off is often the piece nobody local can take on. That is the work we do.\n\nWe confirm the time, send a respectful crew, and keep you or the executor updated until the property is empty. If {{company}} handles probate matters in {{city}}, I would be glad to be a name you can pass along.\n\nherosjunkremovaltx.com has the basics.\n\nNash, Hero's Junk Removal\n{{postal_address}}\nIf this isn't relevant, reply \"no thanks\" and I won't email again."},{"stage":"Follow-up (Day 4)","subject":"following up on estate cleanouts","body":"Hi {{first_name|there}},\n\nFollowing up once on my note. Probate work runs on dates that do not move, and a cleared property is often one of the things due by those dates. We treat these jobs with care: a confirmed window, a courteous crew, and clear communication with whoever is managing the estate.\n\nIf a matter at {{company}} ever needs a property in {{city}} emptied by a deadline, keep this email on file. A reply here reaches me directly.\n\nNash, Hero's Junk Removal\n{{postal_address}}\nReply \"no thanks\" and I won't email again."}]},{"name":"senior-move","emails":[{"stage":"Day 1","subject":"haul-off during a downsize","body":"Hi {{first_name|there}},\n\nNash here with Hero's Junk Removal, my family's company in the DFW area. Downsizing moves usually mean most of a household is not making the trip, and someone has to remove what stays behind, gently and on the family's schedule.\n\nWe coordinate with your move plan, confirm the arrival window, and clear the home so your client's transition stays calm. If {{company}} manages senior moves in {{city}}, I would welcome a short conversation about how we can support them.\n\nherosjunkremovaltx.com if you want to look first.\n\nNash, Hero's Junk Removal\n{{postal_address}}\nIf this isn't a fit, reply \"no thanks\" and I won't email again."},{"stage":"Follow-up (Day 4)","subject":"one more on downsizing help","body":"Hi {{first_name|there}},\n\nCircling back once. In a downsize, the removal is often the heaviest part for the family, both physically and emotionally, and it goes best when the hauler works around the move instead of against it.\n\nThat is what we offer: a confirmed time, a patient crew, and steady communication with your team from start to finish. If {{company}} has a move coming up in {{city}}, consider this a standing offer to help with the haul-off side.\n\nNash, Hero's Junk Removal\n{{postal_address}}\nReply \"no thanks\" and I won't email again."}]},{"name":"moving-company","emails":[{"stage":"Day 1","subject":"the stuff movers won't take","body":"Hi {{first_name|there}},\n\nI run Hero's Junk Removal here in DFW. Every mover hears the same question at some point in a job: can you also take this stuff? You are not set up to haul discards, and saying no leaves the customer stuck.\n\nWe are the hand-off for that. Your crew keeps moving, we come clear what is not going, and the customer thanks you for having an answer. If {{company}} works jobs in {{city}}, let's swap numbers so you have one ready.\n\nherosjunkremovaltx.com has more on us.\n\nNash, Hero's Junk Removal\n{{postal_address}}\nIf this isn't useful, reply \"no thanks\" and I won't email again."},{"stage":"Follow-up (Day 4)","subject":"quick follow up for movers","body":"Hi {{first_name|there}},\n\nFollowing up on my last note. The pitch is simple: we are a hauler, not a mover, so there is no overlap between what {{company}} does and what we do. When a customer in {{city}} wants things gone instead of moved, you point them to us and stay the hero of the job.\n\nIf that sounds useful, a reply or a call gets us introduced. Either way, thanks for reading these.\n\nNash, Hero's Junk Removal\n{{postal_address}}\nReply \"no thanks\" and I won't email again."}]},{"name":"cleaning-service","emails":[{"stage":"Day 1","subject":"before the deep clean starts","body":"Hi {{first_name|there}},\n\nNash with Hero's Junk Removal, my family's company in the DFW area. Move-out cleans and deep cleans often stall the same way: the crew arrives and finds furniture, bags, and piles that have to be gone before any real cleaning can start.\n\nHauling that off is our whole job. We can come ahead of your crew, clear the space, and leave it ready for you to work. If {{company}} runs into that in {{city}}, I would like to be the number you hand it to.\n\nherosjunkremovaltx.com for the details.\n\nNash, Hero's Junk Removal\n{{postal_address}}\nNot interested? Reply \"no thanks\" and I won't email again."},{"stage":"Follow-up (Day 4)","subject":"following up, cleanout partner","body":"Hi {{first_name|there}},\n\nOne quick follow up. When a job in {{city}} turns out to be more removal than cleaning, you should not have to walk away from it or wrestle a couch down the stairs yourself.\n\nRefer the heavy removal to us and keep the cleaning work for {{company}}. We confirm our window, coordinate with your schedule, and get out of your way so your crew can do theirs. Reply here anytime and we can set that up.\n\nNash, Hero's Junk Removal\n{{postal_address}}\nReply \"no thanks\" and I won't email again."}]}],"queue":[{"company":"Neighborhood Management Inc","category":"property-manager","city":"Allen","email":"n***@neighborhoodmanagement.com"},{"company":"Fielding Law","category":"probate-attorney","city":"Mesquite","email":"i***@fieldinglaw.com"},{"company":"Warren & Migliaccio, LLP Child Custody & Divorce Lawyers","category":"probate-attorney","city":"Richardson","email":"c***@wmtxlaw.com"},{"company":"Proper HOA Management","category":"property-manager","city":"Richardson","email":"c***@properhoamanage.com"},{"company":"Treme Estate Sales","category":"estate-sale","city":"Grand Prairie","email":"t***@gmail.com"},{"company":"Pros PM - Professional Services Property Management","category":"property-manager","city":"Denton","email":"h***@prospm.com"},{"company":"The Martino Group","category":"property-manager","city":"Denton","email":"i***@themartinogroup.com"},{"company":"Butler Property Company","category":"property-manager","city":"Richardson","email":"i***@butlerpropertycompany.com"},{"company":"Law Office of Ana M. Pace, PLLC","category":"probate-attorney","city":"Richardson","email":"a***@attorneypace.com"},{"company":"Law office of Leonid Murashkovskiy, P.L.L.C.","category":"probate-attorney","city":"Addison","email":"i***@murashkovskiy.com"},{"company":"Scott Brown Properties","category":"property-manager","city":"Denton","email":"s***@scottbrownproperties.net"},{"company":"Tracey Collier Realty Group @ Denton County Property Management","category":"property-manager","city":"Corinth","email":"p***@gmail.com"},{"company":"Taylor Apartment Locator","category":"property-manager","city":"Irving","email":"i***@taylorapartmentlocator.com"},{"company":"Mansfield Estate Sales","category":"estate-sale","city":"Irving","email":"m***@gmail.com"},{"company":"Alamo Aztek Estate Sales DFW","category":"estate-sale","city":"Dallas","email":"a***@gmail.com"},{"company":"Somerset Association Management","category":"property-manager","city":"Richardson","email":"f***@somersetassociations.com"},{"company":"Brandy Austin Law Firm","category":"probate-attorney","city":"Arlington","email":"b***@brandyaustinlaw.com"},{"company":"Rare Find Estate Sales","category":"estate-sale","city":"Coppell","email":"r***@gmail.com"},{"company":"On Point Contractors","category":"remodeler","city":"Cedar Hill","email":"o***@onpointdfw.com"},{"company":"JDR Restoration & Remodeling","category":"remodeler","city":"Haltom City","email":"i***@jdrrestoration.com"},{"company":"AdvantageExpressMover","category":"senior-move","city":"Plano","email":"c***@gmail.com"},{"company":"Conservatory At Plano","category":"senior-move","city":"Plano","email":"i***@discoverymgt.com"},{"company":"Signature Leasing & Management, Inc.","category":"property-manager","city":"Richardson","email":"i***@signatureleasing.net"},{"company":"Neway Property Management","category":"property-manager","city":"Dallas","email":"o***@neway.com"},{"company":"The Ashmore Law Firm, P.C.","category":"probate-attorney","city":"Dallas","email":"g***@ashmorelaw.com"},{"company":"Bailey & Galyen Attorneys at Law","category":"probate-attorney","city":"Arlington","email":"c***@galyen.com"},{"company":"Peter C. Hall, PLLC","category":"probate-attorney","city":"Plano","email":"p***@ntxlawoffice.com"},{"company":"The Law office of Elisa Kumadey PLLC.","category":"probate-attorney","city":"Irving","email":"e***@ekdnet.law"},{"company":"Oberg Law Office","category":"probate-attorney","city":"Mesquite","email":"g***@oberglaw.com"},{"company":"Hammerle Morris Law Firm","category":"probate-attorney","city":"Lewisville","email":"c***@hammerle.com"},{"company":"Crain & Wooley","category":"probate-attorney","city":"Plano","email":"c***@crainwooley.law"},{"company":"Groovin Move-In - Moving Company","category":"moving-company","city":"Irving","email":"g***@gmail.com"},{"company":"DFW Property Solutions","category":"property-manager","city":"Allen","email":"b***@thesabinoteam.com"},{"company":"The Mardia Group LLC","category":"property-manager","city":"Allen","email":"c***@tmgprop.com"},{"company":"Two Thumbs Up Property Management","category":"property-manager","city":"Coppell","email":"i***@twothumbsuppropmgmt.com"},{"company":"James Major Estate Sales","category":"estate-sale","city":"Arlington","email":"h***@jamesmajorestatesales.com"},{"company":"Donewell Enterprise and Estate Sales LLC","category":"estate-sale","city":"Dallas","email":"d***@gmail.com"},{"company":"Brookwood Estate Sales","category":"estate-sale","city":"Irving","email":"b***@gmail.com"},{"company":"SAGE PATINA Estate Sales","category":"estate-sale","city":"Irving","email":"s***@gmail.com"},{"company":"All County Metroplex Property Management","category":"property-manager","city":"Richardson","email":"c***@allcountymetroplex.com"},{"company":"Eric's Home Renovations","category":"remodeler","city":"Grand Prairie","email":"e***@gmail.com"},{"company":"Estate Sales by Dallas Estate Sellers","category":"estate-sale","city":"Dallas","email":"d***@gmail.com"},{"company":"Place To Be Properties","category":"property-manager","city":"Denton","email":"l***@placetobeproperties.com"},{"company":"C Bar T Properties","category":"property-manager","city":"Denton","email":"c***@verizon.net"},{"company":"Jimmy Brown Property Management","category":"property-manager","city":"Denton","email":"i***@jimmybrownpropertymanagement.com"},{"company":"Comuneo Services, Inc","category":"property-manager","city":"Richardson","email":"i***@comuneo.com"},{"company":"New Leaf Properties LLC","category":"property-manager","city":"Coppell","email":"w***@wesashworth.com"},{"company":"WellRive","category":"senior-move","city":"Irving","email":"i***@wellrive.com"},{"company":"Rusty by Design Estate Sales - Dallas","category":"estate-sale","city":"Dallas","email":"i***@rustybydesignauction.com"},{"company":"L & L Estate Liquidation DFW","category":"estate-sale","city":"Fort Worth","email":"m***@micahrich.com"},{"company":"JLA Treasures LLC","category":"estate-sale","city":"Plano","email":"o***@jlatreasures.com"},{"company":"Miller Law Office, PLLC","category":"probate-attorney","city":"Plano","email":"i***@aaronmillerlaw.com"},{"company":"The Law Office of Yolanda Castro-Dominguez, PLLC","category":"probate-attorney","city":"Irving","email":"y***@ycdlaw.com"},{"company":"Housewright Law Group","category":"probate-attorney","city":"McKinney","email":"s***@housewrightlawgroup.com"},{"company":"Davis, Ermis & Roberts, PC","category":"probate-attorney","city":"Grand Prairie","email":"d***@yahoo.com"},{"company":"Dallas Probate Attorneys.com","category":"probate-attorney","city":"Dallas","email":"i***@dallasprobateattorneys.com"},{"company":"Colin Smith Law PLLC","category":"probate-attorney","city":"Dallas","email":"a***@colinsmithlaw.com"},{"company":"D.P.WOOD LAW, PLLC","category":"probate-attorney","city":"Dallas","email":"i***@dpwoodlaw.com"},{"company":"Rise Up Moving","category":"moving-company","city":"Plano","email":"b***@riseupmoving.com"},{"company":"Property Search Associates","category":"property-manager","city":"Denton","email":"p***@gmail.com"},{"company":"Primera Insurance & Tax Services","category":"realtor","city":"Farmers Branch","email":"c***@getprimera.com"},{"company":"Kite-Like Estate Sales","category":"estate-sale","city":"Plano","email":"r***@kite-like.com"},{"company":"Brickyard Property Management","category":"property-manager","city":"Richardson","email":"i***@brickyardpropertymanagement.com"},{"company":"Texas Star Estate Sales","category":"estate-sale","city":"Coppell","email":"t***@gmail.com"},{"company":"Neblett Property Management","category":"property-manager","city":"Denton","email":"n***@yahoo.com"},{"company":"PMI United","category":"property-manager","city":"Denton","email":"m***@pmiunited.com"},{"company":"The Legacy Willow Bend","category":"senior-move","city":"Plano","email":"i***@thelegacysc.org"},{"company":"Rent Relax","category":"property-manager","city":"Dallas","email":"s***@rentrelax.co"},{"company":"Emerald Creek Management Services","category":"property-manager","city":"Dallas","email":"c***@emeraldcreekms.com"},{"company":"Rent On Your Terms","category":"property-manager","city":"Dallas","email":"b***@rentonyourterms.com"},{"company":"Cole Group Property Management","category":"property-manager","city":"Fort Worth","email":"c***@gmail.com"},{"company":"1st Realty Resources","category":"property-manager","city":"Fort Worth","email":"i***@1strealty.net"},{"company":"Lodge Properties Management, LLC","category":"property-manager","city":"Fort Worth","email":"l***@gmail.com"},{"company":"Fort Property Management","category":"property-manager","city":"Fort Worth","email":"i***@fortpropertymgmt.com"},{"company":"MRE Property Management","category":"property-manager","city":"Arlington","email":"i***@mredfw.com"},{"company":"JM2 Property Management","category":"property-manager","city":"Arlington","email":"j***@rmpropertymgt.com"},{"company":"Home Yield Host","category":"property-manager","city":"Plano","email":"a***@adxpm.com"},{"company":"North Texas Property Management","category":"property-manager","city":"Plano","email":"i***@ntxpm.com"},{"company":"Goldnest Property Management","category":"property-manager","city":"Richardson","email":"s***@goldnest.co"},{"company":"Spring Creek Hollows","category":"property-manager","city":"Plano","email":"m***@bellevuespringcreek.com"},{"company":"RentYard","category":"property-manager","city":"Irving","email":"i***@rentyard.com"},{"company":"Furnished Housing Consultants","category":"property-manager","city":"Irving","email":"s***@furnishedhousingconsultants.com"},{"company":"Allegiance Property Management","category":"property-manager","city":"Garland","email":"a***@allegiancepm.net"},{"company":"Davis Property Management","category":"property-manager","city":"Dallas","email":"f***@gmail.com"},{"company":"Brubaker Property Management","category":"property-manager","city":"Frisco","email":"i***@brubakerpm.com"},{"company":"PMI North Texas","category":"property-manager","city":"Frisco","email":"k***@pminorthtexas.com"},{"company":"Axial Realty & Property Management - David Tung","category":"property-manager","city":"Frisco","email":"d***@axialrealty.com"},{"company":"Rent Now Texas","category":"property-manager","city":"Frisco","email":"a***@rentnowtx.com"},{"company":"PMI Frisco","category":"property-manager","city":"Plano","email":"a***@pmifrisco.com"},{"company":"PMI Collin","category":"property-manager","city":"McKinney","email":"a***@pmicollin.com"},{"company":"Ten31 Property Management, LLC","category":"property-manager","city":"McKinney","email":"j***@ten31pm.com"},{"company":"Roddy Real Estate Group","category":"property-manager","city":"McKinney","email":"o***@roddyproperties.com"},{"company":"Arista McKinney","category":"property-manager","city":"McKinney","email":"l***@aristamckinney.com"},{"company":"PPM \u2013 Parking Lot Striping and Maintenance","category":"property-manager","city":"Mesquite","email":"i***@ppm.us"},{"company":"DALLAS DREAM PROPERTIES","category":"property-manager","city":"Mesquite","email":"d***@dallasdreamproperties.com"},{"company":"Bright Horizon Real Estate","category":"property-manager","city":"Farmers Branch","email":"i***@brighthorizonrealestate.com"},{"company":"CW Sparks Management","category":"property-manager","city":"Dallas","email":"i***@cwsparks.com"},{"company":"Finishing Touches Remodeling","category":"remodeler","city":"Fort Worth","email":"c***@finishingtouchesremodeling.com"},{"company":"Evolve Construction LLC","category":"remodeler","city":"Fort Worth","email":"b***@gmail.com"},{"company":"Handy Gonzo's Home Improvement","category":"remodeler","city":"Fort Worth","email":"h***@gmail.com"},{"company":"Luxury Home Remodeling DFW","category":"remodeler","city":"Fort Worth","email":"u***@gmail.com"},{"company":"Apartment Movers","category":"moving-company","city":"Irving","email":"y***@aptmovers.com"},{"company":"Senior Helpers","category":"senior-move","city":"Irving","email":"p***@seniorhelpers.com"},{"company":"Laser Facility Management","category":"property-manager","city":"Grapevine","email":"i***@laserfacility.com"},{"company":"Shoreline Property Group","category":"property-manager","city":"Flower Mound","email":"i***@shorelinepg.com"},{"company":"Landmark Property Management","category":"property-manager","city":"Mansfield","email":"l***@gmail.com"},{"company":"Reddtrow Properties, LLC","category":"property-manager","city":"Mansfield","email":"i***@reddtrowproperties.com"},{"company":"Rock Sheep Properties","category":"property-manager","city":"Mansfield","email":"r***@gmail.com"},{"company":"Top Tier Estates","category":"property-manager","city":"DeSoto","email":"i***@toptierestatestx.com"},{"company":"Ember Realty - Byron Hunter, DFW Realtor","category":"property-manager","city":"Glenn Heights","email":"b***@ember-realty.com"},{"company":"kacy's properties","category":"property-manager","city":"Dallas","email":"i***@kacysproperties.com"},{"company":"One Porch Property Management","category":"property-manager","city":"Southlake","email":"i***@oneporch.com"},{"company":"BuzzWorthy Property Management","category":"property-manager","city":"Southlake","email":"i***@buzzworthypm.com"},{"company":"N3ST Property Management","category":"property-manager","city":"Colleyville","email":"m***@n3stpm.com"},{"company":"1st Choice Property Management","category":"property-manager","city":"Fort Worth","email":"r***@gmail.com"},{"company":"Homeworx","category":"property-manager","city":"Dallas","email":"o***@homeworxusa.com"},{"company":"Straight Forward Property Management","category":"property-manager","city":"North Richland Hills","email":"i***@straightforwardpropertymanagement.com"},{"company":"Wreedone","category":"remodeler","city":"Denton","email":"t***@getwreedone.com"},{"company":"Details Tile & Remodeling","category":"remodeler","city":"Rockwall","email":"d***@yahoo.com"},{"company":"Turnbow Construction","category":"remodeler","city":"Cedar Hill","email":"b***@turnbowconstruction.com"},{"company":"Worth Property Management","category":"property-manager","city":"Fort Worth","email":"s***@gmail.com"},{"company":"MVS Real Property Services","category":"property-manager","city":"McKinney","email":"j***@mvsrealproperty.com"},{"company":"texas apartment finders","category":"property-manager","city":"Mesquite","email":"s***@gmail.com"},{"company":"Mica Pryor - Real Estate","category":"property-manager","city":"Rockwall","email":"m***@micapryor.com"},{"company":"TIG Real Estate Services \u2014 Addison Branch","category":"property-manager","city":"Addison","email":"b***@tigusa.com"},{"company":"Lees Remodeling and Designs","category":"remodeler","city":"North Richland Hills","email":"p***@leesremodeling.net"},{"company":"Southfork Estate Sales, LLC","category":"estate-sale","city":"Garland","email":"s***@gmail.com"},{"company":"Spencer, Johnson, Harvell, & Spencer, PLLC","category":"probate-attorney","city":"Dallas","email":"i***@dallasprobate.com"},{"company":"Law Office of Charlotte D. Key, PLLC","category":"probate-attorney","city":"Plano","email":"i***@keyestatelaw.com"},{"company":"UNISTAR PROPERTY MANAGEMENT","category":"property-manager","city":"Denton","email":"o***@unistarlease.com"},{"company":"Brock Realtors","category":"property-manager","city":"Fort Worth","email":"k***@brockrealtors.com"},{"company":"Ali Maid","category":"cleaning-service","city":"Garland","email":"i***@alimaid.com"},{"company":"Graceful Maids","category":"cleaning-service","city":"McKinney","email":"i***@gracefulmaids.com"},{"company":"Pellez liquidation","category":"estate-sale","city":"Pantego","email":"s***@pellezliquidation.com"},{"company":"Four Seasons Estate Sales","category":"estate-sale","city":"Plano","email":"f***@gmail.com"},{"company":"WPF Estate Sales & Auctions","category":"estate-sale","city":"Dallas","email":"t***@whenpigsflyshop.com"},{"company":"Surplus Liquidation Solutions, LLC","category":"estate-sale","city":"Carrollton","email":"s***@sls-llc.com"},{"company":"Ziprent","category":"property-manager","city":"Dallas","email":"s***@ziprent.com"},{"company":"Rentready Homes LLC","category":"property-manager","city":"Dallas","email":"t***@rentreadyhomes.com"},{"company":"Tierra Verde Property Management","category":"property-manager","city":"Fort Worth","email":"i***@tveleasing.com"},{"company":"LOCKE Property Management","category":"property-manager","city":"Fort Worth","email":"h***@lockepm.com"},{"company":"Affordable Attractive Realty Management","category":"property-manager","city":"Arlington","email":"s***@aarealty.com"},{"company":"Classic Property Management","category":"property-manager","city":"Arlington","email":"i***@classicpm.com"},{"company":"Doskocil Properties","category":"property-manager","city":"Arlington","email":"j***@dpmrealty.com"},{"company":"OmniKey Realty","category":"property-manager","city":"Plano","email":"i***@omnikeytexas.com"},{"company":"Navigate Property Management - North TX","category":"property-manager","city":"Frisco","email":"s***@nmcpropertymanagement.com"},{"company":"SilverTop Property Management","category":"property-manager","city":"Frisco","email":"i***@silvertoppm.com"},{"company":"Andrews-Dillingham Properties: Carrier 360","category":"property-manager","city":"Grand Prairie","email":"g***@andrews-dillingham.com"},{"company":"Mesquite Greens","category":"property-manager","city":"Dallas","email":"m***@yescommunities.com"},{"company":"Pioneer 1 Realty","category":"property-manager","city":"Balch Springs","email":"c***@pioneer1realty.com"}]},"plan":null,"pendingMetrics":[{"name":"Google Search clicks and impressions","why":"Needs Search Console access for herosjunkremovaltx.com connected to the reporting account","state":"needs access"},{"name":"Keyword rankings","why":"Comes online with the same Search Console connection","state":"needs access"},{"name":"Google Business Profile views","why":"Needs manager access to the Google Business Profile","state":"needs access"},{"name":"Calls and form leads","why":"The contact form does not report back to us yet, so no lead count here would be trustworthy","state":"not connected"}],"metrics":{},"items":[{"date":"2026-09-05","type":"service","title":"Junk removal in Allen, TX","status":"published","url":"https://herosjunkremovaltx.com/services/junk-removal-allen.html"},{"date":"2026-09-05","type":"service","title":"Junk removal in Frisco, TX","status":"published","url":"https://herosjunkremovaltx.com/services/junk-removal-frisco.html"},{"date":"2026-09-05","type":"service","title":"Junk removal in McKinney, TX","status":"published","url":"https://herosjunkremovaltx.com/services/junk-removal-mckinney.html"},{"date":"2026-09-04","type":"blog","title":"Old furniture removal, from the upstairs bedroom out","status":"published","url":"https://herosjunkremovaltx.com/blog/old-furniture-removal-getting-it-out.html"},{"date":"2026-09-04","type":"blog","title":"Who comes to your house on a junk removal job","status":"published","url":"https://herosjunkremovaltx.com/blog/who-comes-to-your-house-junk-removal.html"},{"date":"2026-09-02","type":"blog","title":"Fence and deck teardown debris","status":"published","url":"https://herosjunkremovaltx.com/blog/fence-and-deck-teardown-debris.html"},{"date":"2026-09-02","type":"blog","title":"Same-day junk removal: what typical actually means","status":"published","url":"https://herosjunkremovaltx.com/blog/same-day-junk-removal-what-typical-means.html"},{"date":"2026-08-31","type":"blog","title":"Office and small commercial cleanouts","status":"published","url":"https://herosjunkremovaltx.com/blog/office-and-small-commercial-cleanouts.html"},{"date":"2026-08-31","type":"blog","title":"What to clear before the listing photos","status":"published","url":"https://herosjunkremovaltx.com/blog/what-to-clear-before-listing-photos.html"},{"date":"2026-08-31","type":"service","title":"Junk removal in Plano, TX","status":"published","url":"https://herosjunkremovaltx.com/services/junk-removal-plano.html"},{"date":"2026-08-28","type":"blog","title":"Downsizing a parent into assisted living","status":"published","url":"https://herosjunkremovaltx.com/blog/downsizing-a-parent-into-assisted-living.html"},{"date":"2026-08-28","type":"blog","title":"What to haul instead of moving","status":"published","url":"https://herosjunkremovaltx.com/blog/moving-out-what-to-haul-instead-of-moving.html"},{"date":"2026-08-27","type":"blog","title":"What a remodel really leaves behind","status":"published","url":"https://herosjunkremovaltx.com/blog/construction-debris-after-a-remodel.html"},{"date":"2026-08-27","type":"blog","title":"Dumpster rental vs junk removal","status":"published","url":"https://herosjunkremovaltx.com/blog/dumpster-rental-vs-junk-removal.html"},{"date":"2026-08-24","type":"blog","title":"Mattress disposal in DFW","status":"published","url":"https://herosjunkremovaltx.com/blog/mattress-disposal-dfw.html"},{"date":"2026-08-24","type":"blog","title":"Where your junk actually goes","status":"published","url":"https://herosjunkremovaltx.com/blog/where-your-junk-goes-after-pickup.html"},{"date":"2026-08-22","type":"blog","title":"Apartment junk removal","status":"published","url":"https://herosjunkremovaltx.com/blog/apartment-junk-removal.html"},{"date":"2026-08-22","type":"blog","title":"Appliance and electronics disposal","status":"published","url":"https://herosjunkremovaltx.com/blog/appliance-and-electronics-disposal-north-texas.html"},{"date":"2026-08-22","type":"blog","title":"Hoarding cleanouts, handled quietly","status":"published","url":"https://herosjunkremovaltx.com/blog/hoarder-house-junk-removal.html"},{"date":"2026-08-22","type":"blog","title":"Hot tub, shed, and playset removal in DFW","status":"published","url":"https://herosjunkremovaltx.com/blog/hot-tub-shed-playset-removal.html"},{"date":"2026-08-22","type":"blog","title":"How junk removal works in DFW","status":"published","url":"https://herosjunkremovaltx.com/blog/how-junk-removal-works.html"},{"date":"2026-08-22","type":"blog","title":"Rental property cleanout","status":"published","url":"https://herosjunkremovaltx.com/blog/rental-property-cleanout.html"},{"date":"2026-08-22","type":"blog","title":"Clearing out a storage unit","status":"published","url":"https://herosjunkremovaltx.com/blog/storage-unit-junk-removal.html"},{"date":"2026-08-21","type":"blog","title":"The estate cleanout checklist","status":"published","url":"https://herosjunkremovaltx.com/blog/estate-cleanout-checklist.html"},{"date":"2026-08-21","type":"blog","title":"What we will and will not take","status":"published","url":"https://herosjunkremovaltx.com/blog/what-junk-removal-will-and-will-not-take.html"},{"date":"2026-08-21","type":"service","title":"Construction debris removal in Dallas-Fort Worth","status":"published","url":"https://herosjunkremovaltx.com/services/construction-debris.html"},{"date":"2026-08-05","type":"service","title":"Yard debris removal in Dallas-Fort Worth","status":"published","url":"https://herosjunkremovaltx.com/services/yard-debris.html"},{"date":"2026-08-04","type":"blog","title":"Where to donate furniture and household goods in DFW","status":"published","url":"https://herosjunkremovaltx.com/blog/donate-furniture-dfw.html"},{"date":"2026-08-04","type":"blog","title":"The garage cleanout checklist","status":"published","url":"https://herosjunkremovaltx.com/blog/garage-cleanout-checklist.html"},{"date":"2026-08-04","type":"service","title":"Appliance removal in Dallas-Fort Worth","status":"published","url":"https://herosjunkremovaltx.com/services/appliance-removal.html"},{"date":"2026-08-04","type":"service","title":"Estate cleanouts in Dallas-Fort Worth","status":"published","url":"https://herosjunkremovaltx.com/services/estate-cleanouts.html"},{"date":"2026-08-04","type":"service","title":"Furniture removal in Dallas-Fort Worth","status":"published","url":"https://herosjunkremovaltx.com/services/furniture-removal.html"},{"date":"2026-08-04","type":"service","title":"Garage cleanouts in Dallas-Fort Worth","status":"published","url":"https://herosjunkremovaltx.com/services/garage-cleanouts.html"},{"date":"2026-08-04","type":"service","title":"Hot tub, shed, and playset removal in DFW","status":"published","url":"https://herosjunkremovaltx.com/services/hot-tub-removal.html"},{"date":"2026-08-04","type":"service","title":"Same-day junk removal in Dallas-Fort Worth","status":"published","url":"https://herosjunkremovaltx.com/services/same-day-junk-removal.html"}],"pages":[{"group":"Blog posts live on your site","icon":"pen","links":[{"title":"Apartment junk removal","url":"https://herosjunkremovaltx.com/blog/apartment-junk-removal.html"},{"title":"Appliance and electronics disposal","url":"https://herosjunkremovaltx.com/blog/appliance-and-electronics-disposal-north-texas.html"},{"title":"What a remodel really leaves behind","url":"https://herosjunkremovaltx.com/blog/construction-debris-after-a-remodel.html"},{"title":"Where to donate furniture and household goods in DFW","url":"https://herosjunkremovaltx.com/blog/donate-furniture-dfw.html"},{"title":"Downsizing a parent into assisted living","url":"https://herosjunkremovaltx.com/blog/downsizing-a-parent-into-assisted-living.html"},{"title":"Dumpster rental vs junk removal","url":"https://herosjunkremovaltx.com/blog/dumpster-rental-vs-junk-removal.html"},{"title":"The estate cleanout checklist","url":"https://herosjunkremovaltx.com/blog/estate-cleanout-checklist.html"},{"title":"Fence and deck teardown debris","url":"https://herosjunkremovaltx.com/blog/fence-and-deck-teardown-debris.html"},{"title":"The garage cleanout checklist","url":"https://herosjunkremovaltx.com/blog/garage-cleanout-checklist.html"},{"title":"Hoarding cleanouts, handled quietly","url":"https://herosjunkremovaltx.com/blog/hoarder-house-junk-removal.html"},{"title":"Hot tub, shed, and playset removal in DFW","url":"https://herosjunkremovaltx.com/blog/hot-tub-shed-playset-removal.html"},{"title":"How junk removal works in DFW","url":"https://herosjunkremovaltx.com/blog/how-junk-removal-works.html"},{"title":"Mattress disposal in DFW","url":"https://herosjunkremovaltx.com/blog/mattress-disposal-dfw.html"},{"title":"What to haul instead of moving","url":"https://herosjunkremovaltx.com/blog/moving-out-what-to-haul-instead-of-moving.html"},{"title":"Office and small commercial cleanouts","url":"https://herosjunkremovaltx.com/blog/office-and-small-commercial-cleanouts.html"},{"title":"Old furniture removal, from the upstairs bedroom out","url":"https://herosjunkremovaltx.com/blog/old-furniture-removal-getting-it-out.html"},{"title":"Rental property cleanout","url":"https://herosjunkremovaltx.com/blog/rental-property-cleanout.html"},{"title":"Same-day junk removal: what typical actually means","url":"https://herosjunkremovaltx.com/blog/same-day-junk-removal-what-typical-means.html"},{"title":"Clearing out a storage unit","url":"https://herosjunkremovaltx.com/blog/storage-unit-junk-removal.html"},{"title":"What we will and will not take","url":"https://herosjunkremovaltx.com/blog/what-junk-removal-will-and-will-not-take.html"},{"title":"What to clear before the listing photos","url":"https://herosjunkremovaltx.com/blog/what-to-clear-before-listing-photos.html"},{"title":"Where your junk actually goes","url":"https://herosjunkremovaltx.com/blog/where-your-junk-goes-after-pickup.html"},{"title":"Who comes to your house on a junk removal job","url":"https://herosjunkremovaltx.com/blog/who-comes-to-your-house-junk-removal.html"}]},{"group":"Service pages","icon":"map","links":[{"title":"Appliance removal in Dallas-Fort Worth","url":"https://herosjunkremovaltx.com/services/appliance-removal.html"},{"title":"Construction debris removal in Dallas-Fort Worth","url":"https://herosjunkremovaltx.com/services/construction-debris.html"},{"title":"Estate cleanouts in Dallas-Fort Worth","url":"https://herosjunkremovaltx.com/services/estate-cleanouts.html"},{"title":"Furniture removal in Dallas-Fort Worth","url":"https://herosjunkremovaltx.com/services/furniture-removal.html"},{"title":"Garage cleanouts in Dallas-Fort Worth","url":"https://herosjunkremovaltx.com/services/garage-cleanouts.html"},{"title":"Hot tub, shed, and playset removal in DFW","url":"https://herosjunkremovaltx.com/services/hot-tub-removal.html"},{"title":"Junk removal in Allen, TX","url":"https://herosjunkremovaltx.com/services/junk-removal-allen.html"},{"title":"Junk removal in Frisco, TX","url":"https://herosjunkremovaltx.com/services/junk-removal-frisco.html"},{"title":"Junk removal in McKinney, TX","url":"https://herosjunkremovaltx.com/services/junk-removal-mckinney.html"},{"title":"Junk removal in Plano, TX","url":"https://herosjunkremovaltx.com/services/junk-removal-plano.html"},{"title":"Same-day junk removal in Dallas-Fort Worth","url":"https://herosjunkremovaltx.com/services/same-day-junk-removal.html"},{"title":"Yard debris removal in Dallas-Fort Worth","url":"https://herosjunkremovaltx.com/services/yard-debris.html"}]},{"group":"Core site pages","icon":"globe","links":[{"title":"One pickup truck and a promise","url":"https://herosjunkremovaltx.com/about.html"},{"title":"Get a truck on the way","url":"https://herosjunkremovaltx.com/contact.html"},{"title":"Your junk\u2019s last day","url":"https://herosjunkremovaltx.com/index.html"}]}]};
-
+const DATA = {"slug":"jackson-roofing","generated":"2026-09-06","dataThrough":"2026-09-06","generatedAt":"2026-09-06T18:41:49","brand":{"name":"Jackson Roofing","initials":"JR","site":"https://wingdigital26-maker.github.io/jackson-roofing/","kicker":"Marketing dashboard","headline":"Here is everything we built. Here is what turns back on.","subhead":"Eleven articles went live on your site through July and August, and the rebuilt Jackson Roofing site is up right now. Publishing stopped at the end of August and nothing is posting or emailing on your behalf today. The plan below is what starts again on day one."},"engines":[],"types":{"core":{"label":"Site page","color":"#0aa7e6"},"blog":{"label":"Blog post","color":"#1bc0ff"},"service":{"label":"Service page","color":"#06809f"},"city":{"label":"City page","color":"#33414f"},"other":{"label":"Other","color":"#7a8a9a"}},"outreach":{"intro":"Nothing is being posted, sent or emailed on your behalf today. These are the lanes we would switch on, and what each one needs from you first.","channels":[{"name":"Google Business posts","icon":"star","types":[],"state":"needs_access","note":"Weekly posts to your Google Business Profile, ready to start as soon as you add us as a manager. For a roofer in a hail market this is the fastest lever there is."},{"name":"Review requests","icon":"chat","types":[],"state":"needs_access","note":"An automatic review ask after every finished job. We need your job list or a phone export to connect it, then the asks go out on their own."},{"name":"Facebook and Instagram","icon":"share","types":[],"state":"needs_access","note":"Straight answer: we measured social for your account and it brought in no leads. We will keep the pages current so anyone checking you out sees a live business, but we are not going to tell you it is where the work comes from."}]},"outreachPreview":null,"plan":{"banner":"Publishing stopped at the end of August and nothing on this page is running today. Everything below restarts the week we begin.","title":"What $1,000 a month turns on","intro":"The honest diagnosis first. You have a rebuilt site and eleven articles already live, and right now nothing is feeding any of it. When we measured social for this account it produced no leads, so we are not going to sell you social. Search, your Google profile and storm damage are the three levers that actually move roofing work in North Texas, and none of them are switched on today. That is what the plan below goes after.","phases":[{"when":"Week one","name":"Turn the lights back on","points":["Four blog posts a week begin again, written for what Plano homeowners actually type into Google.","Google Business Profile connected and posting every week.","Search Console connected, so the numbers on this dashboard become real readings instead of guesses.","Review requests wired to your job list, so finished jobs turn into Google reviews."],"state":"Starts on day one"},{"when":"Month one","name":"Pages that can rank","points":["A page for every service you sell: replacement, repair, storm and hail, inspection, commercial.","A page for every town you work: Plano, Rockwall, McKinney, and out from there.","On-page SEO and internal linking across the whole site, so new pages lift the older ones.","Roughly sixteen more posts live by the end of the month, all on your site, all clickable from here."],"state":"Included every month"},{"when":"Month two","name":"Storm targeting","points":["NOAA hail history mapped against your service area, so we know which streets took damage and when.","Storm and hail pages aimed at those neighborhoods while the damage is still fresh.","Google posts timed to the storms instead of to the calendar.","This is the one lever in North Texas roofing that does not come down to outspending somebody."],"state":"The seasonal lever"},{"when":"Every month","name":"You watch all of it","points":["This dashboard stays live and fills in as work goes out.","Every page and post is a link you can click and read for yourself.","A short monthly readout: what went live, what moved, what is next.","Anything we have no real source for stays blank instead of being filled in with a number."],"state":"Ongoing"}],"note":"No lead volume, ranking position or revenue result is promised on this page. What is committed is the work, the pace it goes out at, and a page like this one where you can check it yourself at any time.","cta":{"label":"Open your live site","url":"https://wingdigital26-maker.github.io/jackson-roofing/"}},"pendingMetrics":[{"name":"Google Search clicks and impressions","why":"Needs Search Console access for the site connected to the reporting account","state":"needs access"},{"name":"Keyword rankings","why":"Comes online with the same Search Console connection","state":"needs access"},{"name":"Google Business Profile views and calls","why":"Needs manager access to the Google Business Profile","state":"needs access"},{"name":"Calls and form leads","why":"The contact form does not report back to us, so any lead count here would be a guess","state":"not connected"}],"metrics":{},"items":[{"date":"2026-08-28","type":"blog","title":"How to Choose a Roofer in Allen Without Getting Burned","status":"published","url":"https://jacksonroofingco.com/how-to-choose-a-roofer-allen/"},{"date":"2026-08-28","type":"blog","title":"Getting Your North Texas Roof Ready for Hail Season","status":"published","url":"https://jacksonroofingco.com/roof-hail-season-prep/"},{"date":"2026-08-14","type":"blog","title":"How to Choose a Roofer in McKinney Without Getting Burned","status":"published","url":"https://jacksonroofingco.com/how-to-choose-a-roofer-mckinney/"},{"date":"2026-08-10","type":"core","title":"About Jackson Roofing & What We Do","status":"published","url":"https://wingdigital26-maker.github.io/jackson-roofing/about-services.html"},{"date":"2026-08-10","type":"core","title":"Schedule Your Free Roof Inspection Today","status":"published","url":"https://wingdigital26-maker.github.io/jackson-roofing/contact.html"},{"date":"2026-08-10","type":"core","title":"Our Work","status":"published","url":"https://wingdigital26-maker.github.io/jackson-roofing/gallery.html"},{"date":"2026-08-10","type":"core","title":"Expert Roofing for Homes and Businesses","status":"published","url":"https://wingdigital26-maker.github.io/jackson-roofing/index.html"},{"date":"2026-08-07","type":"blog","title":"Do Your Gutters Need Attention Before the Next Big Rain?","status":"published","url":"https://jacksonroofingco.com/gutters-before-the-next-big-rain/"},{"date":"2026-08-04","type":"blog","title":"How Much Does a New Roof Cost in Plano in 2026?","status":"published","url":"https://jacksonroofingco.com/new-roof-cost-plano/"},{"date":"2026-07-30","type":"blog","title":"Signs You Need a New Roof: A Plano Roofer Checklist","status":"published","url":"https://jacksonroofingco.com/signs-you-need-a-new-roof/"},{"date":"2026-07-27","type":"blog","title":"What to Do After a North Texas Hailstorm","status":"published","url":"https://jacksonroofingco.com/what-to-do-after-a-hailstorm/"},{"date":"2026-07-24","type":"blog","title":"Repair or Replace? A North Texas Roofer Honest Guide","status":"published","url":"https://jacksonroofingco.com/repair-or-replace-roof/"},{"date":"2026-07-22","type":"blog","title":"What Actually Happens During a Free Roof Inspection","status":"published","url":"https://jacksonroofingco.com/free-roof-inspection-explained/"},{"date":"2026-07-22","type":"blog","title":"Hail Damage vs Roof Wear: How to Tell the Difference","status":"published","url":"https://jacksonroofingco.com/hail-damage-vs-roof-wear/"},{"date":"2026-07-22","type":"blog","title":"Do You Need a Roof Permit in Richardson, TX?","status":"published","url":"https://jacksonroofingco.com/roof-permit-richardson-tx/"}],"pages":[{"group":"Core site pages, live now","icon":"globe","links":[{"title":"About Jackson Roofing & What We Do","url":"https://wingdigital26-maker.github.io/jackson-roofing/about-services.html"},{"title":"Schedule Your Free Roof Inspection Today","url":"https://wingdigital26-maker.github.io/jackson-roofing/contact.html"},{"title":"Our Work","url":"https://wingdigital26-maker.github.io/jackson-roofing/gallery.html"},{"title":"Expert Roofing for Homes and Businesses","url":"https://wingdigital26-maker.github.io/jackson-roofing/index.html"}]},{"group":"Blog posts we published on your site, July to August 2026","icon":"file","links":[{"title":"How to Choose a Roofer in Allen Without Getting Burned","url":"https://jacksonroofingco.com/how-to-choose-a-roofer-allen/"},{"title":"Getting Your North Texas Roof Ready for Hail Season","url":"https://jacksonroofingco.com/roof-hail-season-prep/"},{"title":"How to Choose a Roofer in McKinney Without Getting Burned","url":"https://jacksonroofingco.com/how-to-choose-a-roofer-mckinney/"},{"title":"Do Your Gutters Need Attention Before the Next Big Rain?","url":"https://jacksonroofingco.com/gutters-before-the-next-big-rain/"},{"title":"How Much Does a New Roof Cost in Plano in 2026?","url":"https://jacksonroofingco.com/new-roof-cost-plano/"},{"title":"Signs You Need a New Roof: A Plano Roofer Checklist","url":"https://jacksonroofingco.com/signs-you-need-a-new-roof/"},{"title":"What to Do After a North Texas Hailstorm","url":"https://jacksonroofingco.com/what-to-do-after-a-hailstorm/"},{"title":"Repair or Replace? A North Texas Roofer Honest Guide","url":"https://jacksonroofingco.com/repair-or-replace-roof/"},{"title":"What Actually Happens During a Free Roof Inspection","url":"https://jacksonroofingco.com/free-roof-inspection-explained/"},{"title":"Hail Damage vs Roof Wear: How to Tell the Difference","url":"https://jacksonroofingco.com/hail-damage-vs-roof-wear/"},{"title":"Do You Need a Roof Permit in Richardson, TX?","url":"https://jacksonroofingco.com/roof-permit-richardson-tx/"}]}]};
 (function(){
   'use strict';
   const $ = s => document.querySelector(s);
@@ -574,7 +535,6 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
   const meta = t => (DATA.types && DATA.types[t]) || {};
   const label = t => meta(t).label || t || 'Item';
   const color = t => meta(t).color || 'var(--accent)';
-
   const b = DATA.brand || {};
   $('#mark').textContent  = b.initials || '';
   $('#cname').textContent = b.name || '';
@@ -582,13 +542,11 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
   $('#eyebrow').textContent = b.kicker || 'Marketing dashboard';
   $('#headline').textContent = b.headline || '';
   $('#subhead').textContent  = b.subhead || '';
-
   const ITEMS = (DATA.items||[]).slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   // Published only. Planned and drafted rows are internal scheduling state; on a
   // client page they read as promises, and a stale source makes them promises
   // for dates that have already gone by.
   const PUB = ITEMS.filter(i => i.status === 'published' && !isNaN(pd(i.date)));
-
   /* theme -- light only. Dark mode was removed by request; forcing
      data-theme="light" makes the dark @media block (guarded by
      :not([data-theme="light"])) inert and the [data-theme="dark"] block
@@ -597,7 +555,6 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
   root.setAttribute('data-theme', 'light');
   const themeBtn = $('#theme');
   if (themeBtn) themeBtn.style.display = 'none';
-
   /* freshness -- the age of the SOURCE, never the age of this build */
   const through = DATA.dataThrough || DATA.generated;
   const thruDate = pd(through);
@@ -614,7 +571,6 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
       (DATA.undated===1?' is':'s are')+' live on your site that we could not date on this load, '+
       'and will appear here on the next refresh.</div>';
   }
-
   /* three stats */
   const now = new Date();
   const livePages = (DATA.pages||[]).reduce((s,g)=>s+g.links.length,0);
@@ -642,7 +598,6 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
     el.innerHTML = '<div class="stat-v">'+s.v.toLocaleString()+'</div><div class="stat-l">'+esc(s.l)+'</div>';
     $('#stats').appendChild(el);
   });
-
   /* highlights strip -- per-type published counts, an honest summary of the mix.
      Same colours as the chart. Only the types that actually have published work
      appear, so this can never show a fabricated "0 city pages" for a client who
@@ -659,13 +614,11 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
         '<b>'+c[t]+'</b><span>'+esc(c[t]===1?one:many)+'</span></div>';
     }).join('');
   })();
-
   /* ── the chart ───────────────────────────────────────────────
      Buckets run from the first publish to the end of the RECORD -- never to
      today, so a stale file cannot draw phantom empty periods that read as "they
      stopped working". Empty buckets INSIDE that range are drawn as empty,
      because a real gap is real information.
-
      The bucket size adapts: a client three months in has nothing to read in a
      one-bar monthly chart, so short histories are charted by week instead. */
   let buckets = [], unit = 'month';
@@ -674,7 +627,6 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
     const lastD  = (!isNaN(thruDate) && thruDate > firstD) ? thruDate : pd(PUB[0].date);
     const monthSpan = (lastD.getFullYear()-firstD.getFullYear())*12 + (lastD.getMonth()-firstD.getMonth()) + 1;
     unit = monthSpan < 3 ? 'week' : 'month';
-
     if (unit === 'month') {
       let y = firstD.getFullYear(), m = firstD.getMonth();
       while (y < lastD.getFullYear() || (y === lastD.getFullYear() && m <= lastD.getMonth())) {
@@ -708,7 +660,6 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
     while (buckets.length > 1 && !buckets[0].total) buckets.shift();
   }
   const maxB = Math.max(1, ...buckets.map(x=>x.total));
-
   if (!buckets.length) {
     $('#chart').innerHTML = '<div class="empty">Published work will chart here.</div>';
     $('#chart-sd').textContent = 'Nothing published yet.';
@@ -747,7 +698,6 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
         String(endD.getDate()).padStart(2,'0')) +
       '.';
   }
-
   /* ── type mix + key ──────────────────────────────────────── */
   const counts = {};
   PUB.forEach(i => counts[i.type] = (counts[i.type]||0)+1);
@@ -758,16 +708,13 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
   $('#keys').innerHTML = kinds.map(t =>
     '<div class="key"><i style="background:'+color(t)+'"></i>'+
     '<span class="kn">'+esc(label(t))+'</span><span class="kv">'+counts[t]+'</span></div>').join('');
-
   /* ── the list ────────────────────────────────────────────── */
   const STEP = 12;
   let shown = STEP, query = '';
-
   function render(){
     const rows = PUB.filter(i => !query || String(i.title||'').toLowerCase().includes(query));
     const slice = rows.slice(0, shown);
     $('#pubn').textContent = PUB.length + ' published';
-
     if (!slice.length) {
       $('#list').innerHTML = '<div class="empty">'+
         (query ? 'Nothing matches that search.' : 'Published work will appear here.')+'</div>';
@@ -791,7 +738,6 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
         '<div class="row-d">'+fmt(i.date)+'</div></div>';
     });
     $('#list').innerHTML = html;
-
     const left = rows.length - slice.length;
     $('#more').hidden = left <= 0;
     $('#more').textContent = 'Show ' + Math.min(left, STEP) + ' more';
@@ -801,7 +747,6 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
   });
   $('#more').addEventListener('click', () => { shown += STEP; render(); });
   render();
-
   /* ── what happens next -----------------------------------------
      Generic and config-driven. Renders nothing at all unless the payload
      carries a `plan` object, so this block is inert for every client that
@@ -834,7 +779,6 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
       a.hidden = false;
     }
   })();
-
   /* The agency credit is a link only when the payload carries a URL we stand
      behind. A dead link in the footer of a client-facing page is worse than
      plain text, so with no URL it stays plain text. */
@@ -845,7 +789,6 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
     el.outerHTML = '<a id="agency" href="'+esc(url)+'" target="_blank" rel="noopener">'+
       esc(el.textContent)+'</a>';
   })();
-
   /* ── outreach and social ─────────────────────────────────────
      One card per channel. A channel only reports a NUMBER when it is genuinely
      sending and we can count it; otherwise it says plainly why it is empty.
@@ -864,7 +807,6 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
     needs_access:  'Ready when you are',
     pending_approval: 'Ready for your OK'
   };
-
   // A channel's count is the number of PUBLISHED items of its types. Anything
   // not counted from real records stays a state, never a number.
   const sent = [];
@@ -874,12 +816,10 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
       : [];
     if (c.state === 'live') sent.push.apply(sent, c._items);
   });
-
   $('#out-sd').textContent = OUT.intro ||
     'Everything that goes out under your name.';
   $('#outn').textContent = sent.length
     ? sent.length + ' sent' : '';
-
   /* HOUSE RULE: never announce an absence. A channel that simply is not part
      of this client's setup is left out entirely rather than rendered as "Not
      connected" or "Not in your plan" -- a client should not open their
@@ -888,7 +828,6 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
      requests of them, not confessions of a gap. */
   const HIDE_STATES = ['not_connected', 'not_in_plan'];
   const shownChans = chans.filter(c => HIDE_STATES.indexOf(c.state) === -1);
-
   $('#chans').innerHTML = shownChans.length ? shownChans.map(c => {
     const live = c.state === 'live';
     const body = live
@@ -898,7 +837,6 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
       '<div class="chan-i">'+oSvg(c.icon)+'</div><div class="chan-n">'+esc(c.name)+'</div></div>'+
       body + '<div class="chan-note">'+esc(c.note||'')+'</div></div>';
   }).join('') : '';
-
   // The log underneath lists only what actually went out.
   if (sent.length) {
     sent.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
@@ -913,7 +851,6 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
     $('#outlist').innerHTML = '';
   }
   if (!shownChans.length) $('#out-sec').hidden = true;
-
   /* ── other pages: only what is NOT already listed above ──── */
   const listed = new Set(ITEMS.map(i => i.url).filter(Boolean));
   const groups = (DATA.pages||[])
@@ -932,7 +869,6 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
         '</div></div></div>').join('')
     ).join('');
   }
-
   /* ── what is not wired up ────────────────────────────────── */
   // A client can be configured with no pending list at all. Drop the whole
   // section rather than leaving an empty "Not connected yet" card, which reads
@@ -941,7 +877,6 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
   // they do not have. The "what unlocks next" section that used to live here is
   // gone from the markup entirely, so it cannot ship even in page source. The
   // configs keep their pendingMetrics so the data is not lost.
-
   /* ── the live site check ─────────────────────────────────────
      Every OUTCOME metric a client wants (search clicks, calls, form leads) sits
      behind access we may not have. This section needs none of it: it loads the
@@ -960,16 +895,13 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
           'Refresh in a moment to see the latest reading.</div>';
       });
   }
-
   function tile(v, l, pending){
     return '<div class="hstat'+(pending?' pend':'')+'"><div class="hstat-v">'+v+'</div>'+
            '<div class="hstat-l">'+esc(l)+'</div></div>';
   }
-
   function renderHealth(h){
     const p = h.pages || {};
     const tiles = [];
-
     // Google's own grade, only when their API actually answers. A throttled call
     // is not a score, and a permanent "still measuring" tile is just clutter.
     if (h.speed && typeof h.speed.score === 'number') {
@@ -977,7 +909,6 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
         'Google’s speed score for your site on a phone' +
         (h.speed.lcp ? ' · main content in ' + h.speed.lcp : '')));
     }
-
     if (p.checked) {
       tiles.push(tile(p.clean + '<small> of ' + p.checked + '</small>',
         'Pages that pass every on-page check we run'));
@@ -990,9 +921,7 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
       tiles.push(tile(h.sitemap.urls.toLocaleString(),
         'Pages your sitemap hands to Google'));
     }
-
     let html = '<div class="hstats">' + tiles.join('') + '</div>';
-
     if (h.robotsBlocking) {
       html += '<div class="hwarn"><b>Your site is currently telling search engines not to index it.</b> '+
         'That is a one-line fix in robots.txt and we are on it.</div>';
@@ -1001,10 +930,8 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
       html += '<div class="hwarn">We are adding a sitemap so Google gets a clean list of '+
         'every page on your site.</div>';
     }
-
     const issues = h.issues || [];
     const impr = h.improvements || [];
-
     function pageRows(rows, key){
       return rows.map(function(it){
         const name = esc(it.title || it.url);
@@ -1014,7 +941,6 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
           '</ul></div></div>';
       }).join('');
     }
-
     html += '<div class="card">';
     if (!p.checked) {
       html += '<div class="empty">Checking your pages now. Refresh in a moment for the latest reading.</div>';
@@ -1026,7 +952,6 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
         issues.length+' page'+(issues.length===1?'':'s')+' we are fixing next</div></div>';
       html += pageRows(issues, 'problems');
     }
-
     // Working pages with upside left. Kept visually separate from breakage so a
     // long list here reads as a plan, which is what it is. Collapsed past six so
     // the queue cannot become the longest thing on the page.
@@ -1040,7 +965,6 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
           '<button class="more" id="impr-more">Show the other '+(impr.length-HEAD)+'</button>';
       }
     }
-
     // Say plainly what the check did and did not cover.
     const notes = [];
     if (p.checked) notes.push('Checked ' + p.checked + ' of ' + p.listed + ' pages');
@@ -1051,7 +975,6 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
       { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' }));
     if (notes.length) html += '<div class="hstamp">'+esc(notes.join(' · '))+'.</div>';
     html += '</div>';
-
     $('#health').innerHTML = html;
     const imore = $('#impr-more');
     if (imore) imore.addEventListener('click', function(){
@@ -1059,7 +982,6 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
     });
     if (p.checked) $('#healthn').textContent = p.checked + ' pages checked';
   }
-
   /* ── Outreach preview ───────────────────────────────────────────────────────
      A pending email program shown so the OWNER can review exactly what would be
      sent under their name before anything goes out. Data-driven: renders only
@@ -1074,7 +996,6 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
     if (OP.banner) { $('#op-banner').hidden = false; $('#op-banner').textContent = OP.banner; }
     $('#op-plan').innerHTML = (OP.plan||[]).map(p =>
       '<div class="pp">'+esc(p)+'</div>').join('');
-
     // The emails themselves stay folded away behind one link. A client wants to
     // know outreach is going out and to be able to look if they choose; a wall
     // of template copy on the page reads like homework, not like work done.
@@ -1110,7 +1031,6 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
           : 'See the ' + mailCount + ' ' + (mailCount === 1 ? 'email' : 'emails');
       });
     }
-
     // Reach: what has actually been built for this client. Every number here
     // counts rows we hold, never messages sent, so it stays true before a
     // single email goes out.
@@ -1127,7 +1047,6 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
               '<div class="hstat-l">Cities covered</div></div>');
       $('#op-reach').innerHTML = rt.join('');
     }
-
     // Queue
     $('#op-q-label').textContent = 'Who is on the list';
     const Q = OP.queue;
@@ -1167,7 +1086,6 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
     });
     drawQ();
   })();
-
   // ── Referral partners ──────────────────────────────────────────────────────
   // Fetched separately from the dashboard payload and only when the link
   // carries ?k=. No key means the section never appears and no request is even
@@ -1178,25 +1096,20 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
     var slug = P.get('c') || DATA.slug;
     if (!slug) return;
     if (!key) return;
-
     var LD = null, LCAT = 'all', LSHOWN = 100;
-
     fetch('/api/leads/' + encodeURIComponent(slug) + '?k=' + encodeURIComponent(key),
           {cache:'no-store'})
       .then(function(r){ if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
       .then(function(d){ LD = d; initLeads(); })
       .catch(function(){ /* a bad key must fail silently: the rest of the
                             dashboard is still perfectly valid without it */ });
-
     function n(x){ return (x||0).toLocaleString('en-US'); }
-
     function initLeads(){
       var L = LD.leads || [];
       if (!L.length) return;
       $('#leads-sec').hidden = false;
       $('#leadn').textContent = n(L.length) + ' businesses';
       $('#leadsd').textContent = LD.note || '';
-
       $('#lstats').innerHTML =
         '<div class="lstat"><b>' + n(L.length) + '</b><span>businesses</span></div>' +
         '<div class="lstat"><b>' + n(L.filter(function(x){return x.phone}).length) +
@@ -1206,7 +1119,6 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
         '<div class="lstat"><b>' + n(LD.cities||0) + '</b><span>cities</span></div>' +
         '<div class="lstat"><b>' + n((LD.categories||[]).length) +
           '</b><span>partner types</span></div>';
-
       var counts = {};
       L.forEach(function(x){ counts[x.category] = (counts[x.category]||0) + 1; });
       var cats = (LD.categories||[]).filter(function(c){ return counts[c.key]; });
@@ -1216,7 +1128,6 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
           return '<span class="lpill" data-c="' + esc(c.key) + '">' + esc(c.label) +
                  ' <i>' + counts[c.key] + '</i></span>';
         }).join('');
-
       $('#lpills').addEventListener('click', function(e){
         var p = e.target.closest('.lpill'); if (!p) return;
         Array.prototype.forEach.call(document.querySelectorAll('.lpill'),
@@ -1229,12 +1140,10 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
       $('#leadmore').addEventListener('click', function(){ LSHOWN += 200; drawLeads(); });
       drawLeads();
     }
-
     function drawLeads(){
       var q = ($('#lq').value||'').toLowerCase().trim();
       var sort = $('#lsort').value, has = $('#lhas').value;
       var cm = {}; (LD.categories||[]).forEach(function(c){ cm[c.key] = c; });
-
       var rows = (LD.leads||[]).filter(function(x){
         if (LCAT !== 'all' && x.category !== LCAT) return false;
         if (has === 'email' && !x.email) return false;
@@ -1243,7 +1152,6 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
         return ((x.name||'') + ' ' + (x.city||'') + ' ' + (x.phone||'') + ' ' +
                 (x.email||'')).toLowerCase().indexOf(q) > -1;
       });
-
       rows.sort(function(a,b){
         if (sort === 'name')    return (a.name||'').localeCompare(b.name||'');
         if (sort === 'city')    return (a.city||'').localeCompare(b.city||'') ||
@@ -1251,28 +1159,23 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
         if (sort === 'reviews') return (b.reviews||0) - (a.reviews||0);
         return (b.score||0) - (a.score||0);
       });
-
       // The list is capped at LSHOWN rows, so filtering from 3,188 down to 71
       // still renders 40 cards and looks like nothing happened. Always state
       // how many matched.
       $('#leadn').textContent = (rows.length === (LD.leads||[]).length)
         ? n(rows.length) + ' businesses'
         : n(rows.length) + ' of ' + n((LD.leads||[]).length);
-
       $('#lwhy').textContent =
         (LCAT !== 'all' && cm[LCAT]) ? (cm[LCAT].why || '') : '';
-
       if (!rows.length){
         $('#leads').innerHTML = '<div class="empty">Nothing matches that.</div>';
         $('#leadmore').hidden = true;
         return;
       }
-
       $('#leads').innerHTML = rows.slice(0, LSHOWN).map(function(x){
         var bits = [esc((cm[x.category]||{}).label || x.category || '')];
         if (x.city) bits.push(esc(x.city));
         if (x.address) bits.push(esc(x.address));
-
         var cts = [];
         if (x.phone) cts.push('<a class="lct pri" href="tel:' +
           esc(String(x.phone).replace(/\D/g,'')) + '">Call ' + esc(x.phone) + '</a>');
@@ -1286,18 +1189,15 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
         if (x.maps) cts.push('<a class="lct" href="' + esc(x.maps) +
           '" target="_blank" rel="noopener noreferrer">Map</a>');
         if (x.email_status === 'risky') cts.push('<span class="ltag">shared inbox</span>');
-
         var rk = x.reviews ? ('<b>' + x.reviews + '</b> reviews' +
                               (x.rating ? '<br>' + x.rating + '★' : ''))
                            : (x.rating ? x.rating + '★' : '');
-
         return '<div class="lrow"><div class="lrow-t"><div>' +
           '<div class="lnm">' + esc(x.name) + '</div>' +
           '<div class="lmt">' + bits.join(' &middot; ') + '</div></div>' +
           '<div class="lrk">' + rk + '</div></div>' +
           '<div class="lcts">' + cts.join('') + '</div></div>';
       }).join('');
-
       var m = $('#leadmore');
       m.hidden = rows.length <= LSHOWN;
       if (!m.hidden) {
@@ -1308,7 +1208,6 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
       }
     }
   })();
-
   /* ── Demo activity: Leads / Messages+Reviews / typical-client band ──────────
      Renders ONLY when the client payload carries the demo objects, which live
      under DATA.brand so they pass through build.py unchanged (nested there
@@ -1323,7 +1222,6 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
     const statTile = (v, l) =>
       '<div class="stat"><div class="stat-v">'+esc(v)+'</div>'+
       '<div class="stat-l">'+esc(l)+'</div></div>';
-
     // Typical-client projection band -- framed as illustrative, never a promise.
     const proj = D.projection;
     if (proj && proj.text) {
@@ -1333,7 +1231,6 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
         (proj.sub ? '<div class="dbs">'+esc(proj.sub)+'</div>' : '');
       $('#demo-projection-sec').hidden = false;
     }
-
     // Leads coming in
     const lf = D.leadsFeed;
     if (lf && Array.isArray(lf.leads) && lf.leads.length) {
@@ -1364,7 +1261,6 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
       }).join('');
       $('#demo-leads-sec').hidden = false;
     }
-
     // Messages and reviews
     const act = D.activity;
     if (act) {
@@ -1390,7 +1286,6 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
       }
       $('#demo-msg-sec').hidden = false;
     }
-
     // Contact database -- a sample of the enriched contact volume Wing builds.
     // Numbers and rows are illustrative sample data (555-range phone numbers so
     // no real person is implied); the caption says so plainly.
@@ -1421,8 +1316,709 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
 </script>
 <div id="wing-helper" title="Zephyr, from Wing Digital"
   style="position:fixed;right:16px;bottom:14px;z-index:60;opacity:0;pointer-events:none;transition:opacity .8s"></div>
-<script src="/mascot/zephyr-kb.js?v=1"></script>
-<script src="/mascot/wing-mascot.js?v=10"></script>
+<script>
+/* Zephyr's public knowledge base.
+ * Curated for CLIENT-FACING pages: only facts already public on wingdigital.co
+ * or vetted for the pitch page. Never put private vault data, revenue, client
+ * internals, or pricing guesses in here. Unknown questions fall back honestly.
+ * Format: k = keywords (phrases score higher), a = answer HTML (trusted, no user input).
+ */
+window.ZEPHYR_KB = [
+  { k: ['what do you do', 'services', 'offer', 'what is wing', 'about wing', 'who are you', 'company'],
+    a: 'Wing Digital builds websites and runs local SEO, social media, and lead generation for DFW businesses. One team handles all of it: the site, the content, the follow-up, and a live dashboard that shows the work.' },
+  { k: ['website', 'web design', 'site', 'build a site', 'new website', 'redesign'],
+    a: 'Website design is the flagship: a professional, mobile-friendly site that turns visitors into phone calls. Custom design, written copy, photos, domain, hosting, contact form, and on-page SEO, all handled and live in two weeks.' },
+  { k: ['how long', 'how fast', 'two weeks', 'timeline', 'launch', 'live', 'speed'],
+    a: 'Two weeks from kickoff to a live website. Design, copy, photos, hosting, and SEO are all handled for you. The ongoing programs (SEO, social, leads) start showing published work within the first week.' },
+  { k: ['seo', 'local seo', 'google', 'rank', 'ranking', 'search', 'found'],
+    a: 'Local SEO is the ongoing work of getting found when DFW customers search: Google Business Profile optimization, keyword-targeted blog posts every month, city and neighborhood landing pages, and monthly ranking reports you can actually read.' },
+  { k: ['social', 'social media', 'facebook', 'instagram', 'posts', 'posting'],
+    a: 'Social media handled for you: posts written and published across Facebook, Instagram, and Google Business with branded graphics that match your site. Your side of it is one fifteen-minute check-in a month.' },
+  { k: ['lead', 'leads', 'lead generation', 'outreach', 'follow up', 'followup', 'missed call'],
+    a: 'Lead generation fills the gaps between referrals: targeted prospect lists in your service area, an instant reply the moment a lead comes in, missed-call text-back, follow-up sequences written in your voice, and automatic review requests after every job.' },
+  { k: ['dashboard', 'report', 'reporting', 'see the work', 'track', 'proof'],
+    a: 'Every client gets a live dashboard: every blog post, service page, and city page Wing publishes, each linking to the live page on your site, plus a monthly chart of the work. No PDF you have to trust; you watch it happen.' },
+  { k: ['price', 'pricing', 'cost', 'how much', 'expensive', 'cheap', 'budget'],
+    a: 'Pricing depends on what your business needs, a site build, an ongoing program, or both. The honest answer comes from a quick conversation: use the contact form and Wing will lay out exactly what you would get and what it costs.' },
+  { k: ['results', 'proof', 'work', 'case study', 'clients', 'portfolio', 'examples'],
+    a: 'Real work you can click through: Jackson Roofing (250+ website visits generated, pages and posts publishing every week) and Renewal Health among them. Across clients Wing has published hundreds of SEO pages and posts and surfaced thousands of local leads. The work page has live links.' },
+  { k: ['jackson', 'roofing', 'roofer'],
+    a: 'Jackson Roofing is a DFW roofing client: Wing generated 250+ website visits and publishes new blog posts, service pages, and city pages for them every week from the SEO content engine.' },
+  { k: ['renewal', 'health', 'wellness'],
+    a: 'Renewal Health is a live Wing build: a full website plus an ongoing content program, publishing health and wellness content weekly. It is on the work page with a live link.' },
+  { k: ['where', 'location', 'dfw', 'dallas', 'fort worth', 'plano', 'area', 'serve'],
+    a: 'Wing Digital is based in Plano, TX and serves businesses across the whole Dallas-Fort Worth metro.' },
+  { k: ['who is this for', 'industries', 'home service', 'contractors', 'trades', 'hvac', 'plumbing', 'landscaping'],
+    a: 'Wing specializes in local service businesses: roofing, HVAC, plumbing, electrical, landscaping, junk removal, and other home services, plus local businesses that live on Google search and referrals.' },
+  { k: ['contact', 'talk', 'call', 'reach', 'get started', 'start', 'sign up', 'hire'],
+    a: 'Use the contact form (bottom of the home page, or the contact page) and tell Wing about your business. A real person replies fast. From a signed yes, your site is live in two weeks and your dashboard turns on in the first week.' },
+  { k: ['blog', 'content', 'articles', 'writing', 'posts per month'],
+    a: 'Content is written to rank and to sound like you: Wing pulls your real services, the towns you cover, and your voice before writing a word. Keyword-targeted blog posts publish every month alongside service and city pages.' },
+  { k: ['review', 'reviews', 'reputation', 'stars'],
+    a: 'Automated, well-timed review requests go out after every job, so your Google reputation compounds instead of stalling. It is part of the lead generation program.' },
+  { k: ['do i have to', 'my time', 'effort', 'homework', 'hands off', 'write anything'],
+    a: 'You do not have to write or post anything. Wing builds it and runs it; you review whatever you want. Social takes one fifteen-minute check-in a month, and everything else happens without you lifting a finger.' },
+  { k: ['sound like us', 'voice', 'generic', 'template', 'ai content'],
+    a: 'Before writing a word, Wing pulls your real services, the towns you serve, and your voice, so pages and posts read like your company, not a generic template.' },
+  { k: ['booking', 'schedule', 'appointment', 'calendar'],
+    a: 'A simple booking link lets a homeowner lock in a time without phone tag. It plugs into the follow-up system so every new lead gets a fast response.' },
+  { k: ['hosting', 'domain', 'maintain', 'maintenance', 'own my site', 'ownership'],
+    a: 'Domain, hosting, and the contact form are set up as part of the website build, and the site is maintained as part of an ongoing program. Ask through the contact form about ownership specifics for your situation.' },
+  { k: ['zephyr', 'mascot', 'who are you', 'your name', 'orb'],
+    a: 'I am Zephyr, named for the west wind. I am Wing Digital’s assistant: I float around the site and the client dashboards, answer questions, and point you at the right page. The humans do the actual building.' },
+  { k: ['ai', 'automation', 'automated', 'robot', 'chatgpt'],
+    a: 'Wing runs on serious automation: the content engine, follow-up, review requests, and dashboards run around the clock. The strategy, the voice, and the client relationships are human. I am the friendly face on top.' },
+  { k: ['guarantee', 'contract', 'commitment', 'cancel', 'lock in'],
+    a: 'Terms and commitments are a conversation with a human, not something I should improvise. Use the contact form and Wing will be straight with you about how engagements work.' },
+  { k: ['first week', 'when do i see', 'start seeing', 'how do i know'],
+    a: 'Usually within the first week you see pages publishing and your dashboard turn on. From there you can open the dashboard any time and watch each new page and post appear, with a link to see it live on your site.' }
+];
+
+</script>
+<script>
+/* Wing Digital entity: Zephyr.
+ * Floating orb with counter-rotating orbit rings and a blinking lens.
+ * Self-contained interactive SVG component. No dependencies.
+ * Usage:
+ *   <script src="/mascot/wing-mascot.js"><\/script>
+ *   var m = WingMascot.mount(document.getElementById('slot'), { size: 120, intro: true });
+ *   m.setState('calm' | 'excited' | 'alert' | 'dim');
+ * Behavior: levitates with a breathing glow, blinks its lens on a random timer,
+ * rings spin up on hover/tap, brief flare on fast scroll. Honors
+ * prefers-reduced-motion (static pose, no timers).
+ */
+(function () {
+  var SVG = '<svg viewBox="0 0 200 200" width="100%" height="100%" aria-hidden="true" style="overflow:visible">' +
+    '<defs>' +
+    '<radialGradient id="wmCore" cx="42%" cy="34%" r="75%">' +
+    '<stop offset="0%" stop-color="#9db4ff"/><stop offset="45%" stop-color="#2757E6"/><stop offset="100%" stop-color="#12245e"/>' +
+    '</radialGradient>' +
+    '<radialGradient id="wmHalo" cx="50%" cy="50%" r="50%">' +
+    '<stop offset="0%" stop-color="#2757E6" stop-opacity=".55"/><stop offset="100%" stop-color="#2757E6" stop-opacity="0"/>' +
+    '</radialGradient>' +
+    '<linearGradient id="wmComet" x1="0" y1="0" x2="1" y2="0">' +
+    '<stop offset="0%" stop-color="#c9d6ff" stop-opacity="0"/><stop offset="70%" stop-color="#9db4ff" stop-opacity=".9"/><stop offset="100%" stop-color="#eaf0ff"/>' +
+    '</linearGradient>' +
+    '<linearGradient id="wmRing" x1="0" y1="0" x2="1" y2="1">' +
+    '<stop offset="0%" stop-color="#c9d6ff"/><stop offset="55%" stop-color="#5f82f5"/><stop offset="100%" stop-color="#2757E6" stop-opacity=".35"/>' +
+    '</linearGradient>' +
+    '<radialGradient id="wmSheen" cx="50%" cy="50%" r="50%">' +
+    '<stop offset="0%" stop-color="#ffffff" stop-opacity=".5"/><stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>' +
+    '</radialGradient>' +
+    '<radialGradient id="wmAtmo" cx="50%" cy="42%" r="60%">' +
+    '<stop offset="72%" stop-color="#7d9bff" stop-opacity="0"/><stop offset="94%" stop-color="#7d9bff" stop-opacity=".5"/><stop offset="100%" stop-color="#c9d6ff" stop-opacity=".8"/>' +
+    '</radialGradient>' +
+    '</defs>' +
+    '<g class="wm-rig">' +
+    '<circle class="wm-glow" cx="100" cy="96" r="74" fill="url(#wmHalo)"/>' +
+    '<circle class="wm-glow2" cx="100" cy="96" r="52" fill="url(#wmHalo)"/>' +
+    '<circle class="wm-core" cx="100" cy="96" r="40" fill="url(#wmCore)"/>' +
+    '<circle class="wm-atmo" cx="100" cy="96" r="41.5" fill="url(#wmAtmo)"/>' +
+    '<ellipse class="wm-sheenspot" cx="88" cy="80" rx="16" ry="11" fill="url(#wmSheen)" transform="rotate(-24 88 80)"/>' +
+    '<g class="wm-eyes">' +
+    '<g class="wm-eye-open"><rect x="84" y="82" width="11" height="24" rx="5.5" fill="#eaf0ff"/><rect x="105" y="82" width="11" height="24" rx="5.5" fill="#eaf0ff"/></g>' +
+    '<g class="wm-eye-happy" opacity="0"><path d="M84 98 q5.5 -9 11 0" fill="none" stroke="#eaf0ff" stroke-width="5" stroke-linecap="round"/><path d="M105 98 q5.5 -9 11 0" fill="none" stroke="#eaf0ff" stroke-width="5" stroke-linecap="round"/></g>' +
+    '</g>' +
+    '<g class="wm-ring wm-r1">' +
+    '<ellipse cx="100" cy="96" rx="62" ry="20" fill="none" stroke="url(#wmRing)" stroke-width="1.6" opacity=".75" transform="rotate(-18 100 96)"/>' +
+    '<circle cx="162" cy="96" r="6" fill="#7d9bff" opacity=".35" transform="rotate(-18 100 96)"/>' +
+    '<circle cx="162" cy="96" r="3.6" fill="#eaf0ff" transform="rotate(-18 100 96)"/>' +
+    '</g>' +
+    '<g class="wm-ring wm-r2">' +
+    '<ellipse cx="100" cy="96" rx="56" ry="26" fill="none" stroke="url(#wmRing)" stroke-width="1.2" opacity=".45" transform="rotate(24 100 96)"/>' +
+    '<circle cx="44" cy="96" r="4.6" fill="#7d9bff" opacity=".3" transform="rotate(24 100 96)"/>' +
+    '<circle cx="44" cy="96" r="2.8" fill="#c9d6ff" transform="rotate(24 100 96)"/>' +
+    '</g>' +
+    '<g class="wm-comet">' +
+    '<circle cx="100" cy="70" r="5.6" fill="#eaf0ff" opacity=".3" transform="rotate(-18 100 96)"/>' +
+    '<circle cx="100" cy="70" r="3.2" fill="#ffffff" transform="rotate(-18 100 96)"/>' +
+    '</g>' +
+    '<g class="wm-props">' +
+    '<g class="wm-p wm-p-think">' +
+    '<circle cx="128" cy="54" r="3" fill="#7d9bff"/><circle cx="137" cy="43" r="4.5" fill="#9db4ff"/>' +
+    '<ellipse cx="154" cy="27" rx="17" ry="11" fill="#dbe4ff" stroke="#7d9bff" stroke-width="1.2"/><ellipse cx="141" cy="31" rx="10" ry="8" fill="#dbe4ff" stroke="#7d9bff" stroke-width="1.2"/><ellipse cx="167" cy="31" rx="10" ry="8" fill="#dbe4ff" stroke="#7d9bff" stroke-width="1.2"/>' +
+    '<circle class="wm-td" cx="146" cy="28" r="2.2" fill="#2757E6"/><circle class="wm-td wm-td2" cx="154" cy="28" r="2.2" fill="#2757E6"/><circle class="wm-td wm-td3" cx="162" cy="28" r="2.2" fill="#2757E6"/>' +
+    '</g>' +
+    '<g class="wm-p wm-p-alert"><circle cx="148" cy="36" r="13" fill="#F5A623"/><rect x="146" y="27.5" width="4" height="11" rx="2" fill="#0B0C10"/><circle cx="148" cy="43.5" r="2.2" fill="#0B0C10"/></g>' +
+    '<g class="wm-p wm-p-sleep" fill="#5f82f5" font-family="Inter,system-ui,sans-serif" font-weight="700">' +
+    '<text class="wm-z" x="130" y="54" font-size="13">z</text><text class="wm-z wm-z2" x="143" y="42" font-size="17">z</text><text class="wm-z wm-z3" x="158" y="30" font-size="21">z</text>' +
+    '</g>' +
+    '<g class="wm-p wm-p-party">' +
+    '<rect class="wm-cf" x="52" y="18" width="5" height="8" rx="1.5" fill="#F5A623"/>' +
+    '<rect class="wm-cf wm-cf2" x="88" y="8" width="5" height="8" rx="1.5" fill="#7d9bff"/>' +
+    '<rect class="wm-cf wm-cf3" x="126" y="14" width="5" height="8" rx="1.5" fill="#1E44B8"/>' +
+    '<rect class="wm-cf wm-cf4" x="152" y="24" width="5" height="8" rx="1.5" fill="#2757E6"/>' +
+    '<circle class="wm-cf wm-cf5" cx="70" cy="12" r="3" fill="#c9d6ff"/>' +
+    '<circle class="wm-cf wm-cf6" cx="112" cy="20" r="3" fill="#F5A623"/>' +
+    '</g>' +
+    '<g class="wm-p wm-p-spark">' +
+    '<g transform="translate(48,46)"><path class="wm-sp" d="M0 -6 L1.6 -1.6 L6 0 L1.6 1.6 L0 6 L-1.6 1.6 L-6 0 L-1.6 -1.6 Z" fill="#5f82f5"/></g>' +
+    '<g transform="translate(154,40)"><path class="wm-sp wm-sp2" d="M0 -7 L1.8 -1.8 L7 0 L1.8 1.8 L0 7 L-1.8 1.8 L-7 0 L-1.8 -1.8 Z" fill="#2757E6"/></g>' +
+    '<g transform="translate(100,22)"><path class="wm-sp wm-sp3" d="M0 -5 L1.4 -1.4 L5 0 L1.4 1.4 L0 5 L-1.4 1.4 L-5 0 L-1.4 -1.4 Z" fill="#9db4ff"/></g>' +
+    '</g>' +
+    '<g class="wm-p wm-p-dim"><ellipse cx="100" cy="24" rx="20" ry="9" fill="#6b7390"/><ellipse cx="85" cy="28" rx="11" ry="7" fill="#6b7390"/><ellipse cx="115" cy="28" rx="11" ry="7" fill="#6b7390"/></g>' +
+    '</g>' +
+    '</g></svg>';
+
+  var CSS = '.wm-root{display:inline-block;line-height:0}' +
+    '.wm-rig{transform-origin:100px 96px;animation:wm-float 4.2s ease-in-out infinite}' +
+    '@keyframes wm-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}' +
+    '.wm-glow{transform-origin:100px 96px;animation:wm-pulse 3.2s ease-in-out infinite}' +
+    '@keyframes wm-pulse{0%,100%{opacity:.55}50%{opacity:1}}' +
+    '.wm-core{transition:filter .4s;transform-origin:100px 96px;animation:wm-breathe 3.2s ease-in-out infinite}' +
+    '@keyframes wm-breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.035)}}' +
+    '.wm-glow2{transform-origin:100px 96px;animation:wm-pulse 3.2s ease-in-out infinite;animation-delay:-1.6s;opacity:.5}' +
+    '.wm-atmo{transform-origin:100px 96px;animation:wm-breathe 3.2s ease-in-out infinite;pointer-events:none}' +
+    '.wm-sheenspot{pointer-events:none}' +
+    '.wm-comet{transform-origin:100px 96px;animation:wm-comet 5.5s linear infinite;opacity:.9}' +
+    '@keyframes wm-comet{to{transform:rotate(360deg)}}' +
+    '.wm-root:hover .wm-comet,.wm-excited .wm-comet{animation-duration:1.6s}' +
+    '.wm-eyes{transform-origin:100px 94px;animation:wm-look 11s ease-in-out infinite}' +
+    '@keyframes wm-look{0%,26%,100%{transform:translateX(0)}30%,44%{transform:translateX(-5px)}48%,62%{transform:translateX(4px)}66%{transform:translateX(0)}}' +
+    '.wm-eye-open{transform-origin:100px 94px;transition:opacity .15s}' +
+    '.wm-eye-happy{transition:opacity .15s}' +
+    '.wm-eyes.wm-blink .wm-eye-open{animation:wm-blinkk .3s linear}' +
+    '@keyframes wm-blinkk{0%,100%{transform:scaleY(1)}50%{transform:scaleY(.06)}}' +
+    '.wm-root:hover .wm-eye-open,.wm-excited .wm-eye-open{opacity:0}' +
+    '.wm-root:hover .wm-eye-happy,.wm-excited .wm-eye-happy{opacity:1}' +
+    '.wm-ring{transform-origin:100px 96px;animation:wm-orbit 9s linear infinite}' +
+    '.wm-r2{animation-duration:14s;animation-direction:reverse}' +
+    '@keyframes wm-orbit{to{transform:rotate(360deg)}}' +
+    '.wm-root:hover .wm-ring,.wm-excited .wm-ring{animation-duration:2.2s}' +
+    '.wm-root:hover .wm-r2,.wm-excited .wm-r2{animation-duration:3.4s}' +
+    '.wm-root:hover .wm-core,.wm-excited .wm-core{filter:brightness(1.25)}' +
+    /* moods: each changes the MOTION, not just the color */
+    '.wm-excited .wm-rig{animation:wm-bounce 1.1s cubic-bezier(.45,0,.55,1) infinite}' +
+    '@keyframes wm-bounce{0%,100%{transform:translateY(0) scale(1)}30%{transform:translateY(-11px) scale(1.03)}55%{transform:translateY(-2px) scale(.99)}}' +
+    '.wm-dim .wm-core{filter:brightness(.7) saturate(.6)}' +
+    '.wm-dim .wm-glow{animation-duration:6s;opacity:.3}' +
+    '.wm-dim .wm-rig{animation:wm-sink 6.5s ease-in-out infinite}' +
+    '@keyframes wm-sink{0%,100%{transform:translateY(3px)}50%{transform:translateY(0)}}' +
+    '.wm-dim .wm-ring{animation-duration:22s}.wm-dim .wm-r2{animation-duration:30s}.wm-dim .wm-comet{opacity:.35;animation-duration:12s}' +
+    '.wm-alert .wm-core{filter:brightness(1.15) hue-rotate(160deg) saturate(1.6)}' +
+    '.wm-alert .wm-glow{animation-duration:1.1s}' +
+    '.wm-alert .wm-rig{animation:wm-jitter .55s linear infinite}' +
+    '@keyframes wm-jitter{0%,100%{transform:translate(0,0)}20%{transform:translate(-1.6px,1px)}40%{transform:translate(1.4px,-1.2px)}60%{transform:translate(-1.2px,-1px)}80%{transform:translate(1.6px,1.2px)}}' +
+    '.wm-thinking .wm-eyes{animation:none;transform:translate(-5px,-6px)}' +
+    '.wm-thinking .wm-rig{animation:wm-ponder 5.6s ease-in-out infinite}' +
+    '@keyframes wm-ponder{0%,100%{transform:translateY(0) rotate(0)}50%{transform:translateY(-5px) rotate(-4deg)}}' +
+    '.wm-thinking .wm-comet{animation-duration:2.8s;opacity:1}' +
+    '.wm-sleepy .wm-eye-open{transform:scaleY(.28)}' +
+    '.wm-sleepy .wm-eyes{animation:none}' +
+    '.wm-sleepy .wm-rig{animation:wm-drowse 8s ease-in-out infinite}' +
+    '@keyframes wm-drowse{0%,100%{transform:translateY(4px) rotate(2deg)}50%{transform:translateY(1px) rotate(-1deg)}}' +
+    '.wm-sleepy .wm-glow{animation-duration:8s;opacity:.35}.wm-sleepy .wm-ring{animation-duration:26s}.wm-sleepy .wm-r2{animation-duration:34s}.wm-sleepy .wm-comet{opacity:.2;animation-duration:16s}' +
+    '.wm-party .wm-rig{animation:wm-spinup 1.4s cubic-bezier(.4,0,.35,1) infinite}' +
+    '@keyframes wm-spinup{0%,100%{transform:translateY(0) rotate(0) scale(1)}25%{transform:translateY(-9px) rotate(-9deg) scale(1.05)}50%{transform:translateY(-3px) rotate(0) scale(1)}75%{transform:translateY(-9px) rotate(9deg) scale(1.05)}}' +
+    '.wm-party .wm-ring{animation-duration:1.4s}.wm-party .wm-r2{animation-duration:2s}.wm-party .wm-comet{animation-duration:.9s;opacity:1}.wm-party .wm-glow{animation-duration:.9s}' +
+    '.wm-party .wm-eye-open{opacity:0}.wm-party .wm-eye-happy{opacity:1}' +
+    /* mood props: one little scene element per mood, hidden until its mood is on */
+    '.wm-p{opacity:0;transition:opacity .35s}' +
+    '.wm-thinking .wm-p-think,.wm-alert .wm-p-alert,.wm-sleepy .wm-p-sleep,.wm-party .wm-p-party,.wm-excited .wm-p-spark,.wm-dim .wm-p-dim{opacity:1}' +
+    '.wm-td{animation:wm-tdp 1.4s ease-in-out infinite}.wm-td2{animation-delay:.25s}.wm-td3{animation-delay:.5s}' +
+    '@keyframes wm-tdp{0%,100%{opacity:.25}50%{opacity:1}}' +
+    '.wm-p-alert{transform-origin:148px 36px;animation:wm-pop 1s ease-in-out infinite}' +
+    '@keyframes wm-pop{0%,100%{transform:scale(1)}50%{transform:scale(1.14)}}' +
+    '.wm-z{opacity:0;animation:wm-zrise 3s ease-in-out infinite}.wm-z2{animation-delay:1s}.wm-z3{animation-delay:2s}' +
+    '@keyframes wm-zrise{0%{transform:translate(0,6px);opacity:0}30%{opacity:.9}100%{transform:translate(6px,-14px);opacity:0}}' +
+    '.wm-cf{animation:wm-fall 1.7s linear infinite}' +
+    '.wm-cf2{animation-delay:.3s}.wm-cf3{animation-delay:.6s}.wm-cf4{animation-delay:.9s}.wm-cf5{animation-delay:.45s}.wm-cf6{animation-delay:1.1s}' +
+    '@keyframes wm-fall{0%{transform:translateY(-4px) rotate(0);opacity:0}15%{opacity:1}100%{transform:translateY(30px) rotate(140deg);opacity:0}}' +
+    '.wm-sp{animation:wm-tw 1.5s ease-in-out infinite}.wm-sp2{animation-delay:.5s}.wm-sp3{animation-delay:1s}' +
+    '@keyframes wm-tw{0%,100%{opacity:.15;transform:scale(.6) rotate(0)}50%{opacity:1;transform:scale(1.15) rotate(45deg)}}' +
+    '.wm-p-dim{animation:wm-cloudbob 7s ease-in-out infinite}' +
+    '@keyframes wm-cloudbob{0%,100%{transform:translateY(0)}50%{transform:translateY(3px)}}' +
+    '.wm-flare .wm-glow{animation:wm-flarek .6s ease-out}' +
+    '@keyframes wm-flarek{0%{opacity:1;transform:scale(1)}40%{opacity:1;transform:scale(1.25)}100%{opacity:.55;transform:scale(1)}}' +
+    '.wm-intro{animation:wm-arrive 1.6s cubic-bezier(.22,.9,.3,1) both}' +
+    '@keyframes wm-arrive{0%{transform:translateY(-36px) scale(.5);opacity:0}60%{opacity:1}100%{transform:none;opacity:1}}' +
+    '@media (prefers-reduced-motion:reduce){.wm-rig,.wm-glow,.wm-glow2,.wm-atmo,.wm-eyes,.wm-eye-open,.wm-ring,.wm-comet,.wm-core,.wm-intro,.wm-flare .wm-glow{animation:none !important}}' +
+'@media (prefers-reduced-motion:reduce){.wm-excited .wm-rig,.wm-dim .wm-rig,.wm-alert .wm-rig,.wm-thinking .wm-rig,.wm-sleepy .wm-rig,.wm-party .wm-rig{animation:none !important}' +
+'.wm-td,.wm-p-alert,.wm-z,.wm-cf,.wm-sp,.wm-p-dim{animation:none !important}.wm-z,.wm-cf,.wm-sp{opacity:.8}}';
+
+  var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var styleInjected = false;
+
+  /* Sound: tiny synthesized cue engine. No files, no libraries, CSP safe.
+   * Rules that keep a client dashboard quiet:
+   *  - default OFF, choice persisted in localStorage under zephyr:sound
+   *  - nothing ever plays until a real user gesture has happened on the page
+   *  - the AudioContext is built lazily inside that gesture, never at load
+   *  - silent under prefers-reduced-motion, silent if AudioContext is missing
+   *  - every cue is under 400ms and peaks at or below 0.09 gain */
+  var SOUND_KEY = 'zephyr:sound';
+  var sound = (function () {
+    var enabled = false, ctx = null, gestured = false;
+    try {
+      enabled = window.localStorage && window.localStorage.getItem(SOUND_KEY) === 'on';
+    } catch (e) { enabled = false; }
+
+    function markGesture() { gestured = true; }
+    if (window.document && document.addEventListener) {
+      document.addEventListener('pointerdown', markGesture, true);
+      document.addEventListener('click', markGesture, true);
+      document.addEventListener('keydown', markGesture, true);
+    }
+    function quiet() {
+      return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    }
+    function context() {
+      if (ctx) return ctx;
+      var C = window.AudioContext || window.webkitAudioContext;
+      if (!C) return null;
+      try { ctx = new C(); } catch (e) { ctx = null; }
+      return ctx;
+    }
+    /* one soft note: exponential attack and decay so there is no click */
+    function note(c, freq, delay, dur, peak, type) {
+      var t0 = c.currentTime + delay;
+      var o = c.createOscillator();
+      var g = c.createGain();
+      o.type = type || 'sine';
+      if (o.frequency && o.frequency.setValueAtTime) o.frequency.setValueAtTime(freq, t0);
+      if (g.gain && g.gain.setValueAtTime) {
+        g.gain.setValueAtTime(0.0001, t0);
+        g.gain.exponentialRampToValueAtTime(Math.min(peak, 0.09), t0 + 0.018);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      }
+      o.connect(g);
+      g.connect(c.destination);
+      o.start(t0);
+      o.stop(t0 + dur + 0.02);
+    }
+    var CUES = {
+      chime: function (c) { note(c, 660, 0, 0.16, 0.06); note(c, 880, 0.085, 0.19, 0.05); },
+      blip: function (c) { note(c, 760, 0, 0.07, 0.045, 'triangle'); },
+      pop: function (c) { note(c, 520, 0, 0.09, 0.05, 'triangle'); },
+      sparkle: function (c) { note(c, 660, 0, 0.12, 0.045); note(c, 880, 0.06, 0.12, 0.045); note(c, 1180, 0.12, 0.14, 0.04); },
+      hush: function (c) { note(c, 560, 0, 0.1, 0.05); note(c, 380, 0.07, 0.14, 0.04); }
+    };
+    function play(name) {
+      if (!enabled || !gestured) return false;
+      if (quiet()) return false;
+      var cue = CUES[name];
+      if (!cue) return false;
+      var c = context();
+      if (!c) return false;
+      try { if (c.state === 'suspended' && c.resume) c.resume(); } catch (e) { /* ignore */ }
+      try { cue(c); } catch (e) { return false; }
+      return true;
+    }
+    return {
+      play: play,
+      isEnabled: function () { return !!enabled; },
+      setEnabled: function (on) {
+        enabled = !!on;
+        try {
+          if (window.localStorage) window.localStorage.setItem(SOUND_KEY, enabled ? 'on' : 'off');
+        } catch (e) { /* storage can throw; the in-memory choice still holds */ }
+        return enabled;
+      }
+    };
+  })();
+
+  function mount(el, opts) {
+    opts = opts || {};
+    if (!styleInjected) {
+      var s = document.createElement('style');
+      s.textContent = CSS;
+      document.head.appendChild(s);
+      styleInjected = true;
+    }
+    var root = document.createElement('span');
+    root.className = 'wm-root' + (opts.intro && !reduced ? ' wm-intro' : '');
+    root.style.width = (opts.size || 96) + 'px';
+    root.style.height = (opts.size || 96) + 'px';
+    root.innerHTML = SVG;
+    root.setAttribute('role', 'button');
+    root.setAttribute('tabindex', '0');
+    root.setAttribute('aria-label', 'Zephyr, the Wing Digital assistant');
+    root.style.cursor = 'pointer';
+    root.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); root.click(); }
+    });
+    el.appendChild(root);
+    var alive = true;
+
+    var eyes = root.querySelector('.wm-eyes');
+
+    function blink() {
+      if (reduced) return;
+      eyes.classList.add('wm-blink');
+      setTimeout(function () { eyes.classList.remove('wm-blink'); }, 320);
+    }
+    function flare() {
+      if (reduced) return;
+      root.classList.add('wm-flare');
+      setTimeout(function () { root.classList.remove('wm-flare'); }, 650);
+    }
+    var MOODS = ['excited', 'alert', 'dim', 'thinking', 'sleepy', 'party'];
+    /* pinned: a mood the page has committed to (e.g. an honestly dim
+     * dashboard). Ambient behavior (autoMood, pulse endings) returns here
+     * instead of to calm, so temporary emotions never erase an honest state. */
+    var pinned = null;
+    function setState(state) {
+      MOODS.forEach(function (m) { root.classList.remove('wm-' + m); });
+      if (MOODS.indexOf(state) !== -1) root.classList.add('wm-' + state);
+    }
+    function getState() {
+      for (var i = 0; i < MOODS.length; i++) {
+        if (root.classList.contains('wm-' + MOODS[i])) return MOODS[i];
+      }
+      return 'calm';
+    }
+    function pin(state) { pinned = MOODS.indexOf(state) !== -1 ? state : null; setState(state); }
+    function unpin() { pinned = null; setState('calm'); }
+
+    root.addEventListener('click', flare);
+
+    var onMove = null, onScroll = null;
+    if (!reduced) {
+      (function blinkLoop() {
+        setTimeout(function () {
+          if (!alive || !root.isConnected) return;
+          blink(); blinkLoop();
+        }, 2600 + Math.random() * 4200);
+      })();
+      if (opts.intro) setTimeout(flare, 1700);
+      /* eyes follow the cursor; idle look-around resumes after 3s still */
+      var idleTimer = null, raf = 0, mx = 0, my = 0;
+      function track() {
+        raf = 0;
+        var r = root.getBoundingClientRect();
+        var cx = r.left + r.width / 2, cy = r.top + r.height * 0.46;
+        var dx = mx - cx, dy = my - cy;
+        var d = Math.sqrt(dx * dx + dy * dy) || 1;
+        var m = Math.min(d / 40, 1);
+        eyes.style.animation = 'none';
+        eyes.style.transform = 'translate(' + (dx / d * 6 * m).toFixed(1) + 'px,' + (dy / d * 4 * m).toFixed(1) + 'px)';
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(function () {
+          eyes.style.transform = '';
+          eyes.style.animation = '';
+        }, 3000);
+      }
+      onMove = function (e) {
+        mx = e.clientX; my = e.clientY;
+        if (!raf) raf = requestAnimationFrame(track);
+      };
+      window.addEventListener('mousemove', onMove, { passive: true });
+      var lastY = window.scrollY, busy = false;
+      onScroll = function () {
+        var dy = Math.abs(window.scrollY - lastY);
+        lastY = window.scrollY;
+        if (dy > 240 && !busy) {
+          busy = true;
+          flare();
+          setTimeout(function () { busy = false; }, 900);
+        }
+      };
+      window.addEventListener('scroll', onScroll, { passive: true });
+    }
+    function destroy() {
+      alive = false;
+      if (onMove) window.removeEventListener('mousemove', onMove);
+      if (onScroll) window.removeEventListener('scroll', onScroll);
+      root.remove();
+    }
+    /* pulse: hold a mood for ms, then return to the pinned mood if the page
+     * set one, otherwise calm. The timer always fires; a later pulse resets it. */
+    var pulseTimer = null;
+    function pulse(state, ms) {
+      setState(state);
+      if (state === 'party') sound.play('sparkle');
+      clearTimeout(pulseTimer);
+      pulseTimer = setTimeout(function () { setState(pinned || 'calm'); }, ms || 4000);
+    }
+    /* bubble: a small speech balloon near the orb, for arrival greetings.
+     * Plain text only; fades out after ms (default 7s). */
+    var bubbleEl = null, bubbleTimer = null;
+    function bubble(text, ms) {
+      if (!text) return;
+      if (!bubbleEl) {
+        bubbleEl = document.createElement('div');
+        bubbleEl.setAttribute('role', 'status');
+        bubbleEl.style.cssText = 'position:fixed;z-index:60;max-width:240px;padding:10px 13px;' +
+          'background:rgba(13,15,22,.97);color:#eaf0ff;border:1px solid rgba(125,155,255,.4);' +
+          'border-radius:12px 12px 3px 12px;font:13px/1.45 Inter,system-ui,sans-serif;' +
+          'box-shadow:0 8px 30px rgba(39,87,230,.3);opacity:0;transition:opacity .4s;pointer-events:none';
+        document.body.appendChild(bubbleEl);
+      }
+      bubbleEl.textContent = text;
+      var r = root.getBoundingClientRect();
+      bubbleEl.style.visibility = 'hidden';
+      bubbleEl.style.opacity = '0';
+      bubbleEl.style.left = 'auto';
+      bubbleEl.style.right = Math.max(8, window.innerWidth - r.right) + 'px';
+      bubbleEl.style.bottom = Math.max(8, window.innerHeight - r.top + 10) + 'px';
+      bubbleEl.style.visibility = 'visible';
+      requestAnimationFrame(function () { bubbleEl.style.opacity = '1'; });
+      /* pop is gated on sound being on AND a real gesture having happened, so
+       * the arrival greeting on page load stays silent. */
+      sound.play('pop');
+      clearTimeout(bubbleTimer);
+      bubbleTimer = setTimeout(function () { bubbleEl.style.opacity = '0'; }, ms || 7000);
+    }
+    function hideBubble() {
+      clearTimeout(bubbleTimer);
+      if (bubbleEl) bubbleEl.style.opacity = '0';
+    }
+    return {
+      blink: blink, flare: flare, setState: setState, pin: pin, unpin: unpin,
+      pulse: pulse, bubble: bubble, hideBubble: hideBubble, destroy: destroy, el: root,
+      getPinned: function () { return pinned; },
+      getState: getState
+    };
+  }
+
+  /* autoMood: ambient emotions from real, honest signals.
+   * - Sleepy late at night (11pm to 6am local) once the visitor goes quiet.
+   * - Sleepy after ~2.5 minutes of no interaction at any hour.
+   * - Any activity wakes him: back to calm with a flare.
+   * - Tab coming back into view earns a little flare hello.
+   * Never invents business emotions; those come from page data via setState/pulse. */
+  function autoMood(m) {
+    if (!m || !m.setState) return;
+    if (m._autoMoodOff) return; // one ambient loop per mascot
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    var idleMs = 150000, idleTimer = null, dozing = false;
+    function isNight() { var h = new Date().getHours(); return h >= 23 || h < 6; }
+    function doze() { dozing = true; m.setState('sleepy'); }
+    function armIdle() {
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(doze, isNight() ? 45000 : idleMs);
+    }
+    function wake() {
+      if (dozing) {
+        dozing = false;
+        // Waking restores the page's pinned mood (an honest dim stays dim).
+        m.setState((m.getPinned && m.getPinned()) || 'calm');
+        m.flare();
+      }
+      armIdle();
+    }
+    function onVis() { if (!document.hidden) { wake(); m.flare(); } }
+    var evs = ['mousemove', 'scroll', 'keydown', 'pointerdown', 'touchstart'];
+    evs.forEach(function (ev) { window.addEventListener(ev, wake, { passive: true }); });
+    document.addEventListener('visibilitychange', onVis);
+    armIdle();
+    m._autoMoodOff = function () {
+      clearTimeout(idleTimer);
+      evs.forEach(function (ev) { window.removeEventListener(ev, wake); });
+      document.removeEventListener('visibilitychange', onVis);
+      m._autoMoodOff = null;
+    };
+    var baseDestroy = m.destroy;
+    m.destroy = function () {
+      if (m._autoMoodOff) m._autoMoodOff();
+      baseDestroy();
+    };
+  }
+
+  window.WingMascot = { mount: mount, autoMood: autoMood, sound: sound };
+})();
+
+/* Zephyr assistant panel: a guided, scripted Q&A that makes the entity feel
+ * like an AI you can talk to. No backend needed; swap answerFn for a real
+ * API route later without touching the UI. */
+(function () {
+  var PANEL_CSS = '.wmp{position:fixed;right:18px;bottom:96px;z-index:70;width:min(340px,calc(100vw - 36px));' +
+    'background:linear-gradient(170deg,#141a30 0%,#0d0f16 34%);border:1px solid rgba(125,155,255,.45);' +
+    'border-radius:18px;box-shadow:0 2px 0 rgba(255,255,255,.06) inset,0 18px 60px rgba(39,87,230,.4);color:#eaf0ff;' +
+    'font-family:Inter,system-ui,sans-serif;font-size:14px;overflow:hidden;' +
+    'opacity:0;pointer-events:none;transition:opacity .35s}' +
+    '.wmp.open{opacity:1;pointer-events:auto}' +
+    '.wmp-head{display:flex;align-items:center;gap:9px;padding:12px 14px;border-bottom:1px solid rgba(125,155,255,.25);' +
+    'background:linear-gradient(135deg,rgba(39,87,230,.22),rgba(39,87,230,0) 70%)}' +
+    '.wmp-head b{font-weight:600}' +
+    '.wmp-head .dot{width:8px;height:8px;border-radius:50%;background:#7d9bff;box-shadow:0 0 8px #7d9bff;animation:wmpulse 2s infinite}' +
+    '@keyframes wmpulse{50%{opacity:.4}}' +
+    '.wmp-x{background:none;border:0;color:#8fa3d8;font-size:16px;cursor:pointer;padding:2px 6px}' +
+    '.wmp-snd{margin-left:auto;background:rgba(39,87,230,.16);border:1px solid rgba(125,155,255,.3);color:#8fa3d8;' +
+    'border-radius:8px;font-size:13px;line-height:1;cursor:pointer;padding:5px 7px;transition:color .15s,border-color .15s,background .15s}' +
+    '.wmp-snd:hover{color:#eaf0ff;border-color:#7d9bff;background:rgba(39,87,230,.32)}' +
+    '.wmp-snd[aria-pressed="true"]{color:#eaf0ff;border-color:#7d9bff}' +
+    '.wmp-body{padding:14px;min-height:72px;line-height:1.55;color:#c9d6ff}' +
+    '.wmp-body a{color:#9db4ff}' +
+    '.wmp-q{display:flex;flex-direction:column;gap:7px;padding:0 14px 14px}' +
+    '.wmp-q button{text-align:left;background:rgba(39,87,230,.14);border:1px solid rgba(125,155,255,.3);' +
+    'color:#eaf0ff;border-radius:11px;padding:9px 12px;font:inherit;cursor:pointer;' +
+    'transition:background .15s,transform .15s,border-color .15s}' +
+    '.wmp-q button:hover{background:rgba(39,87,230,.34);border-color:#7d9bff;transform:translateX(3px)}' +
+    '.wmp-body{max-height:190px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(125,155,255,.4) transparent}' +
+    '.wmp-ask{display:flex;gap:7px;padding:0 14px 14px}' +
+    '.wmp-ask input{flex:1;min-width:0;background:rgba(255,255,255,.07);border:1px solid rgba(125,155,255,.3);' +
+    'border-radius:10px;padding:9px 12px;color:#eaf0ff;font:inherit}' +
+    '.wmp-ask input::placeholder{color:#8fa3d8}' +
+    '.wmp-ask input:focus{outline:none;border-color:#7d9bff}' +
+    '.wmp-ask button{background:linear-gradient(135deg,#3D6BF0,#1E44B8);border:0;color:#fff;border-radius:10px;' +
+    'padding:9px 14px;font:inherit;font-weight:600;cursor:pointer;transition:filter .15s}' +
+    '.wmp-ask button:hover{filter:brightness(1.18)}' +
+    '@media(prefers-reduced-motion:reduce){.wmp{transition:none}.wmp-head .dot{animation:none}}';
+
+  function attachChat(mascot, opts) {
+    if (mascot.el._wmChat) return mascot.el._wmChat;
+    if (!attachChat._css) {
+      var s = document.createElement('style');
+      s.textContent = PANEL_CSS;
+      document.head.appendChild(s);
+      attachChat._css = true;
+    }
+    var p = document.createElement('div');
+    p.className = 'wmp';
+    p.setAttribute('role', 'dialog');
+    p.setAttribute('aria-label', 'Zephyr assistant');
+    p.innerHTML = '<div class="wmp-head"><span class="dot"></span><b>Zephyr</b>' +
+      '<span style="color:#8fa3d8;font-size:12px">Wing Digital</span>' +
+      '<button class="wmp-snd" type="button" aria-pressed="false" aria-label="Turn Zephyr sound on"></button>' +
+      '<button class="wmp-x" aria-label="Close">&times;</button></div>' +
+      '<div class="wmp-body"></div><div class="wmp-q"></div>' +
+      '<div class="wmp-ask" hidden><input type="text" maxlength="200" placeholder="Ask Zephyr anything..." aria-label="Ask Zephyr">' +
+      '<button type="button">Ask</button></div>';
+    document.body.appendChild(p);
+    var body = p.querySelector('.wmp-body');
+    var qwrap = p.querySelector('.wmp-q');
+    var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var typeTimer = null;
+    var sound = (window.WingMascot && window.WingMascot.sound) || { play: function () { return false; }, isEnabled: function () { return false; }, setEnabled: function () { return false; } };
+
+    /* the mood to fall back to once a temporary emotion is done: an honestly
+     * pinned mood always wins, so a dim dashboard never gets overwritten. */
+    function restMood() {
+      var pinnedMood = mascot.getPinned && mascot.getPinned();
+      if (pinnedMood) return pinnedMood;
+      var now = mascot.getState ? mascot.getState() : 'calm';
+      if (now === 'thinking' || now === 'excited' || now === 'party' || now === 'alert') return 'calm';
+      return now;
+    }
+    /* say: he thinks while he types, then settles back. */
+    function say(html) {
+      clearInterval(typeTimer);
+      var back = restMood();
+      if (reduced) { body.innerHTML = html; if (mascot.setState) mascot.setState(back); return; }
+      var tmp = document.createElement('div');
+      tmp.innerHTML = html;
+      var full = tmp.textContent, i = 0;
+      body.textContent = '';
+      if (mascot.setState) mascot.setState('thinking');
+      typeTimer = setInterval(function () {
+        i += 2;
+        body.textContent = full.slice(0, i);
+        if (i >= full.length) {
+          clearInterval(typeTimer);
+          body.innerHTML = html;
+          if (mascot.setState) mascot.setState(back);
+        }
+      }, 14);
+    }
+    function renderQuestions() {
+      qwrap.innerHTML = '';
+      (opts.items || []).forEach(function (item) {
+        var b = document.createElement('button');
+        b.textContent = item.q;
+        b.addEventListener('click', function () {
+          sound.play('blip');
+          mascot.flare();
+          /* a beat of excitement that someone asked, then he thinks it over */
+          if (mascot.setState && !reduced) mascot.setState('excited');
+          setTimeout(function () { say(item.a); }, reduced ? 0 : 260);
+        });
+        qwrap.appendChild(b);
+      });
+    }
+    var greetedKey = 'zephyr:greeted';
+    function firstOpenOfSession() {
+      try {
+        if (!window.sessionStorage) return false;
+        if (window.sessionStorage.getItem(greetedKey) === '1') return false;
+        window.sessionStorage.setItem(greetedKey, '1');
+        return true;
+      } catch (e) { return false; }
+    }
+    function toggle(force) {
+      var open = typeof force === 'boolean' ? force : !p.classList.contains('open');
+      var was = p.classList.contains('open');
+      p.classList.toggle('open', open);
+      if (open) {
+        if (mascot.hideBubble) mascot.hideBubble();
+        sound.play('chime');
+        mascot.flare();
+        /* a greeting flourish the very first time he is opened this session */
+        if (firstOpenOfSession() && mascot.pulse && !reduced) mascot.pulse('party', 2200);
+        say(opts.greeting || 'Hey, I am Zephyr. What do you want to know?');
+        renderQuestions();
+      } else if (was) {
+        sound.play('hush');
+      }
+    }
+    var sndBtn = p.querySelector('.wmp-snd');
+    function paintSound() {
+      var on = sound.isEnabled();
+      sndBtn.textContent = on ? 'Sound on' : 'Sound off';
+      sndBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      sndBtn.setAttribute('aria-label', on ? 'Turn Zephyr sound off' : 'Turn Zephyr sound on');
+    }
+    paintSound();
+    sndBtn.addEventListener('click', function () {
+      var on = sound.setEnabled(!sound.isEnabled());
+      paintSound();
+      if (on) sound.play('blip');
+    });
+    /* Knowledge base: entries of {k:[keywords], a:'answer html'} from opts.kb or
+     * window.ZEPHYR_KB. Pure client-side keyword scoring; unknown questions get
+     * an honest fallback, never a made-up answer. */
+    var kb = opts.kb || window.ZEPHYR_KB || null;
+    var askRow = p.querySelector('.wmp-ask');
+    if (kb && kb.length) {
+      askRow.hidden = false;
+      var input = askRow.querySelector('input');
+      var askBtn = askRow.querySelector('button');
+      function answer() {
+        var q = (input.value || '').toLowerCase().trim();
+        if (!q) return;
+        input.value = '';
+        var words = q.replace(/[^a-z0-9$ ]/g, ' ').split(/\s+/).filter(function (w) { return w.length > 2; });
+        var best = null, bestScore = 0;
+        kb.forEach(function (entry) {
+          var score = 0;
+          (entry.k || []).forEach(function (key) {
+            key = key.toLowerCase();
+            if (q.indexOf(key) !== -1) score += key.indexOf(' ') !== -1 ? 3 : 2;
+            else words.forEach(function (w) { if (key === w) score += 2; else if (key.indexOf(w) === 0) score += 1; });
+          });
+          if (score > bestScore) { bestScore = score; best = entry; }
+        });
+        sound.play('blip');
+        mascot.setState && mascot.setState('thinking');
+        setTimeout(function () {
+          mascot.flare();
+          if (best && bestScore >= 2) { say(best.a); }
+          else {
+            /* he reacts to not knowing, then hands off honestly */
+            var fb = opts.fallback || 'That one is past what I know off the top of my head. The contact form reaches a real person at Wing Digital fast, and they will have the answer.';
+            /* he reacts to not knowing before answering honestly */
+            if (mascot.setState && !reduced) mascot.setState('alert');
+            setTimeout(function () { say(fb); }, reduced ? 0 : 700);
+          }
+        }, 650);
+      }
+      askBtn.addEventListener('click', answer);
+      input.addEventListener('keydown', function (e) { if (e.key === 'Enter') answer(); });
+    }
+    p.querySelector('.wmp-x').addEventListener('click', function () { toggle(false); });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && p.classList.contains('open')) toggle(false);
+    });
+    mascot.el.addEventListener('click', function () { toggle(); });
+    mascot.el.style.cursor = 'pointer';
+    var api = { toggle: toggle, say: say, el: p };
+    mascot.el._wmChat = api;
+    return api;
+  }
+  if (window.WingMascot) window.WingMascot.chat = attachChat;
+})();
+
+</script>
 <script>
 (function(){
   if (!window.WingMascot) return;
@@ -1481,7 +2077,6 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
     });
   } catch (e) {}
   var dashFallback = 'Let me point you at what I do know: what published and when, and how current this record is. For anything else, reply to the person who sent you this link and a real person answers fast.';
-
   var chatOpts = isSample ? {
     greeting: 'Hey, I am Zephyr from Wing Digital. This is a sample dashboard; ask me how the real one works.',
     items: [
@@ -1518,7 +2113,6 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
     var emails = (DATA.metrics && typeof DATA.metrics.emailsSent30d === 'number')
       ? DATA.metrics.emailsSent30d : 0;
     var mood = null, hold = 0, text = '';
-
     if (isSample) {
       mood = 'excited'; hold = 5000;
       text = 'This is a sample preview. A real dashboard fills in with your own published work.';
@@ -1537,7 +2131,6 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
         text = 'Here is everything live on your site right now. Ask me what is queued next.';
       }
     }
-
     if (mood) {
       setTimeout(function () {
         if (mood === 'dim') z.pin('dim');
@@ -1552,5 +2145,3 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-06","dataThrough":"2026-0
   if (WingMascot.autoMood) WingMascot.autoMood(z);
 })();
 </script>
-</body>
-</html>

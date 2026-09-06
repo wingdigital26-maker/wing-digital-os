@@ -24,6 +24,7 @@ import os
 import re
 import subprocess
 import sys
+from html import unescape
 from datetime import date, datetime
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -122,6 +123,9 @@ def page_title(path, fallback_name):
         if m:
             txt = re.sub(r"<[^>]+>", "", m.group(1))
             txt = re.sub(r"\s+", " ", txt).strip()
+            # "&amp;" in a <title> is an ENTITY, not the text. Left as-is it is
+            # escaped a second time by the page and the client reads "&amp;".
+            txt = unescape(txt)
             # Trim the "| Brand Name" tail that <title> tags carry.
             txt = re.split(r"\s+[|–—]\s+", txt)[0].strip()
             if txt:
@@ -129,7 +133,42 @@ def page_title(path, fallback_name):
     return fallback_name.rsplit(".", 1)[0].replace("-", " ").title()
 
 
-SOURCES = {"state_file": from_state_file, "git_repo": from_git_repo}
+def from_items_file(src):
+    """A plain JSON record of work that no live source can be read for.
+
+    Generic on purpose: point `path` at a JSON file, `key` at the list inside
+    it, and every entry supplies its own date/title/url. `type` and `status`
+    default the rows. Used for HISTORICAL work whose site we can no longer
+    reach (a retired CMS, a host that blocks us), so the record survives even
+    though nothing can re-verify it today. It states only what was published
+    and when; it never claims the URL was checked on this build.
+    """
+    path = src["path"]
+    if not os.path.isabs(path):
+        path = os.path.join(HERE, path)
+    if not os.path.exists(path):
+        print("    ! items file missing: %s" % path)
+        return []
+    note_mtime(path)
+    with open(path, encoding="utf-8") as fh:
+        blob = json.load(fh)
+    rows = blob.get(src.get("key", "items")) or []
+    items = []
+    for e in rows:
+        if not e.get("date") or not e.get("title"):
+            continue
+        items.append({
+            "date": e["date"],
+            "type": e.get("type") or src.get("type") or "other",
+            "title": e["title"],
+            "status": e.get("status") or src.get("status") or "published",
+            "url": e.get("url") or "",
+        })
+    return items
+
+
+SOURCES = {"state_file": from_state_file, "git_repo": from_git_repo,
+           "items_file": from_items_file}
 
 
 # ── outreach preview (client-approval view of a pending email program) ───────
@@ -357,7 +396,7 @@ def build(slug):
             js = fh.read().replace("</script>", "<\\/script>")
         for tag in ('<script src="/mascot/%s"></script>' % fname,
                     '<script src="/mascot/%s?v=1"></script>' % fname,
-                    '<script src="/mascot/%s?v=9"></script>' % fname):
+                    '<script src="/mascot/%s?v=10"></script>' % fname):
             art = art.replace(tag, "<script>\n%s\n</script>" % js)
     # In the Artifact gallery the title is the page's NAME, sat beside dozens of
     # others -- so it carries the client, not the word "dashboard" twice over.

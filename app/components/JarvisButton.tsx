@@ -29,6 +29,22 @@ const SUGGESTED = [
 const ACCENT = "#3D6BF0";
 const FONT = "Inter, sans-serif";
 
+// Zephyr's orb API (public/mascot/wing-mascot.js). Everything is optional
+// because the script is loaded at runtime and may be an older build.
+type Orb = {
+  setState?: (s: string) => void;
+  pulse?: (s: string, ms?: number) => void;
+  flare?: () => void;
+  getPinned?: () => string | null;
+  destroy?: () => void;
+};
+
+// Sound cues stay silent for anyone who asked for reduced motion.
+function reducedMotion(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+}
+
 function newConversationId(): string {
   return typeof crypto !== "undefined" && crypto.randomUUID
     ? crypto.randomUUID()
@@ -70,12 +86,10 @@ export default function JarvisButton() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   // Zephyr orb: the shared mascot component (vanilla) mounted into the FAB.
   const orbSlotRef = useRef<HTMLDivElement>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const orbRef = useRef<any>(null);
+  const orbRef = useRef<Orb | null>(null);
   const [orbOn, setOrbOn] = useState(false);
   const headerSlotRef = useRef<HTMLDivElement>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const headerOrbRef = useRef<any>(null);
+  const headerOrbRef = useRef<Orb | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null);
   const listeningRef = useRef(false);
@@ -91,6 +105,29 @@ export default function JarvisButton() {
   const [speaking, setSpeaking] = useState(false);
 
   useEffect(() => { voiceOnRef.current = voiceOn; }, [voiceOn]);
+
+  // ── Zephyr's face: both orbs always express the same mood ─────────────────
+  // Every mood below is driven by a real stream event or a real state flag.
+  // Nothing here invents an outcome the server did not report.
+  const expressAll = useCallback((fn: (orb: Orb) => void) => {
+    [orbRef.current, headerOrbRef.current].forEach((orb) => {
+      if (orb) {
+        try { fn(orb); } catch { /* an older mascot build: skip silently */ }
+      }
+    });
+  }, []);
+  // Rest = whatever mood the page pinned (an honest dim stays dim), else calm.
+  const restAll = useCallback(() => {
+    expressAll((orb) => orb.setState?.(orb.getPinned?.() || "calm"));
+  }, [expressAll]);
+  // Sound cue that never fires under reduced motion and never before a gesture.
+  const cue = useCallback((name: "reply" | "zephyr-error" | "confirmed") => {
+    if (reducedMotion()) return;
+    sfx.playWhenReady(name);
+  }, []);
+
+  // What the turn that just ran actually reported. Reset at the top of a turn.
+  const turnOutcomeRef = useRef<{ failed: boolean; actionSucceeded: boolean }>({ failed: false, actionSucceeded: false });
 
   // First open of the panel: restore the last 20 turns for this browser tab,
   // mint a conversation id, and check for the speech API. Done in the open
@@ -189,7 +226,8 @@ export default function JarvisButton() {
   const runTurn = useCallback(async (history: Message[], confirm?: string) => {
     setStreaming(true);
     setToolLabel(null);
-    setMessages([...history, { role: "assistant", content: "", tools: [], links: [] }]);
+    turnOutcomeRef.current = { failed: false, actionSucceeded: false };
+    setMessages([...history,{ role: "assistant", content: "", tools: [], links: [] }]);
     const patchLast = (fn: (m: Message) => Message) => {
       setMessages((prev) => {
         const updated = [...prev];
@@ -198,6 +236,7 @@ export default function JarvisButton() {
         return updated;
       });
     };
+    let sawText = false;
     try {
       const res = await fetch("/api/jarvis", {
         method: "POST",
@@ -228,7 +267,17 @@ export default function JarvisButton() {
           if (typeof ev.tool === "string") {
             const lineText = typeof ev.line === "string" && ev.line ? ev.line : `Running ${ev.tool}`;
             setToolLabel(lineText);
+            // A tool actually starting is worth more than plain streaming:
+            // Zephyr stays in thinking and flares once per tool step.
+            expressAll((orb) => { orb.setState?.("thinking"); orb.flare?.(); });
             patchLast((m) => ({ ...m, tools: [...(m.tools ?? []), lineText] }));
+          }
+          if (typeof ev.tool_done === "string") {
+            // The server reports `ok` per tool run. false means the tool
+            // returned an error or needs the PC; true on a confirmed write
+            // means the action Jack approved really did run.
+            if (ev.ok === false) turnOutcomeRef.current.failed = true;
+            else if (ev.ok === true && confirm) turnOutcomeRef.current.actionSucceeded = true;
           }
           if (typeof ev.tool_done === "string" && Array.isArray(ev.links) && ev.links.length) {
             const links = ev.links as Link[];
@@ -240,6 +289,7 @@ export default function JarvisButton() {
           }
           if (typeof ev.text === "string" && ev.text) {
             setToolLabel(null);
+            sawText = true;
             patchLast((m) => ({ ...m, content: m.content + ev.text }));
           }
           if (ev.pending_action && typeof ev.pending_action === "object") {
@@ -248,7 +298,12 @@ export default function JarvisButton() {
             patchLast((m) => ({ ...m, pending: pa, pendingState: "open" }));
           }
           if (ev.budget && typeof ev.budget === "object") {
+            // A rate, spend or backend refusal from the API route.
             setToolLabel(null);
+            turnOutcomeRef.current.failed = true;
+          }
+          if (typeof ev.error === "string" && ev.error) {
+            turnOutcomeRef.current.failed = true;
           }
         }
       }
@@ -260,13 +315,28 @@ export default function JarvisButton() {
         });
       }
     } catch (err) {
+      turnOutcomeRef.current.failed = true;
       patchLast((m) => ({ ...m, content: m.content || "Sorry, something went wrong. Check the console." }));
       console.error("[Jarvis]", err);
     } finally {
       setStreaming(false);
       setToolLabel(null);
+      // How the turn actually ended, straight from what the stream reported.
+      const { failed, actionSucceeded } = turnOutcomeRef.current;
+      if (failed) {
+        expressAll((orb) => orb.pulse?.("alert", 4200));
+        cue("zephyr-error");
+      } else if (actionSucceeded) {
+        expressAll((orb) => orb.pulse?.("party", 3500));
+        cue("confirmed");
+      } else if (sawText) {
+        expressAll((orb) => { orb.pulse?.("excited", 2200); orb.flare?.(); });
+        cue("reply");
+      } else {
+        restAll();
+      }
     }
-  }, [conversationId, speak]);
+  }, [conversationId, speak, expressAll, restAll, cue]);
 
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || streaming) return;
@@ -283,12 +353,13 @@ export default function JarvisButton() {
     if (!target?.pending || streaming) return;
     const token = target.pending.id;
     const history = messages.map((m, i) => (i === idx ? { ...m, pendingState: "done" as const } : m));
-    // A confirmed action deserves a little celebration from Zephyr.
-    [orbRef.current, headerOrbRef.current].forEach((o) => o?.pulse?.("party", 3500));
+    // Immediate acknowledgement of the click. Whether the action really
+    // succeeded is decided by the tool_done event inside runTurn.
+    expressAll((orb) => orb.pulse?.("party", 3500));
     // Keep the assistant's lead-in text as history; the server runs the
     // signed action and narrates the outcome in a fresh assistant turn.
     await runTurn(history, token);
-  }, [messages, streaming, runTurn]);
+  }, [messages, streaming, runTurn, expressAll]);
 
   const cancelAction = useCallback((idx: number) => {
     setMessages((prev) => prev.map((m, i) => (i === idx ? { ...m, pendingState: "cancelled" } : m)));
@@ -327,6 +398,10 @@ export default function JarvisButton() {
       const WM = (window as any).WingMascot;
       if (orbCancelled || orbRef.current || !orbSlotRef.current || !WM) return;
       orbRef.current = WM.mount(orbSlotRef.current, { size: 76 });
+      // Ambient idle/doze/wake already lives in the mascot (autoMood): it goes
+      // sleepy after real inactivity and wakes on real activity or the tab
+      // coming back. Wire it once here rather than rebuilding it in React.
+      WM.autoMood?.(orbRef.current);
       setOrbOn(true);
     };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -355,17 +430,20 @@ export default function JarvisButton() {
     if (!open || headerOrbRef.current || !headerSlotRef.current) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const WM = (window as any).WingMascot;
-    if (WM) headerOrbRef.current = WM.mount(headerSlotRef.current, { size: 38 });
-  }, [open]);
+    if (!WM) return;
+    const orb: Orb = WM.mount(headerSlotRef.current, { size: 38 });
+    headerOrbRef.current = orb;
+    WM.autoMood?.(orb);
+    // Catch the mini orb up to the mood the floating one is already in.
+    orb.setState?.(streaming ? "thinking" : (orb.getPinned?.() || "calm"));
+  }, [open, streaming]);
 
-  // Zephyr's face mirrors what the assistant is doing.
+  // Zephyr thinks while a turn is in flight. He does NOT reset to calm here:
+  // how a turn ended (excited, party, alert) is decided in runTurn's finally,
+  // and those pulses fall back to the pinned mood or calm on their own.
   useEffect(() => {
-    [orbRef.current, headerOrbRef.current].forEach((orb) => {
-      if (!orb) return;
-      if (streaming) orb.setState("thinking");
-      else { orb.setState("calm"); orb.flare?.(); }
-    });
-  }, [streaming]);
+    if (streaming) expressAll((orb) => orb.setState?.("thinking"));
+  }, [streaming, expressAll]);
 
   useEffect(() => { sendMessageRef.current = sendMessage; }, [sendMessage]);
 

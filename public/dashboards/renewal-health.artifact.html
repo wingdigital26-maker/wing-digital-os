@@ -102,18 +102,18 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 .hl b{font-size:.92rem;font-weight:700;font-variant-numeric:tabular-nums;color:var(--t1)}
 .hl span{font-size:.82rem;color:var(--t2)}
 /* sections */
-section{padding:44px 0 0}
+section{padding:34px 0 0}
 .sh{display:flex;align-items:baseline;gap:11px;flex-wrap:wrap}
 .sh h2{font-family:var(--display);font-size:1.22rem;font-weight:700;letter-spacing:-.015em}
 .sh .n{font-size:.79rem;color:var(--t3);font-variant-numeric:tabular-nums}
-.sd{font-size:.85rem;color:var(--t2);margin-top:4px;margin-bottom:18px;max-width:62ch}
+.sd{font-size:.85rem;color:var(--t2);margin-top:3px;margin-bottom:13px;max-width:62ch}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
   padding:20px 22px;box-shadow:var(--shadow)}
 /* monthly chart -- plain bars, value on top, month underneath */
 /* justify-content:center + a per-bar max-width keeps a short series (a new
    client with two months of history) looking deliberate instead of two thin
    columns stranded in a wide empty box. */
-.chart{display:flex;align-items:stretch;justify-content:center;gap:10px;height:200px}
+.chart{display:flex;align-items:stretch;justify-content:center;gap:10px;height:148px}
 .cbar{flex:1 1 0;max-width:110px;display:flex;flex-direction:column;align-items:center;min-width:0}
 .cbar-v{flex:0 0 auto;font-size:.76rem;font-weight:650;color:var(--t2);margin-bottom:6px;
   font-variant-numeric:tabular-nums}
@@ -133,10 +133,10 @@ section{padding:44px 0 0}
   .chart.dense .cbar:nth-child(even) .cbar-l{visibility:hidden}
 }
 /* type mix */
-.mix{display:flex;height:11px;border-radius:6px;overflow:hidden;gap:2px;margin-bottom:16px}
+.mix{display:flex;height:9px;border-radius:6px;overflow:hidden;gap:2px;margin-bottom:11px}
 /* min-width keeps a 1-of-40 segment visible instead of vanishing to a hairline */
 .mix-seg{min-width:8px;transition:flex-grow .7s cubic-bezier(.22,1,.36,1)}
-.keys{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:11px}
+.keys{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:8px}
 .key{display:flex;align-items:baseline;gap:8px;font-size:.83rem}
 .key i{width:10px;height:10px;border-radius:3px;flex:0 0 auto;transform:translateY(1px)}
 .key .kn{color:var(--t2)}
@@ -154,7 +154,7 @@ section{padding:44px 0 0}
 .mgroup{margin-top:26px;padding-bottom:8px;border-bottom:1px solid var(--border)}
 .mlabel{font-size:.72rem;font-weight:700;letter-spacing:.11em;text-transform:uppercase;
   color:var(--t3)}
-.row{display:flex;align-items:baseline;gap:14px;padding:13px 4px;
+.row{display:flex;align-items:baseline;gap:14px;padding:8px 4px;
   border-bottom:1px solid var(--border);transition:background .12s}
 .row:hover{background:var(--surface-2)}
 .row-dot{width:9px;height:9px;border-radius:3px;flex:0 0 auto;transform:translateY(4px)}
@@ -162,7 +162,7 @@ section{padding:44px 0 0}
 .row-t{font-size:.93rem;font-weight:550;line-height:1.4}
 .row-t a{text-decoration:none;border-bottom:1px solid transparent;transition:color .15s,border-color .15s}
 .row-t a:hover{color:var(--accent);border-bottom-color:var(--accent)}
-.row-s{font-size:.77rem;color:var(--t3);margin-top:3px}
+.row-s{font-size:.77rem;color:var(--t3);margin-top:1px}
 .row-d{font-size:.79rem;color:var(--t3);white-space:nowrap;font-variant-numeric:tabular-nums}
 .more{margin-top:20px;padding:10px 18px;border-radius:var(--r-sm);border:1px solid var(--border);
   font-size:.84rem;font-weight:600;color:var(--t2);transition:color .15s,border-color .15s}
@@ -319,7 +319,7 @@ section{padding:44px 0 0}
 .pl-banner{margin-bottom:18px;padding:15px 18px;border-radius:var(--r);
   border:1px solid var(--accent);background:var(--accent-bg);
   font-size:.9rem;font-weight:600;line-height:1.55}
-.pl-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(268px,1fr));gap:14px}
+.pl-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px}
 .pl-card{position:relative;background:var(--surface);border:1px solid var(--border);
   border-radius:var(--r);padding:19px 21px 20px;box-shadow:var(--shadow);overflow:hidden}
 .pl-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent)}
@@ -441,7 +441,7 @@ section{padding:44px 0 0}
   <section>
     <div class="sh"><h2>What we published</h2><span class="n" id="pubn"></span></div>
     <div class="sd">Colours match the chart above. Click any title to open it on your site.</div>
-    <div class="card" style="margin-bottom:22px">
+    <div class="card" style="margin-bottom:14px">
       <div class="mix" id="mix"></div>
       <div class="keys" id="keys"></div>
     </div>
@@ -465,6 +465,7 @@ section{padding:44px 0 0}
   <section id="op-sec" hidden>
     <div class="sh"><h2 id="op-h"></h2><span class="n" id="op-n"></span></div>
     <div class="sd" id="op-sd"></div>
+    <div class="hstats" id="op-reach"></div>
     <div class="op-banner" id="op-banner" hidden></div>
     <div class="op-plan" id="op-plan"></div>
     <div class="mgroup" style="margin-top:0"><div class="mlabel" id="op-tpl-label"></div></div>
@@ -518,7 +519,7 @@ section{padding:44px 0 0}
   </div>
 </main>
 <script>
-const DATA = {"slug":"renewal-health","generated":"2026-09-06","dataThrough":"2026-09-06","generatedAt":"2026-09-06T18:27:59","brand":{"name":"Renewal Health","initials":"RH","site":"https://renewalhealth.life","kicker":"Marketing dashboard","headline":"Everything Wing Digital is building for Renewal Health","subhead":"A live record of the pages and posts running on renewalhealth.life. Click anything to open it on the real site."},"engines":[{"name":"Blog engine","detail":"2 posts a week, published Mondays","icon":"pen"},{"name":"Service pages","detail":"Detox, gut health, hormones, inflammation, weight, neurodivergent care, emotional overwhelm","icon":"map"},{"name":"On-page SEO","detail":"Titles, schema, internal links","icon":"search"},{"name":"Internal linking","detail":"New posts wired to service pages and old posts","icon":"link"}],"types":{"blog":{"label":"Blog post","color":"#8fae85"},"service":{"label":"Service page","color":"#b79cc9"},"core":{"label":"Core page","color":"#c9a24b"},"other":{"label":"Other","color":"#8a7f93"}},"outreach":{"intro":"What runs automatically for Renewal Health each week.","channels":[{"name":"Weekly content engine","icon":"pen","types":["blog"],"state":"live","note":"Live and scheduled: two new blog posts every Monday morning (7:40am), each image-checked and reviewed against health-claim rules before it publishes."},{"name":"Online booking","icon":"chat","types":[],"state":"not_connected","note":"No booking or scheduling system is wired up yet. Consult requests come through the site's contact page for now."},{"name":"Social posting","icon":"share","types":[],"state":"not_connected","note":"Not connected. Nothing is posted to social accounts on your behalf."},{"name":"Review requests","icon":"star","types":[],"state":"not_connected","note":"No review request system is wired up yet. This becomes an option once a Google Business Profile is connected."}]},"outreachPreview":null,"pendingMetrics":[{"name":"Google Search clicks and impressions","why":"Needs Search Console for renewalhealth.life connected to the reporting account","state":"needs access"},{"name":"Keyword rankings","why":"Comes online with the same Search Console connection","state":"needs access"},{"name":"Bookings and consult requests","why":"No booking system is wired up yet, so no consult count here would be trustworthy","state":"not connected"},{"name":"Google Business Profile views","why":"Needs a Google Business Profile connected with manager access","state":"needs access"}],"metrics":{},"items":[{"date":"2026-09-06","type":"service","title":"Nothing Missing, Nothing Broken","status":"published","url":"https://renewalhealth.life/book.html"},{"date":"2026-09-06","type":"service","title":"5 Signs Your Body Is Asking for a Different Kind of Support","status":"published","url":"https://renewalhealth.life/guide.html"},{"date":"2026-09-06","type":"service","title":"Thank You for Walking This Road with Me","status":"published","url":"https://renewalhealth.life/leave-a-review.html"},{"date":"2026-08-31","type":"blog","title":"Cortisol, Safety, and the Belly That Will Not Let Go","status":"published","url":"https://renewalhealth.life/blog/cortisol-and-belly-weight.html"},{"date":"2026-08-31","type":"blog","title":"Open the Exit Ramps: How Your Body&#x27;s Drainage Pathways Work","status":"published","url":"https://renewalhealth.life/blog/drainage-pathways.html"},{"date":"2026-08-31","type":"blog","title":"Wired but Tired: When Your Body Is Stuck in a Quiet Emergency","status":"published","url":"https://renewalhealth.life/blog/wired-but-tired.html"},{"date":"2026-08-24","type":"blog","title":"Chasing Symptoms vs Finding the Root: What Root-Cause Really Means","status":"published","url":"https://renewalhealth.life/blog/chasing-symptoms-vs-finding-the-root.html"},{"date":"2026-08-24","type":"blog","title":"Rest and Digest: Why You Cannot Heal Your Gut While Bracing","status":"published","url":"https://renewalhealth.life/blog/rest-and-digest-cannot-heal-gut-while-bracing.html"},{"date":"2026-08-24","type":"blog","title":"What Is Homeopathy, Really? A Plain-English Primer","status":"published","url":"https://renewalhealth.life/blog/what-is-homeopathy-plain-english-primer.html"},{"date":"2026-08-18","type":"blog","title":"Nervous System Support for Neurodivergent Adults","status":"published","url":"https://renewalhealth.life/blog/neurodivergent-nervous-system-support.html"},{"date":"2026-08-18","type":"blog","title":"Why Weight Will Not Budge When the Body Feels Unsafe","status":"published","url":"https://renewalhealth.life/blog/why-weight-will-not-budge.html"},{"date":"2026-08-10","type":"blog","title":"Chronic Inflammation: The Quiet Fire in the Body","status":"published","url":"https://renewalhealth.life/blog/chronic-inflammation-natural-support.html"},{"date":"2026-08-10","type":"blog","title":"Signs Your Hormones May Be Out of Balance","status":"published","url":"https://renewalhealth.life/blog/signs-of-hormone-imbalance.html"},{"date":"2026-08-05","type":"blog","title":"Gentle Detox: Why Your Body Cleanses Best Under Safety","status":"published","url":"https://renewalhealth.life/blog/gentle-detox.html"},{"date":"2026-08-05","type":"blog","title":"The Gut-Brain Connection: Anxiety Starts in the Belly","status":"published","url":"https://renewalhealth.life/blog/gut-brain-connection.html"},{"date":"2026-08-03","type":"service","title":"Detox","status":"published","url":"https://renewalhealth.life/detox.html"},{"date":"2026-07-27","type":"blog","title":"It Is Not Mine to Carry: How to Surrender Your Burdens","status":"published","url":"https://renewalhealth.life/blog/how-to-surrender-your-burdens-to-god.html"},{"date":"2026-07-27","type":"blog","title":"Renewal Health: Why Your Body Needs a Master Builder, a Blueprint, and a Bridge","status":"published","url":"https://renewalhealth.life/blog/root-cause-healing-naturopathy-homeopathy.html"},{"date":"2026-07-27","type":"blog","title":"When Defeat Becomes a Doorway: Growth Through Hardship","status":"published","url":"https://renewalhealth.life/blog/spiritual-growth-through-hardship.html"},{"date":"2026-07-27","type":"blog","title":"Vagal Tone Exercises: Partner With Your Hidden Engine","status":"published","url":"https://renewalhealth.life/blog/vagal-tone-exercises.html"},{"date":"2026-07-27","type":"service","title":"Emotional Overwhelm Support &amp; Nervous System Regulation for Calm, Clarity, and Balance","status":"published","url":"https://renewalhealth.life/emotional-overwhelm-nervous-system.html"},{"date":"2026-07-27","type":"service","title":"Gut Health Support for Digestion, Energy, and Whole-Body Balance","status":"published","url":"https://renewalhealth.life/gut-health-support.html"},{"date":"2026-07-27","type":"service","title":"Hormone Balance Support for Energy, Mood, and Whole-Body Health","status":"published","url":"https://renewalhealth.life/hormone-balance-support.html"},{"date":"2026-07-27","type":"service","title":"Inflammation Support to Reduce Pain, Fatigue, and Whole-Body Imbalance","status":"published","url":"https://renewalhealth.life/inflammation-support.html"},{"date":"2026-07-27","type":"service","title":"Detox","status":"published","url":"https://renewalhealth.life/naturopathic-detox.html"},{"date":"2026-07-27","type":"service","title":"Naturopathy and Homeopathy","status":"published","url":"https://renewalhealth.life/naturopathy-homeopathy-holistic-healing.html"},{"date":"2026-07-27","type":"service","title":"Neurodivergent Support for Focus, Regulation, and Whole-Body Balance","status":"published","url":"https://renewalhealth.life/neurodivergent-support.html"},{"date":"2026-07-27","type":"service","title":"Weight Balance &amp; Metabolic Health Support Through Root-Cause Care","status":"published","url":"https://renewalhealth.life/weight-metabolic-health.html"},{"date":"2026-07-27","type":"service","title":"The Dragonfly","status":"published","url":"https://renewalhealth.life/why-a-dragonfly-renewal-health.html"}],"pages":[{"group":"Blog posts live on your site","icon":"pen","links":[{"title":"Chasing Symptoms vs Finding the Root: What Root-Cause Really Means","url":"https://renewalhealth.life/blog/chasing-symptoms-vs-finding-the-root.html"},{"title":"Chronic Inflammation: The Quiet Fire in the Body","url":"https://renewalhealth.life/blog/chronic-inflammation-natural-support.html"},{"title":"Cortisol, Safety, and the Belly That Will Not Let Go","url":"https://renewalhealth.life/blog/cortisol-and-belly-weight.html"},{"title":"Open the Exit Ramps: How Your Body&#x27;s Drainage Pathways Work","url":"https://renewalhealth.life/blog/drainage-pathways.html"},{"title":"Gentle Detox: Why Your Body Cleanses Best Under Safety","url":"https://renewalhealth.life/blog/gentle-detox.html"},{"title":"The Gut-Brain Connection: Anxiety Starts in the Belly","url":"https://renewalhealth.life/blog/gut-brain-connection.html"},{"title":"It Is Not Mine to Carry: How to Surrender Your Burdens","url":"https://renewalhealth.life/blog/how-to-surrender-your-burdens-to-god.html"},{"title":"Nervous System Support for Neurodivergent Adults","url":"https://renewalhealth.life/blog/neurodivergent-nervous-system-support.html"},{"title":"Rest and Digest: Why You Cannot Heal Your Gut While Bracing","url":"https://renewalhealth.life/blog/rest-and-digest-cannot-heal-gut-while-bracing.html"},{"title":"Renewal Health: Why Your Body Needs a Master Builder, a Blueprint, and a Bridge","url":"https://renewalhealth.life/blog/root-cause-healing-naturopathy-homeopathy.html"},{"title":"Signs Your Hormones May Be Out of Balance","url":"https://renewalhealth.life/blog/signs-of-hormone-imbalance.html"},{"title":"When Defeat Becomes a Doorway: Growth Through Hardship","url":"https://renewalhealth.life/blog/spiritual-growth-through-hardship.html"},{"title":"Vagal Tone Exercises: Partner With Your Hidden Engine","url":"https://renewalhealth.life/blog/vagal-tone-exercises.html"},{"title":"What Is Homeopathy, Really? A Plain-English Primer","url":"https://renewalhealth.life/blog/what-is-homeopathy-plain-english-primer.html"},{"title":"Why Weight Will Not Budge When the Body Feels Unsafe","url":"https://renewalhealth.life/blog/why-weight-will-not-budge.html"},{"title":"Wired but Tired: When Your Body Is Stuck in a Quiet Emergency","url":"https://renewalhealth.life/blog/wired-but-tired.html"}]},{"group":"Service and core pages","icon":"globe","links":[{"title":"My Personal Journey to Root-Cause Healing and Whole-Body Health","url":"https://renewalhealth.life/about-lynette-wing-renewal-health.html"},{"title":"My Personal Journey to Root-Cause Healing and Whole-Body Health","url":"https://renewalhealth.life/about.html"},{"title":"The Renewal Health Blog","url":"https://renewalhealth.life/blog.html"},{"title":"Nothing Missing, Nothing Broken","url":"https://renewalhealth.life/book.html"},{"title":"Reach Lynette Wing","url":"https://renewalhealth.life/contact-renewal-health.html"},{"title":"Detox","url":"https://renewalhealth.life/detox.html"},{"title":"Emotional Overwhelm Support &amp; Nervous System Regulation for Calm, Clarity, and Balance","url":"https://renewalhealth.life/emotional-overwhelm-nervous-system.html"},{"title":"5 Signs Your Body Is Asking for a Different Kind of Support","url":"https://renewalhealth.life/guide.html"},{"title":"Gut Health Support for Digestion, Energy, and Whole-Body Balance","url":"https://renewalhealth.life/gut-health-support.html"},{"title":"Hormone Balance Support for Energy, Mood, and Whole-Body Health","url":"https://renewalhealth.life/hormone-balance-support.html"},{"title":"Emerge. Align. Live Fully.","url":"https://renewalhealth.life/index.html"},{"title":"Inflammation Support to Reduce Pain, Fatigue, and Whole-Body Imbalance","url":"https://renewalhealth.life/inflammation-support.html"},{"title":"Thank You for Walking This Road with Me","url":"https://renewalhealth.life/leave-a-review.html"},{"title":"Detox","url":"https://renewalhealth.life/naturopathic-detox.html"},{"title":"Naturopathy and Homeopathy","url":"https://renewalhealth.life/naturopathy-homeopathy-holistic-healing.html"},{"title":"Neurodivergent Support for Focus, Regulation, and Whole-Body Balance","url":"https://renewalhealth.life/neurodivergent-support.html"},{"title":"Programs &amp; Packages for Personalized, Root-Cause Health Transformation","url":"https://renewalhealth.life/programs-packages.html"},{"title":"Renewal Health: Why Your Body Needs a Master Builder, a Blueprint, and a Bridge","url":"https://renewalhealth.life/resources.html"},{"title":"Services","url":"https://renewalhealth.life/services.html"},{"title":"Patient Stories &amp; Testimonials","url":"https://renewalhealth.life/testimonials.html"},{"title":"Weight Balance &amp; Metabolic Health Support Through Root-Cause Care","url":"https://renewalhealth.life/weight-metabolic-health.html"},{"title":"The Dragonfly","url":"https://renewalhealth.life/why-a-dragonfly-renewal-health.html"}]}]};
+const DATA = {"slug":"renewal-health","generated":"2026-09-06","dataThrough":"2026-09-06","generatedAt":"2026-09-06T18:41:51","brand":{"name":"Renewal Health","initials":"RH","site":"https://renewalhealth.life","kicker":"Marketing dashboard","headline":"Everything Wing Digital is building for Renewal Health","subhead":"A live record of the pages and posts running on renewalhealth.life. Click anything to open it on the real site."},"engines":[{"name":"Blog engine","detail":"2 posts a week, published Mondays","icon":"pen"},{"name":"Service pages","detail":"Detox, gut health, hormones, inflammation, weight, neurodivergent care, emotional overwhelm","icon":"map"},{"name":"On-page SEO","detail":"Titles, schema, internal links","icon":"search"},{"name":"Internal linking","detail":"New posts wired to service pages and old posts","icon":"link"}],"types":{"blog":{"label":"Blog post","color":"#8fae85"},"service":{"label":"Service page","color":"#b79cc9"},"core":{"label":"Core page","color":"#c9a24b"},"other":{"label":"Other","color":"#8a7f93"}},"outreach":{"intro":"What runs automatically for Renewal Health each week.","channels":[{"name":"Weekly content engine","icon":"pen","types":["blog"],"state":"live","note":"Live and scheduled: two new blog posts every Monday morning (7:40am), each image-checked and reviewed against health-claim rules before it publishes."},{"name":"Online booking","icon":"chat","types":[],"state":"not_connected","note":"No booking or scheduling system is wired up yet. Consult requests come through the site's contact page for now."},{"name":"Social posting","icon":"share","types":[],"state":"not_connected","note":"Not connected. Nothing is posted to social accounts on your behalf."},{"name":"Review requests","icon":"star","types":[],"state":"not_connected","note":"No review request system is wired up yet. This becomes an option once a Google Business Profile is connected."}]},"outreachPreview":null,"plan":null,"pendingMetrics":[{"name":"Google Search clicks and impressions","why":"Needs Search Console for renewalhealth.life connected to the reporting account","state":"needs access"},{"name":"Keyword rankings","why":"Comes online with the same Search Console connection","state":"needs access"},{"name":"Bookings and consult requests","why":"No booking system is wired up yet, so no consult count here would be trustworthy","state":"not connected"},{"name":"Google Business Profile views","why":"Needs a Google Business Profile connected with manager access","state":"needs access"}],"metrics":{},"items":[{"date":"2026-09-06","type":"service","title":"Nothing Missing, Nothing Broken","status":"published","url":"https://renewalhealth.life/book.html"},{"date":"2026-09-06","type":"service","title":"5 Signs Your Body Is Asking for a Different Kind of Support","status":"published","url":"https://renewalhealth.life/guide.html"},{"date":"2026-09-06","type":"service","title":"Thank You for Walking This Road with Me","status":"published","url":"https://renewalhealth.life/leave-a-review.html"},{"date":"2026-08-31","type":"blog","title":"Cortisol, Safety, and the Belly That Will Not Let Go","status":"published","url":"https://renewalhealth.life/blog/cortisol-and-belly-weight.html"},{"date":"2026-08-31","type":"blog","title":"Open the Exit Ramps: How Your Body's Drainage Pathways Work","status":"published","url":"https://renewalhealth.life/blog/drainage-pathways.html"},{"date":"2026-08-31","type":"blog","title":"Wired but Tired: When Your Body Is Stuck in a Quiet Emergency","status":"published","url":"https://renewalhealth.life/blog/wired-but-tired.html"},{"date":"2026-08-24","type":"blog","title":"Chasing Symptoms vs Finding the Root: What Root-Cause Really Means","status":"published","url":"https://renewalhealth.life/blog/chasing-symptoms-vs-finding-the-root.html"},{"date":"2026-08-24","type":"blog","title":"Rest and Digest: Why You Cannot Heal Your Gut While Bracing","status":"published","url":"https://renewalhealth.life/blog/rest-and-digest-cannot-heal-gut-while-bracing.html"},{"date":"2026-08-24","type":"blog","title":"What Is Homeopathy, Really? A Plain-English Primer","status":"published","url":"https://renewalhealth.life/blog/what-is-homeopathy-plain-english-primer.html"},{"date":"2026-08-18","type":"blog","title":"Nervous System Support for Neurodivergent Adults","status":"published","url":"https://renewalhealth.life/blog/neurodivergent-nervous-system-support.html"},{"date":"2026-08-18","type":"blog","title":"Why Weight Will Not Budge When the Body Feels Unsafe","status":"published","url":"https://renewalhealth.life/blog/why-weight-will-not-budge.html"},{"date":"2026-08-10","type":"blog","title":"Chronic Inflammation: The Quiet Fire in the Body","status":"published","url":"https://renewalhealth.life/blog/chronic-inflammation-natural-support.html"},{"date":"2026-08-10","type":"blog","title":"Signs Your Hormones May Be Out of Balance","status":"published","url":"https://renewalhealth.life/blog/signs-of-hormone-imbalance.html"},{"date":"2026-08-05","type":"blog","title":"Gentle Detox: Why Your Body Cleanses Best Under Safety","status":"published","url":"https://renewalhealth.life/blog/gentle-detox.html"},{"date":"2026-08-05","type":"blog","title":"The Gut-Brain Connection: Anxiety Starts in the Belly","status":"published","url":"https://renewalhealth.life/blog/gut-brain-connection.html"},{"date":"2026-08-03","type":"service","title":"Detox","status":"published","url":"https://renewalhealth.life/detox.html"},{"date":"2026-07-27","type":"blog","title":"It Is Not Mine to Carry: How to Surrender Your Burdens","status":"published","url":"https://renewalhealth.life/blog/how-to-surrender-your-burdens-to-god.html"},{"date":"2026-07-27","type":"blog","title":"Renewal Health: Why Your Body Needs a Master Builder, a Blueprint, and a Bridge","status":"published","url":"https://renewalhealth.life/blog/root-cause-healing-naturopathy-homeopathy.html"},{"date":"2026-07-27","type":"blog","title":"When Defeat Becomes a Doorway: Growth Through Hardship","status":"published","url":"https://renewalhealth.life/blog/spiritual-growth-through-hardship.html"},{"date":"2026-07-27","type":"blog","title":"Vagal Tone Exercises: Partner With Your Hidden Engine","status":"published","url":"https://renewalhealth.life/blog/vagal-tone-exercises.html"},{"date":"2026-07-27","type":"service","title":"Emotional Overwhelm Support & Nervous System Regulation for Calm, Clarity, and Balance","status":"published","url":"https://renewalhealth.life/emotional-overwhelm-nervous-system.html"},{"date":"2026-07-27","type":"service","title":"Gut Health Support for Digestion, Energy, and Whole-Body Balance","status":"published","url":"https://renewalhealth.life/gut-health-support.html"},{"date":"2026-07-27","type":"service","title":"Hormone Balance Support for Energy, Mood, and Whole-Body Health","status":"published","url":"https://renewalhealth.life/hormone-balance-support.html"},{"date":"2026-07-27","type":"service","title":"Inflammation Support to Reduce Pain, Fatigue, and Whole-Body Imbalance","status":"published","url":"https://renewalhealth.life/inflammation-support.html"},{"date":"2026-07-27","type":"service","title":"Detox","status":"published","url":"https://renewalhealth.life/naturopathic-detox.html"},{"date":"2026-07-27","type":"service","title":"Naturopathy and Homeopathy","status":"published","url":"https://renewalhealth.life/naturopathy-homeopathy-holistic-healing.html"},{"date":"2026-07-27","type":"service","title":"Neurodivergent Support for Focus, Regulation, and Whole-Body Balance","status":"published","url":"https://renewalhealth.life/neurodivergent-support.html"},{"date":"2026-07-27","type":"service","title":"Weight Balance & Metabolic Health Support Through Root-Cause Care","status":"published","url":"https://renewalhealth.life/weight-metabolic-health.html"},{"date":"2026-07-27","type":"service","title":"The Dragonfly","status":"published","url":"https://renewalhealth.life/why-a-dragonfly-renewal-health.html"}],"pages":[{"group":"Blog posts live on your site","icon":"pen","links":[{"title":"Chasing Symptoms vs Finding the Root: What Root-Cause Really Means","url":"https://renewalhealth.life/blog/chasing-symptoms-vs-finding-the-root.html"},{"title":"Chronic Inflammation: The Quiet Fire in the Body","url":"https://renewalhealth.life/blog/chronic-inflammation-natural-support.html"},{"title":"Cortisol, Safety, and the Belly That Will Not Let Go","url":"https://renewalhealth.life/blog/cortisol-and-belly-weight.html"},{"title":"Open the Exit Ramps: How Your Body's Drainage Pathways Work","url":"https://renewalhealth.life/blog/drainage-pathways.html"},{"title":"Gentle Detox: Why Your Body Cleanses Best Under Safety","url":"https://renewalhealth.life/blog/gentle-detox.html"},{"title":"The Gut-Brain Connection: Anxiety Starts in the Belly","url":"https://renewalhealth.life/blog/gut-brain-connection.html"},{"title":"It Is Not Mine to Carry: How to Surrender Your Burdens","url":"https://renewalhealth.life/blog/how-to-surrender-your-burdens-to-god.html"},{"title":"Nervous System Support for Neurodivergent Adults","url":"https://renewalhealth.life/blog/neurodivergent-nervous-system-support.html"},{"title":"Rest and Digest: Why You Cannot Heal Your Gut While Bracing","url":"https://renewalhealth.life/blog/rest-and-digest-cannot-heal-gut-while-bracing.html"},{"title":"Renewal Health: Why Your Body Needs a Master Builder, a Blueprint, and a Bridge","url":"https://renewalhealth.life/blog/root-cause-healing-naturopathy-homeopathy.html"},{"title":"Signs Your Hormones May Be Out of Balance","url":"https://renewalhealth.life/blog/signs-of-hormone-imbalance.html"},{"title":"When Defeat Becomes a Doorway: Growth Through Hardship","url":"https://renewalhealth.life/blog/spiritual-growth-through-hardship.html"},{"title":"Vagal Tone Exercises: Partner With Your Hidden Engine","url":"https://renewalhealth.life/blog/vagal-tone-exercises.html"},{"title":"What Is Homeopathy, Really? A Plain-English Primer","url":"https://renewalhealth.life/blog/what-is-homeopathy-plain-english-primer.html"},{"title":"Why Weight Will Not Budge When the Body Feels Unsafe","url":"https://renewalhealth.life/blog/why-weight-will-not-budge.html"},{"title":"Wired but Tired: When Your Body Is Stuck in a Quiet Emergency","url":"https://renewalhealth.life/blog/wired-but-tired.html"}]},{"group":"Service and core pages","icon":"globe","links":[{"title":"My Personal Journey to Root-Cause Healing and Whole-Body Health","url":"https://renewalhealth.life/about-lynette-wing-renewal-health.html"},{"title":"My Personal Journey to Root-Cause Healing and Whole-Body Health","url":"https://renewalhealth.life/about.html"},{"title":"The Renewal Health Blog","url":"https://renewalhealth.life/blog.html"},{"title":"Nothing Missing, Nothing Broken","url":"https://renewalhealth.life/book.html"},{"title":"Reach Lynette Wing","url":"https://renewalhealth.life/contact-renewal-health.html"},{"title":"Detox","url":"https://renewalhealth.life/detox.html"},{"title":"Emotional Overwhelm Support & Nervous System Regulation for Calm, Clarity, and Balance","url":"https://renewalhealth.life/emotional-overwhelm-nervous-system.html"},{"title":"5 Signs Your Body Is Asking for a Different Kind of Support","url":"https://renewalhealth.life/guide.html"},{"title":"Gut Health Support for Digestion, Energy, and Whole-Body Balance","url":"https://renewalhealth.life/gut-health-support.html"},{"title":"Hormone Balance Support for Energy, Mood, and Whole-Body Health","url":"https://renewalhealth.life/hormone-balance-support.html"},{"title":"Emerge. Align. Live Fully.","url":"https://renewalhealth.life/index.html"},{"title":"Inflammation Support to Reduce Pain, Fatigue, and Whole-Body Imbalance","url":"https://renewalhealth.life/inflammation-support.html"},{"title":"Thank You for Walking This Road with Me","url":"https://renewalhealth.life/leave-a-review.html"},{"title":"Detox","url":"https://renewalhealth.life/naturopathic-detox.html"},{"title":"Naturopathy and Homeopathy","url":"https://renewalhealth.life/naturopathy-homeopathy-holistic-healing.html"},{"title":"Neurodivergent Support for Focus, Regulation, and Whole-Body Balance","url":"https://renewalhealth.life/neurodivergent-support.html"},{"title":"Programs & Packages for Personalized, Root-Cause Health Transformation","url":"https://renewalhealth.life/programs-packages.html"},{"title":"Renewal Health: Why Your Body Needs a Master Builder, a Blueprint, and a Bridge","url":"https://renewalhealth.life/resources.html"},{"title":"Services","url":"https://renewalhealth.life/services.html"},{"title":"Patient Stories & Testimonials","url":"https://renewalhealth.life/testimonials.html"},{"title":"Weight Balance & Metabolic Health Support Through Root-Cause Care","url":"https://renewalhealth.life/weight-metabolic-health.html"},{"title":"The Dragonfly","url":"https://renewalhealth.life/why-a-dragonfly-renewal-health.html"}]}]};
 (function(){
   'use strict';
   const $ = s => document.querySelector(s);
@@ -708,7 +709,7 @@ const DATA = {"slug":"renewal-health","generated":"2026-09-06","dataThrough":"20
     '<div class="key"><i style="background:'+color(t)+'"></i>'+
     '<span class="kn">'+esc(label(t))+'</span><span class="kv">'+counts[t]+'</span></div>').join('');
   /* ── the list ────────────────────────────────────────────── */
-  const STEP = 15;
+  const STEP = 12;
   let shown = STEP, query = '';
   function render(){
     const rows = PUB.filter(i => !query || String(i.title||'').toLowerCase().includes(query));
@@ -746,6 +747,48 @@ const DATA = {"slug":"renewal-health","generated":"2026-09-06","dataThrough":"20
   });
   $('#more').addEventListener('click', () => { shown += STEP; render(); });
   render();
+  /* ── what happens next -----------------------------------------
+     Generic and config-driven. Renders nothing at all unless the payload
+     carries a `plan` object, so this block is inert for every client that
+     does not have one. It describes INTENDED work only: there is no count,
+     no measurement and no result in here, and the note under it says so. */
+  (function plan(){
+    const P = DATA.plan;
+    const sec = $('#plan-sec');
+    if (!P || !(P.phases||[]).length) return;
+    sec.hidden = false;
+    $('#plan-h').textContent  = P.title || 'What happens next';
+    $('#plan-sd').textContent = P.intro || '';
+    if (P.banner) { $('#plan-banner').textContent = P.banner; $('#plan-banner').hidden = false; }
+    $('#plan-grid').innerHTML = P.phases.map(ph =>
+      '<div class="pl-card">' +
+        (ph.when ? '<div class="pl-when">'+esc(ph.when)+'</div>' : '') +
+        '<div class="pl-name">'+esc(ph.name||'')+'</div>' +
+        '<div class="pl-pts">' + (ph.points||[]).map(pt =>
+          '<div class="pl-pt"><i></i><span>'+esc(pt)+'</span></div>').join('') + '</div>' +
+        (ph.state ? '<div class="pl-state">'+esc(ph.state)+'</div>' : '') +
+      '</div>').join('');
+    if (P.note) { $('#plan-note').textContent = P.note; $('#plan-note').hidden = false; }
+    if (P.cta && P.cta.url && P.cta.label) {
+      const a = $('#plan-cta');
+      a.href = P.cta.url;
+      a.innerHTML = esc(P.cta.label) +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" ' +
+        'stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/>' +
+        '<path d="M9 7h8v8"/></svg>';
+      a.hidden = false;
+    }
+  })();
+  /* The agency credit is a link only when the payload carries a URL we stand
+     behind. A dead link in the footer of a client-facing page is worse than
+     plain text, so with no URL it stays plain text. */
+  (function(){
+    const url = (DATA.brand||{}).agencyUrl;
+    if (!url) return;
+    const el = $('#agency');
+    el.outerHTML = '<a id="agency" href="'+esc(url)+'" target="_blank" rel="noopener">'+
+      esc(el.textContent)+'</a>';
+  })();
   /* ── outreach and social ─────────────────────────────────────
      One card per channel. A channel only reports a NUMBER when it is genuinely
      sending and we can count it; otherwise it says plainly why it is empty.
@@ -948,7 +991,7 @@ const DATA = {"slug":"renewal-health","generated":"2026-09-06","dataThrough":"20
     const OP = DATA.outreachPreview;
     if (!OP) return;
     $('#op-sec').hidden = false;
-    $('#op-h').textContent = 'Outreach preview, for your approval';
+    $('#op-h').textContent = 'Your outreach lane';
     $('#op-sd').textContent = OP.intro || '';
     if (OP.banner) { $('#op-banner').hidden = false; $('#op-banner').textContent = OP.banner; }
     $('#op-plan').innerHTML = (OP.plan||[]).map(p =>
@@ -963,7 +1006,7 @@ const DATA = {"slug":"renewal-health","generated":"2026-09-06","dataThrough":"20
       $('#op-cats').innerHTML = '';
     } else {
       const mailCount = cats.reduce((n, c) => n + (c.emails || []).length, 0);
-      $('#op-tpl-label').textContent = 'What goes out';
+      $('#op-tpl-label').textContent = 'The emails';
       const body = cats.map(c =>
         '<div class="op-cat"><div class="mgroup"><div class="mlabel">'+esc(c.name)+'</div></div>'+
         '<div class="op-mails">'+c.emails.map(e =>
@@ -974,7 +1017,7 @@ const DATA = {"slug":"renewal-health","generated":"2026-09-06","dataThrough":"20
         (OP.templatesNote ? '<div class="op-note">'+esc(OP.templatesNote)+'</div>' : '');
       $('#op-cats').innerHTML =
         '<button class="oplink" id="op-tpl-toggle" aria-expanded="false" aria-controls="op-tpl-body">'+
-        'Read the ' + mailCount + ' ' + (mailCount === 1 ? 'email' : 'emails') + ' we send' +
+        'See the ' + mailCount + ' ' + (mailCount === 1 ? 'email' : 'emails') +
         '<span class="oplink-c">&rsaquo;</span></button>' +
         '<div id="op-tpl-body" hidden>' + body + '</div>';
       const tBtn = $('#op-tpl-toggle'), tBody = $('#op-tpl-body');
@@ -985,11 +1028,27 @@ const DATA = {"slug":"renewal-health","generated":"2026-09-06","dataThrough":"20
         tBtn.classList.toggle('on', open);
         tBtn.firstChild.textContent = open
           ? 'Hide the emails'
-          : 'Read the ' + mailCount + ' ' + (mailCount === 1 ? 'email' : 'emails') + ' we send';
+          : 'See the ' + mailCount + ' ' + (mailCount === 1 ? 'email' : 'emails');
       });
     }
+    // Reach: what has actually been built for this client. Every number here
+    // counts rows we hold, never messages sent, so it stays true before a
+    // single email goes out.
+    const QR = OP.queue || [];
+    if (QR.length) {
+      const cats = new Set(), cities = new Set();
+      QR.forEach(r => { if (r.category) cats.add(r.category); if (r.city) cities.add(r.city); });
+      const rt = [];
+      rt.push('<div class="hstat"><div class="hstat-v">'+QR.length.toLocaleString()+'</div>'+
+              '<div class="hstat-l">Businesses on your list</div></div>');
+      if (cats.size) rt.push('<div class="hstat"><div class="hstat-v">'+cats.size+'</div>'+
+              '<div class="hstat-l">Types of partner we reach</div></div>');
+      if (cities.size) rt.push('<div class="hstat"><div class="hstat-v">'+cities.size+'</div>'+
+              '<div class="hstat-l">Cities covered</div></div>');
+      $('#op-reach').innerHTML = rt.join('');
+    }
     // Queue
-    $('#op-q-label').textContent = 'Who would receive them';
+    $('#op-q-label').textContent = 'Who is on the list';
     const Q = OP.queue;
     if (!Q || !Q.length) {
       // House rule: say nothing rather than announce an empty list.
@@ -1480,6 +1539,84 @@ window.ZEPHYR_KB = [
   var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var styleInjected = false;
 
+  /* Sound: tiny synthesized cue engine. No files, no libraries, CSP safe.
+   * Rules that keep a client dashboard quiet:
+   *  - default OFF, choice persisted in localStorage under zephyr:sound
+   *  - nothing ever plays until a real user gesture has happened on the page
+   *  - the AudioContext is built lazily inside that gesture, never at load
+   *  - silent under prefers-reduced-motion, silent if AudioContext is missing
+   *  - every cue is under 400ms and peaks at or below 0.09 gain */
+  var SOUND_KEY = 'zephyr:sound';
+  var sound = (function () {
+    var enabled = false, ctx = null, gestured = false;
+    try {
+      enabled = window.localStorage && window.localStorage.getItem(SOUND_KEY) === 'on';
+    } catch (e) { enabled = false; }
+
+    function markGesture() { gestured = true; }
+    if (window.document && document.addEventListener) {
+      document.addEventListener('pointerdown', markGesture, true);
+      document.addEventListener('click', markGesture, true);
+      document.addEventListener('keydown', markGesture, true);
+    }
+    function quiet() {
+      return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    }
+    function context() {
+      if (ctx) return ctx;
+      var C = window.AudioContext || window.webkitAudioContext;
+      if (!C) return null;
+      try { ctx = new C(); } catch (e) { ctx = null; }
+      return ctx;
+    }
+    /* one soft note: exponential attack and decay so there is no click */
+    function note(c, freq, delay, dur, peak, type) {
+      var t0 = c.currentTime + delay;
+      var o = c.createOscillator();
+      var g = c.createGain();
+      o.type = type || 'sine';
+      if (o.frequency && o.frequency.setValueAtTime) o.frequency.setValueAtTime(freq, t0);
+      if (g.gain && g.gain.setValueAtTime) {
+        g.gain.setValueAtTime(0.0001, t0);
+        g.gain.exponentialRampToValueAtTime(Math.min(peak, 0.09), t0 + 0.018);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      }
+      o.connect(g);
+      g.connect(c.destination);
+      o.start(t0);
+      o.stop(t0 + dur + 0.02);
+    }
+    var CUES = {
+      chime: function (c) { note(c, 660, 0, 0.16, 0.06); note(c, 880, 0.085, 0.19, 0.05); },
+      blip: function (c) { note(c, 760, 0, 0.07, 0.045, 'triangle'); },
+      pop: function (c) { note(c, 520, 0, 0.09, 0.05, 'triangle'); },
+      sparkle: function (c) { note(c, 660, 0, 0.12, 0.045); note(c, 880, 0.06, 0.12, 0.045); note(c, 1180, 0.12, 0.14, 0.04); },
+      hush: function (c) { note(c, 560, 0, 0.1, 0.05); note(c, 380, 0.07, 0.14, 0.04); }
+    };
+    function play(name) {
+      if (!enabled || !gestured) return false;
+      if (quiet()) return false;
+      var cue = CUES[name];
+      if (!cue) return false;
+      var c = context();
+      if (!c) return false;
+      try { if (c.state === 'suspended' && c.resume) c.resume(); } catch (e) { /* ignore */ }
+      try { cue(c); } catch (e) { return false; }
+      return true;
+    }
+    return {
+      play: play,
+      isEnabled: function () { return !!enabled; },
+      setEnabled: function (on) {
+        enabled = !!on;
+        try {
+          if (window.localStorage) window.localStorage.setItem(SOUND_KEY, enabled ? 'on' : 'off');
+        } catch (e) { /* storage can throw; the in-memory choice still holds */ }
+        return enabled;
+      }
+    };
+  })();
+
   function mount(el, opts) {
     opts = opts || {};
     if (!styleInjected) {
@@ -1523,6 +1660,12 @@ window.ZEPHYR_KB = [
     function setState(state) {
       MOODS.forEach(function (m) { root.classList.remove('wm-' + m); });
       if (MOODS.indexOf(state) !== -1) root.classList.add('wm-' + state);
+    }
+    function getState() {
+      for (var i = 0; i < MOODS.length; i++) {
+        if (root.classList.contains('wm-' + MOODS[i])) return MOODS[i];
+      }
+      return 'calm';
     }
     function pin(state) { pinned = MOODS.indexOf(state) !== -1 ? state : null; setState(state); }
     function unpin() { pinned = null; setState('calm'); }
@@ -1583,6 +1726,7 @@ window.ZEPHYR_KB = [
     var pulseTimer = null;
     function pulse(state, ms) {
       setState(state);
+      if (state === 'party') sound.play('sparkle');
       clearTimeout(pulseTimer);
       pulseTimer = setTimeout(function () { setState(pinned || 'calm'); }, ms || 4000);
     }
@@ -1609,6 +1753,9 @@ window.ZEPHYR_KB = [
       bubbleEl.style.bottom = Math.max(8, window.innerHeight - r.top + 10) + 'px';
       bubbleEl.style.visibility = 'visible';
       requestAnimationFrame(function () { bubbleEl.style.opacity = '1'; });
+      /* pop is gated on sound being on AND a real gesture having happened, so
+       * the arrival greeting on page load stays silent. */
+      sound.play('pop');
       clearTimeout(bubbleTimer);
       bubbleTimer = setTimeout(function () { bubbleEl.style.opacity = '0'; }, ms || 7000);
     }
@@ -1619,7 +1766,8 @@ window.ZEPHYR_KB = [
     return {
       blink: blink, flare: flare, setState: setState, pin: pin, unpin: unpin,
       pulse: pulse, bubble: bubble, hideBubble: hideBubble, destroy: destroy, el: root,
-      getPinned: function () { return pinned; }
+      getPinned: function () { return pinned; },
+      getState: getState
     };
   }
 
@@ -1667,7 +1815,7 @@ window.ZEPHYR_KB = [
     };
   }
 
-  window.WingMascot = { mount: mount, autoMood: autoMood };
+  window.WingMascot = { mount: mount, autoMood: autoMood, sound: sound };
 })();
 
 /* Zephyr assistant panel: a guided, scripted Q&A that makes the entity feel
@@ -1685,7 +1833,11 @@ window.ZEPHYR_KB = [
     '.wmp-head b{font-weight:600}' +
     '.wmp-head .dot{width:8px;height:8px;border-radius:50%;background:#7d9bff;box-shadow:0 0 8px #7d9bff;animation:wmpulse 2s infinite}' +
     '@keyframes wmpulse{50%{opacity:.4}}' +
-    '.wmp-x{margin-left:auto;background:none;border:0;color:#8fa3d8;font-size:16px;cursor:pointer;padding:2px 6px}' +
+    '.wmp-x{background:none;border:0;color:#8fa3d8;font-size:16px;cursor:pointer;padding:2px 6px}' +
+    '.wmp-snd{margin-left:auto;background:rgba(39,87,230,.16);border:1px solid rgba(125,155,255,.3);color:#8fa3d8;' +
+    'border-radius:8px;font-size:13px;line-height:1;cursor:pointer;padding:5px 7px;transition:color .15s,border-color .15s,background .15s}' +
+    '.wmp-snd:hover{color:#eaf0ff;border-color:#7d9bff;background:rgba(39,87,230,.32)}' +
+    '.wmp-snd[aria-pressed="true"]{color:#eaf0ff;border-color:#7d9bff}' +
     '.wmp-body{padding:14px;min-height:72px;line-height:1.55;color:#c9d6ff}' +
     '.wmp-body a{color:#9db4ff}' +
     '.wmp-q{display:flex;flex-direction:column;gap:7px;padding:0 14px 14px}' +
@@ -1718,6 +1870,7 @@ window.ZEPHYR_KB = [
     p.setAttribute('aria-label', 'Zephyr assistant');
     p.innerHTML = '<div class="wmp-head"><span class="dot"></span><b>Zephyr</b>' +
       '<span style="color:#8fa3d8;font-size:12px">Wing Digital</span>' +
+      '<button class="wmp-snd" type="button" aria-pressed="false" aria-label="Turn Zephyr sound on"></button>' +
       '<button class="wmp-x" aria-label="Close">&times;</button></div>' +
       '<div class="wmp-body"></div><div class="wmp-q"></div>' +
       '<div class="wmp-ask" hidden><input type="text" maxlength="200" placeholder="Ask Zephyr anything..." aria-label="Ask Zephyr">' +
@@ -1727,18 +1880,35 @@ window.ZEPHYR_KB = [
     var qwrap = p.querySelector('.wmp-q');
     var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     var typeTimer = null;
+    var sound = (window.WingMascot && window.WingMascot.sound) || { play: function () { return false; }, isEnabled: function () { return false; }, setEnabled: function () { return false; } };
 
+    /* the mood to fall back to once a temporary emotion is done: an honestly
+     * pinned mood always wins, so a dim dashboard never gets overwritten. */
+    function restMood() {
+      var pinnedMood = mascot.getPinned && mascot.getPinned();
+      if (pinnedMood) return pinnedMood;
+      var now = mascot.getState ? mascot.getState() : 'calm';
+      if (now === 'thinking' || now === 'excited' || now === 'party' || now === 'alert') return 'calm';
+      return now;
+    }
+    /* say: he thinks while he types, then settles back. */
     function say(html) {
       clearInterval(typeTimer);
-      if (reduced) { body.innerHTML = html; return; }
+      var back = restMood();
+      if (reduced) { body.innerHTML = html; if (mascot.setState) mascot.setState(back); return; }
       var tmp = document.createElement('div');
       tmp.innerHTML = html;
       var full = tmp.textContent, i = 0;
       body.textContent = '';
+      if (mascot.setState) mascot.setState('thinking');
       typeTimer = setInterval(function () {
         i += 2;
         body.textContent = full.slice(0, i);
-        if (i >= full.length) { clearInterval(typeTimer); body.innerHTML = html; }
+        if (i >= full.length) {
+          clearInterval(typeTimer);
+          body.innerHTML = html;
+          if (mascot.setState) mascot.setState(back);
+        }
       }, 14);
     }
     function renderQuestions() {
@@ -1747,17 +1917,53 @@ window.ZEPHYR_KB = [
         var b = document.createElement('button');
         b.textContent = item.q;
         b.addEventListener('click', function () {
+          sound.play('blip');
           mascot.flare();
-          say(item.a);
+          /* a beat of excitement that someone asked, then he thinks it over */
+          if (mascot.setState && !reduced) mascot.setState('excited');
+          setTimeout(function () { say(item.a); }, reduced ? 0 : 260);
         });
         qwrap.appendChild(b);
       });
     }
+    var greetedKey = 'zephyr:greeted';
+    function firstOpenOfSession() {
+      try {
+        if (!window.sessionStorage) return false;
+        if (window.sessionStorage.getItem(greetedKey) === '1') return false;
+        window.sessionStorage.setItem(greetedKey, '1');
+        return true;
+      } catch (e) { return false; }
+    }
     function toggle(force) {
       var open = typeof force === 'boolean' ? force : !p.classList.contains('open');
+      var was = p.classList.contains('open');
       p.classList.toggle('open', open);
-      if (open) { if (mascot.hideBubble) mascot.hideBubble(); mascot.flare(); say(opts.greeting || 'Hey, I am Zephyr. What do you want to know?'); renderQuestions(); }
+      if (open) {
+        if (mascot.hideBubble) mascot.hideBubble();
+        sound.play('chime');
+        mascot.flare();
+        /* a greeting flourish the very first time he is opened this session */
+        if (firstOpenOfSession() && mascot.pulse && !reduced) mascot.pulse('party', 2200);
+        say(opts.greeting || 'Hey, I am Zephyr. What do you want to know?');
+        renderQuestions();
+      } else if (was) {
+        sound.play('hush');
+      }
     }
+    var sndBtn = p.querySelector('.wmp-snd');
+    function paintSound() {
+      var on = sound.isEnabled();
+      sndBtn.textContent = on ? 'Sound on' : 'Sound off';
+      sndBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      sndBtn.setAttribute('aria-label', on ? 'Turn Zephyr sound off' : 'Turn Zephyr sound on');
+    }
+    paintSound();
+    sndBtn.addEventListener('click', function () {
+      var on = sound.setEnabled(!sound.isEnabled());
+      paintSound();
+      if (on) sound.play('blip');
+    });
     /* Knowledge base: entries of {k:[keywords], a:'answer html'} from opts.kb or
      * window.ZEPHYR_KB. Pure client-side keyword scoring; unknown questions get
      * an honest fallback, never a made-up answer. */
@@ -1782,12 +1988,18 @@ window.ZEPHYR_KB = [
           });
           if (score > bestScore) { bestScore = score; best = entry; }
         });
+        sound.play('blip');
         mascot.setState && mascot.setState('thinking');
         setTimeout(function () {
-          mascot.setState && mascot.setState('calm');
           mascot.flare();
-          if (best && bestScore >= 2) say(best.a);
-          else say(opts.fallback || 'That one is past what I know off the top of my head. The contact form reaches a real person at Wing Digital fast, and they will have the answer.');
+          if (best && bestScore >= 2) { say(best.a); }
+          else {
+            /* he reacts to not knowing, then hands off honestly */
+            var fb = opts.fallback || 'That one is past what I know off the top of my head. The contact form reaches a real person at Wing Digital fast, and they will have the answer.';
+            /* he reacts to not knowing before answering honestly */
+            if (mascot.setState && !reduced) mascot.setState('alert');
+            setTimeout(function () { say(fb); }, reduced ? 0 : 700);
+          }
         }, 650);
       }
       askBtn.addEventListener('click', answer);
@@ -1864,20 +2076,20 @@ window.ZEPHYR_KB = [
       a: 'Click any row in the published list and it opens that exact page on your live site in a new tab.'
     });
   } catch (e) {}
-  var dashFallback = 'Let me point you at what I do know: what published and when, and how current this record is. For anything else a real person answers fast through wingdigital.co.';
+  var dashFallback = 'Let me point you at what I do know: what published and when, and how current this record is. For anything else, reply to the person who sent you this link and a real person answers fast.';
   var chatOpts = isSample ? {
     greeting: 'Hey, I am Zephyr from Wing Digital. This is a sample dashboard; ask me how the real one works.',
     items: [
       { q: 'What am I looking at?', a: 'A preview built with example content. It shows the exact dashboard a real account gets: blog posts, service pages, city pages, and the systems behind them. The figures here are illustrative, not delivered work.' },
       { q: 'What would my real one show?', a: 'Your own published pages and posts, each linking to the live page on your site, updated as Wing publishes. Real clients watch their site fill in from this exact view.' },
-      { q: 'How do I get one?', a: 'Ask the person who sent you this link, or use the contact page on wingdigital.co. Your dashboard turns on in the first week.' }
+      { q: 'How do I get one?', a: 'Ask the person who sent you this link. Your dashboard turns on in the first week.' }
     ]
   } : {
     greeting: 'Hey, I am Zephyr from Wing Digital. This dashboard is yours; ask me about it.',
     items: [
       { q: 'What am I looking at?', a: 'Everything Wing Digital has published for your business. Every row links to the live page on your site.' },
       { q: 'How current is this?', a: 'It refreshes when we publish. When a new page or post goes live on your site, it shows up here on the next update. No monthly PDF, no waiting.' },
-      { q: 'I want more of something', a: 'Tell us. Reply to any email from Wing Digital or use the contact page on wingdigital.co and we will point the engine where you want it.' }
+      { q: 'I want more of something', a: 'Tell us. Reply to any email or text from Wing Digital and we will point the engine where you want it.' }
     ]
   };
   chatOpts.kb = kbLocal.concat(window.ZEPHYR_KB || []);

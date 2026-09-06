@@ -102,7 +102,7 @@
   },
   "_outreachPreview_comment": "The pending B2B referral email program, surfaced for Nash's review BEFORE anything sends. Templates and queue are read off the real program files at build time; emails are masked and internal score columns dropped in build.py. No pricing, trailer-size, or resale language may ever appear here.",
   "outreachPreview": {
-    "banner": "Nothing has been sent yet. Sending starts only after your approval.",
+    "banner": "This lane is built and ready. Sending starts on your go-ahead.",
     "intro": "We built a program that introduces Hero's Junk Removal to local businesses that regularly need junk hauled: realtors, property managers, apartment communities, estate sale companies, remodelers, and storage facilities. Every email it would send, and every business it would go to, is laid out below so you can read it all before a single one goes out.",
     "plan": [
       "Starts at 15 emails a day and ramps gradually to 40 a day.",

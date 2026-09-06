@@ -377,8 +377,23 @@ export default function TodayBoard() {
   // ── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 14, minWidth: 0 }}>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
+    <div className="tb-root" style={{ display: "flex", flexDirection: "column", gap: 14, minWidth: 0 }}>
+      <style>{`
+        @media (max-width: 768px) {
+          /* One column on phone; minmax(0,1fr) so a long unbroken string can
+             never widen the track and cause sideways page scroll. */
+          .tb-grid { grid-template-columns: minmax(0, 1fr) !important; }
+          /* Touch-sized targets for every tappable row/button on the board
+             (Refresh, each section's open button, and the item rows). */
+          .tb-root button { min-height: 40px; }
+          /* Header row: keep "Today" + timestamp + Refresh on one tidy line. */
+          .tb-head { flex-wrap: wrap; align-items: center !important; }
+          /* Item rows: keep the truncating middle span from squeezing the
+             timestamp off the edge. */
+          .tb-root section { overflow: hidden; }
+        }
+      `}</style>
+      <div className="tb-head" style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
         <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "var(--text-primary)", flex: 1 }}>
           Today
         </h2>
@@ -405,6 +420,7 @@ export default function TodayBoard() {
       </div>
 
       <div
+        className="tb-grid"
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",

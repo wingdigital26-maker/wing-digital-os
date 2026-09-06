@@ -238,13 +238,38 @@ export default function SectionChrome({ title, tabs, isTabActive, extras, childr
         @media (max-width: 760px) {
           /* Phone: brand left, actions right, the switcher drops to its own
              full-width row and scrolls sideways instead of wrapping. */
-          .sc-switch { order: 3; flex-basis: 100%; justify-content: flex-start; }
-          .sc-actions { margin-left: auto; }
+          .sc-top { padding: 10px 12px 0; gap: 10px; }
+          .sc-switch {
+            order: 3; flex-basis: 100%; justify-content: flex-start;
+            -webkit-overflow-scrolling: touch;
+          }
+          .sc-actions { margin-left: auto; flex-wrap: nowrap; }
           .sc-email { display: none; }
-          .sc-tab { padding: 11px 10px 12px; font-size: 13px; }
+          /* Touch-sized pills/buttons (>= 40px tall). */
+          .sc-pill {
+            display: inline-flex; align-items: center;
+            padding: 9px 13px; min-height: 40px;
+          }
+          .sc-btn {
+            display: inline-flex; align-items: center;
+            min-height: 40px; padding: 8px 12px;
+          }
+          .sc-tabs { padding: 8px 12px 0; -webkit-overflow-scrolling: touch; }
+          .sc-tab {
+            padding: 12px 10px 13px; font-size: 13px;
+            display: inline-flex; align-items: center; min-height: 42px;
+          }
           /* The panel hangs from the actions row on the right; cap it to the
-             viewport so it never clips off-screen at 375px. */
-          .sc-menu { right: 0; }
+             REAL visible viewport (dvh, minus the header above it) so it
+             never clips off-screen at 375px, and momentum-scrolls. */
+          .sc-menu {
+            right: 0;
+            max-height: calc(100dvh - 130px);
+            -webkit-overflow-scrolling: touch;
+          }
+          .sc-menu-item { padding: 10px; min-height: 40px; display: flex; align-items: center; }
+          .sc-menu-home { padding: 10px; }
+          .sc-main { padding: 16px 12px 96px !important; }
         }
       `}</style>
 
@@ -314,7 +339,7 @@ export default function SectionChrome({ title, tabs, isTabActive, extras, childr
         </div>
       </header>
 
-      <main style={{ maxWidth: 1180, margin: "0 auto", padding: "24px 20px 80px" }}>{children}</main>
+      <main className="sc-main" style={{ maxWidth: 1180, margin: "0 auto", padding: "24px 20px 80px" }}>{children}</main>
     </div>
   );
 }

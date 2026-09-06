@@ -223,7 +223,7 @@ export default function CommandPalette() {
           font-family: inherit;
         }
         .cp-input::placeholder { color: var(--text-muted); }
-        .cp-list { max-height: 46vh; overflow-y: auto; padding: 6px; }
+        .cp-list { max-height: 46vh; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 6px; }
         .cp-item {
           display: flex; align-items: center; gap: 10px;
           padding: 9px 10px; border-radius: 8px; cursor: pointer;
@@ -251,7 +251,31 @@ export default function CommandPalette() {
           font-size: 16px; cursor: pointer;
           display: none; align-items: center; justify-content: center;
         }
-        @media (max-width: 768px) { .cp-fab { display: flex; } }
+        @media (max-width: 768px) {
+          /* FAB: stacked directly ABOVE the Jarvis FAB (which sits at
+             bottom: calc(72px + safe-area), right: 16px, 56px tall), so it
+             clears the fixed bottom tab bar, Jarvis, and the Da Boss chip
+             (bottom-left). */
+          .cp-fab {
+            display: flex;
+            right: 16px;
+            bottom: calc(140px + env(safe-area-inset-bottom, 0px));
+          }
+          /* Near-fullscreen sheet on phone instead of a tiny centered box. */
+          .cp-overlay {
+            padding: calc(env(safe-area-inset-top, 0px) + 10px) 10px
+                     calc(env(safe-area-inset-bottom, 0px) + 10px);
+            align-items: stretch;
+          }
+          .cp-panel { max-width: none; height: 100%; }
+          /* 16px input font prevents iOS auto-zoom on focus. */
+          .cp-input { font-size: 16px; padding: 15px 16px; }
+          .cp-list { max-height: none; flex: 1 1 auto; }
+          /* Touch-sized rows (>= 44px). */
+          .cp-item { padding: 12px 10px; min-height: 44px; }
+          /* Keyboard hints are meaningless on touch. */
+          .cp-hint { display: none; }
+        }
       `}</style>
 
       {!open && (

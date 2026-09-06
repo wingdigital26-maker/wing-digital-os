@@ -1,6 +1,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Hero's Junk Removal Dashboard</title>
+<script>document.documentElement.setAttribute('data-theme','light');</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap">
@@ -90,6 +91,16 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
   line-height:1;font-variant-numeric:tabular-nums}
 .stat-l{margin-top:8px;font-size:.79rem;color:var(--t2);line-height:1.4}
 @media(max-width:620px){.stats{grid-template-columns:1fr}}
+/* highlights -- a quick per-type breakdown of published work. Every number here
+   is an honest count of PUBLISHED items of that type, read straight off the same
+   data the list below renders. It is a summary, never a new claim. */
+.highlights{display:flex;flex-wrap:wrap;gap:9px;margin-top:16px}
+.hl{display:flex;align-items:baseline;gap:8px;background:var(--surface);
+  border:1px solid var(--border);border-radius:999px;padding:7px 14px;
+  box-shadow:var(--shadow)}
+.hl i{width:9px;height:9px;border-radius:3px;flex:0 0 auto;transform:translateY(1px)}
+.hl b{font-size:.92rem;font-weight:700;font-variant-numeric:tabular-nums;color:var(--t1)}
+.hl span{font-size:.82rem;color:var(--t2)}
 /* sections */
 section{padding:44px 0 0}
 .sh{display:flex;align-items:baseline;gap:11px;flex-wrap:wrap}
@@ -157,6 +168,47 @@ section{padding:44px 0 0}
   font-size:.84rem;font-weight:600;color:var(--t2);transition:color .15s,border-color .15s}
 .more:hover{color:var(--t1);border-color:var(--border-hi)}
 .empty{padding:28px 4px;font-size:.87rem;color:var(--t3)}
+/* referral partners -- the "who sends you work" section. Reuses the page's
+   surface/border/text tokens so it reads as part of the dashboard rather than
+   a bolted-on table. */
+.lstats{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));
+  gap:9px;margin-bottom:18px}
+.lstat{background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--r-sm);padding:11px 13px}
+.lstat b{display:block;font-size:1.28rem;letter-spacing:-.02em;
+  font-variant-numeric:tabular-nums;color:var(--t1)}
+.lstat span{font-size:.75rem;color:var(--t3)}
+.lbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.lbar input,.lbar select{padding:8px 11px;border:1px solid var(--border);
+  border-radius:var(--r-sm);background:var(--surface);color:var(--t1);
+  font:inherit;font-size:.85rem}
+.lbar input{flex:1;min-width:180px}
+.lpills{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.lpill{padding:5px 11px;border:1px solid var(--border);border-radius:999px;
+  background:var(--surface);cursor:pointer;font-size:.79rem;color:var(--t2);
+  white-space:nowrap}
+.lpill:hover{border-color:var(--border-hi);color:var(--t1)}
+.lpill.on{background:var(--t1);color:var(--surface);border-color:var(--t1)}
+.lpill i{font-style:normal;opacity:.6;margin-left:4px}
+.lwhy{font-size:.83rem;color:var(--t2);margin-bottom:14px;max-width:74ch;
+  line-height:1.55}
+.lrow{background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--r-sm);padding:13px 15px;margin-bottom:8px}
+.lrow-t{display:flex;justify-content:space-between;gap:14px;align-items:flex-start}
+.lnm{font-weight:640;font-size:.94rem;color:var(--t1);letter-spacing:-.005em}
+.lmt{font-size:.79rem;color:var(--t3);margin-top:2px}
+.lrk{font-size:.76rem;color:var(--t3);text-align:right;white-space:nowrap;
+  font-variant-numeric:tabular-nums}
+.lrk b{color:var(--t2)}
+.lcts{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+.lct{font-size:.79rem;padding:5px 10px;border:1px solid var(--border);
+  border-radius:var(--r-sm);text-decoration:none;color:var(--t2)}
+.lct:hover{color:var(--t1);border-color:var(--border-hi)}
+.lct.pri{color:var(--accent);border-color:transparent;background:var(--accent-bg)}
+.lct.lmail{color:var(--t3);border-style:dashed;cursor:default}
+.ltag{font-size:.7rem;padding:3px 8px;border-radius:999px;
+  border:1px solid var(--border);color:var(--t3)}
+@media(max-width:560px){.lrow-t{flex-direction:column}.lrk{text-align:left}}
 /* channels */
 .chans{display:grid;grid-template-columns:repeat(auto-fit,minmax(232px,1fr));gap:14px}
 .chan{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
@@ -179,6 +231,25 @@ section{padding:44px 0 0}
 .prow .pd{width:8px;height:8px;border-radius:50%;background:var(--t3);opacity:.5;flex:0 0 auto}
 .pn{font-size:.88rem;font-weight:600}
 .pw{font-size:.8rem;color:var(--t2);margin-top:3px;max-width:60ch}
+/* live site check -- measured against the real site at page load */
+.hstats{display:grid;grid-template-columns:repeat(auto-fit,minmax(178px,1fr));gap:14px;margin-bottom:18px}
+.hstat{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
+  padding:17px 19px;box-shadow:var(--shadow)}
+.hstat-v{font-family:var(--display);font-size:1.75rem;font-weight:700;letter-spacing:-.028em;
+  line-height:1;font-variant-numeric:tabular-nums}
+.hstat-v small{font-size:.9rem;font-weight:600;color:var(--t3);font-family:var(--font);
+  letter-spacing:0;margin-left:2px}
+.hstat-l{margin-top:8px;font-size:.79rem;color:var(--t2);line-height:1.45}
+.hstat.pend .hstat-v{font-size:1rem;font-family:var(--font);font-weight:650;color:var(--t3);
+  letter-spacing:0;line-height:1.4}
+.hgood{display:flex;gap:10px;align-items:baseline;font-size:.88rem;color:var(--t2);line-height:1.55}
+.hgood i{width:9px;height:9px;border-radius:50%;background:var(--ok);flex:0 0 auto;
+  transform:translateY(1px)}
+.hprob{margin-top:6px;font-size:.8rem;color:var(--t2);line-height:1.6}
+.hprob li{margin-left:17px}
+.hwarn{margin-bottom:16px;padding:14px 17px;border-radius:var(--r);
+  border:1px solid var(--accent);background:var(--accent-bg);font-size:.86rem;line-height:1.55}
+.hstamp{margin-top:15px;font-size:.78rem;color:var(--t3)}
 .stale{margin-top:20px;padding:14px 17px;border-radius:var(--r);
   border:1px solid var(--accent);background:var(--accent-bg);
   font-size:.86rem;line-height:1.55}
@@ -215,10 +286,17 @@ section{padding:44px 0 0}
     <h1 id="headline"></h1>
     <p id="subhead"></p>
     <div class="stats" id="stats"></div>
+    <div class="highlights" id="highlights"></div>
     <div id="stale"></div>
   </div>
 </section>
 <main class="wrap">
+  <section id="health-sec" hidden>
+    <div class="sh"><h2>Your site, checked just now</h2><span class="n" id="healthn"></span></div>
+    <div class="sd">We opened every page on your site as this loaded and checked the things Google
+      looks at. These are live readings, not a report saved earlier.</div>
+    <div id="health"></div>
+  </section>
   <section>
     <div class="sh"><h2>Published by month</h2></div>
     <div class="sd" id="chart-sd"></div>
@@ -247,14 +325,44 @@ section{padding:44px 0 0}
     <div class="chans" id="chans"></div>
     <div id="outlist"></div>
   </section>
+  <!-- Referral partners. Hidden unless the link carries the access key: the
+       rest of this dashboard shows the client's own already-public website
+       content, but this section is a few thousand enriched B2B contacts and
+       must not sit on a guessable URL. -->
+  <section id="leads-sec" hidden>
+    <div class="sh"><h2>Who sends you work</h2><span class="n" id="leadn"></span></div>
+    <div class="sd" id="leadsd"></div>
+    <div class="lstats" id="lstats"></div>
+    <div class="lbar">
+      <input id="lq" type="search" placeholder="Search name, city, phone or email" aria-label="Search referral partners">
+      <select id="lsort" aria-label="Sort">
+        <!-- Default order is the real ranking score, but it is never labelled
+             as a ranking: naming it invites debate about the ranking instead
+             of a phone call, and makes the tail look like rejects. -->
+        <option value="rank">Suggested</option>
+        <option value="reviews">Most reviews</option>
+        <option value="name">Name A-Z</option>
+        <option value="city">City</option>
+      </select>
+      <select id="lhas" aria-label="Filter by contact">
+        <option value="all">Everyone</option>
+        <option value="email">Has email</option>
+        <option value="phone">Has phone</option>
+      </select>
+    </div>
+    <div class="lpills" id="lpills"></div>
+    <div class="lwhy" id="lwhy"></div>
+    <div id="leads"></div>
+    <button class="more" id="leadmore" hidden></button>
+  </section>
   <section id="pages-sec">
     <div class="sh"><h2>Other pages we maintain</h2><span class="n" id="pagen"></span></div>
     <div class="sd">Pages on your site beyond the list above.</div>
     <div id="pages"></div>
   </section>
-  <section>
-    <div class="sh"><h2>Not connected yet</h2></div>
-    <div class="sd">We only show a number once it comes from a real source. These are blank on purpose, not zero.</div>
+  <section id="pending-sec">
+    <div class="sh"><h2>What unlocks next</h2></div>
+    <div class="sd">We only show a number once it comes from a real source, so these are blank on purpose, not zero. Each one below is a lever we can switch on — here is what it takes.</div>
     <div class="card" id="pending"></div>
   </section>
   <div class="foot">
@@ -263,7 +371,7 @@ section{padding:44px 0 0}
   </div>
 </main>
 <script>
-const DATA = {"generated":"2026-08-28","dataThrough":"2026-08-28","generatedAt":"2026-08-28T14:36:39","brand":{"name":"Hero's Junk Removal","initials":"HJ","site":"https://herosjunkremovaltx.com","kicker":"Marketing dashboard","headline":"Everything Wing Digital is building for Hero's Junk Removal","subhead":"A live record of the pages and posts running on your site. Click anything to open it on the real site."},"engines":[{"name":"Blog engine","detail":"4 to 5 posts a week","icon":"pen"},{"name":"Service pages","detail":"One page per job we haul","icon":"map"},{"name":"On-page SEO","detail":"Titles, schema, internal links","icon":"search"},{"name":"Internal linking","detail":"New posts wired to old ones","icon":"link"}],"types":{"blog":{"label":"Blog post","color":"#4a86e8"},"service":{"label":"Service page","color":"#c9384a"},"city":{"label":"City page","color":"#d9903c"},"core":{"label":"Core page","color":"#2c6ba8"},"other":{"label":"Other","color":"#7a8ba3"}},"outreach":{"intro":"Everything we send out under your name, and what is not running yet. Your plan is search-led, so nothing is being emailed on your behalf.","channels":[{"name":"Email campaigns","icon":"mail","types":[],"state":"not_in_plan","note":"By design. Your plan wins work through search, not inbox outreach, so we do not send email under your name."},{"name":"Google Business posts","icon":"star","types":[],"state":"needs_access","note":"Ready to run as soon as we have manager access to your Google Business Profile."},{"name":"Facebook and Instagram","icon":"share","types":[],"state":"needs_access","note":"Not connected. We would need access to your pages before we could post or report on them."},{"name":"Review requests","icon":"chat","types":[],"state":"not_connected","note":"No review request system is wired up yet. This is the fastest lever once the Google profile is connected."}]},"pendingMetrics":[{"name":"Google Search clicks and impressions","why":"Needs Search Console access for herosjunkremovaltx.com connected to the reporting account","state":"needs access"},{"name":"Keyword rankings","why":"Comes online with the same Search Console connection","state":"needs access"},{"name":"Google Business Profile views","why":"Needs manager access to the Google Business Profile","state":"needs access"},{"name":"Calls and form leads","why":"The contact form does not report back to us yet, so no lead count here would be trustworthy","state":"not connected"}],"items":[{"date":"2026-08-28","type":"blog","title":"Downsizing a parent into assisted living","status":"published","url":"https://herosjunkremovaltx.com/blog/downsizing-a-parent-into-assisted-living.html"},{"date":"2026-08-28","type":"blog","title":"What to haul instead of moving","status":"published","url":"https://herosjunkremovaltx.com/blog/moving-out-what-to-haul-instead-of-moving.html"},{"date":"2026-08-27","type":"blog","title":"What a remodel really leaves behind","status":"published","url":"https://herosjunkremovaltx.com/blog/construction-debris-after-a-remodel.html"},{"date":"2026-08-27","type":"blog","title":"Dumpster rental vs junk removal","status":"published","url":"https://herosjunkremovaltx.com/blog/dumpster-rental-vs-junk-removal.html"},{"date":"2026-08-24","type":"blog","title":"Mattress disposal in DFW","status":"published","url":"https://herosjunkremovaltx.com/blog/mattress-disposal-dfw.html"},{"date":"2026-08-24","type":"blog","title":"Where your junk actually goes","status":"published","url":"https://herosjunkremovaltx.com/blog/where-your-junk-goes-after-pickup.html"},{"date":"2026-08-22","type":"blog","title":"Apartment junk removal","status":"published","url":"https://herosjunkremovaltx.com/blog/apartment-junk-removal.html"},{"date":"2026-08-22","type":"blog","title":"Appliance and electronics disposal","status":"published","url":"https://herosjunkremovaltx.com/blog/appliance-and-electronics-disposal-north-texas.html"},{"date":"2026-08-22","type":"blog","title":"Hoarding cleanouts, handled quietly","status":"published","url":"https://herosjunkremovaltx.com/blog/hoarder-house-junk-removal.html"},{"date":"2026-08-22","type":"blog","title":"Hot tub, shed, and playset removal in DFW","status":"published","url":"https://herosjunkremovaltx.com/blog/hot-tub-shed-playset-removal.html"},{"date":"2026-08-22","type":"blog","title":"How junk removal works in DFW","status":"published","url":"https://herosjunkremovaltx.com/blog/how-junk-removal-works.html"},{"date":"2026-08-22","type":"blog","title":"Rental property cleanout","status":"published","url":"https://herosjunkremovaltx.com/blog/rental-property-cleanout.html"},{"date":"2026-08-22","type":"blog","title":"Clearing out a storage unit","status":"published","url":"https://herosjunkremovaltx.com/blog/storage-unit-junk-removal.html"},{"date":"2026-08-21","type":"blog","title":"The estate cleanout checklist","status":"published","url":"https://herosjunkremovaltx.com/blog/estate-cleanout-checklist.html"},{"date":"2026-08-21","type":"blog","title":"What we will and will not take","status":"published","url":"https://herosjunkremovaltx.com/blog/what-junk-removal-will-and-will-not-take.html"},{"date":"2026-08-21","type":"service","title":"Construction debris removal in Dallas-Fort Worth","status":"published","url":"https://herosjunkremovaltx.com/services/construction-debris.html"},{"date":"2026-08-05","type":"service","title":"Yard debris removal in Dallas-Fort Worth","status":"published","url":"https://herosjunkremovaltx.com/services/yard-debris.html"},{"date":"2026-08-04","type":"blog","title":"Where to donate furniture and household goods in DFW","status":"published","url":"https://herosjunkremovaltx.com/blog/donate-furniture-dfw.html"},{"date":"2026-08-04","type":"blog","title":"The garage cleanout checklist","status":"published","url":"https://herosjunkremovaltx.com/blog/garage-cleanout-checklist.html"},{"date":"2026-08-04","type":"service","title":"Appliance removal in Dallas-Fort Worth","status":"published","url":"https://herosjunkremovaltx.com/services/appliance-removal.html"},{"date":"2026-08-04","type":"service","title":"Estate cleanouts in Dallas-Fort Worth","status":"published","url":"https://herosjunkremovaltx.com/services/estate-cleanouts.html"},{"date":"2026-08-04","type":"service","title":"Furniture removal in Dallas-Fort Worth","status":"published","url":"https://herosjunkremovaltx.com/services/furniture-removal.html"},{"date":"2026-08-04","type":"service","title":"Garage cleanouts in Dallas-Fort Worth","status":"published","url":"https://herosjunkremovaltx.com/services/garage-cleanouts.html"},{"date":"2026-08-04","type":"service","title":"Hot tub, shed, and playset removal in DFW","status":"published","url":"https://herosjunkremovaltx.com/services/hot-tub-removal.html"},{"date":"2026-08-04","type":"service","title":"Same-day junk removal in Dallas-Fort Worth","status":"published","url":"https://herosjunkremovaltx.com/services/same-day-junk-removal.html"}],"pages":[{"group":"Blog posts live on your site","icon":"pen","links":[{"title":"Apartment junk removal","url":"https://herosjunkremovaltx.com/blog/apartment-junk-removal.html"},{"title":"Appliance and electronics disposal","url":"https://herosjunkremovaltx.com/blog/appliance-and-electronics-disposal-north-texas.html"},{"title":"What a remodel really leaves behind","url":"https://herosjunkremovaltx.com/blog/construction-debris-after-a-remodel.html"},{"title":"Where to donate furniture and household goods in DFW","url":"https://herosjunkremovaltx.com/blog/donate-furniture-dfw.html"},{"title":"Downsizing a parent into assisted living","url":"https://herosjunkremovaltx.com/blog/downsizing-a-parent-into-assisted-living.html"},{"title":"Dumpster rental vs junk removal","url":"https://herosjunkremovaltx.com/blog/dumpster-rental-vs-junk-removal.html"},{"title":"The estate cleanout checklist","url":"https://herosjunkremovaltx.com/blog/estate-cleanout-checklist.html"},{"title":"The garage cleanout checklist","url":"https://herosjunkremovaltx.com/blog/garage-cleanout-checklist.html"},{"title":"Hoarding cleanouts, handled quietly","url":"https://herosjunkremovaltx.com/blog/hoarder-house-junk-removal.html"},{"title":"Hot tub, shed, and playset removal in DFW","url":"https://herosjunkremovaltx.com/blog/hot-tub-shed-playset-removal.html"},{"title":"How junk removal works in DFW","url":"https://herosjunkremovaltx.com/blog/how-junk-removal-works.html"},{"title":"Mattress disposal in DFW","url":"https://herosjunkremovaltx.com/blog/mattress-disposal-dfw.html"},{"title":"What to haul instead of moving","url":"https://herosjunkremovaltx.com/blog/moving-out-what-to-haul-instead-of-moving.html"},{"title":"Rental property cleanout","url":"https://herosjunkremovaltx.com/blog/rental-property-cleanout.html"},{"title":"Clearing out a storage unit","url":"https://herosjunkremovaltx.com/blog/storage-unit-junk-removal.html"},{"title":"What we will and will not take","url":"https://herosjunkremovaltx.com/blog/what-junk-removal-will-and-will-not-take.html"},{"title":"Where your junk actually goes","url":"https://herosjunkremovaltx.com/blog/where-your-junk-goes-after-pickup.html"}]},{"group":"Service pages","icon":"map","links":[{"title":"Appliance removal in Dallas-Fort Worth","url":"https://herosjunkremovaltx.com/services/appliance-removal.html"},{"title":"Construction debris removal in Dallas-Fort Worth","url":"https://herosjunkremovaltx.com/services/construction-debris.html"},{"title":"Estate cleanouts in Dallas-Fort Worth","url":"https://herosjunkremovaltx.com/services/estate-cleanouts.html"},{"title":"Furniture removal in Dallas-Fort Worth","url":"https://herosjunkremovaltx.com/services/furniture-removal.html"},{"title":"Garage cleanouts in Dallas-Fort Worth","url":"https://herosjunkremovaltx.com/services/garage-cleanouts.html"},{"title":"Hot tub, shed, and playset removal in DFW","url":"https://herosjunkremovaltx.com/services/hot-tub-removal.html"},{"title":"Same-day junk removal in Dallas-Fort Worth","url":"https://herosjunkremovaltx.com/services/same-day-junk-removal.html"},{"title":"Yard debris removal in Dallas-Fort Worth","url":"https://herosjunkremovaltx.com/services/yard-debris.html"}]},{"group":"Core site pages","icon":"globe","links":[{"title":"One pickup truck and a promise","url":"https://herosjunkremovaltx.com/about.html"},{"title":"Get a truck on the way","url":"https://herosjunkremovaltx.com/contact.html"},{"title":"Your junk\u2019s last day","url":"https://herosjunkremovaltx.com/index.html"}]}]};
+const DATA = {"generated":"2026-09-05","dataThrough":"2026-09-05","generatedAt":"2026-09-05T19:10:17","brand":{"name":"Hero's Junk Removal","initials":"HJ","site":"https://herosjunkremovaltx.com","kicker":"Marketing dashboard","headline":"Everything Wing Digital is building for Hero's Junk Removal","subhead":"A live record of the pages and posts running on your site. Click anything to open it on the real site."},"engines":[{"name":"Blog engine","detail":"4 to 5 posts a week","icon":"pen"},{"name":"Service pages","detail":"One page per job we haul","icon":"map"},{"name":"On-page SEO","detail":"Titles, schema, internal links","icon":"search"},{"name":"Internal linking","detail":"New posts wired to old ones","icon":"link"}],"types":{"blog":{"label":"Blog post","color":"#4a86e8"},"service":{"label":"Service page","color":"#c9384a"},"city":{"label":"City page","color":"#d9903c"},"core":{"label":"Core page","color":"#2c6ba8"},"other":{"label":"Other","color":"#7a8ba3"}},"outreach":{"intro":"Everything we send out under your name, and what is not running yet. Your plan is search-led, so nothing is being emailed on your behalf.","channels":[{"name":"Email campaigns","icon":"mail","types":[],"state":"not_in_plan","note":"By design. Your plan wins work through search, not inbox outreach, so we do not send email under your name."},{"name":"Google Business posts","icon":"star","types":[],"state":"needs_access","note":"Ready to run as soon as we have manager access to your Google Business Profile."},{"name":"Facebook and Instagram","icon":"share","types":[],"state":"needs_access","note":"Not connected. We would need access to your pages before we could post or report on them."},{"name":"Review requests","icon":"chat","types":[],"state":"not_connected","note":"No review request system is wired up yet. This is the fastest lever once the Google profile is connected."}]},"pendingMetrics":[{"name":"Google Search clicks and impressions","why":"Needs Search Console access for herosjunkremovaltx.com connected to the reporting account","state":"needs access"},{"name":"Keyword rankings","why":"Comes online with the same Search Console connection","state":"needs access"},{"name":"Google Business Profile views","why":"Needs manager access to the Google Business Profile","state":"needs access"},{"name":"Calls and form leads","why":"The contact form does not report back to us yet, so no lead count here would be trustworthy","state":"not connected"}],"items":[{"date":"2026-09-05","type":"service","title":"Junk removal in Allen, TX","status":"published","url":"https://herosjunkremovaltx.com/services/junk-removal-allen.html"},{"date":"2026-09-05","type":"service","title":"Junk removal in Frisco, TX","status":"published","url":"https://herosjunkremovaltx.com/services/junk-removal-frisco.html"},{"date":"2026-09-05","type":"service","title":"Junk removal in McKinney, TX","status":"published","url":"https://herosjunkremovaltx.com/services/junk-removal-mckinney.html"},{"date":"2026-09-04","type":"blog","title":"Old furniture removal, from the upstairs bedroom out","status":"published","url":"https://herosjunkremovaltx.com/blog/old-furniture-removal-getting-it-out.html"},{"date":"2026-09-04","type":"blog","title":"Who comes to your house on a junk removal job","status":"published","url":"https://herosjunkremovaltx.com/blog/who-comes-to-your-house-junk-removal.html"},{"date":"2026-09-02","type":"blog","title":"Fence and deck teardown debris","status":"published","url":"https://herosjunkremovaltx.com/blog/fence-and-deck-teardown-debris.html"},{"date":"2026-09-02","type":"blog","title":"Same-day junk removal: what typical actually means","status":"published","url":"https://herosjunkremovaltx.com/blog/same-day-junk-removal-what-typical-means.html"},{"date":"2026-08-31","type":"blog","title":"Office and small commercial cleanouts","status":"published","url":"https://herosjunkremovaltx.com/blog/office-and-small-commercial-cleanouts.html"},{"date":"2026-08-31","type":"blog","title":"What to clear before the listing photos","status":"published","url":"https://herosjunkremovaltx.com/blog/what-to-clear-before-listing-photos.html"},{"date":"2026-08-31","type":"service","title":"Junk removal in Plano, TX","status":"published","url":"https://herosjunkremovaltx.com/services/junk-removal-plano.html"},{"date":"2026-08-28","type":"blog","title":"Downsizing a parent into assisted living","status":"published","url":"https://herosjunkremovaltx.com/blog/downsizing-a-parent-into-assisted-living.html"},{"date":"2026-08-28","type":"blog","title":"What to haul instead of moving","status":"published","url":"https://herosjunkremovaltx.com/blog/moving-out-what-to-haul-instead-of-moving.html"},{"date":"2026-08-27","type":"blog","title":"What a remodel really leaves behind","status":"published","url":"https://herosjunkremovaltx.com/blog/construction-debris-after-a-remodel.html"},{"date":"2026-08-27","type":"blog","title":"Dumpster rental vs junk removal","status":"published","url":"https://herosjunkremovaltx.com/blog/dumpster-rental-vs-junk-removal.html"},{"date":"2026-08-24","type":"blog","title":"Mattress disposal in DFW","status":"published","url":"https://herosjunkremovaltx.com/blog/mattress-disposal-dfw.html"},{"date":"2026-08-24","type":"blog","title":"Where your junk actually goes","status":"published","url":"https://herosjunkremovaltx.com/blog/where-your-junk-goes-after-pickup.html"},{"date":"2026-08-22","type":"blog","title":"Apartment junk removal","status":"published","url":"https://herosjunkremovaltx.com/blog/apartment-junk-removal.html"},{"date":"2026-08-22","type":"blog","title":"Appliance and electronics disposal","status":"published","url":"https://herosjunkremovaltx.com/blog/appliance-and-electronics-disposal-north-texas.html"},{"date":"2026-08-22","type":"blog","title":"Hoarding cleanouts, handled quietly","status":"published","url":"https://herosjunkremovaltx.com/blog/hoarder-house-junk-removal.html"},{"date":"2026-08-22","type":"blog","title":"Hot tub, shed, and playset removal in DFW","status":"published","url":"https://herosjunkremovaltx.com/blog/hot-tub-shed-playset-removal.html"},{"date":"2026-08-22","type":"blog","title":"How junk removal works in DFW","status":"published","url":"https://herosjunkremovaltx.com/blog/how-junk-removal-works.html"},{"date":"2026-08-22","type":"blog","title":"Rental property cleanout","status":"published","url":"https://herosjunkremovaltx.com/blog/rental-property-cleanout.html"},{"date":"2026-08-22","type":"blog","title":"Clearing out a storage unit","status":"published","url":"https://herosjunkremovaltx.com/blog/storage-unit-junk-removal.html"},{"date":"2026-08-21","type":"blog","title":"The estate cleanout checklist","status":"published","url":"https://herosjunkremovaltx.com/blog/estate-cleanout-checklist.html"},{"date":"2026-08-21","type":"blog","title":"What we will and will not take","status":"published","url":"https://herosjunkremovaltx.com/blog/what-junk-removal-will-and-will-not-take.html"},{"date":"2026-08-21","type":"service","title":"Construction debris removal in Dallas-Fort Worth","status":"published","url":"https://herosjunkremovaltx.com/services/construction-debris.html"},{"date":"2026-08-05","type":"service","title":"Yard debris removal in Dallas-Fort Worth","status":"published","url":"https://herosjunkremovaltx.com/services/yard-debris.html"},{"date":"2026-08-04","type":"blog","title":"Where to donate furniture and household goods in DFW","status":"published","url":"https://herosjunkremovaltx.com/blog/donate-furniture-dfw.html"},{"date":"2026-08-04","type":"blog","title":"The garage cleanout checklist","status":"published","url":"https://herosjunkremovaltx.com/blog/garage-cleanout-checklist.html"},{"date":"2026-08-04","type":"service","title":"Appliance removal in Dallas-Fort Worth","status":"published","url":"https://herosjunkremovaltx.com/services/appliance-removal.html"},{"date":"2026-08-04","type":"service","title":"Estate cleanouts in Dallas-Fort Worth","status":"published","url":"https://herosjunkremovaltx.com/services/estate-cleanouts.html"},{"date":"2026-08-04","type":"service","title":"Furniture removal in Dallas-Fort Worth","status":"published","url":"https://herosjunkremovaltx.com/services/furniture-removal.html"},{"date":"2026-08-04","type":"service","title":"Garage cleanouts in Dallas-Fort Worth","status":"published","url":"https://herosjunkremovaltx.com/services/garage-cleanouts.html"},{"date":"2026-08-04","type":"service","title":"Hot tub, shed, and playset removal in DFW","status":"published","url":"https://herosjunkremovaltx.com/services/hot-tub-removal.html"},{"date":"2026-08-04","type":"service","title":"Same-day junk removal in Dallas-Fort Worth","status":"published","url":"https://herosjunkremovaltx.com/services/same-day-junk-removal.html"}],"pages":[{"group":"Blog posts live on your site","icon":"pen","links":[{"title":"Apartment junk removal","url":"https://herosjunkremovaltx.com/blog/apartment-junk-removal.html"},{"title":"Appliance and electronics disposal","url":"https://herosjunkremovaltx.com/blog/appliance-and-electronics-disposal-north-texas.html"},{"title":"What a remodel really leaves behind","url":"https://herosjunkremovaltx.com/blog/construction-debris-after-a-remodel.html"},{"title":"Where to donate furniture and household goods in DFW","url":"https://herosjunkremovaltx.com/blog/donate-furniture-dfw.html"},{"title":"Downsizing a parent into assisted living","url":"https://herosjunkremovaltx.com/blog/downsizing-a-parent-into-assisted-living.html"},{"title":"Dumpster rental vs junk removal","url":"https://herosjunkremovaltx.com/blog/dumpster-rental-vs-junk-removal.html"},{"title":"The estate cleanout checklist","url":"https://herosjunkremovaltx.com/blog/estate-cleanout-checklist.html"},{"title":"Fence and deck teardown debris","url":"https://herosjunkremovaltx.com/blog/fence-and-deck-teardown-debris.html"},{"title":"The garage cleanout checklist","url":"https://herosjunkremovaltx.com/blog/garage-cleanout-checklist.html"},{"title":"Hoarding cleanouts, handled quietly","url":"https://herosjunkremovaltx.com/blog/hoarder-house-junk-removal.html"},{"title":"Hot tub, shed, and playset removal in DFW","url":"https://herosjunkremovaltx.com/blog/hot-tub-shed-playset-removal.html"},{"title":"How junk removal works in DFW","url":"https://herosjunkremovaltx.com/blog/how-junk-removal-works.html"},{"title":"Mattress disposal in DFW","url":"https://herosjunkremovaltx.com/blog/mattress-disposal-dfw.html"},{"title":"What to haul instead of moving","url":"https://herosjunkremovaltx.com/blog/moving-out-what-to-haul-instead-of-moving.html"},{"title":"Office and small commercial cleanouts","url":"https://herosjunkremovaltx.com/blog/office-and-small-commercial-cleanouts.html"},{"title":"Old furniture removal, from the upstairs bedroom out","url":"https://herosjunkremovaltx.com/blog/old-furniture-removal-getting-it-out.html"},{"title":"Rental property cleanout","url":"https://herosjunkremovaltx.com/blog/rental-property-cleanout.html"},{"title":"Same-day junk removal: what typical actually means","url":"https://herosjunkremovaltx.com/blog/same-day-junk-removal-what-typical-means.html"},{"title":"Clearing out a storage unit","url":"https://herosjunkremovaltx.com/blog/storage-unit-junk-removal.html"},{"title":"What we will and will not take","url":"https://herosjunkremovaltx.com/blog/what-junk-removal-will-and-will-not-take.html"},{"title":"What to clear before the listing photos","url":"https://herosjunkremovaltx.com/blog/what-to-clear-before-listing-photos.html"},{"title":"Where your junk actually goes","url":"https://herosjunkremovaltx.com/blog/where-your-junk-goes-after-pickup.html"},{"title":"Who comes to your house on a junk removal job","url":"https://herosjunkremovaltx.com/blog/who-comes-to-your-house-junk-removal.html"}]},{"group":"Service pages","icon":"map","links":[{"title":"Appliance removal in Dallas-Fort Worth","url":"https://herosjunkremovaltx.com/services/appliance-removal.html"},{"title":"Construction debris removal in Dallas-Fort Worth","url":"https://herosjunkremovaltx.com/services/construction-debris.html"},{"title":"Estate cleanouts in Dallas-Fort Worth","url":"https://herosjunkremovaltx.com/services/estate-cleanouts.html"},{"title":"Furniture removal in Dallas-Fort Worth","url":"https://herosjunkremovaltx.com/services/furniture-removal.html"},{"title":"Garage cleanouts in Dallas-Fort Worth","url":"https://herosjunkremovaltx.com/services/garage-cleanouts.html"},{"title":"Hot tub, shed, and playset removal in DFW","url":"https://herosjunkremovaltx.com/services/hot-tub-removal.html"},{"title":"Junk removal in Allen, TX","url":"https://herosjunkremovaltx.com/services/junk-removal-allen.html"},{"title":"Junk removal in Frisco, TX","url":"https://herosjunkremovaltx.com/services/junk-removal-frisco.html"},{"title":"Junk removal in McKinney, TX","url":"https://herosjunkremovaltx.com/services/junk-removal-mckinney.html"},{"title":"Junk removal in Plano, TX","url":"https://herosjunkremovaltx.com/services/junk-removal-plano.html"},{"title":"Same-day junk removal in Dallas-Fort Worth","url":"https://herosjunkremovaltx.com/services/same-day-junk-removal.html"},{"title":"Yard debris removal in Dallas-Fort Worth","url":"https://herosjunkremovaltx.com/services/yard-debris.html"}]},{"group":"Core site pages","icon":"globe","links":[{"title":"One pickup truck and a promise","url":"https://herosjunkremovaltx.com/about.html"},{"title":"Get a truck on the way","url":"https://herosjunkremovaltx.com/contact.html"},{"title":"Your junk\u2019s last day","url":"https://herosjunkremovaltx.com/index.html"}]}]};
 (function(){
   'use strict';
   const $ = s => document.querySelector(s);
@@ -291,16 +399,14 @@ const DATA = {"generated":"2026-08-28","dataThrough":"2026-08-28","generatedAt":
   // client page they read as promises, and a stale source makes them promises
   // for dates that have already gone by.
   const PUB = ITEMS.filter(i => i.status === 'published' && !isNaN(pd(i.date)));
-  /* theme */
+  /* theme -- light only. Dark mode was removed by request; forcing
+     data-theme="light" makes the dark @media block (guarded by
+     :not([data-theme="light"])) inert and the [data-theme="dark"] block
+     unreachable, so no dark styles ever apply. The toggle is hidden. */
   const root = document.documentElement;
-  try { const t = localStorage.getItem('wd-theme'); if (t) root.setAttribute('data-theme', t); } catch(e){}
-  const effective = () => root.getAttribute('data-theme')
-    || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-  $('#theme').addEventListener('click', () => {
-    const t = effective() === 'dark' ? 'light' : 'dark';
-    root.setAttribute('data-theme', t);
-    try { localStorage.setItem('wd-theme', t); } catch(e){}
-  });
+  root.setAttribute('data-theme', 'light');
+  const themeBtn = $('#theme');
+  if (themeBtn) themeBtn.style.display = 'none';
   /* freshness -- the age of the SOURCE, never the age of this build */
   const through = DATA.dataThrough || DATA.generated;
   const thruDate = pd(through);
@@ -309,6 +415,13 @@ const DATA = {"generated":"2026-08-28","dataThrough":"2026-08-28","generatedAt":
   if (staleDays > 10) {
     $('#stale').innerHTML = '<div class="stale">This record stops on <b>'+esc(fmt(through))+
       '</b>. Anything published after that date is not in here yet.</div>';
+  } else if (DATA.undated > 0) {
+    // A page we can see but could not date is missing from the counts below.
+    // Saying so beats letting a client watch their own total shrink between
+    // two loads of the same link.
+    $('#stale').innerHTML = '<div class="stale">'+DATA.undated+' more page'+
+      (DATA.undated===1?' is':'s are')+' live on your site that we could not date on this load, '+
+      'so the counts below are running low by that much. Refresh in a minute and they will fill in.</div>';
   }
   /* three stats */
   const now = new Date();
@@ -337,6 +450,22 @@ const DATA = {"generated":"2026-08-28","dataThrough":"2026-08-28","generatedAt":
     el.innerHTML = '<div class="stat-v">'+s.v.toLocaleString()+'</div><div class="stat-l">'+esc(s.l)+'</div>';
     $('#stats').appendChild(el);
   });
+  /* highlights strip -- per-type published counts, an honest summary of the mix.
+     Same colours as the chart. Only the types that actually have published work
+     appear, so this can never show a fabricated "0 city pages" for a client who
+     does not run them. Hidden entirely when nothing is published yet. */
+  (function(){
+    const c = {};
+    PUB.forEach(i => c[i.type] = (c[i.type]||0) + 1);
+    const order = Object.keys(c).sort((a,b)=>c[b]-c[a]);
+    if (!order.length) return;
+    $('#highlights').innerHTML = order.map(t => {
+      const one = label(t), many = /page$/i.test(one) ? one.replace(/page$/i,'pages')
+        : /post$/i.test(one) ? one.replace(/post$/i,'posts') : one;
+      return '<div class="hl"><i style="background:'+color(t)+'"></i>'+
+        '<b>'+c[t]+'</b><span>'+esc(c[t]===1?one:many)+'</span></div>';
+    }).join('');
+  })();
   /* ── the chart ───────────────────────────────────────────────
      Buckets run from the first publish to the end of the RECORD -- never to
      today, so a stale file cannot draw phantom empty periods that read as "they
@@ -544,8 +673,235 @@ const DATA = {"generated":"2026-08-28","dataThrough":"2026-08-28","generatedAt":
     ).join('');
   }
   /* ── what is not wired up ────────────────────────────────── */
-  $('#pending').innerHTML = (DATA.pendingMetrics||[]).map(p =>
+  // A client can be configured with no pending list at all. Drop the whole
+  // section rather than leaving an empty "Not connected yet" card, which reads
+  // worse than not raising the subject.
+  const PEND = DATA.pendingMetrics || [];
+  if (!PEND.length) $('#pending-sec').hidden = true;
+  $('#pending').innerHTML = PEND.map(p =>
     '<div class="prow"><span class="pd"></span><div><div class="pn">'+esc(p.name)+'</div>'+
     '<div class="pw">'+esc(p.why)+'</div></div></div>').join('');
+  /* ── the live site check ─────────────────────────────────────
+     Every OUTCOME metric a client wants (search clicks, calls, form leads) sits
+     behind access we may not have. This section needs none of it: it loads the
+     real site and reports what it finds. Only rendered in live mode -- a saved
+     file has no server to ask, and a stale "checked just now" would be a lie. */
+  const hsec = $('#health-sec');
+  if (DATA.live && DATA.slug) {
+    hsec.hidden = false;
+    $('#health').innerHTML = '<div class="empty">Opening your pages and checking them…</div>';
+    fetch('/api/dashboard/' + encodeURIComponent(DATA.slug) + '/health', { cache:'no-store' })
+      .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
+      .then(renderHealth)
+      .catch(() => {
+        // A failed check must never render as a site with zero healthy pages.
+        $('#health').innerHTML = '<div class="empty">The live check did not finish this time. '+
+          'Nothing is wrong with your website — refresh in a moment to run it again.</div>';
+      });
+  }
+  function tile(v, l, pending){
+    return '<div class="hstat'+(pending?' pend':'')+'"><div class="hstat-v">'+v+'</div>'+
+           '<div class="hstat-l">'+esc(l)+'</div></div>';
+  }
+  function renderHealth(h){
+    const p = h.pages || {};
+    const tiles = [];
+    // Google's own grade, only when their API actually answers. A throttled call
+    // is not a score, and a permanent "still measuring" tile is just clutter.
+    if (h.speed && typeof h.speed.score === 'number') {
+      tiles.push(tile(h.speed.score+'<small>/100</small>',
+        'Google’s speed score for your site on a phone' +
+        (h.speed.lcp ? ' · main content in ' + h.speed.lcp : '')));
+    }
+    if (p.checked) {
+      tiles.push(tile(p.clean + '<small> of ' + p.checked + '</small>',
+        'Pages that pass every on-page check we run'));
+    }
+    if (typeof h.homepageMs === 'number') {
+      tiles.push(tile(h.homepageMs.toLocaleString()+'<small>ms</small>',
+        'How fast your homepage answered when we asked for it just now'));
+    }
+    if (h.sitemap && h.sitemap.found) {
+      tiles.push(tile(h.sitemap.urls.toLocaleString(),
+        'Pages your sitemap hands to Google'));
+    }
+    let html = '<div class="hstats">' + tiles.join('') + '</div>';
+    if (h.robotsBlocking) {
+      html += '<div class="hwarn"><b>Your site is currently telling search engines not to index it.</b> '+
+        'That is a one-line fix in robots.txt and we are on it.</div>';
+    }
+    if (!h.sitemap || !h.sitemap.found) {
+      html += '<div class="hwarn">No sitemap was found at your domain, so Google has to discover '+
+        'pages on its own. We are adding one.</div>';
+    }
+    const issues = h.issues || [];
+    const impr = h.improvements || [];
+    function pageRows(rows, key){
+      return rows.map(function(it){
+        const name = esc(it.title || it.url);
+        return '<div class="prow"><span class="pd"></span><div><div class="pn">'+
+          '<a href="'+esc(it.url)+'" target="_blank" rel="noopener">'+name+'</a></div>'+
+          '<ul class="hprob">'+it[key].map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+
+          '</ul></div></div>';
+      }).join('');
+    }
+    html += '<div class="card">';
+    if (!p.checked) {
+      html += '<div class="empty">We could not reach the site to check it this time.</div>';
+    } else if (!issues.length) {
+      html += '<div class="hgood"><i></i><div>Every page we checked is working: it loads, it has a '+
+        'title and a description, a main heading, and it is open to Google.</div></div>';
+    } else {
+      html += '<div class="mgroup" style="margin-top:0"><div class="mlabel">'+
+        issues.length+' page'+(issues.length===1?'':'s')+' with something wrong</div></div>';
+      html += pageRows(issues, 'problems');
+    }
+    // Working pages with upside left. Kept visually separate from breakage so a
+    // long list here reads as a plan, which is what it is. Collapsed past six so
+    // the queue cannot become the longest thing on the page.
+    if (impr.length) {
+      const HEAD = 6;
+      html += '<div class="mgroup"><div class="mlabel">'+impr.length+' page'+
+        (impr.length===1?'':'s')+' we have queued for improvement</div></div>' +
+        pageRows(impr.slice(0, HEAD), 'notes');
+      if (impr.length > HEAD) {
+        html += '<div id="impr-rest" hidden>'+pageRows(impr.slice(HEAD), 'notes')+'</div>'+
+          '<button class="more" id="impr-more">Show the other '+(impr.length-HEAD)+'</button>';
+      }
+    }
+    // Say plainly what the check did and did not cover.
+    const notes = [];
+    if (p.checked) notes.push('Checked ' + p.checked + ' of ' + p.listed + ' pages');
+    if (p.capped) notes.push('the largest sites are checked in batches');
+    if (p.unreachable) notes.push(p.unreachable + ' page' + (p.unreachable===1?'':'s') + ' did not respond');
+    const when = h.checkedAt ? new Date(h.checkedAt) : null;
+    if (when && !isNaN(when)) notes.push('run ' + when.toLocaleString('en-US',
+      { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' }));
+    if (notes.length) html += '<div class="hstamp">'+esc(notes.join(' · '))+'.</div>';
+    html += '</div>';
+    $('#health').innerHTML = html;
+    const imore = $('#impr-more');
+    if (imore) imore.addEventListener('click', function(){
+      $('#impr-rest').hidden = false; imore.remove();
+    });
+    if (p.checked) $('#healthn').textContent = p.checked + ' pages checked';
+  }
+  // ── Referral partners ──────────────────────────────────────────────────────
+  // Fetched separately from the dashboard payload and only when the link
+  // carries ?k=. No key means the section never appears and no request is even
+  // made, so the client's normal dashboard link stays safe to forward.
+  (function leadsSection(){
+    var P = new URLSearchParams(location.search);
+    var key = P.get('k');
+    var slug = P.get('c') || 'heros-junk';
+    if (!key) return;
+    var LD = null, LCAT = 'all', LSHOWN = 40;
+    fetch('/api/leads/' + encodeURIComponent(slug) + '?k=' + encodeURIComponent(key),
+          {cache:'no-store'})
+      .then(function(r){ if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function(d){ LD = d; initLeads(); })
+      .catch(function(){ /* a bad key must fail silently: the rest of the
+                            dashboard is still perfectly valid without it */ });
+    function n(x){ return (x||0).toLocaleString('en-US'); }
+    function initLeads(){
+      var L = LD.leads || [];
+      if (!L.length) return;
+      $('#leads-sec').hidden = false;
+      $('#leadn').textContent = n(L.length) + ' businesses';
+      $('#leadsd').textContent = LD.note || '';
+      $('#lstats').innerHTML =
+        '<div class="lstat"><b>' + n(L.length) + '</b><span>businesses</span></div>' +
+        '<div class="lstat"><b>' + n(L.filter(function(x){return x.phone}).length) +
+          '</b><span>with a phone</span></div>' +
+        '<div class="lstat"><b>' + n(L.filter(function(x){return x.email}).length) +
+          '</b><span>with an email</span></div>' +
+        '<div class="lstat"><b>' + n(LD.cities||0) + '</b><span>cities</span></div>' +
+        '<div class="lstat"><b>' + n((LD.categories||[]).length) +
+          '</b><span>partner types</span></div>';
+      var counts = {};
+      L.forEach(function(x){ counts[x.category] = (counts[x.category]||0) + 1; });
+      var cats = (LD.categories||[]).filter(function(c){ return counts[c.key]; });
+      $('#lpills').innerHTML =
+        '<span class="lpill on" data-c="all">Everyone <i>' + L.length + '</i></span>' +
+        cats.map(function(c){
+          return '<span class="lpill" data-c="' + esc(c.key) + '">' + esc(c.label) +
+                 ' <i>' + counts[c.key] + '</i></span>';
+        }).join('');
+      $('#lpills').addEventListener('click', function(e){
+        var p = e.target.closest('.lpill'); if (!p) return;
+        Array.prototype.forEach.call(document.querySelectorAll('.lpill'),
+          function(x){ x.classList.remove('on'); });
+        p.classList.add('on'); LCAT = p.dataset.c; LSHOWN = 40; drawLeads();
+      });
+      ['#lq','#lsort','#lhas'].forEach(function(s){
+        $(s).addEventListener('input', function(){ LSHOWN = 40; drawLeads(); });
+      });
+      $('#leadmore').addEventListener('click', function(){ LSHOWN += 40; drawLeads(); });
+      drawLeads();
+    }
+    function drawLeads(){
+      var q = ($('#lq').value||'').toLowerCase().trim();
+      var sort = $('#lsort').value, has = $('#lhas').value;
+      var cm = {}; (LD.categories||[]).forEach(function(c){ cm[c.key] = c; });
+      var rows = (LD.leads||[]).filter(function(x){
+        if (LCAT !== 'all' && x.category !== LCAT) return false;
+        if (has === 'email' && !x.email) return false;
+        if (has === 'phone' && !x.phone) return false;
+        if (!q) return true;
+        return ((x.name||'') + ' ' + (x.city||'') + ' ' + (x.phone||'') + ' ' +
+                (x.email||'')).toLowerCase().indexOf(q) > -1;
+      });
+      rows.sort(function(a,b){
+        if (sort === 'name')    return (a.name||'').localeCompare(b.name||'');
+        if (sort === 'city')    return (a.city||'').localeCompare(b.city||'') ||
+                                       (b.reviews||0) - (a.reviews||0);
+        if (sort === 'reviews') return (b.reviews||0) - (a.reviews||0);
+        return (b.score||0) - (a.score||0);
+      });
+      // The list is capped at LSHOWN rows, so filtering from 3,188 down to 71
+      // still renders 40 cards and looks like nothing happened. Always state
+      // how many matched.
+      $('#leadn').textContent = (rows.length === (LD.leads||[]).length)
+        ? n(rows.length) + ' businesses'
+        : n(rows.length) + ' of ' + n((LD.leads||[]).length);
+      $('#lwhy').textContent =
+        (LCAT !== 'all' && cm[LCAT]) ? (cm[LCAT].why || '') : '';
+      if (!rows.length){
+        $('#leads').innerHTML = '<div class="empty">Nothing matches that.</div>';
+        $('#leadmore').hidden = true;
+        return;
+      }
+      $('#leads').innerHTML = rows.slice(0, LSHOWN).map(function(x){
+        var bits = [esc((cm[x.category]||{}).label || x.category || '')];
+        if (x.city) bits.push(esc(x.city));
+        if (x.address) bits.push(esc(x.address));
+        var cts = [];
+        if (x.phone) cts.push('<a class="lct pri" href="tel:' +
+          esc(String(x.phone).replace(/\D/g,'')) + '">Call ' + esc(x.phone) + '</a>');
+        // Email shown as plain text, never a mailto link. Outreach to these
+        // partners is sent by Wing, not by the client, and a clickable
+        // compose window is an invitation to double-send into the same
+        // inbox. (Jack's call, 2026-09-04)
+        if (x.email) cts.push('<span class="lct lmail">' + esc(x.email) + '</span>');
+        if (x.website) cts.push('<a class="lct" href="' + esc(x.website) +
+          '" target="_blank" rel="noopener noreferrer">Website</a>');
+        if (x.maps) cts.push('<a class="lct" href="' + esc(x.maps) +
+          '" target="_blank" rel="noopener noreferrer">Map</a>');
+        if (x.email_status === 'risky') cts.push('<span class="ltag">shared inbox</span>');
+        var rk = x.reviews ? ('<b>' + x.reviews + '</b> reviews' +
+                              (x.rating ? '<br>' + x.rating + '★' : ''))
+                           : (x.rating ? x.rating + '★' : '');
+        return '<div class="lrow"><div class="lrow-t"><div>' +
+          '<div class="lnm">' + esc(x.name) + '</div>' +
+          '<div class="lmt">' + bits.join(' &middot; ') + '</div></div>' +
+          '<div class="lrk">' + rk + '</div></div>' +
+          '<div class="lcts">' + cts.join('') + '</div></div>';
+      }).join('');
+      var m = $('#leadmore');
+      m.hidden = rows.length <= LSHOWN;
+      if (!m.hidden) m.textContent = 'Show ' +
+        Math.min(40, rows.length - LSHOWN) + ' more of ' + n(rows.length);
+    }
+  })();
 })();
 </script>

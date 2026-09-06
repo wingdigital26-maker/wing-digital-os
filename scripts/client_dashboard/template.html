@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>__TITLE__</title>
+<script>document.documentElement.setAttribute('data-theme','light');</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap">
@@ -433,16 +434,14 @@ const DATA = __DATA__;
   // for dates that have already gone by.
   const PUB = ITEMS.filter(i => i.status === 'published' && !isNaN(pd(i.date)));
 
-  /* theme */
+  /* theme -- light only. Dark mode was removed by request; forcing
+     data-theme="light" makes the dark @media block (guarded by
+     :not([data-theme="light"])) inert and the [data-theme="dark"] block
+     unreachable, so no dark styles ever apply. The toggle is hidden. */
   const root = document.documentElement;
-  try { const t = localStorage.getItem('wd-theme'); if (t) root.setAttribute('data-theme', t); } catch(e){}
-  const effective = () => root.getAttribute('data-theme')
-    || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-  $('#theme').addEventListener('click', () => {
-    const t = effective() === 'dark' ? 'light' : 'dark';
-    root.setAttribute('data-theme', t);
-    try { localStorage.setItem('wd-theme', t); } catch(e){}
-  });
+  root.setAttribute('data-theme', 'light');
+  const themeBtn = $('#theme');
+  if (themeBtn) themeBtn.style.display = 'none';
 
   /* freshness -- the age of the SOURCE, never the age of this build */
   const through = DATA.dataThrough || DATA.generated;

@@ -74,7 +74,7 @@
   "sources": [
     {
       "kind": "state_file",
-      "path": "clients/summit-ridge-roofing.state.json"
+      "path": "demo_data/summit-ridge-roofing.state.json"
     }
   ],
   "pages_from_items": [

@@ -1,17 +1,22 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 
 // One header for every standalone routed section (Call Room, Sequences,
-// Automations). Before this each layout drew its own logo and title, so the
-// three screens read as three different apps. Now they share: the W logo home,
-// the product name, a section switcher that is identical everywhere, the
-// per-section extras on the right, Sign out, and the section's own tab strip
-// underneath.
+// Email, Automations). Before this each layout drew its own logo and title, so
+// the screens read as different apps. Now they share: the W logo home, the
+// product name, a section switcher that is identical everywhere, an "All
+// sections" menu mirroring the OS shell's full nav, the per-section extras on
+// the right, Sign out, and the section's own tab strip underneath.
 //
-// Sections that live inside the OS shell (Calendar, CRM, Agents) are not
-// listed in the switcher because "/" is the only way in; Home covers them.
+// The switcher pills are the ROUTED sections only. Everything that lives
+// inside the OS shell (Clients, CRM, Marketing, Calendar, Agents, Intel) is in
+// the "All sections" menu, so someone on /sequences can reach the CRM without
+// going Home first. Those links use "/#view=<subId>": the shell's os:navigate
+// CustomEvent only works once "/" is mounted, so a plain link can't use it —
+// page.tsx reads the hash on mount instead (see SHELL_GROUPS below).
 
 export type SectionTab = { href: string; label: string; exact?: boolean };
 
@@ -21,6 +26,48 @@ const SECTIONS: { href: string; label: string }[] = [
   { href: "/sequences", label: "Sequences" },
   { href: "/email", label: "Email" },
   { href: "/automations", label: "Automations" },
+];
+
+// Mirror of the shell's NAV in app/page.tsx (groups that live inside "/").
+// Each sub links to "/#view=<subId>"; the shell honors the hash on mount and
+// plain "/" still works as before. Keep the ids in sync with page.tsx NAV.
+const SHELL_GROUPS: { label: string; subs: { id: string; label: string }[] }[] = [
+  { label: "Command Center", subs: [{ id: "command", label: "Overview" }, { id: "personal", label: "Personal" }] },
+  {
+    label: "Clients",
+    subs: [
+      { id: "clients", label: "Clients" },
+      { id: "potential", label: "Potential clients" },
+      { id: "sonar", label: "Sonar Leads" },
+      { id: "storms", label: "Storm Response" },
+    ],
+  },
+  {
+    label: "CRM",
+    subs: [
+      { id: "crm", label: "Everything" },
+      { id: "email", label: "Email" },
+      { id: "text", label: "Text" },
+      { id: "replies", label: "Reply Inbox" },
+    ],
+  },
+  {
+    label: "Marketing",
+    subs: [
+      { id: "social", label: "Social" },
+      { id: "reviews", label: "Reviews" },
+      { id: "customers", label: "Customers" },
+    ],
+  },
+  { label: "Calendar", subs: [{ id: "calendar", label: "Calendar" }] },
+  { label: "Agents", subs: [{ id: "agent", label: "Mission Control" }] },
+  {
+    label: "Intel",
+    subs: [
+      { id: "knowledge", label: "Knowledge Base" },
+      { id: "competitors", label: "Competitor Intel" },
+    ],
+  },
 ];
 
 type Props = {
@@ -40,6 +87,72 @@ type Props = {
 
 function defaultActive(t: SectionTab, pathname: string): boolean {
   return t.exact ? pathname === t.href : pathname.startsWith(t.href);
+}
+
+/** "All sections ▾" — the OS shell's full nav as a dropdown, so routed pages
+ *  present the same mental model as "/". Plain button + absolutely positioned
+ *  panel; closes on outside click and Escape. Works at 375px (panel is capped
+ *  to the viewport and scrolls). */
+function AllSectionsMenu() {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent | TouchEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("touchstart", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("touchstart", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div className="sc-menu-root" ref={rootRef}>
+      <button
+        type="button"
+        className="sc-btn sc-menu-btn"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen(o => !o)}
+      >
+        All sections <span aria-hidden="true" style={{ fontSize: 9, opacity: 0.8 }}>▾</span>
+      </button>
+      {open && (
+        <div className="sc-menu" role="menu" aria-label="All OS sections">
+          <a href="/" className="sc-menu-home" role="menuitem" onClick={() => setOpen(false)}>
+            ← Back to OS home
+          </a>
+          {SHELL_GROUPS.map(g => (
+            <div key={g.label} className="sc-menu-group">
+              <div className="sc-menu-label">{g.label}</div>
+              {g.subs.map(s => (
+                // Full <a> navigation on purpose: "/" is not mounted here, so
+                // os:navigate can't be dispatched — the shell reads the hash.
+                <a
+                  key={s.id}
+                  href={`/#view=${s.id}`}
+                  className="sc-menu-item"
+                  role="menuitem"
+                  onClick={() => setOpen(false)}
+                >
+                  {s.label}
+                </a>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function SectionChrome({ title, tabs, isTabActive, extras, children }: Props) {
@@ -81,6 +194,31 @@ export default function SectionChrome({ title, tabs, isTabActive, extras, childr
           background: var(--bg-hover); color: var(--text-primary);
           font-size: 12.5px; font-weight: 600; text-decoration: none; white-space: nowrap;
         }
+        .sc-menu-root { position: relative; }
+        .sc-menu-btn { cursor: pointer; display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: 12.5px; font-weight: 600; }
+        .sc-menu {
+          position: absolute; top: calc(100% + 6px); right: 0; z-index: 40;
+          min-width: 230px; max-width: calc(100vw - 24px);
+          max-height: min(70vh, 480px); overflow-y: auto;
+          background: var(--bg-primary); border: 1px solid var(--border); border-radius: 12px;
+          box-shadow: 0 12px 32px rgba(0,0,0,0.35);
+          padding: 8px;
+        }
+        .sc-menu-home {
+          display: block; padding: 8px 10px; margin-bottom: 4px; border-radius: 8px;
+          font-size: 12.5px; font-weight: 700; text-decoration: none; color: var(--accent);
+        }
+        .sc-menu-home:hover { background: var(--bg-hover); }
+        .sc-menu-group { padding: 4px 0; border-top: 1px solid var(--border); }
+        .sc-menu-label {
+          padding: 6px 10px 2px; font-size: 10px; font-weight: 700; letter-spacing: 0.07em;
+          text-transform: uppercase; color: var(--text-muted);
+        }
+        .sc-menu-item {
+          display: block; padding: 7px 10px; border-radius: 8px;
+          font-size: 13px; font-weight: 500; text-decoration: none; color: var(--text-primary);
+        }
+        .sc-menu-item:hover { background: var(--bg-hover); color: var(--accent); }
         .sc-email { font-size: 12px; color: var(--text-muted); max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .sc-tabs-wrap { position: relative; }
         .sc-tabs {
@@ -104,6 +242,9 @@ export default function SectionChrome({ title, tabs, isTabActive, extras, childr
           .sc-actions { margin-left: auto; }
           .sc-email { display: none; }
           .sc-tab { padding: 11px 10px 12px; font-size: 13px; }
+          /* The panel hangs from the actions row on the right; cap it to the
+             viewport so it never clips off-screen at 375px. */
+          .sc-menu { right: 0; }
         }
       `}</style>
 
@@ -150,6 +291,7 @@ export default function SectionChrome({ title, tabs, isTabActive, extras, childr
 
           <div className="sc-actions">
             {extras}
+            <AllSectionsMenu />
             <a href="/api/logout" className="sc-btn">
               Sign out
             </a>

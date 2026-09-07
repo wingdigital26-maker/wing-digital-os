@@ -22,6 +22,27 @@ $ErrorActionPreference = "Stop"
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
+# This screen is scaled, so a process that is not DPI aware is handed
+# virtualised coordinates (1280x800 on a display that is physically larger).
+# Window placement and hit testing then land in the wrong place. Declare
+# awareness before anything reads a screen size or moves a window.
+$dpiSig = @'
+using System;
+using System.Runtime.InteropServices;
+public class NimbusDpi {
+  [DllImport("user32.dll")] static extern bool SetProcessDpiAwarenessContext(IntPtr value);
+  [DllImport("user32.dll")] static extern bool SetProcessDPIAware();
+  static readonly IntPtr PER_MONITOR_V2 = new IntPtr(-4);
+  public static void Declare() {
+    try { if (SetProcessDpiAwarenessContext(PER_MONITOR_V2)) return; } catch { }
+    try { SetProcessDPIAware(); } catch { }
+  }
+}
+'@
+if (-not ("NimbusDpi" -as [type])) { Add-Type -TypeDefinition $dpiSig }
+[NimbusDpi]::Declare()
+
+
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 $vbs  = Join-Path $here "nimbus.vbs"
 $repo = Split-Path -Parent $here
@@ -114,10 +135,35 @@ public class OrbWin {
   }
 
   /// Push an ARGB bitmap onto the window, alpha and all.
+  ///
+  /// UpdateLayeredWindow with AC_SRC_ALPHA requires PREMULTIPLIED alpha, and
+  /// GDI+ hands back straight alpha. Skip this step and the window draws
+  /// nothing at all, which is exactly what happened the first time.
+  static System.Drawing.Bitmap Premultiply(System.Drawing.Bitmap src) {
+    var rect = new System.Drawing.Rectangle(0, 0, src.Width, src.Height);
+    var copy = new System.Drawing.Bitmap(src.Width, src.Height, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+    var s = src.LockBits(rect, System.Drawing.Imaging.ImageLockMode.ReadOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+    var d = copy.LockBits(rect, System.Drawing.Imaging.ImageLockMode.WriteOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+    int n = src.Width * src.Height * 4;
+    byte[] buf = new byte[n];
+    Marshal.Copy(s.Scan0, buf, 0, n);
+    for (int i = 0; i < n; i += 4) {
+      int a = buf[i + 3];
+      buf[i] = (byte)(buf[i] * a / 255);
+      buf[i + 1] = (byte)(buf[i + 1] * a / 255);
+      buf[i + 2] = (byte)(buf[i + 2] * a / 255);
+    }
+    Marshal.Copy(buf, 0, d.Scan0, n);
+    src.UnlockBits(s);
+    copy.UnlockBits(d);
+    return copy;
+  }
+
   public static void Paint(IntPtr hwnd, System.Drawing.Bitmap bmp, int x, int y) {
+    System.Drawing.Bitmap pm = Premultiply(bmp);
     IntPtr screen = GetDC(IntPtr.Zero);
     IntPtr mem = CreateCompatibleDC(screen);
-    IntPtr hBitmap = bmp.GetHbitmap(System.Drawing.Color.FromArgb(0));
+    IntPtr hBitmap = pm.GetHbitmap(System.Drawing.Color.FromArgb(0));
     IntPtr old = SelectObject(mem, hBitmap);
     SIZE size; size.cx = bmp.Width; size.cy = bmp.Height;
     POINT src; src.X = 0; src.Y = 0;
@@ -132,6 +178,7 @@ public class OrbWin {
     DeleteObject(hBitmap);
     DeleteDC(mem);
     ReleaseDC(IntPtr.Zero, screen);
+    pm.Dispose();
   }
 }
 '@
@@ -216,7 +263,11 @@ function Render-Orb {
   $bmp.Dispose()
 }
 
-$form.Add_Shown({ [OrbWin]::MakeLayered($form.Handle); Render-Orb })
+$form.Add_HandleCreated({ [OrbWin]::MakeLayered($form.Handle) })
+$form.Add_Shown({
+  [OrbWin]::MakeLayered($form.Handle)
+  Render-Orb
+})
 
 # ── Breathing, and the five second decay back to calm ───────────────────────
 $anim = New-Object System.Windows.Forms.Timer

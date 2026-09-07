@@ -62,7 +62,14 @@
       "real-estate-inspector": "Home and property inspectors",
       "restoration-company": "Restoration and water damage companies",
       "hoa-management": "HOA management companies",
-      "insurance-adjuster": "Insurance adjusters"
+      "insurance-adjuster": "Insurance adjusters",
+      "apartment-community": "Apartment communities",
+      "real-estate-brokerage": "Real estate brokerages",
+      "home-builder": "Home builders",
+      "gutter-company": "Gutter companies",
+      "commercial-property-mgmt": "Commercial property managers",
+      "solar-installer": "Solar installers",
+      "remodeling-contractor": "Remodeling contractors"
     },
     "sampleSize": 10,
     "topCities": 8,
@@ -107,8 +114,29 @@
   "notes": {
     "published": "These went up on jacksonroofingco.com through July and August 2026. Eleven open directly."
   },
-  "_sources_comment": "Two sources. (1) git_repo: the real site repo, matching the live deploy; dates are the first commit that ADDED each file, so 2026-08-10 is a real publish date and not a build stamp. It now reads two globs: the four core pages, and blog/*.html (the five posts added 2026-09-06, blog/index.html excluded so the blog landing page is never counted as an article). All nine URLs curl-verified 200 on 2026-09-06. (2) items_file: the 11 articles published on jacksonroofingco.com, lifted verbatim from the dashboard published 2026-08-28. Their dates are the real publish dates. They CANNOT be curl-verified because that domain Cloudflare-blocks our IP, and nothing on this page claims otherwise.",
+  "_sources_comment": "Rebuilt-site blog re-added as a source 2026-09-07 so posts published by the jackson-content-weekly schedule appear on the dashboard automatically. Only blog/ is pulled, not the core pages: the site chrome still sells Commercial Roofing, a service this client dropped, so those pages stay off the dashboard until that is cleaned. Legacy jacksonroofingco.com posts remain in the items_file.",
   "sources": [
+    {
+      "kind": "git_repo",
+      "repo": "C:\\Users\\wjack\\jackson-roofing-site",
+      "base_url": "https://wingdigital26-maker.github.io/jackson-roofing",
+      "globs": [
+        {
+          "glob": "blog/*.html",
+          "type": "blog",
+          "skip": [
+            "index.html"
+          ]
+        },
+        {
+          "glob": "services/*.html",
+          "type": "service",
+          "skip": [
+            "index.html"
+          ]
+        }
+      ]
+    },
     {
       "kind": "items_file",
       "path": "history/jackson-roofing-legacy.json",
@@ -117,7 +145,28 @@
       "status": "published"
     }
   ],
-  "pages": [],
+  "pages": [
+    {
+      "group": "Posts we published for you, live now",
+      "icon": "pen",
+      "repo": "C:\\Users\\wjack\\jackson-roofing-site",
+      "base_url": "https://wingdigital26-maker.github.io/jackson-roofing",
+      "dir": "blog",
+      "skip": [
+        "index.html"
+      ]
+    },
+    {
+      "group": "Service and city pages we built for you, live now",
+      "icon": "file",
+      "repo": "C:\\Users\\wjack\\jackson-roofing-site",
+      "base_url": "https://wingdigital26-maker.github.io/jackson-roofing",
+      "dir": "services",
+      "skip": [
+        "index.html"
+      ]
+    }
+  ],
   "pages_from_items": [
     {
       "group": "Blog posts you can open on your site, July to August 2026",
@@ -153,5 +202,29 @@
   "_actions_comment": "Google Business post and review-request rows removed 2026-09-06. The only \"published\" social record in the system was a single 2026-07-20 status string in a planning file with no post ID, no URL and no platform confirmation. Nothing has posted to any social network for this client: the OS social board is draft-only by design, and the intended GBP output route retired with GHL on 2026-08-22.",
   "_copy_comment": "Copy rewritten 2026-09-06 to Jack spec: title names what Wing is doing, no absence language, no \"who could send you work\". The one consent line in the banner stays on purpose: outreach would go out under the client name, so his approval must be stated on the page, not assumed. Consent banner removed 2026-09-06 at Jack request after being flagged; the operational gate is unchanged (nothing sends unless armed), it is simply no longer printed on the page.",
   "showChart": false,
-  "_stats_comment": "Stats reordered 2026-09-06: highest-value number first. The rolling \"published in the last 30 days\" stat was removed outright, and showChart is false, because publishing is paused and both surfaces turned that pause into the loudest thing on the page."
+  "_stats_comment": "Stats reordered 2026-09-06: highest-value number first. The rolling \"published in the last 30 days\" stat was removed outright, and showChart is false, because publishing is paused and both surfaces turned that pause into the loudest thing on the page.",
+  "_stormHistory_comment": "Storm history section. Generic template block: build.py reads the data file named below and the template renders a section only because this key exists. Every number on the page is a count of records in NOAA's public Storm Events Database, pulled 2026-09-07 from https://www.ncei.noaa.gov/pub/data/swdi/stormevents/csvfiles/. Nothing here is estimated, projected or inferred: NOAA does not record roofs damaged, homes affected or revenue, so no such figure appears. This is intelligence we can act on, not work already performed. Copy must stay factual and short.",
+  "stormHistory": {
+    "data": "history/jackson-storm-events.json",
+    "topEvents": 10,
+    "title": "Hail history in your service area",
+    "intro": "Every hail report NOAA logged in Collin, Denton, Dallas, Rockwall and Kaufman counties over the 24 months from June 2024 through May 2026. These are recorded events, not estimates.",
+    "banner": "Hail is the demand signal for residential roof replacement in North Texas. This is the record for your counties.",
+    "labels": {
+      "tiles": [
+        "hail reports on record",
+        "at 1 inch or larger",
+        "separate storm days",
+        "largest hail recorded",
+        "counties covered",
+        "months of record"
+      ],
+      "countyLabel": "Hail reports by county",
+      "monthLabel": "What months the hail lands in",
+      "cityLabel": "Your cities named on the record",
+      "eventLabel": "The largest hail on record"
+    },
+    "source_line": "Source: NOAA National Centers for Environmental Information, Storm Events Database. Filters: Texas, counties Collin, Denton, Dallas, Rockwall and Kaufman, event type Hail, June 2024 through May 2026.",
+    "note": "1 inch is the size that typically damages asphalt shingles, which is why it is counted separately. We have not contacted anyone off this data or run any campaign from it. It is the targeting layer we would build on, and it is here so you can check it yourself."
+  }
 }

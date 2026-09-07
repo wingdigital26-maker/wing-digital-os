@@ -299,6 +299,63 @@ def collect_outreach_preview(cfg):
     return data
 
 
+# ── storm history (a read-only summary of a public storm record) ─────────────
+def collect_storm_history(cfg):
+    """Summarise a storm-record data file for the dashboard.
+
+    Generic on purpose: the config names the JSON file and supplies all of the
+    copy, so any weather-driven trade gets the same section. Returns None when
+    the config omits the key, and the template then renders nothing at all.
+
+    Honesty rules enforced here rather than left to the template:
+      * Nothing is computed, modelled or extrapolated. Every number emitted is
+        read straight out of the source file, which is itself a copy of a
+        public record. There is no "homes affected", "roofs damaged" or
+        revenue figure, because the source does not contain one.
+      * The source URL and the pull date travel with the payload so the page
+        can print them and the client can check the record himself.
+      * The event list is only sliced, never re-ordered by anything the source
+        does not already say.
+    """
+    sh = cfg.get("stormHistory")
+    if not sh:
+        return None
+    path = sh["data"]
+    if not os.path.isabs(path):
+        path = os.path.join(HERE, path)
+    if not os.path.exists(path):
+        print("    ! storm data missing: %s" % path)
+        return None
+    note_mtime(path)
+    with open(path, encoding="utf-8") as fh:
+        src = json.load(fh)
+    meta = src.get("_comment", {})
+    events = src.get("events", [])
+    top_n = sh.get("topEvents", 10)
+    # Biggest hail first, then most recent. Both keys come from the source.
+    top = sorted(events, key=lambda e: (-(e.get("hailInches") or 0),
+                                        e.get("date") or ""))[:top_n]
+    return {
+        "title": sh.get("title", "Storm history in your service area"),
+        "intro": sh.get("intro", ""),
+        "banner": sh.get("banner", ""),
+        "note": sh.get("note", ""),
+        "sourceLine": sh.get("source_line", ""),
+        "sourceUrl": meta.get("databaseHomepage") or meta.get("sourceUrl"),
+        "pulledOn": meta.get("pulledOn"),
+        "coverageNote": meta.get("coverageNote", ""),
+        "window": src.get("window", {}),
+        "summary": src.get("summary", {}),
+        "byCounty": src.get("byCounty", []),
+        "byMonth": src.get("byMonth", []),
+        "byServiceCity": src.get("byServiceCity", []),
+        "citiesWithNoNamedReport": src.get("serviceCitiesWithNoNamedReport", []),
+        "cityNote": src.get("serviceCityNote", ""),
+        "topEvents": top,
+        "labels": sh.get("labels", {}),
+    }
+
+
 # ── referral partners (a staged, never-contacted list, summarised) ───────────
 def collect_referral_partners(cfg):
     """Summarise a staged partner list out of a SQLite table.
@@ -523,6 +580,9 @@ def build(slug):
         # Absent key -> no section at all. Addresses are masked before they get
         # anywhere near the HTML.
         "referralPartners": collect_referral_partners(cfg),
+        # Optional, generic: a summary of a public storm/weather record file.
+        # Absent key -> no section at all. Counts only, straight off the source.
+        "stormHistory": collect_storm_history(cfg),
         # Optional, generic: per-section copy overrides (see template).
         "notes": cfg.get("notes", {}),
         # Optional REAL numbers only (e.g. {"emailsSent30d": 120, "asOf": "2026-09-06"}).

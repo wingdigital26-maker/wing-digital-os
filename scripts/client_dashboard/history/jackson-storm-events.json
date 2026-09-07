@@ -1,0 +1,1387 @@
+{
+  "_comment": {
+    "source": "NOAA National Centers for Environmental Information, Storm Events Database bulk CSV archive",
+    "sourceUrl": "https://www.ncei.noaa.gov/pub/data/swdi/stormevents/csvfiles/",
+    "databaseHomepage": "https://www.ncdc.noaa.gov/stormevents/",
+    "filesUsed": [
+      "StormEvents_details-ftp_v1.0_d2024_c20260728.csv.gz",
+      "StormEvents_details-ftp_v1.0_d2025_c20260819.csv.gz",
+      "StormEvents_details-ftp_v1.0_d2026_c20260901.csv.gz"
+    ],
+    "filters": "STATE = TEXAS; CZ_NAME in (COLLIN, DENTON, DALLAS, ROCKWALL, KAUFMAN); EVENT_TYPE = 'Hail'; BEGIN_YEARMONTH between 202406 and 202605",
+    "pulledOn": "2026-09-07",
+    "coverageNote": "The Storm Events Database publishes on a lag. At the pull date the newest Texas month present in the archive was May 2026, so the 24 month window used here is June 2024 through May 2026. June, July and August 2026 are not yet published and are not represented.",
+    "honesty": "Every value below is copied from the NOAA record. Nothing is estimated, projected, modelled or inferred. There are no figures for roofs damaged, homes affected, jobs or revenue because NOAA does not record them."
+  },
+  "window": {
+    "start": "2024-06-01",
+    "end": "2026-05-31",
+    "months": 24
+  },
+  "counties": [
+    "Collin",
+    "Denton",
+    "Dallas",
+    "Rockwall",
+    "Kaufman"
+  ],
+  "summary": {
+    "hailEvents": 137,
+    "hailEventsOneInchOrLarger": 122,
+    "largestHailInches": 3.0,
+    "largestHailDate": "2026-04-25",
+    "largestHailLocation": "Lakeview",
+    "largestHailCounty": "Dallas",
+    "distinctStormDays": 27
+  },
+  "byCounty": [
+    {
+      "name": "Collin",
+      "count": 44
+    },
+    {
+      "name": "Dallas",
+      "count": 41
+    },
+    {
+      "name": "Denton",
+      "count": 34
+    },
+    {
+      "name": "Rockwall",
+      "count": 10
+    },
+    {
+      "name": "Kaufman",
+      "count": 8
+    }
+  ],
+  "byMonth": [
+    {
+      "month": "March",
+      "count": 37
+    },
+    {
+      "month": "April",
+      "count": 34
+    },
+    {
+      "month": "May",
+      "count": 22
+    },
+    {
+      "month": "June",
+      "count": 12
+    },
+    {
+      "month": "September",
+      "count": 24
+    },
+    {
+      "month": "November",
+      "count": 6
+    },
+    {
+      "month": "December",
+      "count": 2
+    }
+  ],
+  "byServiceCity": [
+    {
+      "city": "Richardson",
+      "count": 7,
+      "oneInchOrLarger": 7
+    },
+    {
+      "city": "Murphy",
+      "count": 5,
+      "oneInchOrLarger": 4
+    },
+    {
+      "city": "Wylie",
+      "count": 4,
+      "oneInchOrLarger": 4
+    },
+    {
+      "city": "Garland",
+      "count": 3,
+      "oneInchOrLarger": 3
+    },
+    {
+      "city": "Little Elm",
+      "count": 2,
+      "oneInchOrLarger": 2
+    },
+    {
+      "city": "Frisco",
+      "count": 2,
+      "oneInchOrLarger": 2
+    },
+    {
+      "city": "McKinney",
+      "count": 2,
+      "oneInchOrLarger": 1
+    },
+    {
+      "city": "Sachse",
+      "count": 2,
+      "oneInchOrLarger": 2
+    },
+    {
+      "city": "Rockwall",
+      "count": 2,
+      "oneInchOrLarger": 2
+    },
+    {
+      "city": "Prosper",
+      "count": 1,
+      "oneInchOrLarger": 0
+    },
+    {
+      "city": "Allen",
+      "count": 1,
+      "oneInchOrLarger": 1
+    }
+  ],
+  "serviceCitiesWithNoNamedReport": [
+    "Plano",
+    "Celina",
+    "The Colony"
+  ],
+  "serviceCityNote": "NOAA logs each hail report against the nearest named location, which is often a historic community name rather than the incorporated city. Counts here are exact matches on the NOAA location name only, so a city can show zero named reports while hail was still recorded next to it under another name.",
+  "events": [
+    {
+      "date": "2024-06-02",
+      "county": "Denton",
+      "location": "Denton",
+      "hailInches": 1.5,
+      "source": "Amateur Radio",
+      "eventId": "1195069",
+      "narrative": "HAM reported ping pong ball sized hail near Loop 288 and Hwy 77 in Denton."
+    },
+    {
+      "date": "2024-06-02",
+      "county": "Denton",
+      "location": "Mingo",
+      "hailInches": 1.0,
+      "source": "Public",
+      "eventId": "1195071",
+      "narrative": "Reported via mPing."
+    },
+    {
+      "date": "2024-06-02",
+      "county": "Denton",
+      "location": "Denton",
+      "hailInches": 1.0,
+      "source": "Public",
+      "eventId": "1195072",
+      "narrative": "Reported via mPing."
+    },
+    {
+      "date": "2024-06-02",
+      "county": "Denton",
+      "location": "Little Elm",
+      "hailInches": 1.0,
+      "source": "Public",
+      "eventId": "1195073",
+      "narrative": "Reported via mPing."
+    },
+    {
+      "date": "2024-06-02",
+      "county": "Denton",
+      "location": "Justin",
+      "hailInches": 1.75,
+      "source": "Public",
+      "eventId": "1195075",
+      "narrative": "Reported via mPing."
+    },
+    {
+      "date": "2024-06-03",
+      "county": "Kaufman",
+      "location": "Crandall",
+      "hailInches": 0.75,
+      "source": "Public",
+      "eventId": "1195082",
+      "narrative": "Reported via mPing."
+    },
+    {
+      "date": "2024-09-25",
+      "county": "Denton",
+      "location": "Navo",
+      "hailInches": 1.0,
+      "source": "Public",
+      "eventId": "1216328",
+      "narrative": "Reported via mPing."
+    },
+    {
+      "date": "2024-09-25",
+      "county": "Collin",
+      "location": "Frisco",
+      "hailInches": 1.0,
+      "source": "Social Media",
+      "eventId": "1216329",
+      "narrative": "Nickel to quarter sized hail was reported in Frisco."
+    },
+    {
+      "date": "2024-09-25",
+      "county": "Denton",
+      "location": "Carney",
+      "hailInches": 1.0,
+      "source": "Public",
+      "eventId": "1216330",
+      "narrative": "Reported via mPing."
+    },
+    {
+      "date": "2024-09-25",
+      "county": "Collin",
+      "location": "Lebanon",
+      "hailInches": 1.0,
+      "source": "Public",
+      "eventId": "1216331",
+      "narrative": "Reported via mPing."
+    },
+    {
+      "date": "2024-09-25",
+      "county": "Collin",
+      "location": "Lebanon",
+      "hailInches": 2.0,
+      "source": "Amateur Radio",
+      "eventId": "1216332",
+      "narrative": "Two inch hail was reported near Dallas North Tollway and Texas 121 in Frisco."
+    },
+    {
+      "date": "2024-09-25",
+      "county": "Denton",
+      "location": "Carney",
+      "hailInches": 1.0,
+      "source": "Public",
+      "eventId": "1216333",
+      "narrative": "Quarter sized hail was reported 1 mile north of The Colony."
+    },
+    {
+      "date": "2024-09-25",
+      "county": "Collin",
+      "location": "Frisco",
+      "hailInches": 1.5,
+      "source": "Public",
+      "eventId": "1216334",
+      "narrative": "Reported via mPing."
+    },
+    {
+      "date": "2024-09-25",
+      "county": "Collin",
+      "location": "Shepton",
+      "hailInches": 2.0,
+      "source": "Amateur Radio",
+      "eventId": "1216335",
+      "narrative": "Two inch hail was reported at Parker Road and Midway in Plano."
+    },
+    {
+      "date": "2024-09-25",
+      "county": "Collin",
+      "location": "Shepton",
+      "hailInches": 1.0,
+      "source": "Public",
+      "eventId": "1216336",
+      "narrative": "Reported via mPing."
+    },
+    {
+      "date": "2024-11-04",
+      "county": "Collin",
+      "location": "Climax",
+      "hailInches": 1.75,
+      "source": "Trained Spotter",
+      "eventId": "1223811",
+      "narrative": "Trained spotter reported golf ball sized hail northeast of Princeton."
+    },
+    {
+      "date": "2024-12-16",
+      "county": "Collin",
+      "location": "Prosper",
+      "hailInches": 0.75,
+      "source": "Public",
+      "eventId": "1229198",
+      "narrative": "Reported via mPing."
+    },
+    {
+      "date": "2024-12-24",
+      "county": "Kaufman",
+      "location": "Forney",
+      "hailInches": 0.75,
+      "source": "Public",
+      "eventId": "1226422",
+      "narrative": ""
+    },
+    {
+      "date": "2025-03-04",
+      "county": "Dallas",
+      "location": "Reinhardt",
+      "hailInches": 1.0,
+      "source": "Public",
+      "eventId": "1243505",
+      "narrative": "An mPING report indicated quarter sized hail 5 miles south of Buckingham."
+    },
+    {
+      "date": "2025-03-08",
+      "county": "Collin",
+      "location": "Branch",
+      "hailInches": 1.0,
+      "source": "Public",
+      "eventId": "1243575",
+      "narrative": "Reported via mPING 2 miles north of Wylie."
+    },
+    {
+      "date": "2025-03-08",
+      "county": "Dallas",
+      "location": "Desoto",
+      "hailInches": 1.0,
+      "source": "Public",
+      "eventId": "1243577",
+      "narrative": "Reported via mPING just north of DeSoto."
+    },
+    {
+      "date": "2025-03-08",
+      "county": "Collin",
+      "location": "Murphy",
+      "hailInches": 0.75,
+      "source": "Public",
+      "eventId": "1243576",
+      "narrative": "Reported via mPING just east of Murphy."
+    },
+    {
+      "date": "2025-03-08",
+      "county": "Dallas",
+      "location": "Desoto",
+      "hailInches": 1.0,
+      "source": "Emergency Manager",
+      "eventId": "1243578",
+      "narrative": "Emergency manager reported 1 inch hail north of DeSoto."
+    },
+    {
+      "date": "2025-03-25",
+      "county": "Collin",
+      "location": "Wylie",
+      "hailInches": 1.5,
+      "source": "Trained Spotter",
+      "eventId": "1242195",
+      "narrative": "A trained spotter reported ping pong ball sized hail and estimated 60 mph winds."
+    },
+    {
+      "date": "2025-03-25",
+      "county": "Collin",
+      "location": "McKinney",
+      "hailInches": 1.25,
+      "source": "Amateur Radio",
+      "eventId": "1242193",
+      "narrative": "An amateur radio operator reported half dollar sized hail at Lake Forest and 380 in west McKinney."
+    },
+    {
+      "date": "2025-03-25",
+      "county": "Collin",
+      "location": "Fairview",
+      "hailInches": 1.5,
+      "source": "Amateur Radio",
+      "eventId": "1242194",
+      "narrative": "An amateur radio reported ping pong ball sized hail at Hardin and Eldorado in McKinney."
+    },
+    {
+      "date": "2025-03-25",
+      "county": "Collin",
+      "location": "Wylie",
+      "hailInches": 1.5,
+      "source": "Fire Department/Rescue",
+      "eventId": "1242197",
+      "narrative": "Fire department reported hail up to ping pong ball size accumulated 4 to 6 inches deep at Wylie Fire Station 1 on S. Ballard St."
+    },
+    {
+      "date": "2025-03-25",
+      "county": "Dallas",
+      "location": "Briggs",
+      "hailInches": 1.75,
+      "source": "Emergency Manager",
+      "eventId": "1243515",
+      "narrative": "Emergency manager reported golf ball sized hail in Dallas."
+    },
+    {
+      "date": "2025-03-25",
+      "county": "Collin",
+      "location": "Fairview",
+      "hailInches": 1.5,
+      "source": "Amateur Radio",
+      "eventId": "1242164",
+      "narrative": "Amateur radio operator reported ping pong ball sized hail just west of Fairview."
+    },
+    {
+      "date": "2025-03-25",
+      "county": "Collin",
+      "location": "Forest Grove",
+      "hailInches": 2.0,
+      "source": "Public",
+      "eventId": "1242165",
+      "narrative": "Reported via mPING southeast of Allen."
+    },
+    {
+      "date": "2025-03-25",
+      "county": "Collin",
+      "location": "Parker",
+      "hailInches": 2.25,
+      "source": "Social Media",
+      "eventId": "1242172",
+      "narrative": "A picture on social media showed a 2.25 inch hail stone fell near Parker."
+    },
+    {
+      "date": "2025-03-25",
+      "county": "Collin",
+      "location": "Parker",
+      "hailInches": 1.75,
+      "source": "Public",
+      "eventId": "1242175",
+      "narrative": "Reported via mPING just north of Parker."
+    },
+    {
+      "date": "2025-03-25",
+      "county": "Collin",
+      "location": "Wylie",
+      "hailInches": 1.0,
+      "source": "Amateur Radio",
+      "eventId": "1242192",
+      "narrative": "Amateur radio reported one inch hail at Park and Country Club in Wylie."
+    },
+    {
+      "date": "2025-03-25",
+      "county": "Kaufman",
+      "location": "Talty",
+      "hailInches": 1.0,
+      "source": "Social Media",
+      "eventId": "1243523",
+      "narrative": "Facebook photo showed large amounts of pea to quarter sized fell near Terrell."
+    },
+    {
+      "date": "2025-03-25",
+      "county": "Dallas",
+      "location": "Liggett",
+      "hailInches": 1.5,
+      "source": "Public",
+      "eventId": "1243517",
+      "narrative": "Reported via mPING 3 miles southwest of Irving."
+    },
+    {
+      "date": "2025-03-25",
+      "county": "Dallas",
+      "location": "Irving",
+      "hailInches": 1.0,
+      "source": "NWS Employee",
+      "eventId": "1243518",
+      "narrative": "NWS employee reported that pea to quarter size hail fell for 5 minutes south of Irving."
+    },
+    {
+      "date": "2025-03-25",
+      "county": "Collin",
+      "location": "Princeton",
+      "hailInches": 1.25,
+      "source": "Amateur Radio",
+      "eventId": "1242199",
+      "narrative": "Amateur radio operator reported half dollar sized hail in downtown Princeton."
+    },
+    {
+      "date": "2025-03-25",
+      "county": "Dallas",
+      "location": "Sayene",
+      "hailInches": 1.0,
+      "source": "Public",
+      "eventId": "1242216",
+      "narrative": "Reported via mPING east of Dallas."
+    },
+    {
+      "date": "2025-03-25",
+      "county": "Dallas",
+      "location": "Reinhardt",
+      "hailInches": 0.75,
+      "source": "Public",
+      "eventId": "1242218",
+      "narrative": "Public reported dime and penny sized hail in Dallas."
+    },
+    {
+      "date": "2025-03-25",
+      "county": "Dallas",
+      "location": "Wilmer",
+      "hailInches": 1.5,
+      "source": "Social Media",
+      "eventId": "1243516",
+      "narrative": "An image on social media showed ping pong sized hail in Wilmer."
+    },
+    {
+      "date": "2025-03-25",
+      "county": "Collin",
+      "location": "Renner",
+      "hailInches": 1.0,
+      "source": "Trained Spotter",
+      "eventId": "1242154",
+      "narrative": "A trained spotter measured one inch hail near GB Turnpike and Coit Rd that lasted approximately 4 minutes."
+    },
+    {
+      "date": "2025-03-25",
+      "county": "Kaufman",
+      "location": "Forney",
+      "hailInches": 1.0,
+      "source": "Social Media",
+      "eventId": "1243522",
+      "narrative": "Facebook video showed large amounts of pea to quarter sized hail falling in Forney."
+    },
+    {
+      "date": "2025-03-25",
+      "county": "Kaufman",
+      "location": "Talty",
+      "hailInches": 1.0,
+      "source": "Public",
+      "eventId": "1243524",
+      "narrative": "Reported via mPING southeast of Forney."
+    },
+    {
+      "date": "2025-03-25",
+      "county": "Collin",
+      "location": "Parker",
+      "hailInches": 1.5,
+      "source": "Fire Department/Rescue",
+      "eventId": "1242181",
+      "narrative": "Fire department reported that ping pong ball sized hail at the City of Parker Fire Station."
+    },
+    {
+      "date": "2025-03-25",
+      "county": "Collin",
+      "location": "Parker",
+      "hailInches": 1.25,
+      "source": "Amateur Radio",
+      "eventId": "1242191",
+      "narrative": "An amateur radio operator reported hail up to half dollar size covering the ground up to 2 inches deep in some places near Park and Country Club in Parker."
+    },
+    {
+      "date": "2025-03-25",
+      "county": "Collin",
+      "location": "Renner",
+      "hailInches": 1.0,
+      "source": "Amateur Radio",
+      "eventId": "1242155",
+      "narrative": "Amateur radio operator reported quarter sized hail at UT Dallas."
+    },
+    {
+      "date": "2025-03-25",
+      "county": "Collin",
+      "location": "Renner",
+      "hailInches": 1.5,
+      "source": "Public",
+      "eventId": "1242161",
+      "narrative": "Reported via mPING north of Richardson."
+    },
+    {
+      "date": "2025-03-25",
+      "county": "Collin",
+      "location": "Forest Grove",
+      "hailInches": 1.75,
+      "source": "Broadcast Media",
+      "eventId": "1242177",
+      "narrative": "Broadcast media reported golf ball hail in east Allen."
+    },
+    {
+      "date": "2025-03-29",
+      "county": "Collin",
+      "location": "Allen",
+      "hailInches": 1.0,
+      "source": "Public",
+      "eventId": "1243563",
+      "narrative": "Reported via mPING northwest of Allen."
+    },
+    {
+      "date": "2025-03-29",
+      "county": "Denton",
+      "location": "Little Elm",
+      "hailInches": 1.0,
+      "source": "Public",
+      "eventId": "1243559",
+      "narrative": "Reported via mPING northwest of The Colony."
+    },
+    {
+      "date": "2025-03-29",
+      "county": "Collin",
+      "location": "Lolaville",
+      "hailInches": 1.0,
+      "source": "Public",
+      "eventId": "1243561",
+      "narrative": "Reported via mPING east of The Colony."
+    },
+    {
+      "date": "2025-03-29",
+      "county": "Collin",
+      "location": "Lebanon",
+      "hailInches": 1.0,
+      "source": "Public",
+      "eventId": "1243562",
+      "narrative": "Reported via mPING southeast of Frisco."
+    },
+    {
+      "date": "2025-03-29",
+      "county": "Denton",
+      "location": "Lewisville",
+      "hailInches": 1.25,
+      "source": "Public",
+      "eventId": "1243560",
+      "narrative": "Public report of half dollar sized hail in Lewisville."
+    },
+    {
+      "date": "2025-04-20",
+      "county": "Collin",
+      "location": "Rockhill",
+      "hailInches": 1.0,
+      "source": "Public",
+      "eventId": "1253569",
+      "narrative": "A member of the public reported quarter sized hail 2 miles SSW of Prosper."
+    },
+    {
+      "date": "2025-04-23",
+      "county": "Denton",
+      "location": "Justin",
+      "hailInches": 1.0,
+      "source": "Public",
+      "eventId": "1253577",
+      "narrative": "Mping report of quarter size hail."
+    },
+    {
+      "date": "2025-04-23",
+      "county": "Denton",
+      "location": "Denton",
+      "hailInches": 0.75,
+      "source": "Public",
+      "eventId": "1253578",
+      "narrative": "Mping report of dime size hail."
+    },
+    {
+      "date": "2025-05-06",
+      "county": "Denton",
+      "location": "Argyle",
+      "hailInches": 1.0,
+      "source": "Social Media",
+      "eventId": "1261937",
+      "narrative": "Photo on X showed up to quarter size hail in Argyle."
+    },
+    {
+      "date": "2025-05-06",
+      "county": "Denton",
+      "location": "Denton Muni Arpt",
+      "hailInches": 0.75,
+      "source": "Public",
+      "eventId": "1261938",
+      "narrative": "Report from mPING: Dime (0.75 in.)."
+    },
+    {
+      "date": "2025-05-06",
+      "county": "Denton",
+      "location": "Denton",
+      "hailInches": 1.0,
+      "source": "Public",
+      "eventId": "1261939",
+      "narrative": "Quarter sized hail was reported at the Denton Public Library North Branch."
+    },
+    {
+      "date": "2025-05-06",
+      "county": "Dallas",
+      "location": "Garland",
+      "hailInches": 1.0,
+      "source": "Trained Spotter",
+      "eventId": "1261943",
+      "narrative": "Spotter reported 1 inch hail in Garland."
+    },
+    {
+      "date": "2025-05-06",
+      "county": "Dallas",
+      "location": "Garland",
+      "hailInches": 1.25,
+      "source": "Social Media",
+      "eventId": "1261944",
+      "narrative": "Social media picture of half dollar sized hail in North Garland."
+    },
+    {
+      "date": "2025-05-06",
+      "county": "Dallas",
+      "location": "Sachse",
+      "hailInches": 1.5,
+      "source": "Social Media",
+      "eventId": "1261945",
+      "narrative": "Social media report of 1.5 inch hail around HWY 78 and 5th street in Sachse."
+    },
+    {
+      "date": "2025-05-06",
+      "county": "Dallas",
+      "location": "Garland",
+      "hailInches": 1.0,
+      "source": "Public",
+      "eventId": "1261948",
+      "narrative": "Report from mPING: Quarter (1.00 in.)."
+    },
+    {
+      "date": "2025-05-06",
+      "county": "Dallas",
+      "location": "Sachse",
+      "hailInches": 1.0,
+      "source": "Public",
+      "eventId": "1261949",
+      "narrative": "A member of the public reported 1 inch hail in Sachse."
+    },
+    {
+      "date": "2025-05-06",
+      "county": "Collin",
+      "location": "Murphy",
+      "hailInches": 1.25,
+      "source": "Public",
+      "eventId": "1261950",
+      "narrative": "Report from mPING: Half Dollar (1.25 in.)."
+    },
+    {
+      "date": "2025-05-06",
+      "county": "Collin",
+      "location": "Murphy",
+      "hailInches": 1.5,
+      "source": "Public",
+      "eventId": "1261952",
+      "narrative": "Report from mPING: Ping Pong Ball (1.50 in.)."
+    },
+    {
+      "date": "2025-05-06",
+      "county": "Denton",
+      "location": "Roanoke Vly Arpt",
+      "hailInches": 1.0,
+      "source": "Emergency Manager",
+      "eventId": "1261935",
+      "narrative": "Emergency manager reported 1 inch hail in Roanoke."
+    },
+    {
+      "date": "2025-05-06",
+      "county": "Denton",
+      "location": "Smoots",
+      "hailInches": 0.75,
+      "source": "Public",
+      "eventId": "1261936",
+      "narrative": "Report from mPING: Dime (0.75 in.)."
+    },
+    {
+      "date": "2025-05-16",
+      "county": "Kaufman",
+      "location": "Crandall",
+      "hailInches": 1.75,
+      "source": "Public",
+      "eventId": "1262033",
+      "narrative": "A Facebook photo showed golfball size hail in Crandall."
+    },
+    {
+      "date": "2025-05-16",
+      "county": "Kaufman",
+      "location": "Crandall",
+      "hailInches": 1.0,
+      "source": "Public",
+      "eventId": "1262034",
+      "narrative": "Report from mPING: Quarter (1.00 in.)."
+    },
+    {
+      "date": "2025-05-16",
+      "county": "Kaufman",
+      "location": "Terrell",
+      "hailInches": 1.0,
+      "source": "Fire Department/Rescue",
+      "eventId": "1262035",
+      "narrative": ""
+    },
+    {
+      "date": "2025-06-01",
+      "county": "Dallas",
+      "location": "Florence Hill",
+      "hailInches": 2.0,
+      "source": "Public",
+      "eventId": "1265495",
+      "narrative": "Report from mPING: Hen Egg (2.00 in.)."
+    },
+    {
+      "date": "2025-06-01",
+      "county": "Dallas",
+      "location": "Florence Hill",
+      "hailInches": 1.0,
+      "source": "Public",
+      "eventId": "1265496",
+      "narrative": "Report from mPING: Quarter (1.00 in.)."
+    },
+    {
+      "date": "2025-06-08",
+      "county": "Denton",
+      "location": "Corinth",
+      "hailInches": 1.0,
+      "source": "Public",
+      "eventId": "1265813",
+      "narrative": "Report from mPING: Quarter (1.00 in.)."
+    },
+    {
+      "date": "2025-06-08",
+      "county": "Denton",
+      "location": "Corinth",
+      "hailInches": 1.0,
+      "source": "Public",
+      "eventId": "1265815",
+      "narrative": "Report from mPING: Quarter (1.00 in.)."
+    },
+    {
+      "date": "2025-06-08",
+      "county": "Denton",
+      "location": "Lake Dallas",
+      "hailInches": 1.0,
+      "source": "Amateur Radio",
+      "eventId": "1265816",
+      "narrative": "Quarter size hail was reported in Lake Dallas via amateur radio."
+    },
+    {
+      "date": "2025-06-08",
+      "county": "Collin",
+      "location": "Branch",
+      "hailInches": 1.0,
+      "source": "Public",
+      "eventId": "1265825",
+      "narrative": "Report from mPING: Quarter (1.00 in.)."
+    },
+    {
+      "date": "2025-09-05",
+      "county": "Denton",
+      "location": "Krum",
+      "hailInches": 0.75,
+      "source": "Public",
+      "eventId": "1293707",
+      "narrative": "A public report indicated dime sized hail in Krum."
+    },
+    {
+      "date": "2025-09-05",
+      "county": "Denton",
+      "location": "Navo",
+      "hailInches": 1.25,
+      "source": "Public",
+      "eventId": "1293717",
+      "narrative": "A public report indicated half-dollar sized hail midway between Denton and Prosper."
+    },
+    {
+      "date": "2025-09-05",
+      "county": "Denton",
+      "location": "Navo",
+      "hailInches": 1.0,
+      "source": "Public",
+      "eventId": "1293718",
+      "narrative": "A public report indicated quarter sized hail 2 miles east of Lincoln Park."
+    },
+    {
+      "date": "2025-09-05",
+      "county": "Denton",
+      "location": "Parvin",
+      "hailInches": 1.25,
+      "source": "Public",
+      "eventId": "1293719",
+      "narrative": "A public report indicated half-dollar sized hail 4 miles west of Celina."
+    },
+    {
+      "date": "2025-09-05",
+      "county": "Denton",
+      "location": "Navo",
+      "hailInches": 1.0,
+      "source": "Public",
+      "eventId": "1294877",
+      "narrative": "A public report indicated quarter sized hail 3 miles east of Lincoln Park."
+    },
+    {
+      "date": "2025-09-21",
+      "county": "Denton",
+      "location": "Sanger",
+      "hailInches": 1.0,
+      "source": "Amateur Radio",
+      "eventId": "1295390",
+      "narrative": ""
+    },
+    {
+      "date": "2025-09-21",
+      "county": "Denton",
+      "location": "Sanger",
+      "hailInches": 1.0,
+      "source": "Emergency Manager",
+      "eventId": "1295391",
+      "narrative": ""
+    },
+    {
+      "date": "2025-09-21",
+      "county": "Denton",
+      "location": "Green Vly",
+      "hailInches": 1.25,
+      "source": "Public",
+      "eventId": "1295393",
+      "narrative": "Reported via mPing."
+    },
+    {
+      "date": "2025-09-21",
+      "county": "Collin",
+      "location": "Anna",
+      "hailInches": 1.75,
+      "source": "Public",
+      "eventId": "1295508",
+      "narrative": "Reported via mPing."
+    },
+    {
+      "date": "2025-09-21",
+      "county": "Collin",
+      "location": "Anna",
+      "hailInches": 1.25,
+      "source": "Public",
+      "eventId": "1295509",
+      "narrative": "Reported via mPing."
+    },
+    {
+      "date": "2025-09-21",
+      "county": "Denton",
+      "location": "Denton",
+      "hailInches": 0.75,
+      "source": "Public",
+      "eventId": "1295511",
+      "narrative": "Penny sized hail fell for about 5 minutes on the northern side of Denton. This was  reported via mPing."
+    },
+    {
+      "date": "2025-09-21",
+      "county": "Collin",
+      "location": "Anna",
+      "hailInches": 1.0,
+      "source": "Public",
+      "eventId": "1295512",
+      "narrative": "Reported via mPing."
+    },
+    {
+      "date": "2025-09-21",
+      "county": "Collin",
+      "location": "Melissa",
+      "hailInches": 2.0,
+      "source": "Public",
+      "eventId": "1295513",
+      "narrative": "Reported via mPing."
+    },
+    {
+      "date": "2025-09-21",
+      "county": "Collin",
+      "location": "Melissa",
+      "hailInches": 1.0,
+      "source": "Public",
+      "eventId": "1295514",
+      "narrative": "Reported via mPing."
+    },
+    {
+      "date": "2025-09-21",
+      "county": "Collin",
+      "location": "Altoga",
+      "hailInches": 0.75,
+      "source": "Public",
+      "eventId": "1295516",
+      "narrative": "Reported via mPing."
+    },
+    {
+      "date": "2025-11-24",
+      "county": "Denton",
+      "location": "Drop",
+      "hailInches": 1.0,
+      "source": "NWS Employee",
+      "eventId": "1301319",
+      "narrative": "Quarter sized hail was reported by a National Weather Service employee on Highway 407 midway between Justin and New Fairview."
+    },
+    {
+      "date": "2025-11-24",
+      "county": "Denton",
+      "location": "Ponder",
+      "hailInches": 1.0,
+      "source": "Social Media",
+      "eventId": "1301323",
+      "narrative": "Several social media reports indicated quarter sized hail in Ponder."
+    },
+    {
+      "date": "2025-11-24",
+      "county": "Denton",
+      "location": "Smoots",
+      "hailInches": 1.5,
+      "source": "Public",
+      "eventId": "1301325",
+      "narrative": "An mPing report indicated ping pong ball sized hail just southeast of Corral City."
+    },
+    {
+      "date": "2025-11-24",
+      "county": "Collin",
+      "location": "Foot",
+      "hailInches": 0.75,
+      "source": "Public",
+      "eventId": "1301326",
+      "narrative": "An mPing report indicated dime sized hail near Rustwood Acres west of the city of McKinney."
+    },
+    {
+      "date": "2025-11-24",
+      "county": "Collin",
+      "location": "McKinney",
+      "hailInches": 0.88,
+      "source": "Social Media",
+      "eventId": "1301327",
+      "narrative": "Numerous social media reports indicated small hail up to the size of nickels, covering the ground in some spots, in McKinney."
+    },
+    {
+      "date": "2026-03-04",
+      "county": "Rockwall",
+      "location": "Rockwell Muni Arpt",
+      "hailInches": 1.0,
+      "source": "Amateur Radio",
+      "eventId": "1316418",
+      "narrative": "Quarter size hail was reported near the intersection of Rochelle Rd and SH 276."
+    },
+    {
+      "date": "2026-03-04",
+      "county": "Dallas",
+      "location": "Florence Hill",
+      "hailInches": 1.25,
+      "source": "Broadcast Media",
+      "eventId": "1316419",
+      "narrative": "Broadcast media reported 1.25 inch hail near Joe Pool Lake."
+    },
+    {
+      "date": "2026-04-25",
+      "county": "Dallas",
+      "location": "Grand Prairie Arpt",
+      "hailInches": 1.0,
+      "source": "Trained Spotter",
+      "eventId": "1326024",
+      "narrative": "Trained spotter reported 1 inch hail in Grand Prairie."
+    },
+    {
+      "date": "2026-04-25",
+      "county": "Dallas",
+      "location": "Lakeview",
+      "hailInches": 3.0,
+      "source": "Social Media",
+      "eventId": "1326034",
+      "narrative": "Facebook photo showed large hail estimated to be up to 3 inches in diameter around Dallas Baptist University. Windows of cars were blown out."
+    },
+    {
+      "date": "2026-04-25",
+      "county": "Dallas",
+      "location": "Duncanville",
+      "hailInches": 1.0,
+      "source": "Public",
+      "eventId": "1326035",
+      "narrative": "Report of 1 inch hail from mPING."
+    },
+    {
+      "date": "2026-04-25",
+      "county": "Dallas",
+      "location": "Duncanville",
+      "hailInches": 1.0,
+      "source": "Public",
+      "eventId": "1326036",
+      "narrative": "Report of 1 inch hail from mPING."
+    },
+    {
+      "date": "2026-04-25",
+      "county": "Dallas",
+      "location": "Arcadia Park",
+      "hailInches": 1.25,
+      "source": "Public",
+      "eventId": "1326038",
+      "narrative": "Report of 1.25 inch hail from mPING."
+    },
+    {
+      "date": "2026-04-26",
+      "county": "Dallas",
+      "location": "Cockrell Hill",
+      "hailInches": 1.5,
+      "source": "Emergency Manager",
+      "eventId": "1326039",
+      "narrative": "Emergency manager reported 1.5 inch hail south of Cockrell Hill."
+    },
+    {
+      "date": "2026-04-27",
+      "county": "Rockwall",
+      "location": "Chisholm",
+      "hailInches": 2.0,
+      "source": "Trained Spotter",
+      "eventId": "1326161",
+      "narrative": "Trained spotter reported 2 inch hail near McLendon-Chisholm."
+    },
+    {
+      "date": "2026-04-27",
+      "county": "Dallas",
+      "location": "Rowlett",
+      "hailInches": 1.25,
+      "source": "Public",
+      "eventId": "1326097",
+      "narrative": "Report of 1.25 inch hail from mPING."
+    },
+    {
+      "date": "2026-04-27",
+      "county": "Dallas",
+      "location": "Rowlett",
+      "hailInches": 1.75,
+      "source": "Amateur Radio",
+      "eventId": "1326100",
+      "narrative": "Amateur radio operator reported 1.75 inch hail near Rowlett."
+    },
+    {
+      "date": "2026-04-27",
+      "county": "Dallas",
+      "location": "Rowlett",
+      "hailInches": 1.0,
+      "source": "Public",
+      "eventId": "1326104",
+      "narrative": "Report of 1 inch hail from mPING."
+    },
+    {
+      "date": "2026-04-27",
+      "county": "Dallas",
+      "location": "Rowlett",
+      "hailInches": 1.0,
+      "source": "Public",
+      "eventId": "1326105",
+      "narrative": "Report of 1 inch hail from mPING."
+    },
+    {
+      "date": "2026-04-27",
+      "county": "Dallas",
+      "location": "Curtis",
+      "hailInches": 1.0,
+      "source": "Public",
+      "eventId": "1326110",
+      "narrative": "Report of 1 inch hail from mPING."
+    },
+    {
+      "date": "2026-04-27",
+      "county": "Dallas",
+      "location": "Richardson",
+      "hailInches": 1.25,
+      "source": "Public",
+      "eventId": "1326114",
+      "narrative": "Report of 1.25 inch hail from mPING."
+    },
+    {
+      "date": "2026-04-27",
+      "county": "Dallas",
+      "location": "Richardson",
+      "hailInches": 1.75,
+      "source": "Public",
+      "eventId": "1326117",
+      "narrative": "A public email relayed 1.75 inch hail that was measured in Richardson."
+    },
+    {
+      "date": "2026-04-27",
+      "county": "Dallas",
+      "location": "Richardson",
+      "hailInches": 1.0,
+      "source": "Public",
+      "eventId": "1326119",
+      "narrative": "Report of 1 inch hail from mPING."
+    },
+    {
+      "date": "2026-04-27",
+      "county": "Dallas",
+      "location": "Richardson",
+      "hailInches": 1.25,
+      "source": "Public",
+      "eventId": "1326124",
+      "narrative": "Report of 1.25 inch hail from mPING."
+    },
+    {
+      "date": "2026-04-27",
+      "county": "Dallas",
+      "location": "Richardson",
+      "hailInches": 1.0,
+      "source": "Public",
+      "eventId": "1326130",
+      "narrative": "Report of 1 inch hail from mPING."
+    },
+    {
+      "date": "2026-04-27",
+      "county": "Dallas",
+      "location": "Richardson",
+      "hailInches": 1.25,
+      "source": "Public",
+      "eventId": "1326133",
+      "narrative": "Hail between 1 and 1.25 inches fell near East Spring Valley Road and South Lois Lane in Richardson."
+    },
+    {
+      "date": "2026-04-27",
+      "county": "Dallas",
+      "location": "Richardson",
+      "hailInches": 1.0,
+      "source": "Public",
+      "eventId": "1326136",
+      "narrative": "Report of 1 inch hail from mPING."
+    },
+    {
+      "date": "2026-04-27",
+      "county": "Dallas",
+      "location": "Bouchard",
+      "hailInches": 1.0,
+      "source": "Public",
+      "eventId": "1326137",
+      "narrative": "Report of 1 inch hail from mPING."
+    },
+    {
+      "date": "2026-04-27",
+      "county": "Rockwall",
+      "location": "Rowlett",
+      "hailInches": 2.0,
+      "source": "Emergency Manager",
+      "eventId": "1326138",
+      "narrative": "Emergency manager reported 2 inch hail in Rowlett."
+    },
+    {
+      "date": "2026-04-27",
+      "county": "Collin",
+      "location": "Murphy",
+      "hailInches": 1.0,
+      "source": "Public",
+      "eventId": "1326141",
+      "narrative": "Report of 1 inch hail from mPING."
+    },
+    {
+      "date": "2026-04-27",
+      "county": "Collin",
+      "location": "Murphy",
+      "hailInches": 1.0,
+      "source": "Public",
+      "eventId": "1326143",
+      "narrative": "Report of 1 inch hail from mPING."
+    },
+    {
+      "date": "2026-04-27",
+      "county": "Collin",
+      "location": "Wylie",
+      "hailInches": 1.25,
+      "source": "Fire Department/Rescue",
+      "eventId": "1326145",
+      "narrative": "Fire Department reported 1.25 inch hail in Saint Paul."
+    },
+    {
+      "date": "2026-04-27",
+      "county": "Rockwall",
+      "location": "Rockwall",
+      "hailInches": 1.75,
+      "source": "Amateur Radio",
+      "eventId": "1326146",
+      "narrative": "Amateur radio operator reported 1.75 inch hail just south of Rockwall."
+    },
+    {
+      "date": "2026-04-27",
+      "county": "Rockwall",
+      "location": "Fate",
+      "hailInches": 2.75,
+      "source": "Public",
+      "eventId": "1326151",
+      "narrative": "Large hail reported in Fate. Exact hail size was unknown, but the hail was large enough to leave holes in a metal roof on a property near the Brookshires."
+    },
+    {
+      "date": "2026-04-27",
+      "county": "Rockwall",
+      "location": "Rockwall",
+      "hailInches": 1.75,
+      "source": "Public",
+      "eventId": "1326156",
+      "narrative": "Report of 1.75 inch hail from mPING."
+    },
+    {
+      "date": "2026-04-27",
+      "county": "Rockwall",
+      "location": "Blackland",
+      "hailInches": 2.0,
+      "source": "Public",
+      "eventId": "1326158",
+      "narrative": "Report of 2 inch hail from mPING."
+    },
+    {
+      "date": "2026-04-27",
+      "county": "Rockwall",
+      "location": "Fate",
+      "hailInches": 1.5,
+      "source": "Public",
+      "eventId": "1326159",
+      "narrative": "Report of 1.5 inch hail from mPING."
+    },
+    {
+      "date": "2026-04-27",
+      "county": "Rockwall",
+      "location": "Blackland",
+      "hailInches": 1.5,
+      "source": "Public",
+      "eventId": "1326160",
+      "narrative": "Report of 1.5 inch hail from mPING."
+    },
+    {
+      "date": "2026-04-28",
+      "county": "Dallas",
+      "location": "Addison",
+      "hailInches": 0.75,
+      "source": "Public",
+      "eventId": "1326308",
+      "narrative": "Report of 0.75 inch hail from mPING."
+    },
+    {
+      "date": "2026-05-19",
+      "county": "Denton",
+      "location": "Aubrey",
+      "hailInches": 0.88,
+      "source": "Amateur Radio",
+      "eventId": "1334955",
+      "narrative": "HAM radio operator reported nickel size hail north of Aubrey."
+    },
+    {
+      "date": "2026-05-23",
+      "county": "Dallas",
+      "location": "(Rbd)Redbird Arpt Da",
+      "hailInches": 1.0,
+      "source": "Public",
+      "eventId": "1334936",
+      "narrative": "Hail up to 1 inch was reported east of Duncanville."
+    },
+    {
+      "date": "2026-05-23",
+      "county": "Dallas",
+      "location": "Trinity Mills",
+      "hailInches": 1.5,
+      "source": "Social Media",
+      "eventId": "1334938",
+      "narrative": "A post on X showed 1.5 inch hail near the intersection of Trinity Mills Rd and Scott Mill Rd."
+    },
+    {
+      "date": "2026-05-23",
+      "county": "Dallas",
+      "location": "Meaders",
+      "hailInches": 1.0,
+      "source": "Other Federal Agency",
+      "eventId": "1334939",
+      "narrative": "Hail up to 1 inch was reported north of University Park."
+    },
+    {
+      "date": "2026-05-23",
+      "county": "Rockwall",
+      "location": "Heath",
+      "hailInches": 1.0,
+      "source": "Trained Spotter",
+      "eventId": "1334940",
+      "narrative": "A trained spotter reported 1 inch hail in Heath on X."
+    },
+    {
+      "date": "2026-05-24",
+      "county": "Denton",
+      "location": "Drop",
+      "hailInches": 1.0,
+      "source": "NWS Employee",
+      "eventId": "1334944",
+      "narrative": "NWS employee reported 1 inch hail west northwest of Justin."
+    },
+    {
+      "date": "2026-05-24",
+      "county": "Dallas",
+      "location": "Duncanville",
+      "hailInches": 1.0,
+      "source": "Public",
+      "eventId": "1344254",
+      "narrative": "Quarter sized hail was reported on North Merrill Ave in Duncanville."
+    }
+  ]
+}

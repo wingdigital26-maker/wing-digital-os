@@ -354,6 +354,23 @@ section{padding:34px 0 0}
 .pl-state{margin-top:14px;display:inline-block;font-size:.68rem;font-weight:700;
   letter-spacing:.07em;text-transform:uppercase;padding:4px 10px;border-radius:5px;
   background:var(--surface-2);color:var(--t3)}
+/* storm history -- a generic, config-driven summary of a public storm record.
+   Renders ONLY when the payload carries `stormHistory`, so a client config
+   without one ships none of it. Every number is a count read straight off the
+   source file; there is no estimate, projection or damage figure anywhere in
+   it, because the public record does not contain one. */
+.sv-ev{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;align-items:baseline;
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
+  padding:11px 14px;margin-bottom:8px}
+.sv-sz{grid-row:1/3;font-family:var(--display);font-weight:700;font-size:1rem;
+  color:var(--accent);font-variant-numeric:tabular-nums;white-space:nowrap;
+  min-width:3.4em}
+.sv-wh{font-size:.9rem;font-weight:600;color:var(--t1);overflow-wrap:break-word}
+.sv-mt{font-size:.78rem;color:var(--t3);overflow-wrap:break-word}
+.sv-src{margin-top:14px;font-size:.79rem;color:var(--t3);line-height:1.55;
+  overflow-wrap:break-word}
+.sv-src a{color:var(--accent);text-decoration:none;overflow-wrap:anywhere}
+@media(max-width:420px){.sv-ev{grid-template-columns:1fr}.sv-sz{grid-row:auto}}
 /* referral partner asset -- a generic, config-driven summary of a staged list
    of businesses who could send the client work. Renders ONLY when the payload
    carries `referralPartners`, so a client config without one ships none of it.
@@ -453,6 +470,30 @@ section{padding:34px 0 0}
     <div id="rp-sample"></div>
     <div class="ctbl-cap" id="rp-cap"></div>
     <div class="pl-note" id="rp-note" hidden></div>
+  </section>
+
+
+  <!-- Storm history. Generic and config-driven: this whole section exists only
+       when the payload carries `stormHistory`, and every visible word is either
+       injected by the stormHistory() script below or read out of the source
+       data file. Counts of recorded events only: no estimate, no projection,
+       no damage or revenue figure. -->
+  <section id="sv-sec" hidden>
+    <div class="sh"><h2 id="sv-h"></h2><span class="n" id="sv-n"></span></div>
+    <div class="sd" id="sv-sd"></div>
+    <div class="pl-banner" id="sv-banner" hidden></div>
+    <div class="lstats" id="sv-stats"></div>
+    <div class="mgroup"><div class="mlabel" id="sv-county-label"></div></div>
+    <div class="rp-bars" id="sv-counties"></div>
+    <div class="mgroup"><div class="mlabel" id="sv-month-label"></div></div>
+    <div class="rp-bars" id="sv-months"></div>
+    <div class="mgroup"><div class="mlabel" id="sv-city-label"></div></div>
+    <div class="lpills" id="sv-cities"></div>
+    <div class="ctbl-cap" id="sv-city-note" hidden></div>
+    <div class="mgroup"><div class="mlabel" id="sv-ev-label"></div></div>
+    <div id="sv-events"></div>
+    <div class="sv-src" id="sv-src"></div>
+    <div class="pl-note" id="sv-note" hidden></div>
   </section>
 
   <!-- Demo activity sections (SAMPLE / preview clients only). These render ONLY
@@ -958,6 +999,92 @@ const DATA = __DATA__;
     }
     if (R.note) { $('#rp-note').textContent = R.note; $('#rp-note').hidden = false; }
   })();
+
+  /* -- storm history --------------------------------------------
+     Generic and config-driven. Renders nothing unless the payload carries
+     `stormHistory`. Every figure printed here is a count of records in a
+     public storm database, copied through the build without transformation.
+     Nothing is estimated, projected or inferred, and the source link and pull
+     date are printed on the page so the client can check the record himself. */
+  (function stormHistory(){
+    const S = DATA.stormHistory;
+    if (!S || !S.summary || !S.summary.hailEvents) return;
+    $('#sv-sec').hidden = false;
+    const L = S.labels || {};
+    const num = x => (x||0).toLocaleString('en-US');
+    const inch = v => (v % 1 === 0 ? v.toFixed(0) : String(v)) + '"';
+    const day = d => { if (!d) return ''; const p = d.split('-');
+      return new Date(+p[0], +p[1]-1, +p[2]).toLocaleDateString('en-US',
+        {month:'short', day:'numeric', year:'numeric'}); };
+
+    $('#sv-h').textContent  = S.title || 'Storm history in your service area';
+    $('#sv-n').textContent  = num(S.summary.hailEvents) + ' recorded hail reports';
+    $('#sv-sd').textContent = S.intro || '';
+    if (S.banner) { $('#sv-banner').textContent = S.banner; $('#sv-banner').hidden = false; }
+
+    const q = S.summary;
+    const tiles = [
+      [num(q.hailEvents),                'hail reports on record'],
+      [num(q.hailEventsOneInchOrLarger), 'at 1 inch or larger'],
+      [num(q.distinctStormDays),         'separate storm days'],
+      [inch(q.largestHailInches||0),     'largest hail recorded'],
+      [num((S.byCounty||[]).length),     'counties covered'],
+      [num((S.window||{}).months||0),    'months of record']
+    ];
+    const tl = L.tiles || [];
+    $('#sv-stats').innerHTML = tiles.map((t,i) =>
+      '<div class="lstat"><b>'+esc(t[0])+'</b><span>'+esc(tl[i]||t[1])+'</span></div>').join('');
+
+    const bars = (el, rows, key) => {
+      if (!rows.length) return;
+      const max = Math.max.apply(null, rows.map(r=>r.count));
+      $(el).innerHTML = rows.map(r =>
+        '<div class="rp-bar"><div class="rpn">'+esc(r[key])+'</div>'+
+        '<div class="rpc">'+num(r.count)+'</div>'+
+        '<div class="rpt"><i data-w="'+((r.count/max)*100).toFixed(1)+'"></i></div></div>').join('');
+    };
+    $('#sv-county-label').textContent = L.countyLabel || 'By county';
+    bars('#sv-counties', S.byCounty||[], 'name');
+    $('#sv-month-label').textContent = L.monthLabel || 'When it happens';
+    bars('#sv-months', S.byMonth||[], 'month');
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      document.querySelectorAll('#sv-counties .rpt i, #sv-months .rpt i')
+        .forEach(b=>{ b.style.width = b.dataset.w+'%'; });
+    }));
+
+    const cities = S.byServiceCity || [];
+    if (cities.length) {
+      $('#sv-city-label').textContent = L.cityLabel || 'Your cities, by name on the record';
+      $('#sv-cities').innerHTML = cities.map(c =>
+        '<span class="lpill">'+esc(c.city)+' <i>'+num(c.count)+'</i></span>').join('');
+    }
+    const gaps = S.citiesWithNoNamedReport || [];
+    let cn = S.cityNote || '';
+    if (gaps.length) cn += ' No report in this window is filed under the ' +
+      (gaps.length > 1 ? 'names ' : 'name ') +
+      (gaps.length > 1 ? gaps.slice(0,-1).join(', ') + ' or ' + gaps[gaps.length-1]
+                       : gaps[0]) + '.';
+    if (cn.trim()) { $('#sv-city-note').textContent = cn.trim();
+                     $('#sv-city-note').hidden = false; }
+
+    const ev = S.topEvents || [];
+    if (ev.length) {
+      $('#sv-ev-label').textContent = L.eventLabel || 'The largest on record';
+      $('#sv-events').innerHTML = ev.map(e =>
+        '<div class="sv-ev"><div class="sv-sz">'+esc(inch(e.hailInches||0))+'</div>'+
+        '<div class="sv-wh">'+esc(e.location||'')+', '+esc(e.county||'')+' County</div>'+
+        '<div class="sv-mt">'+esc(day(e.date))+
+          (e.source ? ' &middot; reported by ' + esc(e.source) : '')+'</div></div>').join('');
+    }
+
+    let src = S.sourceLine || '';
+    if (S.coverageNote) src += (src ? ' ' : '') + S.coverageNote;
+    if (S.pulledOn) src += (src ? ' ' : '') + 'Pulled ' + day(S.pulledOn) + '.';
+    $('#sv-src').innerHTML = esc(src) + (S.sourceUrl ?
+      ' <a href="'+esc(S.sourceUrl)+'" target="_blank" rel="noopener">'+esc(S.sourceUrl)+'</a>' : '');
+    if (S.note) { $('#sv-note').textContent = S.note; $('#sv-note').hidden = false; }
+  })();
+
 
   /* The agency credit is a link only when the payload carries a URL we stand
      behind. A dead link in the footer of a client-facing page is worse than

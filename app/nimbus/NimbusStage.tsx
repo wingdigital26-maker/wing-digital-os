@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import "./stage.css";
+import ProblemsPanel from "./ProblemsPanel";
 
 type Mood = "calm" | "excited" | "thinking" | "alert" | "party" | "sleepy" | "dim";
 
 type MascotHandle = {
   setState: (state: Mood) => void;
+  pulse?: (state: Mood, ms?: number) => void;
   destroy: () => void;
 };
 
@@ -122,6 +124,8 @@ type Layout = { orb: number; showOrb: boolean; showDate: boolean; showChips: boo
 // The mascot is mounted once at this size and then CSS-scaled to fit. Scaling
 // beats remounting: a remount restarts the intro and drops the current mood.
 const ORB_BASE = 200;
+// How long a mood is worn before Nimbus settles back to calm.
+const MOOD_HOLD_MS = 5000;
 
 // Fixed geometry of the hero itself. Everything else is measured off the real
 // DOM, because guessed row heights are exactly what clipped the orb before:
@@ -226,6 +230,8 @@ function splitCaveat(text: string): { head: string; caveat: string | null } {
 export default function NimbusStage() {
   const slotRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
+  // The problems list, opened from the alert chip or from a nimbus:problems event.
+  const [problemsOpen, setProblemsOpen] = useState(false);
   const heroRef = useRef<HTMLDivElement>(null);
   const dateRef = useRef<HTMLParagraphElement>(null);
   const chipsRef = useRef<HTMLDivElement>(null);
@@ -256,14 +262,16 @@ export default function NimbusStage() {
   const problems = glance?.watch?.problems;
   const mood: Mood = typeof problems === "number" && problems > 0 ? "alert" : "calm";
 
-  const chips: { key: string; text: string; tone: "normal" | "alert" | "muted"; ask?: string }[] = [];
+  const chips: { key: string; text: string; tone: "normal" | "alert" | "muted"; ask?: string; opens?: "problems" }[] = [];
   const watchHeadline = glance?.watch?.headline;
   if (watchHeadline) {
     chips.push({
       key: "watch",
       text: watchHeadline,
       tone: typeof problems === "number" && problems > 0 ? "alert" : "normal",
-      ask: "What is broken right now, and how do I fix each one?",
+      // Opens the list instead of asking a question: seeing them and acting on
+      // them beats reading a paragraph about them.
+      opens: "problems",
     });
   }
   const mrrLine = glance?.mrr?.line;
@@ -379,6 +387,13 @@ export default function NimbusStage() {
   }, [measure]);
 
   useEffect(() => {
+    const open = () => setProblemsOpen(true);
+    window.addEventListener("nimbus:problems", open);
+    if (typeof window !== "undefined" && window.location.hash === "#problems") open();
+    return () => window.removeEventListener("nimbus:problems", open);
+  }, []);
+
+  useEffect(() => {
     const ctl = new AbortController();
     fetch("/api/nimbus/glance", { signal: ctl.signal, cache: "no-store" })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
@@ -434,7 +449,24 @@ export default function NimbusStage() {
 
   // Mood follows the watch only. Nothing here animates on a timer.
   useEffect(() => {
-    if (mascotRef.current) mascotRef.current.setState(mood);
+    const orb = mascotRef.current;
+    if (!orb) return;
+    if (mood === "calm") {
+      orb.setState("calm");
+      return;
+    }
+    // React to the news, then let it go. pulse() is the mascot's own
+    // show-this-then-return-to-rest call; setState would stick forever and an
+    // orb that is permanently alarmed reads as broken rather than as informed.
+    if (orb.pulse) {
+      orb.pulse(mood, MOOD_HOLD_MS);
+      return;
+    }
+    // An older mascot build with no pulse(): do it by hand so the decay still
+    // happens rather than silently not happening.
+    orb.setState(mood);
+    const t = window.setTimeout(() => orb.setState("calm"), MOOD_HOLD_MS);
+    return () => clearTimeout(t);
   }, [mood, glance, mascotFailed]);
 
   // Trouble is reported as what broke plus what to do about it. Never a symptom
@@ -500,6 +532,7 @@ export default function NimbusStage() {
 
   return (
     <div className="nimbus-stage" data-mood={mood}>
+      {problemsOpen ? <ProblemsPanel onClose={() => setProblemsOpen(false)} /> : null}
       <div className="nimbus-stage-layer nimbus-aurora" />
       <div className="nimbus-stage-layer nimbus-stars-far" />
       <div className="nimbus-stage-layer nimbus-stars" />
@@ -554,7 +587,7 @@ export default function NimbusStage() {
                     type="button"
                     className="nimbus-trouble"
                     title={t.what + " " + t.fix}
-                    onClick={() => window.dispatchEvent(new CustomEvent("jarvis:ask", { detail: t.ask }))}
+                    onClick={() => setProblemsOpen(true)}
                   >
                     <span className="nimbus-trouble-what">{t.what}</span>
                     <span className="nimbus-trouble-fix">{t.fix}</span>
@@ -569,7 +602,7 @@ export default function NimbusStage() {
                     "nimbus-chip" +
                     (c.tone === "alert" ? " nimbus-chip-alert" : "") +
                     (c.tone === "muted" ? " nimbus-chip-muted" : "") +
-                    (c.ask ? " nimbus-chip-ask" : "");
+                    (c.ask || c.opens ? " nimbus-chip-ask" : "");
                   const { head, caveat } = splitCaveat(c.text);
                   const inner = (
                     <>
@@ -580,7 +613,14 @@ export default function NimbusStage() {
                       </span>
                     </>
                   );
-                  return c.ask ? (
+                  // A chip either opens the problems list or asks a question.
+                  // The watch chip opens the list: Jack asked to SEE and HANDLE
+                  // the problems, and a paragraph in the chat is neither.
+                  return c.opens === "problems" ? (
+                    <button key={c.key} type="button" className={cls} onClick={() => setProblemsOpen(true)}>
+                      {inner}
+                    </button>
+                  ) : c.ask ? (
                     <button
                       key={c.key}
                       type="button"

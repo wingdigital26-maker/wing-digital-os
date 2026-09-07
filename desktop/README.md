@@ -46,6 +46,41 @@ a password exactly as before. Clear it by deleting the line from `.env.local`.
   confirmation cards in that mode, which is the trade for it being able to do
   real work. The choice is remembered per machine.
 
+## The orb
+
+After installing, a small Nimbus sits in the bottom right corner of the screen,
+over whatever you are doing, the way a chat widget sits on a website. No taskbar
+button and no alt-tab entry.
+
+* **Click it** to open the Nimbus window. When something is broken it opens
+  straight onto the problems list.
+* **Right click it** for Open, Show problems, Check now, and Quit.
+* **Drag it** anywhere; it remembers where you put it.
+* It checks the OS every five minutes. When something NEW breaks it shows a
+  popup and wears an amber badge with the count, then settles back to calm after
+  five seconds. A standing problem keeps its badge but stops nagging.
+* A grey rim means the status could not be read at all. That is different from
+  a clean orb, on purpose: unknown is never drawn as fine.
+
+The Nimbus window itself no longer takes a taskbar button either, since the orb
+is the permanent presence. Set `NIMBUS_TASKBAR=1` if you want the button back.
+
+## Handling problems
+
+The window's problems list is the thing to open when something is wrong. Each
+problem shows what broke, the suggested fix, and three buttons:
+
+* **Look into it** hands it to Nimbus. He investigates on this PC, fixes what is
+  safe to fix, and reports what he found with the steps he took.
+* **Ask me** takes it into the chat.
+* The third button opens the part of the OS where the problem lives.
+
+What he will not do on his own, whatever he concludes: send anything to a real
+person, arm or unpause a sender, spend money, delete data, push, deploy, or
+touch a client's live site. Those come back as "Needs you" with the exact
+command. A fix he cannot show evidence for is reported as needing your eyes, not
+as done.
+
 ## Files
 
 | File | What it does |
@@ -55,6 +90,8 @@ a password exactly as before. Clear it by deleting the line from `.env.local`.
 | `nimbus-hotkey.vbs` | Starts the listener with no console box. |
 | `nimbus.vbs` | Opens the window itself, also with no console box. |
 | `nimbus.ps1` | Opens or focuses the app window. Says so plainly if the OS is not running. |
+| `nimbus-orb.ps1` | The always-there orb: draws it, watches for problems, shows the popup. |
+| `nimbus-orb.vbs` | Starts the orb with no console box. |
 | `nimbus.ahk` | Optional AutoHotkey version of the same toggle, if you would rather use that. |
 
 Set `NIMBUS_PORT` if the OS is not on 3000.

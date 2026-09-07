@@ -24,8 +24,10 @@ $ErrorActionPreference = "Stop"
 $here      = Split-Path -Parent $MyInvocation.MyCommand.Path
 $vbs       = Join-Path $here "nimbus.vbs"
 $listener  = Join-Path $here "nimbus-hotkey.vbs"
+$orbVbs    = Join-Path $here "nimbus-orb.vbs"
 $link      = Join-Path ([Environment]::GetFolderPath("Programs")) "Nimbus.lnk"
 $startup   = Join-Path ([Environment]::GetFolderPath("Startup")) "Nimbus hotkey.lnk"
+$orbStartup = Join-Path ([Environment]::GetFolderPath("Startup")) "Nimbus orb.lnk"
 
 function Get-ListenerProcesses {
   # NOTE the leading backslash and the install- exclusion. Matching a bare
@@ -40,6 +42,19 @@ function Get-ListenerProcesses {
     }
 }
 
+function Get-OrbProcesses {
+  Get-CimInstance Win32_Process -Filter "Name = 'powershell.exe'" |
+    Where-Object {
+      $_.CommandLine -and
+      $_.CommandLine -like "*\nimbus-orb.ps1*" -and
+      $_.ProcessId -ne $PID
+    }
+}
+
+function Stop-Orb {
+  Get-OrbProcesses | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+}
+
 function Stop-Listener {
   # The listener holds a named mutex, so killing the powershell that owns the
   # script is enough; nothing else is left behind.
@@ -48,7 +63,8 @@ function Stop-Listener {
 
 if ($Remove) {
   Stop-Listener
-  foreach ($f in @($link, $startup)) {
+  Stop-Orb
+  foreach ($f in @($link, $startup, $orbStartup)) {
     if (Test-Path $f) { Remove-Item $f -Force; Write-Host "Removed $f" }
   }
   Write-Host "Nimbus is off the hotkey."
@@ -86,6 +102,29 @@ if ($keyName -eq "SPACE") {
     Write-Host "Try: .\install-nimbus-hotkey.ps1 -Hotkey 'Ctrl+Alt+Space'"
   }
   Write-Host "Starts again at login: $startup"
+
+# ── The orb: Nimbus in the corner of the screen, always ─────────────────────
+# No taskbar button and no alt-tab entry, the way a chat widget sits on a page.
+# It also watches, and pops up when something new breaks.
+if (Test-Path $orbVbs) {
+  Stop-Orb
+  $so = $shell.CreateShortcut($orbStartup)
+  $so.TargetPath       = "$env:SystemRoot\System32\wscript.exe"
+  $so.Arguments        = """$orbVbs"""
+  $so.WorkingDirectory = $here
+  $so.WindowStyle      = 7
+  $so.Description      = "Nimbus orb"
+  $so.Save()
+  Start-Process -FilePath "$env:SystemRoot\System32\wscript.exe" -ArgumentList """$orbVbs""" -WindowStyle Hidden
+  Start-Sleep -Milliseconds 900
+  if (Get-OrbProcesses) {
+    Write-Host "The orb is on screen, bottom right. Click it to open Nimbus, right click it for the menu."
+  } else {
+    Write-Host "The orb did not stay running. Start it by hand to see the error:"
+    Write-Host "  powershell -ExecutionPolicy Bypass -File .\nimbus-orb.ps1"
+  }
+  Write-Host "Starts again at login: $orbStartup"
+}
   return
 }
 
@@ -111,3 +150,26 @@ $sc.Save()
 Write-Host "Nimbus is on $Hotkey."
 Write-Host "Shortcut: $link"
 Write-Host "If the hotkey does not fire, open the shortcut's Properties once and confirm the Shortcut key field."
+
+# ── The orb: Nimbus in the corner of the screen, always ─────────────────────
+# No taskbar button and no alt-tab entry, the way a chat widget sits on a page.
+# It also watches, and pops up when something new breaks.
+if (Test-Path $orbVbs) {
+  Stop-Orb
+  $so = $shell.CreateShortcut($orbStartup)
+  $so.TargetPath       = "$env:SystemRoot\System32\wscript.exe"
+  $so.Arguments        = """$orbVbs"""
+  $so.WorkingDirectory = $here
+  $so.WindowStyle      = 7
+  $so.Description      = "Nimbus orb"
+  $so.Save()
+  Start-Process -FilePath "$env:SystemRoot\System32\wscript.exe" -ArgumentList """$orbVbs""" -WindowStyle Hidden
+  Start-Sleep -Milliseconds 900
+  if (Get-OrbProcesses) {
+    Write-Host "The orb is on screen, bottom right. Click it to open Nimbus, right click it for the menu."
+  } else {
+    Write-Host "The orb did not stay running. Start it by hand to see the error:"
+    Write-Host "  powershell -ExecutionPolicy Bypass -File .\nimbus-orb.ps1"
+  }
+  Write-Host "Starts again at login: $orbStartup"
+}

@@ -26,6 +26,10 @@ if (-not $Key) {
 }
 $Url = "http://localhost:$Port/nimbus"
 if ($Key) { $Url = "$Url" + "?k=" + [uri]::EscapeDataString($Key) }
+# The orb opens him straight onto the problems list when there are problems.
+# NIMBUS_OPEN_HASH is set by the caller; anything unexpected is ignored.
+$Hash = $env:NIMBUS_OPEN_HASH
+if ($Hash -eq "#problems" -or $Hash -eq "#nimbus") { $Url = "$Url$Hash" }
 
 function Get-ChromePath {
   $candidates = @(
@@ -79,6 +83,43 @@ if (-not $browser) {
   exit 1
 }
 
+# Keep the window off the taskbar and out of alt-tab. The orb in the corner is
+# the permanent presence; a second button for the same assistant is clutter.
+# Set NIMBUS_TASKBAR=1 to get the normal window button back.
+$hideSig = @'
+using System;
+using System.Runtime.InteropServices;
+using System.Text;
+public class NimbusChrome {
+  [DllImport("user32.dll")] static extern int GetWindowLong(IntPtr h, int i);
+  [DllImport("user32.dll")] static extern int SetWindowLong(IntPtr h, int i, int v);
+  [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr h, int c);
+  [DllImport("user32.dll")] static extern bool EnumWindows(EnumProc cb, IntPtr p);
+  [DllImport("user32.dll")] static extern int GetWindowText(IntPtr h, StringBuilder s, int n);
+  [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
+  delegate bool EnumProc(IntPtr h, IntPtr p);
+  const int GWL_EXSTYLE = -20, WS_EX_TOOLWINDOW = 0x80, SW_HIDE = 0, SW_SHOW = 5;
+
+  /// Re-style every visible window whose title is the Nimbus window.
+  public static int HideFromTaskbar() {
+    int n = 0;
+    EnumWindows((h, p) => {
+      if (!IsWindowVisible(h)) return true;
+      var sb = new StringBuilder(256);
+      GetWindowText(h, sb, sb.Capacity);
+      if (sb.ToString().IndexOf("Nimbus", StringComparison.OrdinalIgnoreCase) < 0) return true;
+      // The style only takes effect across a hide/show cycle.
+      ShowWindow(h, SW_HIDE);
+      SetWindowLong(h, GWL_EXSTYLE, GetWindowLong(h, GWL_EXSTYLE) | WS_EX_TOOLWINDOW);
+      ShowWindow(h, SW_SHOW);
+      n++;
+      return true;
+    }, IntPtr.Zero);
+    return n;
+  }
+}
+'@
+
 New-Item -ItemType Directory -Force -Path $Profile | Out-Null
 
 # 560x780 was sized for a chat panel alone. The stage now shows the orb large
@@ -111,3 +152,16 @@ $args = @(
   "--no-default-browser-check"
 )
 Start-Process -FilePath $browser -ArgumentList $args | Out-Null
+
+if ($env:NIMBUS_TASKBAR -ne "1") {
+  # Chrome needs a moment to create the window before it can be re-styled.
+  try {
+    if (-not ("NimbusChrome" -as [type])) { Add-Type -TypeDefinition $hideSig }
+    for ($i = 0; $i -lt 20; $i++) {
+      Start-Sleep -Milliseconds 250
+      if ([NimbusChrome]::HideFromTaskbar() -gt 0) { break }
+    }
+  } catch {
+    # Cosmetic only. A window that shows in the taskbar still works fine.
+  }
+}

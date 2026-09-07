@@ -622,22 +622,17 @@ export default function JarvisButton() {
              The clamp keeps the stage above at 300px or more at 900px tall,
              and still leaves it room at 600px and 1100px. */
           height: clamp(300px, 56vh, 620px) !important;
+          /* ONE surface, not a card on a stage. No border, no radius, no
+             shadow: the only thing separating the chat from the sky above it
+             is the fade of the background itself, so the window reads as a
+             single continuous thing rather than two stacked panels. */
           border: none !important;
-          border-top: 1px solid rgba(61,107,240,0.28) !important;
-          border-radius: 24px 24px 0 0 !important;
-          background: linear-gradient(180deg, rgba(13,17,23,0.58) 0%, rgba(13,17,23,0.92) 14%, #0d1117 42%) !important;
-          -webkit-backdrop-filter: blur(22px) saturate(120%);
-          backdrop-filter: blur(22px) saturate(120%);
-          box-shadow: 0 -1px 0 rgba(61,107,240,0.18), 0 -24px 70px rgba(0,0,0,0.55) !important;
+          border-radius: 0 !important;
+          background: linear-gradient(180deg, rgba(13,17,23,0) 0%, rgba(13,17,23,0.55) 34px, rgba(13,17,23,0.9) 96px, #0d1117 190px) !important;
+          box-shadow: none !important;
           animation: jarvis-solo-in 260ms ease-out both;
         }
-        @keyframes jarvis-solo-in { from { transform: translateY(14px); opacity: 0; } to { transform: none; opacity: 1; } }
-        /* A hairline of accent light along the top edge, so the card reads as
-           part of the stage rather than a box dropped on top of it. */
-        .jarvis-solo .jarvis-head::before {
-          content: ""; position: absolute; left: 12%; right: 12%; top: 0; height: 1px;
-          background: linear-gradient(90deg, transparent, rgba(61,107,240,0.55), transparent);
-        }
+        @keyframes jarvis-solo-in { from { opacity: 0; } to { opacity: 1; } }
         .jarvis-solo .jarvis-head {
           position: relative;
           /* Four controls plus the name do not fit on one line under about
@@ -645,8 +640,8 @@ export default function JarvisButton() {
           flex-wrap: wrap;
           row-gap: 8px;
           background: transparent !important;
-          border-bottom: 1px solid rgba(61,107,240,0.10) !important;
-          padding: 14px 22px 12px !important;
+          border-bottom: none !important;
+          padding: 10px 22px 6px !important;
         }
         .jarvis-solo .jarvis-name { font-size: 17px !important; letter-spacing: 0.01em; }
         .jarvis-solo .jarvis-headbtn { font-size: 11px !important; padding: 5px 11px !important; border-radius: 8px !important; }

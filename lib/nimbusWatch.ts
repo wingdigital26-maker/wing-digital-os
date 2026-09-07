@@ -195,7 +195,7 @@ async function checkSending(): Promise<Check[]> {
             "Cold email sender",
             `The sender is paused${age === null ? "" : ` and has been since its last run ${age} days ago`}. Nothing is going out.`,
             VIEW_LINK("email", "CRM > Email"),
-            "Unpause the sender in Supabase outreach_state (set paused to false for client wing), then confirm the next cloud run sends.")
+            "Unpausing alone sends nothing: daily_outreach.py lost its delivery step when GHL was retired and smtp-sender has no mailbox credentials. Decide the delivery pipe first, add the mailbox secrets to wing-outreach-cloud, dry-run smtp-sender, then clear the pause.")
         );
       } else if (age !== null && age >= 2) {
         out.push(

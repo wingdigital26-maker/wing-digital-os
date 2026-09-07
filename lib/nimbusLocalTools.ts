@@ -27,6 +27,7 @@ import { VAULT_PATH, readVaultFile } from "@/lib/vaultSource";
 import { getRevenueTruth, BASIS_LABEL } from "@/lib/revenue";
 import { sbGet } from "@/app/api/pipeline/_lib";
 import { sbUrl, sbService } from "@/lib/osSupabase";
+import { runNimbusWatch, formatWatchReport } from "@/lib/nimbusWatch";
 
 export type LocalToolArgs = Record<string, unknown>;
 export type LocalToolOutcome = { content: string; links?: { label: string; view?: string; href?: string }[] };
@@ -454,6 +455,26 @@ async function callRoom(a: LocalToolArgs): Promise<LocalToolOutcome> {
   }
 }
 
+// ── nimbus_report: the same watch the scheduled alerts run on ───────────────
+async function nimbusReport(): Promise<LocalToolOutcome> {
+  try {
+    const w = await runNimbusWatch();
+    return {
+      content: json({
+        ranAt: w.ranAt,
+        headline: w.headline,
+        problems: w.problems.map((p) => ({ id: p.id, label: p.label, detail: p.detail, link: p.link?.href ?? null, severity: p.severity ?? "normal" })),
+        could_not_check: w.unknowns.map((u) => ({ id: u.id, label: u.label, why: u.detail })),
+        working: w.checks.filter((c) => c.state === "ok").map((c) => ({ label: c.label, detail: c.detail })),
+        text: formatWatchReport(w),
+      }),
+      links: w.problems.length && w.problems[0].link ? [{ label: w.problems[0].link.label, href: w.problems[0].link.href }] : undefined,
+    };
+  } catch (e) {
+    return fail(`the watch failed to run: ${errText(e)}`);
+  }
+}
+
 // ── Definitions, dispatch and wording ───────────────────────────────────────
 export const NIMBUS_LOCAL_TOOLS: ToolDef[] = [
   {
@@ -504,6 +525,12 @@ export const NIMBUS_LOCAL_TOOLS: ToolDef[] = [
     }),
   },
   {
+    name: "nimbus_report",
+    description:
+      "Run your own watch over the whole business and report what is working, what is broken, and what could not be checked: cold email sending, revenue running out, client sites gone quiet, the lead pipeline, overdue call-backs and the agent fleet. This is the same check behind the alerts pushed to Jack's phone. Use it for what is broken, anything wrong, give me a report, or how are we doing.",
+    input_schema: obj({}),
+  },
+  {
     name: "recall_memory",
     description:
       "Read everything the user has told you to remember. Your system prompt already carries this, so only call it when you are asked what you remember or you need the full file.",
@@ -537,6 +564,8 @@ export async function runNimbusLocalTool(name: string, rawArgs: unknown): Promis
         return await revenueState();
       case "call_room":
         return await callRoom(a);
+      case "nimbus_report":
+        return await nimbusReport();
       case "recall_memory":
         return await recallMemory();
       case "remember":
@@ -568,6 +597,8 @@ export function localActivityLine(name: string, rawArgs: unknown): string | null
       return "Checked revenue";
     case "call_room":
       return "Checked the call room";
+    case "nimbus_report":
+      return "Ran the full watch";
     case "recall_memory":
       return "Read your memory";
     default:

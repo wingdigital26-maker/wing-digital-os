@@ -650,6 +650,9 @@ export async function POST(req: NextRequest) {
   const incoming = Array.isArray(body.messages) ? (body.messages as { role?: string; content?: unknown }[]) : [];
   const conversationId = typeof body.conversationId === "string" && body.conversationId.trim() ? body.conversationId.trim().slice(0, 100) : null;
   const confirmToken = typeof body.confirm_action_id === "string" ? body.confirm_action_id : null;
+  // Agent mode: this one request runs through Claude Code on the PC instead of
+  // the API tool loop. Ignored in the cloud, where there is no CLI to run.
+  const wantsCli = body.engine === "cli" && !isCloud();
 
   // History is plain text turns from the browser; the server keeps no chat state.
   const messages: unknown[] = incoming
@@ -691,13 +694,18 @@ export async function POST(req: NextRequest) {
         } else if (!messages.length) {
           send({ text: "Say something and I will get to work." });
         } else {
-          const preferCli = process.env.JARVIS_ENGINE === "cli" || !apiKey;
+          const preferCli = wantsCli || process.env.JARVIS_ENGINE === "cli" || !apiKey;
           const cli = preferCli ? findClaudeCli() : null;
           let handled = false;
           if (cli && userText) {
             handled = await runClaudeCode({ cli, userText, conversationId, send, signal: req.signal });
           }
           if (!handled) {
+            if (wantsCli) {
+              // Asked for the agent and it is not there: say so rather than
+              // quietly answering as something else.
+              send({ text: "Agent mode needs the Claude Code CLI on this PC and I could not start it, so I answered with the OS tools instead.\n\n" });
+            }
             if (apiKey) {
               send({ engine: "api" });
               await runApiLoop({ send, messages, apiKey, ip, signal: req.signal, spendOverride });

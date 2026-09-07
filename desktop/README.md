@@ -11,9 +11,25 @@ powershell -ExecutionPolicy Bypass -File .\install-nimbus-hotkey.ps1
 
 That creates a Start Menu shortcut whose hotkey is **Ctrl+Shift+N**. Windows
 itself watches the key, so there is no daemon. Press it anywhere and Nimbus
-opens in a frameless Chrome app window at `localhost:3000/#nimbus`, with his
-panel already up. Press it again while the window is behind something and it
-comes to the front instead of opening a second one.
+opens in a frameless Chrome app window: **Nimbus alone, not the OS**, with his
+panel filling the window and a small "Open the OS" link bottom right for when
+you do want the full thing. Press it again while the window is behind something
+and it comes to the front instead of opening a second one.
+
+**No login.** The window carries a machine key (`NIMBUS_LOCAL_KEY` in
+`.env.local`, generated on install) that opens the Nimbus page and his own API
+and nothing else in the OS. The key exists only on this PC and the middleware
+branch is skipped entirely on the cloud deploy, so the hosted OS still asks for
+a password exactly as before. Clear it by deleting the line from `.env.local`.
+
+**Two modes**, switched in the panel header:
+
+* **Chat** is the OS tool set. He can read the whole business and every write
+  stops at a confirmation card.
+* **Agent** runs the turn through Claude Code on this PC, the same as a terminal
+  session: he can read and change files and run commands. There are no
+  confirmation cards in that mode, which is the trade for it being able to do
+  real work. The choice is remembered per machine.
 
 Undo: `powershell -File .\install-nimbus-hotkey.ps1 -Remove`
 

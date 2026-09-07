@@ -109,3 +109,20 @@ jobs:
             https://wing-digital-os.vercel.app/api/cron/watchdog)
           cat /tmp/out
           [ "$code" = "200" ] || { echo "watchdog returned $code"; exit 1; }
+
+      # The Nimbus watch: the wider business check (sending, money running out,
+      # client sites gone quiet, the lead pipeline, overdue call-backs). It
+      # pushes only for a NEW problem, so running it every 30 minutes is quiet.
+      # Once a day, at 7am Central (12:00 UTC while CDT is in effect), the same
+      # run also pushes the digest so Jack gets one report even on a clean day.
+      - name: Ping the Nimbus watch
+        run: |
+          hour=$(date -u +%H)
+          minute=$(date -u +%M)
+          extra=""
+          if [ "$hour" = "12" ] && [ "$minute" -lt 30 ]; then extra="?report=1"; fi
+          code=$(curl -s -o /tmp/nimbus -w '%{http_code}' \
+            -H "x-heartbeat-key: ${{ secrets.HEARTBEAT_KEY }}" \
+            "https://wing-digital-os.vercel.app/api/cron/nimbus-report$extra")
+          cat /tmp/nimbus
+          [ "$code" = "200" ] || { echo "nimbus watch returned $code"; exit 1; }

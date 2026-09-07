@@ -1,6 +1,7 @@
 "use client";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { usePathname } from "next/navigation";
+import Link from "next/link";
 import { sfx } from "../lib/sounds";
 
 // ── Types shared with app/api/jarvis/route.ts (stream contract) ──────────────
@@ -73,7 +74,13 @@ function saveHistory(msgs: Message[]) {
 
 export default function JarvisButton() {
   const pathname = usePathname();
+  // The desktop hotkey window (/nimbus) is Nimbus alone: no OS shell behind him,
+  // no floating button, the panel fills the window.
+  const solo = pathname === "/nimbus";
   const [open, setOpen] = useState(false);
+  // "Agent" runs the request through Claude Code on this PC instead of the API
+  // tool loop, so a question can turn into real work on the machine.
+  const [agentMode, setAgentMode] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [listening, setListening] = useState(false);
@@ -96,6 +103,7 @@ export default function JarvisButton() {
   const finalTranscriptRef = useRef("");
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sendMessageRef = useRef<(text: string) => void>(() => {});
+  const agentModeRef = useRef(false);
   const SILENCE_MS = 4500;
   const [voiceOn, setVoiceOn] = useState(false);
   const voiceOnRef = useRef(false);
@@ -244,6 +252,7 @@ export default function JarvisButton() {
         body: JSON.stringify({
           messages: history.slice(-MAX_TURNS * 2).map((m) => ({ role: m.role, content: m.content })),
           conversationId,
+          ...(agentModeRef.current ? { engine: "cli" } : {}),
           ...(confirm ? { confirm_action_id: confirm } : {}),
         }),
       });
@@ -392,6 +401,10 @@ export default function JarvisButton() {
       openPanel();
       if (typeof detail === "string" && detail.trim()) setTimeout(() => sendMessageRef.current(detail), 150);
     };
+    if (solo) {
+      // The window IS Nimbus, so he is already listening when it appears.
+      setTimeout(() => openPanel(), 60);
+    }
     window.addEventListener("jarvis:open", onOpen);
     window.addEventListener("jarvis:ask", onAsk);
     // The desktop hotkey window opens the OS at #nimbus, so the panel is
@@ -430,7 +443,21 @@ export default function JarvisButton() {
       window.removeEventListener("jarvis:ask", onAsk);
       if (orbRef.current?.destroy) { orbRef.current.destroy(); orbRef.current = null; }
     };
-  }, [openPanel]);
+  }, [openPanel, solo]);
+
+  // Agent mode is remembered per machine, because it is a property of where
+  // Nimbus is running, not of one conversation.
+  useEffect(() => {
+    let saved = false;
+    try {
+      saved = localStorage.getItem("nimbus:agent") === "1";
+    } catch { /* private mode */ }
+    agentModeRef.current = saved;
+    // The stored choice only exists in the browser, so it cannot be initial
+    // state without breaking hydration. One render, on mount, when it is set.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (saved) setAgentMode(true);
+  }, []);
 
   // A mini Nimbus lives in the panel header (the only avatar on mobile,
   // where the bottom tab bar replaces the floating orb).
@@ -552,13 +579,14 @@ export default function JarvisButton() {
         @keyframes jarvis-dots { 0%, 80%, 100% { opacity: 0; transform: scale(0.6); } 40% { opacity: 1; transform: scale(1); } }
         @keyframes jarvis-speak { 0%, 100% { transform: scaleY(0.4); opacity: 0.6; } 50% { transform: scaleY(1); opacity: 1; } }
         .jarvis-panel { position: fixed; bottom: 112px; right: 20px; width: 380px; height: 560px; }
+        .jarvis-panel.jarvis-solo { inset: 0; width: auto; height: auto; border-radius: 0; border: none; box-shadow: none; }
         @media (max-width: 480px) {
           .jarvis-panel { left: 8px; right: 8px; bottom: 84px; width: auto; height: min(70vh, 560px); }
         }
         .jarvis-chip:hover { border-color: ${ACCENT} !important; color: ${ACCENT} !important; }
       `}</style>
 
-      <button
+      {!solo && <button
         className="jarvis-fab"
         onClick={() => { sfx.play(open ? "close" : "chime"); if (open) setOpen(false); else openPanel(); }}
         title="Nimbus"
@@ -589,11 +617,11 @@ export default function JarvisButton() {
             <span style={{ width: 8, height: 8, borderRadius: 2, background: "#fff" }} />
           </span>
         )}
-      </button>
+      </button>}
 
       {open && (
         <div
-          className="jarvis-panel"
+          className={solo ? "jarvis-panel jarvis-solo" : "jarvis-panel"}
           data-testid="jarvis-panel"
           style={{
             background: "#0d1117", border: "1px solid rgba(61,107,240,0.25)", borderRadius: 16,
@@ -623,8 +651,20 @@ export default function JarvisButton() {
               <button onClick={() => { const next = !voiceOn; setVoiceOn(next); if (!next) stopAudio(); }} title={voiceOn ? "Voice replies on" : "Voice replies off"} style={{ ...smallBtn, color: voiceOn ? ACCENT : "#556" }}>
                 {voiceOn ? "Voice on" : "Voice off"}
               </button>
+              <button
+                onClick={() => { const next = !agentMode; setAgentMode(next); agentModeRef.current = next; try { localStorage.setItem("nimbus:agent", next ? "1" : "0"); } catch { /* private mode */ } }}
+                disabled={streaming}
+                title={agentMode
+                  ? "Agent mode: runs through Claude Code on this PC, so he can read and change files and run commands. No confirmation cards in this mode."
+                  : "Chat mode: the OS tool set, and every write stops at a confirmation card."}
+                style={{ ...smallBtn, color: agentMode ? "#7ee0a8" : "#556", borderColor: agentMode ? "rgba(126,224,168,0.45)" : undefined, cursor: streaming ? "default" : "pointer" }}
+              >
+                {agentMode ? "Agent" : "Chat"}
+              </button>
               <button onClick={clearChat} disabled={streaming} title="Clear this chat" style={{ ...smallBtn, cursor: streaming ? "default" : "pointer" }}>Clear chat</button>
-              <button onClick={() => { sfx.play("close"); setOpen(false); }} aria-label="Close" style={{ background: "none", border: "none", color: "#666", cursor: "pointer", fontSize: 18, lineHeight: 1 }}>×</button>
+              {!solo && (
+                <button onClick={() => { sfx.play("close"); setOpen(false); }} aria-label="Close" style={{ background: "none", border: "none", color: "#666", cursor: "pointer", fontSize: 18, lineHeight: 1 }}>×</button>
+              )}
             </div>
           </div>
 
@@ -759,6 +799,28 @@ export default function JarvisButton() {
           </form>
           {!hasSpeechAPI && (
             <div style={{ padding: "0 12px 8px", color: "#555", fontSize: 11, fontFamily: FONT }}>Voice input not available in this browser.</div>
+          )}
+
+          {/* The way out of the solo window and into the full OS. */}
+          {solo && (
+            <Link
+              href="/"
+              title="Open the full OS in the browser"
+              style={{
+                // Sits just above the composer: as a bottom-right pill it used
+                // to cover the Send button and swallow the click.
+                position: "fixed", right: 14, bottom: 66, zIndex: 10000,
+                display: "inline-flex", alignItems: "center", gap: 6,
+                background: "rgba(61,107,240,0.10)", border: "1px solid rgba(61,107,240,0.30)",
+                borderRadius: 999, padding: "6px 12px", color: "#9bc",
+                fontSize: 11.5, fontFamily: FONT, textDecoration: "none",
+              }}
+            >
+              Open the OS
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M7 17 17 7" /><path d="M8 7h9v9" />
+              </svg>
+            </Link>
           )}
         </div>
       )}

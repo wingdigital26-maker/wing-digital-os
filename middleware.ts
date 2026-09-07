@@ -50,6 +50,9 @@ function isPublicPath(pathname: string): boolean {
     pathname === "/api/heartbeat" ||
     pathname === "/api/notify" ||
     pathname === "/api/cron/watchdog" ||
+    // The Nimbus watch. Same shape as the watchdog: it authorises itself with
+    // CRON_SECRET or HEARTBEAT_KEY inside the route, never with a login.
+    pathname === "/api/cron/nimbus-report" ||
     // Automation engine catch-up (GitHub Actions every 10 min, same key
     // contract as the watchdog: Bearer CRON_SECRET or x-heartbeat-key).
     pathname === "/api/cron/automations" ||
@@ -122,6 +125,34 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(url);
   }
   if (isPublicPath(pathname)) return NextResponse.next();
+
+  // ── The Nimbus desktop window ──────────────────────────────────────────────
+  // The hotkey window is Nimbus alone, not the OS, and Jack should never meet a
+  // login screen to ask his own assistant a question. It carries a machine key
+  // that only exists on his PC (NIMBUS_LOCAL_KEY, deliberately unset in the
+  // cloud), passed once as ?k= and then held in a cookie.
+  //
+  // FAILS CLOSED: no key set, wrong key, or a cloud deployment and this whole
+  // branch does nothing, so the normal login gate applies. The key opens ONLY
+  // the Nimbus page and the assistant's own endpoints, never the rest of the OS.
+  const nimbusKey = process.env.NIMBUS_LOCAL_KEY;
+  const nimbusScoped =
+    pathname === "/nimbus" ||
+    pathname === "/api/jarvis" ||
+    pathname.startsWith("/api/jarvis/");
+  if (nimbusKey && nimbusScoped && process.env.RUNTIME_ENV !== "cloud") {
+    const presented = req.nextUrl.searchParams.get("k") || req.cookies.get("nimbus_local")?.value;
+    if (presented === nimbusKey) {
+      const res = NextResponse.next();
+      res.cookies.set("nimbus_local", nimbusKey, {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        maxAge: 60 * 60 * 24 * 365,
+      });
+      return res;
+    }
+  }
 
   // NEW (additive): a valid Supabase-auth session cookie grants access. Returns
   // null if the cookie is absent/invalid or AUTH_SESSION_SECRET is unset, in

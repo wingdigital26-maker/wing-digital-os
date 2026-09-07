@@ -10,8 +10,22 @@
 $ErrorActionPreference = "Stop"
 
 $Port    = if ($env:NIMBUS_PORT) { $env:NIMBUS_PORT } else { "3000" }
-$Url     = "http://localhost:$Port/#nimbus"
 $Profile = Join-Path $env:LOCALAPPDATA "Nimbus\chrome-profile"
+$RepoRoot = Split-Path -Parent $PSScriptRoot
+
+# The window opens Nimbus alone, not the OS, and carries the machine key so it
+# never meets a login screen. The key lives in .env.local on this PC only; the
+# cloud deploy has no such key, so nothing here weakens the hosted OS.
+$Key = $env:NIMBUS_LOCAL_KEY
+if (-not $Key) {
+  $envFile = Join-Path $RepoRoot ".env.local"
+  if (Test-Path $envFile) {
+    $line = Select-String -Path $envFile -Pattern '^\s*NIMBUS_LOCAL_KEY\s*=' -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($line) { $Key = ($line.Line -split "=", 2)[1].Trim().Trim('"') }
+  }
+}
+$Url = "http://localhost:$Port/nimbus"
+if ($Key) { $Url = "$Url" + "?k=" + [uri]::EscapeDataString($Key) }
 
 function Get-ChromePath {
   $candidates = @(
@@ -41,7 +55,7 @@ try {
 
 # Already open? Focus it rather than spawning a second window.
 $existing = Get-Process -Name chrome, msedge -ErrorAction SilentlyContinue |
-  Where-Object { $_.MainWindowTitle -and $_.MainWindowTitle -like "*Wing*" }
+  Where-Object { $_.MainWindowTitle -and ($_.MainWindowTitle -like "*Nimbus*" -or $_.MainWindowTitle -like "*Wing*") }
 if ($existing) {
   $sig = @'
 using System;
@@ -69,7 +83,7 @@ New-Item -ItemType Directory -Force -Path $Profile | Out-Null
 $args = @(
   "--app=$Url",
   "--user-data-dir=$Profile",
-  "--window-size=520,760",
+  "--window-size=560,780",
   "--no-first-run",
   "--no-default-browser-check"
 )

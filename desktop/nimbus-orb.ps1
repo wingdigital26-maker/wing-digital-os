@@ -67,7 +67,6 @@ $Port = if ($env:NIMBUS_PORT) { $env:NIMBUS_PORT } else { "3000" }
 $script:problems  = $null    # $null means unknown, which is NOT the same as zero
 $script:lastKnown = $null
 $script:mood      = "calm"   # calm | alert | offline
-$script:phase     = 0.0
 
 # ── The window ──────────────────────────────────────────────────────────────
 $form = New-Object System.Windows.Forms.Form
@@ -159,108 +158,305 @@ public class OrbWin {
     return copy;
   }
 
-  public static void Paint(IntPtr hwnd, System.Drawing.Bitmap bmp, int x, int y) {
+  /// Bake a bitmap into a premultiplied GDI handle. Done once per frame, at
+  /// startup, so the animation loop never touches pixels again.
+  public static IntPtr Bake(System.Drawing.Bitmap bmp) {
     System.Drawing.Bitmap pm = Premultiply(bmp);
+    IntPtr h = pm.GetHbitmap(System.Drawing.Color.FromArgb(0));
+    pm.Dispose();
+    return h;
+  }
+
+  public static void Free(IntPtr hBitmap) {
+    if (hBitmap != IntPtr.Zero) DeleteObject(hBitmap);
+  }
+
+  /// Show an already baked frame. This is the whole per-frame cost.
+  public static void PaintBaked(IntPtr hwnd, IntPtr hBitmap, int w, int h, int x, int y) {
     IntPtr screen = GetDC(IntPtr.Zero);
     IntPtr mem = CreateCompatibleDC(screen);
-    IntPtr hBitmap = pm.GetHbitmap(System.Drawing.Color.FromArgb(0));
     IntPtr old = SelectObject(mem, hBitmap);
-    SIZE size; size.cx = bmp.Width; size.cy = bmp.Height;
+    SIZE size; size.cx = w; size.cy = h;
     POINT src; src.X = 0; src.Y = 0;
     POINT pos; pos.X = x; pos.Y = y;
     BLENDFUNCTION blend;
-    blend.BlendOp = 0;            // AC_SRC_OVER
+    blend.BlendOp = 0;
     blend.BlendFlags = 0;
     blend.SourceConstantAlpha = 255;
-    blend.AlphaFormat = 1;        // AC_SRC_ALPHA
+    blend.AlphaFormat = 1;
     UpdateLayeredWindow(hwnd, screen, ref pos, ref size, mem, ref src, 0, ref blend, 2);
     SelectObject(mem, old);
-    DeleteObject(hBitmap);
     DeleteDC(mem);
     ReleaseDC(IntPtr.Zero, screen);
-    pm.Dispose();
   }
 }
 '@
 if (-not ("OrbWin" -as [type])) { Add-Type -TypeDefinition $sig -ReferencedAssemblies System.Drawing }
 
-# ── Drawing: the same character as the web orb, in GDI+ ─────────────────────
-function Render-Orb {
-  $bmp = New-Object System.Drawing.Bitmap($Size, $Size, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+# ── Drawing ─────────────────────────────────────────────────────────────────
+#
+# Every frame of the loop is baked ONCE, at startup, into a small film strip of
+# premultiplied bitmaps. The timer then does nothing but hand the next one to
+# the window. Drawing a sphere with gradients, a blurred glow and two rings
+# thirty times a second in GDI+ is what made the first version drag; blitting a
+# ready-made bitmap costs almost nothing.
+#
+# The artwork is drawn at 4x and scaled down with a high quality filter, which
+# is where the clean edges come from: GDI+ anti-aliasing alone is coarse at
+# 68px, and this orb is mostly curves.
+
+$FrameCount = 36          # one full breath, and one slow ring revolution
+$SS     = 4           # supersample factor
+
+# frames[mood + ":" + badge] -> Bitmap[]. Rebuilt only when the state changes.
+$script:strip    = @{}
+$script:stripKey = ""
+$script:frame    = 0
+
+function New-OrbFrame([int]$i, [string]$mood, $badge) {
+  $big = $Size * $SS
+  $bmp = New-Object System.Drawing.Bitmap($big, $big, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
   $g = [System.Drawing.Graphics]::FromImage($bmp)
-  $g.SmoothingMode = "AntiAlias"
+  $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+  $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
   $g.Clear([System.Drawing.Color]::FromArgb(0, 0, 0, 0))
 
-  $pad = 7
-  $d = $Size - ($pad * 2)
+  $t = ($i / $FrameCount) * 2 * [Math]::PI
+  $breath = [Math]::Sin($t)
+
+  # Colours per mood. Alert warms the rim and the glow, it never repaints the
+  # core red: this is Nimbus paying attention, not Nimbus broken.
+  $warm = $mood -eq "alert"
+  $dim  = $mood -eq "offline"
+
+  $pad = [int]($big * 0.175)
+  $d = $big - ($pad * 2)
   $rect = New-Object System.Drawing.Rectangle($pad, $pad, $d, $d)
+  $cx = $big / 2.0
+  $cy = $big / 2.0
 
-  # Breathing glow behind the core.
-  $glowAlpha = [int](44 + 18 * [Math]::Sin($script:phase))
-  $glowRect = New-Object System.Drawing.Rectangle(0, 0, $Size, $Size)
-  $glowPath = New-Object System.Drawing.Drawing2D.GraphicsPath
-  $glowPath.AddEllipse($glowRect)
-  $glowBrush = New-Object System.Drawing.Drawing2D.PathGradientBrush($glowPath)
-  $glowBrush.CenterColor = [System.Drawing.Color]::FromArgb($glowAlpha, 90, 140, 255)
-  $glowBrush.SurroundColors = @([System.Drawing.Color]::FromArgb(0, 90, 140, 255))
-  $g.FillEllipse($glowBrush, $glowRect)
+  # 1. Outer glow. Two passes: a wide soft halo and a tighter brighter one, so
+  #    the falloff is not the single flat ramp a lone gradient gives.
+  $glowA = if ($dim) { 26 } elseif ($warm) { 74 } else { 58 }
+  $glowA = [int]($glowA + 12 * $breath)
+  $glowCol = if ($warm) { [System.Drawing.Color]::FromArgb($glowA, 235, 165, 90) }
+             elseif ($dim) { [System.Drawing.Color]::FromArgb($glowA, 120, 132, 156) }
+             else { [System.Drawing.Color]::FromArgb($glowA, 90, 140, 255) }
+  foreach ($spread in @(1.0, 0.72)) {
+    $gw = [int]($big * $spread)
+    $gr = New-Object System.Drawing.Rectangle([int]($cx - $gw / 2), [int]($cy - $gw / 2), $gw, $gw)
+    $gp = New-Object System.Drawing.Drawing2D.GraphicsPath
+    $gp.AddEllipse($gr)
+    $gb = New-Object System.Drawing.Drawing2D.PathGradientBrush($gp)
+    $gb.CenterColor = $glowCol
+    $gb.SurroundColors = @([System.Drawing.Color]::FromArgb(0, $glowCol.R, $glowCol.G, $glowCol.B))
+    $gb.FocusScales = New-Object System.Drawing.PointF(0.28, 0.28)
+    $g.FillEllipse($gb, $gr)
+    $gb.Dispose(); $gp.Dispose()
+  }
 
-  # The core, lit from the upper left so it reads as a sphere.
-  $corePath = New-Object System.Drawing.Drawing2D.GraphicsPath
-  $corePath.AddEllipse($rect)
-  $core = New-Object System.Drawing.Drawing2D.PathGradientBrush($corePath)
-  $core.CenterPoint = New-Object System.Drawing.PointF(($rect.X + $d * 0.36), ($rect.Y + $d * 0.32))
-  $core.CenterColor = [System.Drawing.Color]::FromArgb(255, 150, 185, 255)
-  $core.SurroundColors = @([System.Drawing.Color]::FromArgb(255, 22, 44, 118))
-  $g.FillEllipse($core, $rect)
+  # 2. The back half of the orbit ring, so the sphere sits INSIDE the orbit
+  #    rather than on top of a flat hoop. Two rings, counter turning.
+  $ringCol = if ($warm) { [System.Drawing.Color]::FromArgb(150, 240, 205, 150) }
+             elseif ($dim) { [System.Drawing.Color]::FromArgb(70, 150, 160, 185) }
+             else { [System.Drawing.Color]::FromArgb(120, 175, 205, 255) }
+  $ringSpec = @(
+    @{ tilt = -22.0; rw = 1.30; rh = 0.46; speed = 1.0 },
+    @{ tilt = 28.0;  rw = 1.16; rh = 0.34; speed = -0.62 }
+  )
+  function Draw-Ring($g, $spec, $t, $cx, $cy, $d, $col, $half) {
+    $st = $g.Save()
+    $g.TranslateTransform($cx, $cy)
+    $g.RotateTransform($spec.tilt + 22 * [Math]::Sin($t * $spec.speed))
+    $rw = $d * $spec.rw
+    $rh = $d * $spec.rh
+    $pen = New-Object System.Drawing.Pen($col, ($SS * 1.25))
+    $r = New-Object System.Drawing.RectangleF((-$rw / 2), (-$rh / 2), $rw, $rh)
+    if ($half -eq "back") { $g.DrawArc($pen, $r, 180, 180) } else { $g.DrawArc($pen, $r, 0, 180) }
+    $pen.Dispose()
+    $g.Restore($st)
+  }
+  foreach ($spec in $ringSpec) { Draw-Ring $g $spec $t $cx $cy $d $ringCol "back" }
 
-  # Atmosphere rim. Warm when something needs attention, the same language the
-  # web orb uses, grey when the status could not be read at all.
-  $rimColor = if ($script:mood -eq "alert") {
-    [System.Drawing.Color]::FromArgb(210, 240, 180, 120)
-  } elseif ($script:mood -eq "offline") {
-    [System.Drawing.Color]::FromArgb(130, 130, 140, 160)
+  # 3. The sphere. A radial gradient offset to the upper left for the lit side,
+  #    then a darkened lower right limb, then a specular gleam. Three cheap
+  #    layers that read as one lit ball.
+  $core = New-Object System.Drawing.Drawing2D.GraphicsPath
+  $core.AddEllipse($rect)
+  $cb = New-Object System.Drawing.Drawing2D.PathGradientBrush($core)
+  $cb.CenterPoint = New-Object System.Drawing.PointF(($rect.X + $d * 0.34), ($rect.Y + $d * 0.30))
+  if ($dim) {
+    $cb.CenterColor = [System.Drawing.Color]::FromArgb(255, 108, 122, 150)
+    $cb.SurroundColors = @([System.Drawing.Color]::FromArgb(255, 26, 34, 52))
   } else {
-    [System.Drawing.Color]::FromArgb(160, 130, 170, 255)
+    $cb.CenterColor = [System.Drawing.Color]::FromArgb(255, 190, 214, 255)
+    $cb.SurroundColors = @([System.Drawing.Color]::FromArgb(255, 46, 84, 205))
   }
-  $pen = New-Object System.Drawing.Pen($rimColor, 1.7)
-  $g.DrawEllipse($pen, $rect)
+  $g.FillEllipse($cb, $rect)
+  $cb.Dispose(); $core.Dispose()
 
-  # Eyes.
-  $eyeW = [Math]::Max(3, [int]($d * 0.11))
-  $eyeH = [Math]::Max(6, [int]($d * 0.27))
-  $eyeY = $rect.Y + [int]($d * 0.33)
-  $white = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(242, 245, 250, 255))
-  $g.FillEllipse($white, ($rect.X + [int]($d * 0.30)), $eyeY, $eyeW, $eyeH)
-  $g.FillEllipse($white, ($rect.X + [int]($d * 0.57)), $eyeY, $eyeW, $eyeH)
+  # Limb darkening on the far side.
+  $limb = New-Object System.Drawing.Drawing2D.GraphicsPath
+  $limb.AddEllipse($rect)
+  $lb = New-Object System.Drawing.Drawing2D.PathGradientBrush($limb)
+  $lb.CenterPoint = New-Object System.Drawing.PointF(($rect.X + $d * 0.72), ($rect.Y + $d * 0.76))
+  $lb.CenterColor = [System.Drawing.Color]::FromArgb(0, 0, 0, 0)
+  $lb.SurroundColors = @([System.Drawing.Color]::FromArgb(88, 6, 14, 40))
+  $g.FillEllipse($lb, $rect)
+  $lb.Dispose(); $limb.Dispose()
 
-  # Orbit ring, tilted, slowly turning.
-  $ringPen = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(120, 190, 210, 255), 1.3)
-  $state = $g.Save()
-  $g.TranslateTransform(($Size / 2), ($Size / 2))
-  $g.RotateTransform((-24 + 14 * [Math]::Sin($script:phase * 0.35)))
-  $g.DrawEllipse($ringPen, (-$d / 2 - 2), (-$d / 5), ($d + 4), ($d / 2.5))
-  $g.Restore($state)
+  # Specular gleam, breathing very slightly.
+  $spec = 0.30 + 0.03 * $breath
+  $sw = $d * $spec
+  $sh = $d * ($spec * 0.62)
+  $sr = New-Object System.Drawing.RectangleF(($rect.X + $d * 0.20), ($rect.Y + $d * 0.14), $sw, $sh)
+  $sp = New-Object System.Drawing.Drawing2D.GraphicsPath
+  $sp.AddEllipse($sr)
+  $sb2 = New-Object System.Drawing.Drawing2D.PathGradientBrush($sp)
+  $sb2.CenterColor = [System.Drawing.Color]::FromArgb(150, 255, 255, 255)
+  $sb2.SurroundColors = @([System.Drawing.Color]::FromArgb(0, 255, 255, 255))
+  $g.FillEllipse($sb2, $sr)
+  $sb2.Dispose(); $sp.Dispose()
 
-  # The badge is only ever drawn from a number that was really read. Unknown
-  # stays unknown: no badge, grey rim.
-  if ($null -ne $script:problems -and $script:problems -gt 0) {
-    $bd = [int]($Size * 0.32)
-    $bx = $Size - $bd - 1
-    $by = 0
-    $amber = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(255, 232, 163, 61))
-    $g.FillEllipse($amber, $bx, $by, $bd, $bd)
-    $font = New-Object System.Drawing.Font("Segoe UI", ($bd * 0.55), [System.Drawing.FontStyle]::Bold, [System.Drawing.GraphicsUnit]::Pixel)
-    $text = if ($script:problems -gt 9) { "9+" } else { [string]$script:problems }
+  # 4. Atmosphere rim: a lit edge, warm when something needs attention.
+  $rimCol = if ($warm) { [System.Drawing.Color]::FromArgb(225, 245, 190, 125) }
+            elseif ($dim) { [System.Drawing.Color]::FromArgb(120, 150, 162, 190) }
+            else { [System.Drawing.Color]::FromArgb(175, 150, 190, 255) }
+  $rp = New-Object System.Drawing.Pen($rimCol, ($SS * 1.1))
+  $g.DrawEllipse($rp, $rect)
+  $rp.Dispose()
+
+  # 5. Eyes, with a soft glow behind each so they read as lit rather than
+  #    painted on. Blink on two frames of the cycle.
+  $blink = ($i -eq 8 -or $i -eq 9)
+  $eyeW = $d * 0.115
+  $eyeH = if ($blink) { $d * 0.035 } else { $d * 0.275 }
+  $eyeY = $rect.Y + $d * 0.34 + (($d * 0.275 - $eyeH) / 2)
+  foreach ($ex in @(0.295, 0.59)) {
+    $x = $rect.X + $d * $ex
+    $halo = New-Object System.Drawing.RectangleF(($x - $eyeW * 0.7), ($eyeY - $eyeH * 0.35), ($eyeW * 2.4), ($eyeH * 1.7))
+    $hp = New-Object System.Drawing.Drawing2D.GraphicsPath
+    $hp.AddEllipse($halo)
+    $hb = New-Object System.Drawing.Drawing2D.PathGradientBrush($hp)
+    $hb.CenterColor = [System.Drawing.Color]::FromArgb(90, 200, 225, 255)
+    $hb.SurroundColors = @([System.Drawing.Color]::FromArgb(0, 200, 225, 255))
+    $g.FillEllipse($hb, $halo)
+    $hb.Dispose(); $hp.Dispose()
+    $eb = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(246, 248, 252, 255))
+    $g.FillEllipse($eb, (New-Object System.Drawing.RectangleF($x, $eyeY, $eyeW, $eyeH)))
+    $eb.Dispose()
+  }
+
+  # 6. The front half of the rings, over the sphere, with a travelling dot.
+  foreach ($spec2 in $ringSpec) {
+    Draw-Ring $g $spec2 $t $cx $cy $d $ringCol "front"
+    $st = $g.Save()
+    $g.TranslateTransform($cx, $cy)
+    $g.RotateTransform($spec2.tilt + 22 * [Math]::Sin($t * $spec2.speed))
+    $ang = $t * 2 * $spec2.speed
+    $dx = ($d * $spec2.rw / 2) * [Math]::Cos($ang)
+    $dy = ($d * $spec2.rh / 2) * [Math]::Sin($ang)
+    $dot = $SS * 2.2
+    $db = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(220, 225, 238, 255))
+    $g.FillEllipse($db, ($dx - $dot / 2), ($dy - $dot / 2), $dot, $dot)
+    $db.Dispose()
+    $g.Restore($st)
+  }
+
+  # 7. The badge. Only ever drawn from a count that was really read.
+  if ($null -ne $badge -and $badge -gt 0) {
+    $bd = [int]($big * 0.34)
+    $bx = $big - $bd - [int]($big * 0.02)
+    $by = [int]($big * 0.01)
+    $br = New-Object System.Drawing.Rectangle($bx, $by, $bd, $bd)
+    $shadow = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(70, 0, 0, 0))
+    $g.FillEllipse($shadow, ($bx + $SS), ($by + $SS), $bd, $bd)
+    $shadow.Dispose()
+    $bp = New-Object System.Drawing.Drawing2D.GraphicsPath
+    $bp.AddEllipse($br)
+    $bb = New-Object System.Drawing.Drawing2D.PathGradientBrush($bp)
+    $bb.CenterPoint = New-Object System.Drawing.PointF(($bx + $bd * 0.35), ($by + $bd * 0.3))
+    $bb.CenterColor = [System.Drawing.Color]::FromArgb(255, 255, 205, 120)
+    $bb.SurroundColors = @([System.Drawing.Color]::FromArgb(255, 226, 146, 40))
+    $g.FillEllipse($bb, $br)
+    $bb.Dispose(); $bp.Dispose()
+    $text = if ($badge -gt 9) { "9+" } else { [string]$badge }
+    $font = New-Object System.Drawing.Font("Segoe UI", ($bd * 0.56), [System.Drawing.FontStyle]::Bold, [System.Drawing.GraphicsUnit]::Pixel)
     $sf = New-Object System.Drawing.StringFormat
-    $sf.Alignment = "Center"; $sf.LineAlignment = "Center"
-    $g.DrawString($text, $font, [System.Drawing.Brushes]::Black, (New-Object System.Drawing.RectangleF($bx, $by, $bd, $bd)), $sf)
-    $font.Dispose()
+    $sf.Alignment = [System.Drawing.StringAlignment]::Center
+    $sf.LineAlignment = [System.Drawing.StringAlignment]::Center
+    $tb = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(255, 40, 26, 4))
+    $g.DrawString($text, $font, $tb, (New-Object System.Drawing.RectangleF($bx, $by, $bd, $bd)), $sf)
+    $tb.Dispose(); $font.Dispose(); $sf.Dispose()
   }
-
   $g.Dispose()
-  try { [OrbWin]::Paint($form.Handle, $bmp, $form.Left, $form.Top) } catch { }
+
+  # Down to real size with a good filter. This is what makes it look drawn
+  # rather than plotted.
+  $out = New-Object System.Drawing.Bitmap($Size, $Size, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+  $og = [System.Drawing.Graphics]::FromImage($out)
+  $og.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+  $og.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+  $og.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+  $og.DrawImage($bmp, (New-Object System.Drawing.Rectangle(0, 0, $Size, $Size)))
+  $og.Dispose()
   $bmp.Dispose()
+  return $out
+}
+
+# PowerShell hands back an Object[] for some JSON shapes, and comparing that to
+# a number throws. Everything that reads the count goes through here.
+function Get-Count {
+  if ($null -eq $script:problems) { return $null }
+  $v = @($script:problems)[0]
+  if ($null -eq $v) { return $null }
+  try { return [int]$v } catch { return $null }
+}
+
+function Get-Strip {
+  $n = Get-Count
+  $badge = if ($null -ne $n -and $n -gt 0) { $n } else { 0 }
+  $key = "$($script:mood):$badge"
+  if ($script:stripKey -eq $key -and $script:strip.ContainsKey($key)) { return $script:strip[$key] }
+  if (-not $script:strip.ContainsKey($key)) {
+    $frames = New-Object 'System.Collections.Generic.List[System.IntPtr]'
+    for ($i = 0; $i -lt $FrameCount; $i++) {
+      $f = @(New-OrbFrame $i $script:mood $badge)[-1]
+      $frames.Add([OrbWin]::Bake($f))
+      $f.Dispose()
+    }
+    # Only a handful of states ever occur (three moods x a small badge count),
+    # but do not let the cache grow without limit if the count keeps changing.
+    if ($script:strip.Count -ge 6) {
+      foreach ($k in @($script:strip.Keys)) {
+        if ($k -ne $key) { foreach ($f in $script:strip[$k]) { [OrbWin]::Free($f) }; $script:strip.Remove($k); break }
+      }
+    }
+    $script:strip[$key] = $frames
+  }
+  $script:stripKey = $key
+  return $script:strip[$key]
+}
+
+# Anything that goes wrong in a WinForms event handler is swallowed silently,
+# which is how an invisible orb happened twice. Failures land in this file.
+$script:logPath = Join-Path $env:LOCALAPPDATA "Nimbus\orb.log"
+function Write-OrbLog([string]$msg) {
+  try {
+    New-Item -ItemType Directory -Force -Path (Split-Path $script:logPath) | Out-Null
+    Add-Content -Path $script:logPath -Value ("{0}  {1}" -f (Get-Date -Format "HH:mm:ss"), $msg)
+  } catch { }
+}
+
+function Render-Orb {
+  try {
+    $frames = Get-Strip
+    $h = $frames[$script:frame % $FrameCount]
+    if ($null -eq $h -or $h -eq [IntPtr]::Zero) { Write-OrbLog "no frame at index $($script:frame % $FrameCount)"; return }
+    [OrbWin]::PaintBaked($form.Handle, $h, $Size, $Size, $form.Left, $form.Top)
+  } catch {
+    Write-OrbLog ("render failed at [" + $_.InvocationInfo.Line.Trim() + "] line " + $_.InvocationInfo.ScriptLineNumber + ": " + $_.Exception.Message)
+  }
 }
 
 $form.Add_HandleCreated({ [OrbWin]::MakeLayered($form.Handle) })
@@ -269,14 +465,18 @@ $form.Add_Shown({
   Render-Orb
 })
 
-# ── Breathing, and the five second decay back to calm ───────────────────────
+# ── The loop ────────────────────────────────────────────────────────────────
+# 20 frames a second while there is something to animate. When Nimbus is calm
+# and nothing is wrong he still breathes, so the strip keeps playing, but every
+# tick is one blit of a bitmap that already exists.
 $anim = New-Object System.Windows.Forms.Timer
-$anim.Interval = 120
+$anim.Interval = 83
 $anim.Add_Tick({
-  $script:phase += 0.12
+  $script:frame++
   if ($script:moodUntil -and (Get-Date) -gt $script:moodUntil) {
-    # Wear the feeling, then let it go.
-    $script:mood = if ($script:problems -gt 0) { "calm" } else { "calm" }
+    # Wear the feeling, then let it go. The badge stays, because the count is a
+    # fact; the mood is just how he is holding it.
+    $script:mood = "calm"
     $script:moodUntil = $null
   }
   Render-Orb
@@ -317,7 +517,7 @@ function Poll-Status {
       Render-Orb
       return
     }
-    $n = [int]$json.watch.problems
+    $n = [int](@($json.watch.problems)[0])
     $was = $script:lastKnown
     $script:problems = $n
     $script:lastKnown = $n
@@ -410,7 +610,11 @@ $raise.Interval = 15000
 $raise.Add_Tick({ try { [OrbWin]::Raise($form.Handle) } catch { } })
 $raise.Start()
 
-$form.Add_FormClosed({ try { $notify.Dispose() } catch { } })
+$form.Add_FormClosed({
+  try { $notify.Dispose() } catch { }
+  # GDI handles are not garbage collected, so give them back explicitly.
+  try { foreach ($k in @($script:strip.Keys)) { foreach ($f in $script:strip[$k]) { [OrbWin]::Free($f) } } } catch { }
+})
 
 [System.Windows.Forms.Application]::Run($form)
 $mutex.ReleaseMutex()

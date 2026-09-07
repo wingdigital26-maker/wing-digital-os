@@ -394,6 +394,11 @@ export default function JarvisButton() {
     };
     window.addEventListener("jarvis:open", onOpen);
     window.addEventListener("jarvis:ask", onAsk);
+    // The desktop hotkey window opens the OS at #nimbus, so the panel is
+    // already up and focused by the time Jack looks at it.
+    if (typeof window !== "undefined" && window.location.hash === "#nimbus") {
+      setTimeout(() => openPanel(), 120);
+    }
     // Mount the Nimbus orb into the FAB (loads the shared mascot script once).
     let orbCancelled = false;
     const mountOrb = () => {

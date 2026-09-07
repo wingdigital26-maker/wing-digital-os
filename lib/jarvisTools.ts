@@ -32,6 +32,15 @@ import { EXPECTED_HEARTBEATS, inPcWindow } from "@/lib/watchdogExpected";
 import { buildTimeline } from "@/app/components/pipeline/types";
 import { researchSite, normalizeUrl, domainOf, isPublicHost } from "@/lib/siteResearch";
 import type { TaskRow, WorkflowRow, WorkflowRunRow } from "@/lib/automations/types";
+import {
+  NIMBUS_LOCAL_TOOLS,
+  NIMBUS_LOCAL_WRITE_TOOLS,
+  runNimbusLocalTool,
+  describeLocalAction,
+  localActivityLine,
+  isNimbusLocalTool,
+  isDeniedPath,
+} from "@/lib/nimbusLocalTools";
 
 export type ToolArgs = Record<string, unknown>;
 
@@ -291,6 +300,11 @@ export const JARVIS_TOOLS: ToolDef[] = [
   },
 ];
 
+// The deep-access tools (pipeline, publishing, send ledger, revenue, call room)
+// and the memory tools live in lib/nimbusLocalTools.ts and are appended here so
+// there is still exactly one tool list handed to the model.
+JARVIS_TOOLS.push(...NIMBUS_LOCAL_TOOLS);
+
 export const WRITE_TOOLS = new Set<string>([
   "create_task",
   "complete_task",
@@ -308,9 +322,16 @@ export const WRITE_TOOLS = new Set<string>([
   "write_vault_file",
   "run_outreach",
   "run_agent",
+  ...NIMBUS_LOCAL_WRITE_TOOLS,
 ]);
 
-export const PC_ONLY_TOOLS = new Set<string>(["outreach_status", "run_outreach", "run_agent"]);
+export const PC_ONLY_TOOLS = new Set<string>([
+  "outreach_status",
+  "run_outreach",
+  "run_agent",
+  "query_pipeline",
+  "remember",
+]);
 
 export function isKnownTool(name: string): boolean {
   return JARVIS_TOOLS.some((t) => t.name === name);
@@ -730,6 +751,8 @@ async function getSystemCheck(): Promise<ToolOutcome> {
 async function readVault(a: ToolArgs): Promise<ToolOutcome> {
   const rel = str(a.path).replace(/^[/\\]+/, "");
   if (!rel || rel.includes("..")) return { content: json({ error: "path is required and may not contain '..'" }) };
+  // Credentials are never readable, by any spelling of the path.
+  if (isDeniedPath(rel)) return { content: json({ error: "that path is on the secrets deny list and cannot be read" }) };
   const text = await readVaultFile(rel);
   if (text === null) return { content: json({ error: `could not read '${rel}' (missing or unreadable)` }) };
   return { content: text.length > 16000 ? text.slice(0, 16000) + "\n...[truncated]" : text };
@@ -1213,7 +1236,9 @@ export async function runJarvisTool(name: string, rawArgs: unknown): Promise<Too
       case "write_vault_file": return writeVaultFile(a);
       case "run_outreach": return await runOutreach(a);
       case "run_agent": return await runAgent(a);
-      default: return { content: json({ error: `unknown tool '${name}'` }) };
+      default:
+        if (isNimbusLocalTool(name)) return await runNimbusLocalTool(name, a);
+        return { content: json({ error: `unknown tool '${name}'` }) };
     }
   } catch (e) {
     // The model must hear "could not check", never a fake empty answer.
@@ -1252,7 +1277,7 @@ export function describeAction(name: string, rawArgs: unknown): string {
     case "write_vault_file": return `${a.mode === "append" ? "Append to" : "Write"} vault file ${s("path")}`;
     case "run_outreach": return a.dryRun === false ? "Run outreach and SEND real cold emails" : "Dry-run the outreach script (no sends)";
     case "run_agent": return `Run the ${s("agent")} agent${a.dryRun ? " (dry run)" : ""}`;
-    default: return `Run ${name}`;
+    default: return describeLocalAction(name, a) ?? `Run ${name}`;
   }
 }
 
@@ -1280,6 +1305,7 @@ export function toolActivityLine(name: string, rawArgs: unknown): string {
     case "web_search": return `Searched the web for '${s("query").slice(0, 40)}'`;
     case "fetch_url": return `Fetched ${s("url").slice(0, 50)}`;
     case "outreach_status": return "Checked outreach status";
-    default: return WRITE_TOOLS.has(name) ? describeAction(name, a) : `Ran ${name}`;
+    default:
+      return localActivityLine(name, a) ?? (WRITE_TOOLS.has(name) ? describeAction(name, a) : `Ran ${name}`);
   }
 }

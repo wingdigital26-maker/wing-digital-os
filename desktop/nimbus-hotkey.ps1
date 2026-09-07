@@ -66,12 +66,16 @@ public class NimbusHotkeyForm : Form {
   [DllImport("user32.dll")] static extern bool UnregisterHotKey(IntPtr hWnd, int id);
   [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
   [DllImport("user32.dll")] static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
+  [DllImport("user32.dll")] static extern bool EnumWindows(EnumProc cb, IntPtr p);
+  [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr h);
+  [DllImport("user32.dll")] static extern bool IsIconic(IntPtr h);
+  delegate bool EnumProc(IntPtr h, IntPtr p);
   [DllImport("user32.dll")] static extern int GetWindowTextLength(IntPtr hWnd);
   [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr hWnd, StringBuilder s, int max);
 
   const int HOTKEY_ID = 0xB17;
   const int WM_HOTKEY = 0x0312;
-  const int SW_MINIMIZE = 6;
+  const int SW_HIDE = 0, SW_SHOW = 5, SW_RESTORE = 9;
 
   readonly uint mods, vk;
   /// True when the chord was claimed. False means someone else owns it.
@@ -112,6 +116,22 @@ public class NimbusHotkeyForm : Form {
     base.WndProc(ref m);
   }
 
+  /// Show the Nimbus window wherever it is: hidden, minimised or buried.
+  /// Returns false when there is not one, and the caller launches.
+  public static bool ShowExisting() {
+    IntPtr found = IntPtr.Zero;
+    EnumWindows((h, p) => {
+      var sb = new StringBuilder(256);
+      GetWindowText(h, sb, sb.Capacity);
+      if (sb.ToString().IndexOf("Nimbus", StringComparison.OrdinalIgnoreCase) >= 0) { found = h; return false; }
+      return true;
+    }, IntPtr.Zero);
+    if (found == IntPtr.Zero) return false;
+    ShowWindowAsync(found, IsIconic(found) ? SW_RESTORE : SW_SHOW);
+    SetForegroundWindow(found);
+    return true;
+  }
+
   /// True when the window in front of the user is the Nimbus window.
   public static bool NimbusIsInFront() {
     IntPtr h = GetForegroundWindow();
@@ -122,8 +142,10 @@ public class NimbusHotkeyForm : Form {
     return sb.ToString().IndexOf("Nimbus", StringComparison.OrdinalIgnoreCase) >= 0;
   }
 
-  public static void MinimizeFront() {
-    ShowWindowAsync(GetForegroundWindow(), SW_MINIMIZE);
+  /// Put the window away instantly. No minimise animation, and nothing to
+  /// animate to: it has no taskbar button.
+  public static void HideFront() {
+    ShowWindowAsync(GetForegroundWindow(), SW_HIDE);
   }
 }
 '@
@@ -134,7 +156,9 @@ $form.add_Pressed({
   # him, or bring the window already open to the front. nimbus.ps1 knows the
   # difference, so this stays one call either way.
   if ([NimbusHotkeyForm]::NimbusIsInFront()) {
-    [NimbusHotkeyForm]::MinimizeFront()
+    [NimbusHotkeyForm]::HideFront()
+  } elseif ([NimbusHotkeyForm]::ShowExisting()) {
+    # Already open, just hidden or behind something: showing it is instant.
   } else {
     Start-Process -FilePath "$env:SystemRoot\System32\wscript.exe" -ArgumentList """$vbs""" -WindowStyle Hidden
   }

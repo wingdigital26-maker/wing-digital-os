@@ -132,6 +132,8 @@ public class OrbWin {
   [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr h, int cmd);
   [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr h);
   [DllImport("user32.dll")] static extern bool IsWindow(IntPtr h);
+  [DllImport("user32.dll")] static extern bool IsIconic(IntPtr h);
+  [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
   delegate bool EnumProc(IntPtr h, IntPtr p);
   const int SW_HIDE = 0, SW_SHOW = 5, SW_RESTORE = 9;
 
@@ -154,9 +156,16 @@ public class OrbWin {
   public static bool ShowNimbus() {
     IntPtr h = FindNimbus();
     if (h == IntPtr.Zero || !IsWindow(h)) return false;
-    ShowWindow(h, SW_RESTORE);
+    // A hidden window needs SW_SHOW; SW_RESTORE alone leaves it hidden.
+    ShowWindow(h, IsIconic(h) ? SW_RESTORE : SW_SHOW);
     SetForegroundWindow(h);
     return true;
+  }
+
+  /// True when Nimbus is the window the user is looking at.
+  public static bool NimbusInFront() {
+    IntPtr h = FindNimbus();
+    return h != IntPtr.Zero && h == GetForegroundWindow();
   }
 
   public static bool HideNimbus() {
@@ -725,6 +734,27 @@ $prewarm.Add_Tick({
   }
 })
 $prewarm.Start()
+
+# Closing the window with its X quits Chrome, and the next click would pay the
+# full launch again. Keep exactly one window ready at all times: if none exists,
+# open one hidden. Jack never sees it happen, and every click stays instant.
+$keepwarm = New-Object System.Windows.Forms.Timer
+$keepwarm.Interval = 60000
+$keepwarm.Add_Tick({
+  if ($env:NIMBUS_NO_PREWARM -eq "1") { return }
+  try {
+    if ([OrbWin]::FindNimbus() -ne [IntPtr]::Zero) { return }
+    $env:NIMBUS_OPEN_HASH = ""
+    Start-Process -FilePath "$env:SystemRoot\System32\wscript.exe" -ArgumentList """$vbs""" -WindowStyle Hidden
+    $hide2 = New-Object System.Windows.Forms.Timer
+    $hide2.Interval = 9000
+    $hide2.Add_Tick({ $hide2.Stop(); try { [void][OrbWin]::HideNimbus() } catch { } })
+    $hide2.Start()
+  } catch {
+    Write-OrbLog "keepwarm failed"
+  }
+})
+$keepwarm.Start()
 
 $menu = New-Object System.Windows.Forms.ContextMenuStrip
 [void]$menu.Items.Add("Open Nimbus", $null, { Open-Nimbus "" })

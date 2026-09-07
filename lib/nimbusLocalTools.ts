@@ -463,7 +463,15 @@ async function nimbusReport(): Promise<LocalToolOutcome> {
       content: json({
         ranAt: w.ranAt,
         headline: w.headline,
-        problems: w.problems.map((p) => ({ id: p.id, label: p.label, detail: p.detail, link: p.link?.href ?? null, severity: p.severity ?? "normal" })),
+        problems: w.problems.map((p) => ({
+          id: p.id,
+          label: p.label,
+          detail: p.detail,
+          // Always answer with the fix, never just the symptom.
+          fix: p.fix ?? null,
+          link: p.link?.href ?? null,
+          severity: p.severity ?? "normal",
+        })),
         could_not_check: w.unknowns.map((u) => ({ id: u.id, label: u.label, why: u.detail })),
         working: w.checks.filter((c) => c.state === "ok").map((c) => ({ label: c.label, detail: c.detail })),
         text: formatWatchReport(w),

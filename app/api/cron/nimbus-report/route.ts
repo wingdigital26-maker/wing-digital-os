@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { sbUrl, sbService, sbSelect } from "@/lib/osSupabase";
 import { pushToAll } from "@/lib/push";
-import { runNimbusWatch, formatWatchReport, type Check } from "@/lib/nimbusWatch";
+import { runNimbusWatch, formatWatchReport, alertBody, type Check } from "@/lib/nimbusWatch";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -30,7 +30,6 @@ export const maxDuration = 60;
 
 const REPUSH_MS = 6 * 60 * 60 * 1000;
 const KEY_PREFIX = "nimbus:";
-
 type AlertRow = { key: string; title: string | null; last_pushed: string | null; resolved_at: string | null };
 
 function sameSecret(got: string | null, expected: string | undefined): boolean {
@@ -108,7 +107,9 @@ export async function GET(req: NextRequest) {
     if (due) {
       await pushToAll({
         title: `${p.severity === "high" ? "🔴" : "🟠"} ${p.label}`,
-        body: p.detail.slice(0, 220),
+        // The alert carries the fix, so a lock-screen glance is actionable.
+        // Only the detail may be shortened; the fix goes out intact.
+        body: alertBody(p.detail, p.fix),
         url: p.link?.href || "/mission",
         tag: k,
       });

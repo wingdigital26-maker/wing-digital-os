@@ -80,10 +80,33 @@ if (-not $browser) {
 }
 
 New-Item -ItemType Directory -Force -Path $Profile | Out-Null
+
+# 560x780 was sized for a chat panel alone. The stage now shows the orb large
+# above the conversation, so the window needs height more than width: 520 wide
+# keeps the chat column comfortable without going wide enough to look like a
+# browser, and 900 tall leaves the stage room without crowding the transcript.
+$WinW = 520
+$WinH = 900
+$WinArgs = @("--window-size=$WinW,$WinH")
+
+# Park it against the right edge, vertically centred, so a keystroke window
+# lands somewhere predictable instead of on top of whatever Jack is reading.
+# Screen geometry can be unavailable in odd sessions, so it stays optional.
+try {
+  Add-Type -AssemblyName System.Windows.Forms
+  $area = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
+  if ($WinH -gt $area.Height) { $WinH = $area.Height - 40; $WinArgs = @("--window-size=$WinW,$WinH") }
+  $x = $area.X + $area.Width - $WinW - 40
+  $y = $area.Y + [int](($area.Height - $WinH) / 2)
+  if ($x -lt $area.X) { $x = $area.X }
+  if ($y -lt $area.Y) { $y = $area.Y }
+  $WinArgs += "--window-position=$x,$y"
+} catch { }
+
 $args = @(
   "--app=$Url",
-  "--user-data-dir=$Profile",
-  "--window-size=560,780",
+  "--user-data-dir=$Profile"
+) + $WinArgs + @(
   "--no-first-run",
   "--no-default-browser-check"
 )

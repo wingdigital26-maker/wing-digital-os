@@ -91,6 +91,10 @@ export default function JarvisButton() {
   const [engine, setEngine] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  // The scroll container itself, so a restored history can be pinned to the
+  // bottom instantly instead of animated there.
+  const msgsRef = useRef<HTMLDivElement>(null);
+  const didInitialScrollRef = useRef(false);
   // Nimbus orb: the shared mascot component (vanilla) mounted into the FAB.
   const orbSlotRef = useRef<HTMLDivElement>(null);
   const orbRef = useRef<Orb | null>(null);
@@ -226,6 +230,22 @@ export default function JarvisButton() {
   }, [stopAudio, speakFallback]);
 
   useEffect(() => {
+    const el = msgsRef.current;
+    // A conversation restored from sessionStorage must open on the NEWEST
+    // message, not the oldest. The smooth scrollIntoView below cannot do that
+    // on the very first paint: the solo card is still running its 260ms entry
+    // animation and the bubbles are still settling, so the smooth scroll gets
+    // dropped and the list stays at scrollTop 0. Jump instantly instead, and
+    // repeat over the next frames because scrollHeight grows as content lays
+    // out. Instant means no visible travel, so there is no jump to see.
+    if (el && !didInitialScrollRef.current && messages.length > 0) {
+      didInitialScrollRef.current = true;
+      const jump = () => { el.scrollTop = el.scrollHeight; };
+      jump();
+      const r1 = requestAnimationFrame(() => { jump(); requestAnimationFrame(jump); });
+      const t = setTimeout(jump, 320); // after the entry animation finishes
+      return () => { cancelAnimationFrame(r1); clearTimeout(t); };
+    }
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streaming]);
 
@@ -431,7 +451,7 @@ export default function JarvisButton() {
       let s = document.querySelector('script[data-nimbus]') as HTMLScriptElement | null;
       if (!s) {
         s = document.createElement("script");
-        s.src = "/mascot/wing-mascot.js?v=9";
+        s.src = "/mascot/wing-mascot.js?v=13";
         s.dataset.nimbus = "1";
         document.head.appendChild(s);
       }
@@ -579,11 +599,115 @@ export default function JarvisButton() {
         @keyframes jarvis-dots { 0%, 80%, 100% { opacity: 0; transform: scale(0.6); } 40% { opacity: 1; transform: scale(1); } }
         @keyframes jarvis-speak { 0%, 100% { transform: scaleY(0.4); opacity: 0.6; } 50% { transform: scaleY(1); opacity: 1; } }
         .jarvis-panel { position: fixed; bottom: 112px; right: 20px; width: 380px; height: 560px; }
-        .jarvis-panel.jarvis-solo { inset: 0; width: auto; height: auto; border-radius: 0; border: none; box-shadow: none; }
+        /* The small panel keeps its own mobile rule. :not(.jarvis-solo) matters
+           because the solo rules below would otherwise lose to this later rule
+           in a narrow hotkey window. */
         @media (max-width: 480px) {
-          .jarvis-panel { left: 8px; right: 8px; bottom: 84px; width: auto; height: min(70vh, 560px); }
+          .jarvis-panel:not(.jarvis-solo) { left: 8px; right: 8px; bottom: 84px; width: auto; height: min(70vh, 560px); }
         }
         .jarvis-chip:hover { border-color: ${ACCENT} !important; color: ${ACCENT} !important; }
+
+        /* ── Solo mode only (/nimbus). Everything below is scoped to
+           .jarvis-solo so the floating orb and the small OS panel are
+           untouched by this pass. ─────────────────────────────────────────── */
+        .jarvis-panel.jarvis-solo {
+          inset: auto 0 0 0;
+          width: auto;
+          /* The top of the window belongs to the orb stage, so the chat card
+             takes the lower band and lets the glow sit above it.
+             !important is required, not decorative: globals.css sets
+             a .jarvis-panel height of 82vh !important inside its mobile
+             block, and the hotkey window is 520px wide so that block applies.
+             Two classes plus !important is the lowest weight that beats it.
+             The clamp keeps the stage above at 300px or more at 900px tall,
+             and still leaves it room at 600px and 1100px. */
+          height: clamp(300px, 56vh, 620px) !important;
+          border: none !important;
+          border-top: 1px solid rgba(61,107,240,0.28) !important;
+          border-radius: 24px 24px 0 0 !important;
+          background: linear-gradient(180deg, rgba(13,17,23,0.58) 0%, rgba(13,17,23,0.92) 14%, #0d1117 42%) !important;
+          -webkit-backdrop-filter: blur(22px) saturate(120%);
+          backdrop-filter: blur(22px) saturate(120%);
+          box-shadow: 0 -1px 0 rgba(61,107,240,0.18), 0 -24px 70px rgba(0,0,0,0.55) !important;
+          animation: jarvis-solo-in 260ms ease-out both;
+        }
+        @keyframes jarvis-solo-in { from { transform: translateY(14px); opacity: 0; } to { transform: none; opacity: 1; } }
+        /* A hairline of accent light along the top edge, so the card reads as
+           part of the stage rather than a box dropped on top of it. */
+        .jarvis-solo .jarvis-head::before {
+          content: ""; position: absolute; left: 12%; right: 12%; top: 0; height: 1px;
+          background: linear-gradient(90deg, transparent, rgba(61,107,240,0.55), transparent);
+        }
+        .jarvis-solo .jarvis-head {
+          position: relative;
+          /* Four controls plus the name do not fit on one line under about
+             430px, and the right group would otherwise overrun the name. */
+          flex-wrap: wrap;
+          row-gap: 8px;
+          background: transparent !important;
+          border-bottom: 1px solid rgba(61,107,240,0.10) !important;
+          padding: 14px 22px 12px !important;
+        }
+        .jarvis-solo .jarvis-name { font-size: 17px !important; letter-spacing: 0.01em; }
+        .jarvis-solo .jarvis-headbtn { font-size: 11px !important; padding: 5px 11px !important; border-radius: 8px !important; }
+        .jarvis-solo .jarvis-headbtn:hover:not(:disabled) { border-color: rgba(61,107,240,0.55); background: rgba(61,107,240,0.08); }
+
+        .jarvis-solo .jarvis-msgs { padding: 18px 22px 8px !important; gap: 16px !important; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: rgba(61,107,240,0.35) transparent; }
+        .jarvis-solo .jarvis-msgs::-webkit-scrollbar { width: 8px; }
+        .jarvis-solo .jarvis-msgs::-webkit-scrollbar-thumb { background: rgba(61,107,240,0.28); border-radius: 99px; }
+        /* One readable column, centred, so long replies never run edge to edge. */
+        .jarvis-solo .jarvis-msgs > * { width: 100%; max-width: 720px; margin-left: auto; margin-right: auto; }
+
+        .jarvis-solo .jarvis-bubble { font-size: 15px !important; line-height: 1.62 !important; padding: 12px 16px !important; max-width: 82% !important; }
+        .jarvis-solo .jarvis-bubble-a {
+          background: rgba(22,27,34,0.9) !important;
+          border: 1px solid rgba(61,107,240,0.16) !important;
+          border-radius: 4px 16px 16px 16px !important;
+          /* Spoken answers are often one line. A floor width and a little air
+             make a short answer read as finished, not as a stray fragment. */
+          min-width: 128px;
+        }
+        .jarvis-solo .jarvis-bubble-u {
+          border-radius: 16px 16px 4px 16px !important;
+          box-shadow: 0 4px 18px rgba(61,107,240,0.22);
+        }
+        .jarvis-solo .jarvis-tool { font-size: 12px !important; letter-spacing: 0.01em; }
+        .jarvis-solo .jarvis-pending { max-width: 560px !important; padding: 14px 16px !important; border-radius: 14px !important; }
+        .jarvis-solo .jarvis-pending-btn { font-size: 13px !important; padding: 8px 18px !important; }
+        /* Nothing to scroll yet, so the prompt and chips sit in the middle of
+           the card rather than pinned to the top above a large void.
+           "safe" centring, because in a short window the block overflows and
+           plain centring would cut off its top out of reach of the scroll. */
+        .jarvis-solo .jarvis-msgs-empty { justify-content: safe center !important; padding-bottom: 18px !important; }
+        .jarvis-solo .jarvis-msgs-empty .jarvis-empty { margin-top: 0 !important; }
+        .jarvis-solo .jarvis-empty { font-size: 14px !important; max-width: 460px; margin-left: auto; margin-right: auto; }
+        .jarvis-solo .jarvis-chips { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px !important; max-width: 620px; margin: 16px auto 0 !important; }
+        .jarvis-solo .jarvis-chip { font-size: 12.5px !important; padding: 11px 14px !important; border-radius: 12px !important; }
+        /* Link chips stay pills; declared after so they beat the chip sizing. */
+        .jarvis-solo .jarvis-chip.jarvis-linkchip { font-size: 11px !important; padding: 4px 12px !important; border-radius: 99px !important; }
+
+        .jarvis-solo .jarvis-composer {
+          background: transparent !important;
+          border-top: 1px solid rgba(61,107,240,0.10) !important;
+          /* Side padding, otherwise the Send button's right edge lands exactly
+             on the 520px window edge and reads as clipped. */
+          padding: 14px 18px 10px !important;
+          gap: 10px !important;
+          width: 100%; max-width: 764px; margin: 0 auto; align-items: center;
+        }
+        .jarvis-solo .jarvis-input { padding: 13px 16px !important; font-size: 14.5px !important; border-radius: 14px !important; background: rgba(22,27,34,0.85) !important; transition: border-color 140ms ease, box-shadow 140ms ease; }
+        .jarvis-solo .jarvis-input:focus { border-color: rgba(61,107,240,0.65) !important; box-shadow: 0 0 0 3px rgba(61,107,240,0.16); }
+        .jarvis-solo .jarvis-mic, .jarvis-solo .jarvis-send { width: 44px !important; height: 44px !important; }
+        .jarvis-solo .jarvis-send { box-shadow: 0 4px 16px rgba(61,107,240,0.28); }
+        .jarvis-solo .jarvis-send svg, .jarvis-solo .jarvis-mic svg { width: 17px; height: 17px; }
+        /* The pill lives in the header row in solo mode: part of the card's
+           own chrome, and structurally unable to reach the Send button. */
+        .jarvis-solo .jarvis-exit { position: static !important; margin: 0; }
+        .jarvis-solo .jarvis-exit:hover { border-color: rgba(61,107,240,0.55); background: rgba(61,107,240,0.08); }
+
+        @media (prefers-reduced-motion: reduce) {
+          .jarvis-panel.jarvis-solo, .jarvis-panel.jarvis-solo * { animation: none !important; transition: none !important; }
+        }
       `}</style>
 
       {!solo && <button
@@ -630,10 +754,10 @@ export default function JarvisButton() {
           }}
         >
           {/* Header */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", borderBottom: "1px solid rgba(61,107,240,0.15)", background: "#0d1117", gap: 8 }}>
+          <div className="jarvis-head" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", borderBottom: "1px solid rgba(61,107,240,0.15)", background: "#0d1117", gap: 8 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
               <div ref={headerSlotRef} style={{ width: 38, height: 38, flexShrink: 0 }} aria-hidden="true" />
-              <span style={{ color: ACCENT, fontWeight: 700, fontSize: 15, fontFamily: "Space Grotesk, sans-serif" }}>Nimbus</span>
+              <span className="jarvis-name" style={{ color: ACCENT, fontWeight: 700, fontSize: 15, fontFamily: "Space Grotesk, sans-serif" }}>Nimbus</span>
               {speaking && (
                 <button onClick={stopAudio} title="Stop speaking" style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "rgba(61,107,240,0.12)", border: "1px solid rgba(61,107,240,0.4)", borderRadius: 6, padding: "2px 7px", cursor: "pointer" }}>
                   {[0, 1, 2].map((n) => (
@@ -648,10 +772,11 @@ export default function JarvisButton() {
               )}
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-              <button onClick={() => { const next = !voiceOn; setVoiceOn(next); if (!next) stopAudio(); }} title={voiceOn ? "Voice replies on" : "Voice replies off"} style={{ ...smallBtn, color: voiceOn ? ACCENT : "#556" }}>
+              <button className="jarvis-headbtn" onClick={() => { const next = !voiceOn; setVoiceOn(next); if (!next) stopAudio(); }} title={voiceOn ? "Voice replies on" : "Voice replies off"} style={{ ...smallBtn, color: voiceOn ? ACCENT : "#556" }}>
                 {voiceOn ? "Voice on" : "Voice off"}
               </button>
               <button
+                className="jarvis-headbtn"
                 onClick={() => { const next = !agentMode; setAgentMode(next); agentModeRef.current = next; try { localStorage.setItem("nimbus:agent", next ? "1" : "0"); } catch { /* private mode */ } }}
                 disabled={streaming}
                 title={agentMode
@@ -661,7 +786,28 @@ export default function JarvisButton() {
               >
                 {agentMode ? "Agent" : "Chat"}
               </button>
-              <button onClick={clearChat} disabled={streaming} title="Clear this chat" style={{ ...smallBtn, cursor: streaming ? "default" : "pointer" }}>Clear chat</button>
+              <button className="jarvis-headbtn" onClick={clearChat} disabled={streaming} title="Clear this chat" style={{ ...smallBtn, cursor: streaming ? "default" : "pointer" }}>Clear chat</button>
+              {/* The way out of the solo window and into the full OS. It sits
+                  in the header so it reads as part of the card's chrome and can
+                  never crowd the Send button. */}
+              {solo && (
+                <Link
+                  href="/"
+                  className="jarvis-exit"
+                  title="Open the full OS in the browser"
+                  style={{
+                    display: "inline-flex", alignItems: "center", gap: 5,
+                    background: "rgba(61,107,240,0.10)", border: "1px solid rgba(61,107,240,0.30)",
+                    borderRadius: 999, padding: "5px 11px", color: "#9bc",
+                    fontSize: 11, fontFamily: FONT, textDecoration: "none", whiteSpace: "nowrap",
+                  }}
+                >
+                  Open the OS
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M7 17 17 7" /><path d="M8 7h9v9" />
+                  </svg>
+                </Link>
+              )}
               {!solo && (
                 <button onClick={() => { sfx.play("close"); setOpen(false); }} aria-label="Close" style={{ background: "none", border: "none", color: "#666", cursor: "pointer", fontSize: 18, lineHeight: 1 }}>×</button>
               )}
@@ -669,13 +815,13 @@ export default function JarvisButton() {
           </div>
 
           {/* Messages */}
-          <div style={{ flex: 1, overflowY: "auto", padding: "12px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
+          <div ref={msgsRef} className={messages.length === 0 ? "jarvis-msgs jarvis-msgs-empty" : "jarvis-msgs"} style={{ flex: 1, overflowY: "auto", padding: "12px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
             {messages.length === 0 && (
               <>
-                <div style={{ color: "#556", fontSize: 13, textAlign: "center", marginTop: 28, fontFamily: FONT, lineHeight: 1.5 }}>
+                <div className="jarvis-empty" style={{ color: "#556", fontSize: 13, textAlign: "center", marginTop: 28, fontFamily: FONT, lineHeight: 1.5 }}>
                   Ask about today, a contact, a task, an automation, or tell me to do something. Anything that changes data waits for your OK.
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 10 }}>
+                <div className="jarvis-chips" style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 10 }}>
                   {SUGGESTED.map((q) => (
                     <button key={q} className="jarvis-chip" onClick={() => sendMessageRef.current(q)} style={{
                       background: "rgba(61,107,240,0.06)", border: "1px solid rgba(61,107,240,0.22)",
@@ -696,12 +842,12 @@ export default function JarvisButton() {
                   {!isUser && (msg.tools?.length ?? 0) > 0 && (
                     <div style={{ display: "flex", flexDirection: "column", gap: 2, paddingLeft: 6 }}>
                       {msg.tools!.map((t, k) => (
-                        <span key={k} style={{ color: "#4a5568", fontSize: 11, fontFamily: FONT }}>{t}</span>
+                        <span key={k} className="jarvis-tool" style={{ color: "#4a5568", fontSize: 11, fontFamily: FONT }}>{t}</span>
                       ))}
                     </div>
                   )}
                   {(isUser || msg.content || showTyping) && (
-                    <div style={{
+                    <div className={`jarvis-bubble ${isUser ? "jarvis-bubble-u" : "jarvis-bubble-a"}`} style={{
                       maxWidth: "86%", padding: "8px 12px",
                       borderRadius: isUser ? "14px 14px 4px 14px" : "14px 14px 14px 4px",
                       background: isUser ? ACCENT : "#161b22", color: isUser ? "#000" : "#e0e0e0",
@@ -722,7 +868,7 @@ export default function JarvisButton() {
                   )}
                   {/* pending action card */}
                   {!isUser && msg.pending && (
-                    <div data-testid="jarvis-pending" style={{
+                    <div data-testid="jarvis-pending" className="jarvis-pending" style={{
                       maxWidth: "92%", border: `1px solid ${msg.pendingState === "open" ? "rgba(251,191,36,0.55)" : "rgba(61,107,240,0.15)"}`,
                       background: msg.pendingState === "open" ? "rgba(251,191,36,0.06)" : "#11151c",
                       borderRadius: 12, padding: "10px 12px", fontFamily: FONT,
@@ -733,11 +879,11 @@ export default function JarvisButton() {
                       <div style={{ fontSize: 13, color: "#e0e0e0", lineHeight: 1.45 }}>{msg.pending.human_summary}</div>
                       {msg.pendingState === "open" && (
                         <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-                          <button onClick={() => confirmAction(i)} disabled={streaming} data-testid="jarvis-do-it" style={{
+                          <button className="jarvis-pending-btn" onClick={() => confirmAction(i)} disabled={streaming} data-testid="jarvis-do-it" style={{
                             background: ACCENT, color: "#000", border: "none", borderRadius: 8, padding: "6px 14px",
                             fontSize: 12, fontWeight: 700, cursor: streaming ? "default" : "pointer", fontFamily: FONT,
                           }}>Do it</button>
-                          <button onClick={() => cancelAction(i)} disabled={streaming} style={{
+                          <button className="jarvis-pending-btn" onClick={() => cancelAction(i)} disabled={streaming} style={{
                             background: "none", color: "#9bc", border: "1px solid rgba(61,107,240,0.3)", borderRadius: 8,
                             padding: "6px 14px", fontSize: 12, cursor: streaming ? "default" : "pointer", fontFamily: FONT,
                           }}>Cancel</button>
@@ -749,7 +895,7 @@ export default function JarvisButton() {
                   {!isUser && (msg.links?.length ?? 0) > 0 && !(isLast && streaming) && (
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6, paddingLeft: 2 }}>
                       {msg.links!.map((l, k) => (
-                        <button key={k} className="jarvis-chip" onClick={() => openLink(l)} style={{
+                        <button key={k} className="jarvis-chip jarvis-linkchip" onClick={() => openLink(l)} style={{
                           background: "none", border: "1px solid rgba(61,107,240,0.25)", borderRadius: 99,
                           color: "#8ab", cursor: "pointer", fontSize: 10, padding: "2px 9px", fontFamily: FONT,
                         }}>{l.label}</button>
@@ -771,8 +917,9 @@ export default function JarvisButton() {
           </div>
 
           {/* Input */}
-          <form onSubmit={handleSubmit} style={{ display: "flex", gap: 8, padding: "10px 12px", borderTop: "1px solid rgba(61,107,240,0.15)", background: "#0d1117" }}>
+          <form onSubmit={handleSubmit} className="jarvis-composer" style={{ display: "flex", gap: 8, padding: "10px 12px", borderTop: "1px solid rgba(61,107,240,0.15)", background: "#0d1117" }}>
             <input
+              className="jarvis-input"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               disabled={listening || streaming}
@@ -781,7 +928,7 @@ export default function JarvisButton() {
               style={{ flex: 1, minWidth: 0, background: "#161b22", border: "1px solid rgba(61,107,240,0.2)", borderRadius: 10, color: "#e0e0e0", padding: "8px 12px", fontSize: 13, fontFamily: FONT, outline: "none" }}
             />
             {hasSpeechAPI && (
-              <button type="button" onClick={listening ? stopListening : startListening} disabled={streaming} title={listening ? "Stop" : "Speak"} style={{ width: 36, height: 36, borderRadius: "50%", background: listening ? "#ef4444" : "rgba(61,107,240,0.15)", border: "1px solid rgba(61,107,240,0.3)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "background 0.2s" }}>
+              <button type="button" className="jarvis-mic" onClick={listening ? stopListening : startListening} disabled={streaming} title={listening ? "Stop" : "Speak"} style={{ width: 36, height: 36, borderRadius: "50%", background: listening ? "#ef4444" : "rgba(61,107,240,0.15)", border: "1px solid rgba(61,107,240,0.3)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "background 0.2s" }}>
                 {listening ? (
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="white"><rect x="3" y="3" width="18" height="18" rx="3"/></svg>
                 ) : (
@@ -791,7 +938,7 @@ export default function JarvisButton() {
                 )}
               </button>
             )}
-            <button type="submit" disabled={!input.trim() || streaming || listening} aria-label="Send" style={{ width: 36, height: 36, borderRadius: "50%", background: input.trim() && !streaming ? ACCENT : "rgba(61,107,240,0.1)", border: "none", cursor: input.trim() && !streaming ? "pointer" : "default", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "background 0.2s" }}>
+            <button type="submit" className="jarvis-send" disabled={!input.trim() || streaming || listening} aria-label="Send" style={{ width: 36, height: 36, borderRadius: "50%", background: input.trim() && !streaming ? ACCENT : "rgba(61,107,240,0.1)", border: "none", cursor: input.trim() && !streaming ? "pointer" : "default", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "background 0.2s" }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={input.trim() && !streaming ? "#000" : "#444"} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
               </svg>
@@ -801,27 +948,6 @@ export default function JarvisButton() {
             <div style={{ padding: "0 12px 8px", color: "#555", fontSize: 11, fontFamily: FONT }}>Voice input not available in this browser.</div>
           )}
 
-          {/* The way out of the solo window and into the full OS. */}
-          {solo && (
-            <Link
-              href="/"
-              title="Open the full OS in the browser"
-              style={{
-                // Sits just above the composer: as a bottom-right pill it used
-                // to cover the Send button and swallow the click.
-                position: "fixed", right: 14, bottom: 66, zIndex: 10000,
-                display: "inline-flex", alignItems: "center", gap: 6,
-                background: "rgba(61,107,240,0.10)", border: "1px solid rgba(61,107,240,0.30)",
-                borderRadius: 999, padding: "6px 12px", color: "#9bc",
-                fontSize: 11.5, fontFamily: FONT, textDecoration: "none",
-              }}
-            >
-              Open the OS
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M7 17 17 7" /><path d="M8 7h9v9" />
-              </svg>
-            </Link>
-          )}
         </div>
       )}
     </>

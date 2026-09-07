@@ -139,7 +139,10 @@ export async function middleware(req: NextRequest) {
   const nimbusScoped =
     pathname === "/nimbus" ||
     pathname === "/api/jarvis" ||
-    pathname.startsWith("/api/jarvis/");
+    pathname.startsWith("/api/jarvis/") ||
+    // Read-only glance data the window's own stage renders (greeting, watch
+    // headline, MRR line). Same key, same local-only branch.
+    pathname.startsWith("/api/nimbus/");
   if (nimbusKey && nimbusScoped && process.env.RUNTIME_ENV !== "cloud") {
     const presented = req.nextUrl.searchParams.get("k") || req.cookies.get("nimbus_local")?.value;
     if (presented === nimbusKey) {

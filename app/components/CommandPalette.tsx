@@ -114,13 +114,17 @@ export default function CommandPalette() {
   }, []);
 
   // Public-path guard: the palette is mounted globally (layout.tsx), but must
-  // stay inert on public/client-facing routes.
+  // stay inert on public/client-facing routes. /nimbus is in the list for a
+  // different reason: it is the frameless hotkey window, ~520px wide, so the
+  // mobile-width .cp-fab rule would render an OS button floating over the chat
+  // card. That window is Nimbus alone, not the OS, so the palette has no place
+  // there. Every other route, phone widths included, is untouched.
   useEffect(() => {
     const p = window.location.pathname;
-    const isPublic = ["/login", "/book", "/portal", "/d"].some(
+    const inert = ["/login", "/book", "/portal", "/d", "/nimbus"].some(
       prefix => p === prefix || p.startsWith(prefix + "/")
     );
-    setEnabled(!isPublic);
+    setEnabled(!inert);
   }, []);
 
   // Global hotkey — self-registered so mounting the component is the wiring.

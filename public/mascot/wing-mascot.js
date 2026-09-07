@@ -5,6 +5,9 @@
  *   <script src="/mascot/wing-mascot.js"></script>
  *   var m = WingMascot.mount(document.getElementById('slot'), { size: 120, intro: true });
  *   m.setState('calm' | 'excited' | 'alert' | 'dim');
+ * Optional { hero: true } upgrades the lighting for a large stage. It is opt
+ * in and applies only at size >= 140 with motion allowed, so every existing
+ * mount renders exactly as before.
  * Behavior: levitates with a breathing glow, blinks its lens on a random timer,
  * rings spin up on hover/tap, brief flare on fast scroll. Honors
  * prefers-reduced-motion (static pose, no timers).
@@ -30,6 +33,24 @@
     '<radialGradient id="wmAtmo" cx="50%" cy="42%" r="60%">' +
     '<stop offset="72%" stop-color="#7d9bff" stop-opacity="0"/><stop offset="94%" stop-color="#7d9bff" stop-opacity=".5"/><stop offset="100%" stop-color="#c9d6ff" stop-opacity=".8"/>' +
     '</radialGradient>' +
+    /* hero-only paint. These defs are inert unless the .wm-hero class is on the
+     * root, because every element that references them is display:none by
+     * default. Kept here rather than in a second SVG so the hero orb is the
+     * same object, just better lit. */
+    '<radialGradient id="wmHDepth" cx="42%" cy="34%" r="78%">' +
+    '<stop offset="0%" stop-color="#0b1440" stop-opacity="0"/><stop offset="58%" stop-color="#0b1440" stop-opacity="0"/><stop offset="86%" stop-color="#0b1440" stop-opacity=".34"/><stop offset="100%" stop-color="#070d26" stop-opacity=".62"/>' +
+    '</radialGradient>' +
+    '<radialGradient id="wmHBounce" cx="70%" cy="84%" r="44%">' +
+    '<stop offset="0%" stop-color="#7d9bff" stop-opacity=".5"/><stop offset="100%" stop-color="#7d9bff" stop-opacity="0"/>' +
+    '</radialGradient>' +
+    '<radialGradient id="wmHNeb" cx="50%" cy="50%" r="50%">' +
+    '<stop offset="0%" stop-color="#9db4ff" stop-opacity=".55"/><stop offset="100%" stop-color="#9db4ff" stop-opacity="0"/>' +
+    '</radialGradient>' +
+    '<linearGradient id="wmHRim" x1="0" y1="1" x2="1" y2="0">' +
+    '<stop offset="0%" stop-color="#c9d6ff" stop-opacity="0"/><stop offset="42%" stop-color="#dfe8ff" stop-opacity=".8"/><stop offset="100%" stop-color="#c9d6ff" stop-opacity="0"/>' +
+    '</linearGradient>' +
+    '<clipPath id="wmHClip"><circle cx="100" cy="96" r="40"/></clipPath>' +
+    '<filter id="wmHBlur" x="-70%" y="-70%" width="240%" height="240%"><feGaussianBlur stdDeviation="3.2"/></filter>' +
     '</defs>' +
     '<g class="wm-rig">' +
     '<circle class="wm-glow" cx="100" cy="96" r="74" fill="url(#wmHalo)"/>' +
@@ -37,8 +58,24 @@
     '<circle class="wm-core" cx="100" cy="96" r="40" fill="url(#wmCore)"/>' +
     '<circle class="wm-atmo" cx="100" cy="96" r="41.5" fill="url(#wmAtmo)"/>' +
     '<ellipse class="wm-sheenspot" cx="88" cy="80" rx="16" ry="11" fill="url(#wmSheen)" transform="rotate(-24 88 80)"/>' +
+    /* hero depth stack, sitting on the core and under the eyes: an inner
+     * parallax drift, limb darkening that turns the disc into a sphere,
+     * bounced fill from below, a lit rim and a tight specular. All hidden
+     * unless .wm-hero is set, so the default orb is untouched. */
+    '<g class="wm-h wm-hdepth">' +
+    '<g clip-path="url(#wmHClip)"><g class="wm-hswirl">' +
+    '<ellipse cx="82" cy="112" rx="30" ry="22" fill="url(#wmHNeb)"/>' +
+    '<ellipse cx="120" cy="80" rx="24" ry="18" fill="url(#wmHNeb)" opacity=".7"/>' +
+    '</g></g>' +
+    '<circle cx="100" cy="96" r="40" fill="url(#wmHDepth)"/>' +
+    '<circle cx="100" cy="96" r="40" fill="url(#wmHBounce)"/>' +
+    '<circle cx="100" cy="96" r="40.4" fill="none" stroke="url(#wmHRim)" stroke-width="1.5"/>' +
+    '<ellipse class="wm-hspec" cx="85" cy="76" rx="7" ry="4.4" fill="#ffffff" opacity=".6" transform="rotate(-24 85 76)"/>' +
+    '</g>' +
     '<g class="wm-eyes">' +
-    '<g class="wm-eye-open"><rect x="84" y="82" width="11" height="24" rx="5.5" fill="#eaf0ff"/><rect x="105" y="82" width="11" height="24" rx="5.5" fill="#eaf0ff"/></g>' +
+    '<g class="wm-eye-open">' +
+    '<g class="wm-h wm-heyeglow" filter="url(#wmHBlur)"><rect x="84" y="82" width="11" height="24" rx="5.5" fill="#9db4ff"/><rect x="105" y="82" width="11" height="24" rx="5.5" fill="#9db4ff"/></g>' +
+    '<rect x="84" y="82" width="11" height="24" rx="5.5" fill="#eaf0ff"/><rect x="105" y="82" width="11" height="24" rx="5.5" fill="#eaf0ff"/></g>' +
     '<g class="wm-eye-happy" opacity="0"><path d="M84 98 q5.5 -9 11 0" fill="none" stroke="#eaf0ff" stroke-width="5" stroke-linecap="round"/><path d="M105 98 q5.5 -9 11 0" fill="none" stroke="#eaf0ff" stroke-width="5" stroke-linecap="round"/></g>' +
     '</g>' +
     '<g class="wm-ring wm-r1">' +
@@ -117,8 +154,19 @@
     '.wm-dim .wm-rig{animation:wm-sink 6.5s ease-in-out infinite}' +
     '@keyframes wm-sink{0%,100%{transform:translateY(3px)}50%{transform:translateY(0)}}' +
     '.wm-dim .wm-ring{animation-duration:22s}.wm-dim .wm-r2{animation-duration:30s}.wm-dim .wm-comet{opacity:.35;animation-duration:12s}' +
-    '.wm-alert .wm-core{filter:brightness(1.15) hue-rotate(160deg) saturate(1.6)}' +
+    /* alert = attention, NOT failure. Nimbus stays blue: a red core made the
+     * assistant itself look broken, especially at hero size. The urgency is
+     * carried by the amber badge, a warm amber rim on the atmosphere ring,
+     * sped-up orbits, a faster glow pulse and the jitter. The core only gets
+     * brighter and a touch more saturated, so it is still recognisably him. */
+    '.wm-alert .wm-core{filter:brightness(1.16) saturate(1.25)}' +
+    /* the rim is the one place a warm accent can live without eating the
+     * identity: it is 6% of the disc radius, so it reads as a hot edge at
+     * 200px and as a warm speck at 76px rather than as a colour change. */
+    '.wm-alert .wm-atmo{filter:hue-rotate(178deg) saturate(1.5) brightness(1.1);opacity:1}' +
     '.wm-alert .wm-glow{animation-duration:1.1s}' +
+    '.wm-alert .wm-ring{animation-duration:3.4s}' +
+    '.wm-alert .wm-r2{animation-duration:4.8s}' +
     '.wm-alert .wm-rig{animation:wm-jitter .55s linear infinite}' +
     '@keyframes wm-jitter{0%,100%{transform:translate(0,0)}20%{transform:translate(-1.6px,1px)}40%{transform:translate(1.4px,-1.2px)}60%{transform:translate(-1.2px,-1px)}80%{transform:translate(1.6px,1.2px)}}' +
     '.wm-thinking .wm-eyes{animation:none;transform:translate(-5px,-6px)}' +
@@ -156,7 +204,27 @@
     '@keyframes wm-arrive{0%{transform:translateY(-36px) scale(.5);opacity:0}60%{opacity:1}100%{transform:none;opacity:1}}' +
     '@media (prefers-reduced-motion:reduce){.wm-rig,.wm-glow,.wm-glow2,.wm-atmo,.wm-eyes,.wm-eye-open,.wm-ring,.wm-comet,.wm-core,.wm-intro,.wm-flare .wm-glow{animation:none !important}}' +
 '@media (prefers-reduced-motion:reduce){.wm-excited .wm-rig,.wm-dim .wm-rig,.wm-alert .wm-rig,.wm-thinking .wm-rig,.wm-sleepy .wm-rig,.wm-party .wm-rig{animation:none !important}' +
-'.wm-td,.wm-p-alert,.wm-z,.wm-cf,.wm-sp,.wm-p-dim{animation:none !important}.wm-z,.wm-cf,.wm-sp{opacity:.8}}';
+'.wm-td,.wm-p-alert,.wm-z,.wm-cf,.wm-sp,.wm-p-dim{animation:none !important}.wm-z,.wm-cf,.wm-sp{opacity:.8}}' +
+    /* hero presentation, opt in only. display:none (not opacity) so the browser
+     * never pays for the blur filter or the extra gradients on the small orbs
+     * that ship on the site, the pitch page and the client dashboards. */
+    '.wm-h{display:none}' +
+    '.wm-hero .wm-h{display:inline}' +
+    '.wm-hero .wm-hdepth{transform-origin:100px 96px;animation:wm-breathe 3.2s ease-in-out infinite}' +
+    '.wm-hero .wm-hswirl{animation:wm-hdrift 19s ease-in-out infinite}' +
+    '@keyframes wm-hdrift{0%,100%{transform:translate(-5px,3px)}50%{transform:translate(6px,-4px)}}' +
+    '.wm-hero .wm-hspec{transform-origin:85px 76px;animation:wm-hgleam 7s ease-in-out infinite}' +
+    '@keyframes wm-hgleam{0%,100%{opacity:.42;transform:scale(.92)}50%{opacity:.75;transform:scale(1.08)}}' +
+    /* the atmosphere rim carries more of the read at 200px than at 96px */
+    '.wm-hero .wm-atmo{opacity:.85}' +
+    '.wm-hero .wm-glow2{opacity:.62}' +
+    /* the hero lift is additive, so it was cancelling the two LOW-energy
+     * moods: at 200px a dim or sleepy orb sat as bright as a calm one, which
+     * is dishonest on a dashboard that is dim because nothing is connected.
+     * Hero-scoped, so the small orbs on the site and dashboards are unchanged. */
+    '.wm-hero.wm-dim .wm-atmo{opacity:.4}.wm-hero.wm-dim .wm-glow2{opacity:.22}' +
+    '.wm-hero.wm-sleepy .wm-atmo{opacity:.5}.wm-hero.wm-sleepy .wm-glow2{opacity:.28}' +
+    '@media (prefers-reduced-motion:reduce){.wm-hero .wm-hdepth,.wm-hero .wm-hswirl,.wm-hero .wm-hspec{animation:none !important}}';
 
   var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var styleInjected = false;
@@ -247,10 +315,16 @@
       document.head.appendChild(s);
       styleInjected = true;
     }
+    var size = opts.size || 96;
+    /* hero: the richer lighting only earns its cost on a large stage. Below
+     * HERO_MIN the extra layers read as mud, and under reduced motion the
+     * honest answer is the plain orb, so both fall back to the default. */
+    var HERO_MIN = 140;
+    var hero = !!opts.hero && !reduced && size >= HERO_MIN;
     var root = document.createElement('span');
-    root.className = 'wm-root' + (opts.intro && !reduced ? ' wm-intro' : '');
-    root.style.width = (opts.size || 96) + 'px';
-    root.style.height = (opts.size || 96) + 'px';
+    root.className = 'wm-root' + (opts.intro && !reduced ? ' wm-intro' : '') + (hero ? ' wm-hero' : '');
+    root.style.width = size + 'px';
+    root.style.height = size + 'px';
     root.innerHTML = SVG;
     root.setAttribute('role', 'button');
     root.setAttribute('tabindex', '0');
@@ -395,6 +469,9 @@
     return {
       blink: blink, flare: flare, setState: setState, pin: pin, unpin: unpin,
       pulse: pulse, bubble: bubble, hideBubble: hideBubble, destroy: destroy, el: root,
+      /* so a stage can tell whether the hero layers actually applied instead of
+         assuming they did after asking for them */
+      isHero: function () { return hero; },
       getPinned: function () { return pinned; },
       getState: getState
     };

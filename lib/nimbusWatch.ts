@@ -31,6 +31,12 @@ export type Check = {
   detail: string;
   /** Where to go to fix it. Every problem must have one. */
   link?: { label: string; href: string };
+  /**
+   * What to actually DO about it, in one imperative sentence. Required on every
+   * problem: an alert that names a symptom and stops leaves the reader guessing,
+   * which is the failure mode this watch exists to remove.
+   */
+  fix?: string;
   /** Severity for ordering and for the push title. */
   severity?: "high" | "normal";
 };
@@ -46,14 +52,81 @@ export type WatchResult = {
 
 const OS_LINK = (path: string, label: string) => ({ label, href: path });
 
+/**
+ * A link into an in-shell view of "/". The shell reads the HASH form
+ * (app/page.tsx honors "#view=<subId>" on mount and on hashchange); a "?view="
+ * query param is read by nothing and lands on the default view, so every link
+ * here has to be built with this helper. Ids must be real NAV_TREE sub ids
+ * (app/lib/nav.ts) or LEGACY_VIEW_ALIAS keys. Note the agents view id is
+ * "agent", singular.
+ */
+const VIEW_LINK = (subId: string, label: string) => ({ label, href: `/#view=${subId}` });
+
+/**
+ * Some agents write a whole report into their heartbeat message, and the first
+ * line is a banner or a date stamp rather than the failure. Pick the first line
+ * that actually carries information: skip separators, skip bare dates/times,
+ * and skip all-caps banners (with or without a "label:" prefix in front).
+ */
+export function firstInformativeLine(message: string | null | undefined): string | null {
+  const lines = (message || "")
+    .split(String.fromCharCode(10))
+    .map((l) => l.trim())
+    .filter(Boolean);
+  for (const line of lines) {
+    // Drop a leading "Something:" label before judging what follows it.
+    const body = line.replace(/^[A-Za-z][\w '-]{0,40}:\s*/, "") || line;
+    // Remove dates, clock times and punctuation to see what content is left.
+    const bare = body
+      .replace(/\d{4}-\d{2}-\d{2}([T ]\d{1,2}:\d{2}(:\d{2})?)?/g, " ")
+      .replace(/\b\d{1,2}:\d{2}(:\d{2})?\s*(am|pm)?\b/gi, " ")
+      .replace(/[^A-Za-z ]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (bare.length < 8) continue; // separator, date stamp, or near-empty
+    if (bare === bare.toUpperCase()) continue; // ALL-CAPS BANNER
+    return line;
+  }
+  return lines[0] || null;
+}
+
+/** Push bodies get cut around here on a lock screen, so budget to it. */
+const BODY_MAX = 300;
+
+/**
+ * Build the push body so the FIX always survives whole. The detail is the part
+ * that gets shortened; a fix cut mid-word ("...so plug the laptop in and
+ * re-enable") is worse than no fix at all, because it reads like an
+ * instruction and is not one.
+ */
+export function alertBody(detail: string, fix: string | undefined, max = BODY_MAX): string {
+  const tail = fix ? ` FIX: ${fix}` : "";
+  // No room for both: the fix wins and goes out on its own, uncut. It is the
+  // only actionable half.
+  const room = max - tail.length;
+  if (room < 24) return (fix ? `FIX: ${fix}` : detail.slice(0, max)).trim();
+  if (detail.length <= room) return `${detail}${tail}`;
+  // Trim the detail on a word boundary and mark that it was shortened.
+  const cut = detail.slice(0, room - 3);
+  const at = cut.lastIndexOf(" ");
+  return `${(at > room / 2 ? cut.slice(0, at) : cut).trimEnd()}...${tail}`;
+}
+
 function ok(id: string, label: string, detail: string): Check {
   return { id, label, state: "ok", detail };
 }
 function unknown(id: string, label: string, why: string): Check {
   return { id, label, state: "unknown", detail: `Could not check: ${why}` };
 }
-function problem(id: string, label: string, detail: string, link: Check["link"], severity: "high" | "normal" = "normal"): Check {
-  return { id, label, state: "problem", detail, link, severity };
+function problem(
+  id: string,
+  label: string,
+  detail: string,
+  link: Check["link"],
+  fix: string,
+  severity: "high" | "normal" = "normal"
+): Check {
+  return { id, label, state: "problem", detail, link, fix, severity };
 }
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -121,8 +194,8 @@ async function checkSending(): Promise<Check[]> {
             "send:paused",
             "Cold email sender",
             `The sender is paused${age === null ? "" : ` and has been since its last run ${age} days ago`}. Nothing is going out.`,
-            OS_LINK("/?view=email", "Deliverability")
-          )
+            VIEW_LINK("email", "CRM > Email"),
+            "Unpause the sender in Supabase outreach_state (set paused to false for client wing), then confirm the next cloud run sends.")
         );
       } else if (age !== null && age >= 2) {
         out.push(
@@ -130,8 +203,8 @@ async function checkSending(): Promise<Check[]> {
             "send:silent",
             "Cold email sender",
             `The sender is armed but has not run in ${age} days (expected daily).`,
-            OS_LINK("/?view=email", "Deliverability")
-          )
+            VIEW_LINK("email", "CRM > Email"),
+            "Check the outreach GitHub Actions run for a failure, then re-run it. If the cloud runner is fine, look at the send-ready lead count.")
         );
       } else {
         out.push(ok("send:state", "Cold email sender", `Running, last recorded ${s.count ?? "an unknown number of"} sends.`));
@@ -151,8 +224,8 @@ async function checkSending(): Promise<Check[]> {
           "send:errors",
           "Email send errors",
           `${errors} email${errors === 1 ? "" : "s"} failed to send in the last 7 days and never went out.`,
-          OS_LINK("/?view=email", "Deliverability")
-        )
+          VIEW_LINK("email", "CRM > Email"),
+            "Open Deliverability and read last_send_error on the failed rows. A bad mailbox password or a rejected domain is the usual cause.")
       );
     } else {
       out.push(ok("send:errors", "Email send errors", "No failed sends in the last 7 days."));
@@ -174,20 +247,35 @@ async function checkRevenue(): Promise<Check[]> {
           "revenue:expiring",
           "Revenue expiring",
           `$${t.nextExpiry.amount.toLocaleString()}/mo ends ${t.nextExpiry.end}, ${t.nextExpiry.monthsRemaining} month${t.nextExpiry.monthsRemaining === 1 ? "" : "s"} left, unless it is renewed. That is ${Math.round((t.nextExpiry.amount / Math.max(t.mrr, 1)) * 100)}% of MRR.`,
-          OS_LINK("/?view=clients", "Clients"),
-          "high"
-        )
+          VIEW_LINK("clients", "Clients"),
+            "Start the renewal conversation now. A term that ends with nothing lined up is a cliff, not a surprise.", "high")
       );
     } else {
       out.push(ok("revenue:expiring", "Revenue expiring", `MRR is $${t.mrr.toLocaleString()} with no term ending inside two months.`));
     }
     if (t.unknown.length) {
+      // Two different causes, two different fixes. getRevenueTruth marks a
+      // roster client that has no vault page at all with needsVaultPage (see
+      // lib/revenue.ts), and telling Jack to edit frontmatter on a file that
+      // does not exist is a dead instruction.
+      const noPage = t.unknown.filter((c) => c.needsVaultPage).map((c) => c.name);
+      const noFigure = t.unknown.filter((c) => !c.needsVaultPage).map((c) => c.name);
+      const fixParts: string[] = [];
+      if (noFigure.length)
+        fixParts.push(
+          `Add revenue_amount and revenue_basis to the frontmatter of the vault page for ${noFigure.join(", ")}.`
+        );
+      if (noPage.length)
+        fixParts.push(
+          `Create a vault client page for ${noPage.join(", ")} (they are on the roster with no page at all) with revenue_amount and revenue_basis in the frontmatter.`
+        );
       out.push(
         problem(
           "revenue:unpriced",
           "Clients with no figure",
-          `${t.unknown.length} active client${t.unknown.length === 1 ? " has" : "s have"} no amount on file, so MRR is understated by an unknown amount.`,
-          OS_LINK("/?view=clients", "Clients")
+          `${t.unknown.length} active client${t.unknown.length === 1 ? " has" : "s have"} no amount on file, so MRR is understated by an unknown amount: ${t.unknown.map((c) => `${c.name}${c.needsVaultPage ? " (no vault page)" : ""}`).join(", ")}.`,
+          VIEW_LINK("clients", "Clients"),
+          fixParts.join(" ")
         )
       );
     }
@@ -208,27 +296,64 @@ async function checkAgents(): Promise<Check[]> {
     const byAgent = new Map(beats.map((b) => [b.agent, b]));
     const out: Check[] = [];
     const stale: string[] = [];
+    const missing: string[] = [];
+    const disabled: string[] = [];
+    let judged = 0; // only agents this pass actually looked at
     const inWindow = inPcWindow();
     for (const exp of EXPECTED_HEARTBEATS) {
       if (exp.windowed && !inWindow) continue;
       const b = byAgent.get(exp.agent);
-      if (!b || b.status === "disabled") continue;
+      // An expected agent with NO row at all has never checked in. That is a
+      // problem, not an unknown: the expectation is ours, so silence from an
+      // agent we expect to hear from is a fact about the fleet, not a gap in
+      // what we could measure. Skipping it let the fleet report green.
+      if (!b) {
+        missing.push(`${exp.label} (${exp.agent})`);
+        judged++;
+        continue;
+      }
+      if (b.status === "disabled") {
+        disabled.push(exp.label);
+        continue;
+      }
+      judged++;
       const ageMin = (Date.now() - new Date(b.last_beat).getTime()) / 60000;
       if (ageMin > exp.staleMin) stale.push(`${exp.label} (${Math.round(ageMin / 60)}h ago)`);
     }
     const erroring = beats.filter((b) => b.status === "error");
     if (stale.length) {
-      out.push(problem("agents:stale", "Silent agents", `${stale.length} agent${stale.length === 1 ? "" : "s"} past the allowed gap: ${stale.join(", ")}.`, OS_LINK("/?view=agents", "Agents")));
+      out.push(problem("agents:stale", "Silent agents", `${stale.length} agent${stale.length === 1 ? "" : "s"} past the allowed gap: ${stale.join(", ")}.`, VIEW_LINK("agent", "Mission Control"),
+            "Open Mission Control and check that task's last run. A battery-frozen or disabled Windows task is the usual cause, so plug the laptop in and re-enable it."));
+    }
+    if (missing.length) {
+      out.push(
+        problem(
+          "agents:missing",
+          "Agents that have never reported",
+          `${missing.length} expected agent${missing.length === 1 ? " has" : "s have"} no heartbeat row at all: ${missing.join(", ")}.`,
+          VIEW_LINK("agent", "Mission Control"),
+          "Either start that agent so it posts a heartbeat, or drop it from EXPECTED_HEARTBEATS in lib/watchdogExpected.ts if it is retired. An expected agent with no row is invisible everywhere else.",
+          "high"
+        )
+      );
     }
     for (const b of erroring) {
-      // Some agents report a whole report as their message. Alerts have to fit
-      // on a lock screen, so take the first meaningful line and cap it; the
-      // full text stays where the agent wrote it.
-      const detailLines = (b.message || "").split(String.fromCharCode(10)).map((l) => l.trim()).filter(Boolean);
-      const first = detailLines[0] || "No detail was recorded with the error.";
-      out.push(problem(`agents:error:${b.agent}`, `${b.agent} reported an error`, first.slice(0, 200), OS_LINK("/?view=agents", "Agents")));
+      // Some agents report a whole report as their message, headed by a banner
+      // and a date. Take the first line that actually says something.
+      const first = firstInformativeLine(b.message) || "No detail was recorded with the error.";
+      out.push(problem(`agents:error:${b.agent}`, `${b.agent} reported an error`, first.slice(0, 200), VIEW_LINK("agent", "Mission Control"), "Open Mission Control and read that agent's full message, then fix what it reported and let it run again."));
     }
-    if (!stale.length && !erroring.length) out.push(ok("agents:stale", "Agent fleet", `All ${beats.length} reporting agents are inside their expected gap.`));
+    if (!stale.length && !missing.length && !erroring.length) {
+      // Count what was judged, not beats.length: that included disabled rows
+      // and rows for agents nobody expects.
+      out.push(
+        ok(
+          "agents:stale",
+          "Agent fleet",
+          `All ${judged} expected agent${judged === 1 ? " is" : "s are"} inside their allowed gap${disabled.length ? `, and ${disabled.length} (${disabled.join(", ")}) ${disabled.length === 1 ? "is" : "are"} marked disabled and not judged` : ""}.`
+        )
+      );
+    }
     return out;
   } catch (e) {
     return [unknown("agents:stale", "Agent fleet", errText(e))];
@@ -246,8 +371,8 @@ async function checkPipeline(): Promise<Check[]> {
           "pipeline:low",
           "Send-ready leads",
           `Only ${sendable} leads are send-ready (below the 200 mark). The scrapers need to run before the sender runs dry.`,
-          OS_LINK("/?view=crm", "CRM")
-        ),
+          VIEW_LINK("crm", "CRM"),
+            "Run `python C:/Users/wjack/ghl-cli/b2b_prospect_run.py` to scrape and stage new B2B leads, then `python C:/Users/wjack/ghl-cli/arm_b2b_scored.py` to arm them so the cloud sender can drain them."),
       ];
     }
     return [ok("pipeline:low", "Send-ready leads", `${sendable.toLocaleString()} leads are send-ready.`)];
@@ -267,7 +392,8 @@ async function checkCallRoom(): Promise<Check[]> {
           "calls:overdue",
           "Call-backs overdue",
           `${overdue} lead${overdue === 1 ? " is" : "s are"} past the call-back time you set.`,
-          OS_LINK("/calls", "Call room")
+          OS_LINK("/calls", "Call room"),
+          "Open the call room and either make the call or move the call-back time so the list stays honest."
         ),
       ];
     }
@@ -288,34 +414,74 @@ async function checkClientPublishing(): Promise<Check[]> {
     if (!fs.existsSync(dir)) return [unknown("clients:quiet", "Client publishing", "no built dashboards on this host")];
     const out: Check[] = [];
     const quiet: string[] = [];
+    const empty: string[] = [];
+    const unreadable: string[] = [];
+    let judged = 0;
     for (const f of fs.readdirSync(dir).filter((x) => x.endsWith(".html") && !x.endsWith(".artifact.html"))) {
+      // Sample dashboards are demos, not clients, and must not raise alarms.
+      if (/summit-ridge/i.test(f)) continue;
       const html = fs.readFileSync(path.join(dir, f), "utf-8");
       const at = html.indexOf("const DATA = ");
-      if (at < 0) continue;
+      if (at < 0) {
+        // Not a built client dashboard, or the build changed shape. Either way
+        // this file was not judged, so say so rather than passing over it.
+        unreadable.push(f);
+        continue;
+      }
       const data = html.slice(at);
       const dates = [...data.matchAll(/"date":"(\d{4}-\d{2}-\d{2})"/g)].map((x) => x[1]).sort();
       const nameMatch = data.match(/"brand":\{"name":"([^"]*)"/);
       const name = nameMatch ? nameMatch[1] : f.replace(/\.html$/, "");
-      if (!dates.length) continue;
-      const newest = dates[dates.length - 1] || null;
-      const age = daysSince(newest);
-      // Sample dashboards are demos, not clients, and must not raise alarms.
-      if (/summit-ridge/i.test(f)) continue;
-      if (age === null) quiet.push(`${name} (no dated work on file)`);
-      else if (age > 14) quiet.push(`${name} (${age} days)`);
+      judged++;
+      // A dashboard with no dated work at all is exactly what a client whose
+      // delivery stopped looks like. Silently skipping it let the next branch
+      // claim every client had work go live.
+      if (!dates.length) {
+        empty.push(name);
+        continue;
+      }
+      const age = daysSince(dates[dates.length - 1]);
+      if (age !== null && age > 14) quiet.push(`${name} (${age} days)`);
     }
+    const CONTENT_FIX =
+      "Run that client's content engine skill (heros-content-engine or renewal-content-engine), then rebuild the dashboard with `python C:/Users/wjack/wing-digital-os/scripts/client_dashboard/build.py <slug>` so the published record catches up.";
     if (quiet.length) {
       out.push(
         problem(
           "clients:quiet",
           "Client sites gone quiet",
           `Nothing has gone live in over 14 days for: ${quiet.join(", ")}.`,
-          OS_LINK("/?view=clients", "Clients"),
+          VIEW_LINK("clients", "Clients"),
+          CONTENT_FIX,
           "high"
         )
       );
-    } else {
-      out.push(ok("clients:quiet", "Client publishing", "Every client had work go live inside the last 14 days."));
+    }
+    if (empty.length) {
+      out.push(
+        problem(
+          "clients:nodates",
+          "Client dashboards with no dated work",
+          `${empty.length} dashboard${empty.length === 1 ? " lists" : "s list"} no dated work at all, so there is nothing to age: ${empty.join(", ")}.`,
+          VIEW_LINK("clients", "Clients"),
+          CONTENT_FIX,
+          "high"
+        )
+      );
+    }
+    if (unreadable.length) {
+      out.push(
+        unknown(
+          "clients:unreadable",
+          "Client publishing",
+          `${unreadable.length} file${unreadable.length === 1 ? "" : "s"} in public/dashboards had no readable DATA block, so ${unreadable.length === 1 ? "it was" : "they were"} not judged: ${unreadable.join(", ")}`
+        )
+      );
+    }
+    if (!quiet.length && !empty.length) {
+      out.push(
+        ok("clients:quiet", "Client publishing", `All ${judged} client dashboard${judged === 1 ? "" : "s"} had work go live inside the last 14 days.`)
+      );
     }
     return out;
   } catch (e) {
@@ -351,7 +517,10 @@ export function formatWatchReport(r: WatchResult): string {
   lines.push(r.headline, "");
   if (r.problems.length) {
     lines.push("NEEDS ATTENTION");
-    for (const p of r.problems) lines.push(`- ${p.label}: ${p.detail}${p.link ? ` [${p.link.label}: ${p.link.href}]` : ""}`);
+    for (const p of r.problems) {
+      lines.push(`- ${p.label}: ${p.detail}${p.link ? ` [${p.link.label}: ${p.link.href}]` : ""}`);
+      if (p.fix) lines.push(`  FIX: ${p.fix}`);
+    }
     lines.push("");
   }
   if (r.unknowns.length) {

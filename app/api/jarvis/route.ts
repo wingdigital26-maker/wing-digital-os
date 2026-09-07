@@ -45,11 +45,25 @@ export const dynamic = "force-dynamic";
 //   { error }                        anything else
 //   data: [DONE]
 //
+// WHICH LANE ANSWERED
+//   The desktop window asks for "cli" on every message, so the CLI lane failing
+//   is a normal event, not an edge case. runClaudeCode only sends
+//   { engine: "claude-code" } once the CLI has actually produced output; every
+//   way it can fail before that (missing binary, spawn failure, start error,
+//   silent timeout, exit with no output) returns handled=false with a reason,
+//   and the handler then labels the real lane and says in one sentence that
+//   Claude Code did not answer. The window must never say "via Claude Code"
+//   over an answer the API wrote.
+//
 // MONEY
-//   Every model call reserves against the "jarvis" bucket in api_usage
+//   Every API-lane model call reserves against the "jarvis" bucket in api_usage
 //   (supabase/migrations/0026_api_usage.sql), the bucketed twin of
 //   lib/rateLimit.ts. Defaults 200 calls and $3 a day, env-overridable. Fails
-//   CLOSED: if the counter is unreachable the call is refused.
+//   CLOSED: if the counter is unreachable the call is refused. The CLI lane
+//   spends nothing on the API key (it runs on Jack's Claude subscription) so it
+//   reserves nothing; it is a PC-only, staff-authenticated, one-child-process
+//   path, and making it depend on Supabase would take the desktop agent down
+//   whenever the counter is unreachable.
 //
 // CONFIRMATION TOKEN
 //   pending_action.id is base64url(payload).base64url(HMAC-SHA256(payload))
@@ -498,10 +512,17 @@ async function runConfirmed(opts: {
 }
 
 // ── Claude Code CLI engine (PC only, opt-in) ─────────────────────────────────
+// This prompt is now the default for Jack's desktop window, so it carries the
+// honesty rules as well as the voice rules. It stays short on purpose: the CLI
+// already has its own instructions and CLAUDE.md, and a long append here would
+// fight them.
 const CLI_STYLE_PROMPT =
   "You are Nimbus, Jack Wing's voice assistant for Wing Digital OS. Your reply is read aloud by TTS. Sound young, warm, and lightly playful, never robotic or grave. " +
   "Hard style rules: lead with the answer; 2-4 short sentences by default; no bullet lists, headers, markdown symbols, emojis, or decorative unicode; " +
-  "give numbers plainly; if more depth exists, offer it briefly instead of dumping it. No em dashes. Sound like a competent chief of staff.";
+  "give numbers plainly; if more depth exists, offer it briefly instead of dumping it. No em dashes. Plain English, no hype. Sound like a competent chief of staff. " +
+  "Honesty rules, which outrank brevity: never claim something worked unless a command or file you actually ran shows it did, and say what showed it. " +
+  "If you could not check something, say \"I could not check that\" and name what failed, instead of guessing, rounding, or filling in a zero. " +
+  "Every problem you report comes with the fix in the same breath, so Jack is never left with a symptom and no next step.";
 const CLAUDE_CODE_TIMEOUT_MS = 180_000;
 const SESSION_FILE = "C:\\Users\\wjack\\wing-digital-os\\.jarvis-session.json";
 let cachedCliPath: string | null | undefined;
@@ -545,8 +566,15 @@ function saveSession(conversationId: string, sessionId: string) {
   } catch { /* continuity degrades to fresh sessions */ }
 }
 
-function runClaudeCode(opts: { cli: string; userText: string; conversationId: string | null; send: Send; signal: AbortSignal }): Promise<boolean> {
-  return new Promise((resolve) => {
+// handled=false means the CLI never answered and NOTHING was streamed for it,
+// including the { engine } event, so the caller is free to fall back to another
+// lane and label it truthfully. handled=true means the CLI committed: it owns
+// the turn and the { engine: "claude-code" } the UI already rendered is true.
+// `reason` is plain wording for why the CLI lane did not produce the answer.
+type CliOutcome = { handled: boolean; reason: string | null };
+
+function runClaudeCode(opts: { cli: string; userText: string; conversationId: string | null; send: Send; signal: AbortSignal }): Promise<CliOutcome> {
+  return new Promise<CliOutcome>((resolve) => {
     const { cli, userText, conversationId, send, signal } = opts;
     const prevSession = conversationId ? readSessions()[conversationId] : undefined;
     const args = ["-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--dangerously-skip-permissions", "--append-system-prompt", CLI_STYLE_PROMPT];
@@ -556,15 +584,20 @@ function runClaudeCode(opts: { cli: string; userText: string; conversationId: st
     try {
       child = spawn(cli, args, { cwd: VAULT_PATH, windowsHide: true, env: process.env });
     } catch {
-      resolve(false);
+      resolve({ handled: false, reason: "the Claude Code CLI would not start on this PC" });
       return;
     }
     let committed = false, done = false, sawDelta = false, anyText = false, resultText = "", buffer = "";
+    let timedOut = false;
     const commit = () => { if (!committed) { committed = true; send({ engine: "claude-code" }); } };
     const kill = () => { try { child.kill(); } catch { /* dead */ } };
     const onAbort = () => kill();
     signal.addEventListener("abort", onAbort);
     const timer = setTimeout(() => {
+      timedOut = true;
+      // Only speak about the timeout if the UI has already been told the CLI is
+      // answering. Before commit nothing has been streamed, so the caller falls
+      // back and reports the timeout itself as part of the fallback sentence.
       if (committed) {
         send({ text: "\n\n(Nimbus timed out after 180s. The CLI task was stopped.)" });
         send({ error: "claude_code_timeout" });
@@ -597,17 +630,39 @@ function runClaudeCode(opts: { cli: string; userText: string; conversationId: st
       while ((nl = buffer.indexOf("\n")) >= 0) { const line = buffer.slice(0, nl).trim(); buffer = buffer.slice(nl + 1); if (line) handleLine(line); }
     });
     child.stderr?.on("data", () => { /* progress noise */ });
-    const finish = (ok: boolean) => { if (done) return; done = true; clearTimeout(timer); signal.removeEventListener("abort", onAbort); resolve(ok); };
-    child.on("error", () => { if (!committed) finish(false); });
+    const finish = (handled: boolean, reason: string | null) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      signal.removeEventListener("abort", onAbort);
+      resolve({ handled, reason });
+    };
+    // A spawn-level error after commit still ends in "close", which resolves;
+    // resolving here too would be a double-resolve, and `done` guards that.
+    child.on("error", () => { if (!committed) finish(false, "the Claude Code CLI would not start on this PC"); });
     child.on("close", (code) => {
       if (buffer.trim()) handleLine(buffer.trim());
-      if (!committed) { finish(false); return; }
+      if (!committed) {
+        finish(
+          false,
+          timedOut
+            ? `the Claude Code CLI produced nothing for ${CLAUDE_CODE_TIMEOUT_MS / 1000} seconds`
+            : `the Claude Code CLI exited (code ${code === null ? "unknown" : code}) without answering`
+        );
+        return;
+      }
+      // Committed, so the turn is the CLI's and the engine label already sent is
+      // correct. What is left is making sure the window is never silent or
+      // falsely quiet about a failed run.
       if (!anyText && resultText) send({ text: resultText });
-      else if (!anyText && code !== 0 && !signal.aborted) {
-        send({ text: "(Nimbus could not finish that one. Try again.)" });
+      else if (!anyText && !signal.aborted && !timedOut) {
+        // Covers both a non-zero exit and a clean exit that produced no answer.
+        // A silent success is indistinguishable from a silent failure here, so
+        // it is reported as a failure rather than left blank.
+        send({ text: `(Claude Code exited without a reply${code ? ` (code ${code})` : ""}. Ask again, or run it in a terminal to see the error.)` });
         send({ error: "claude_code_no_reply" });
       }
-      finish(true);
+      finish(true, null);
     });
   });
 }
@@ -638,9 +693,30 @@ async function runLimitedMode(send: Send, userText: string) {
 // ── Handler ──────────────────────────────────────────────────────────────────
 const MAX_HISTORY = 40; // 20 turns
 
+/**
+ * The desktop window's own key.
+ *
+ * middleware.ts lets the window reach /nimbus and /api/jarvis with the
+ * nimbus_local cookie, but requireStaff() knows nothing about that cookie, so
+ * the page opened fine and then every message it sent came back 401. The window
+ * is Jack on his own machine by definition: the key exists only in .env.local,
+ * is never set in the cloud, and the branch below refuses to look at it there.
+ */
+function hasNimbusLocalKey(req: NextRequest): boolean {
+  if (isCloud()) return false;
+  const key = process.env.NIMBUS_LOCAL_KEY;
+  if (!key) return false;
+  const presented = req.cookies.get("nimbus_local")?.value;
+  if (!presented || presented.length !== key.length) return false;
+  // Constant time, so the comparison leaks nothing about the key.
+  return crypto.timingSafeEqual(Buffer.from(presented), Buffer.from(key));
+}
+
 export async function POST(req: NextRequest) {
-  const auth = await requireStaff();
-  if (isAuthFailure(auth)) return auth;
+  if (!hasNimbusLocalKey(req)) {
+    const auth = await requireStaff();
+    if (isAuthFailure(auth)) return auth;
+  }
 
   let body: Record<string, unknown>;
   try {
@@ -690,6 +766,12 @@ export async function POST(req: NextRequest) {
       };
       try {
         if (confirmToken) {
+          // A confirmation ALWAYS runs on the API lane, whatever engine the
+          // body asks for. The token was minted here, by signAction, against
+          // the API lane's WRITE tool list, and verifyAction plus runJarvisTool
+          // are the only things that can spend it. The CLI lane never sees the
+          // token, never mints one, and cannot consume one, so agent mode has
+          // no path to bypass or reuse the confirmation flow.
           send({ engine: "api" });
           await runConfirmed({ send, messages, token: confirmToken, apiKey, ip, signal: req.signal, spendOverride });
         } else if (!messages.length) {
@@ -698,17 +780,29 @@ export async function POST(req: NextRequest) {
           const preferCli = wantsCli || process.env.JARVIS_ENGINE === "cli" || !apiKey;
           const cli = preferCli ? findClaudeCli() : null;
           let handled = false;
+          // Why the CLI lane did not answer, in plain words. Set for every way
+          // it can fail, not just a missing binary, because the desktop window
+          // now asks for the CLI on every message and a wrong engine label
+          // would be repeated to Jack as fact.
+          let cliReason: string | null = null;
+          if (preferCli && !cli) cliReason = "the Claude Code CLI is not installed where the OS looks for it";
+          else if (preferCli && !userText) cliReason = "there was no message text to hand the CLI";
           if (cli && userText) {
-            handled = await runClaudeCode({ cli, userText, conversationId, send, signal: req.signal });
+            const outcome = await runClaudeCode({ cli, userText, conversationId, send, signal: req.signal });
+            handled = outcome.handled;
+            if (!handled) cliReason = outcome.reason;
           }
           if (!handled) {
-            if (wantsCli) {
-              // Asked for the agent and it is not there: say so rather than
-              // quietly answering as something else.
-              send({ text: "Agent mode needs the Claude Code CLI on this PC and I could not start it, so I answered with the OS tools instead.\n\n" });
+            // Engine first, then the explanation, so the label the UI shows is
+            // corrected before any text arrives under it.
+            if (apiKey) send({ engine: "api" });
+            if (preferCli && cliReason) {
+              const lane = apiKey
+                ? "so this answer came from the OS tools on the Anthropic API instead, not from Claude Code"
+                : "and there is no API key either, so this is a plain readout of the OS state files, not an answer from Claude Code";
+              send({ text: `Agent mode did not run: ${cliReason}, ${lane}.\n\n` });
             }
             if (apiKey) {
-              send({ engine: "api" });
               await runApiLoop({ send, messages, apiKey, ip, signal: req.signal, spendOverride });
             } else {
               await runLimitedMode(send, userText);

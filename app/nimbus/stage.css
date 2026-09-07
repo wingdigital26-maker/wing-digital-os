@@ -87,6 +87,12 @@
   box-sizing: border-box;
 }
 
+/* The orb is the subject, so the text block starts a clear beat below the
+ * reflection rather than crowding it. This is the only place the composition
+ * spends real whitespace; inside the text block the rows sit close together so
+ * they read as one group instead of four floating bands. */
+.nimbus-hero-body { margin-top: 10px; }
+
 
 .nimbus-orb-wrap {
   position: relative;
@@ -157,22 +163,31 @@
   min-width: 0;
 }
 
+/* The greeting is the pleasantry, so it is the smallest and quietest thing in
+ * the block. It used to be the loudest, which put a nicety above a broken
+ * check. Hierarchy is carried by weight and colour here, not by borders. */
 .nimbus-greeting {
   flex: 0 0 auto;
   font-family: 'Space Grotesk', 'Inter', sans-serif;
-  font-size: clamp(17px, 3.6vh, 26px);
+  font-size: clamp(15px, 2.2vh, 19px);
   font-weight: 600;
+  /* Tight, because the date sits immediately under it as a second line and the
+   * pair has to read as one caption. It also buys back the height the date line
+   * costs, so showing the date no longer takes it out of the orb. */
+  line-height: 1.2;
   letter-spacing: -0.01em;
   margin: 0;
   text-align: center;
-  color: #eef2ff;
+  color: #cfd8f2;
 }
 
+/* The date sits directly under the greeting as its second line, so the two
+ * read as one caption under the orb rather than as two separate bands. */
 .nimbus-dateline {
   flex: 0 0 auto;
-  font-size: 12px;
-  color: #7f8db4;
-  margin: 0;
+  font-size: 11.5px;
+  color: #6d7a9d;
+  margin: -3px 0 0;
   text-align: center;
 }
 
@@ -181,30 +196,34 @@
 .nimbus-nextrun { color: #93a0c4; }
 .nimbus-dot-sep { color: #56618199; }
 
-/* Stacked, not side by side: a long chip must never elbow the other one out
- * of the window. Two chips at most, so this stays two lines. */
+/* Stacked, not side by side: a long line must never elbow the other one out
+ * of the window. Two lines at most, so this stays two rows. */
 .nimbus-chips {
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 7px;
+  gap: 4px;
   width: 100%;
   min-width: 0;
 }
 
+/* A status line is no longer a bordered pill. A pill around "business as usual"
+ * competes with the attention card, which is the one thing on this window that
+ * has actually earned a border. The coloured dot carries the same meaning at a
+ * fraction of the visual weight. */
 .nimbus-chip {
   display: inline-flex;
   align-items: flex-start;
-  gap: 6px;
-  padding: 6px 11px;
-  border-radius: 12px;
-  border: 1px solid rgba(120, 150, 230, 0.22);
-  background: rgba(20, 27, 43, 0.66);
-  color: #b7c4e6;
+  gap: 8px;
+  padding: 5px 10px;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #aab7d8;
   font-size: 11.5px;
-  line-height: 1.35;
-  max-width: min(420px, 92vw);
+  line-height: 1.4;
+  max-width: min(400px, 90vw);
   min-width: 0;
   text-align: left;
 }
@@ -226,8 +245,20 @@
   min-width: 0;
   font-size: 10.5px;
   line-height: 1.35;
-  color: #8b97b8;
+  color: #7c88a8;
   overflow-wrap: anywhere;
+}
+
+/* Pressability without a border: a faint chevron that firms up on hover. The
+ * line is a button, and a button nobody can tell is a button is a dead end. */
+.nimbus-chip-go {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: #55618199;
+  font-size: 12px;
+  line-height: 1.4;
+  /* Colour only. Nothing moves, so this needs no reduced-motion exception. */
+  transition: color 120ms ease;
 }
 
 .nimbus-chip-dot {
@@ -239,7 +270,7 @@
   flex: 0 0 auto;
 }
 
-.nimbus-chip-alert { border-color: rgba(240, 138, 61, 0.34); color: #e8c39a; }
+.nimbus-chip-alert { color: #e8c39a; }
 .nimbus-chip-alert .nimbus-chip-dot { background: #f08a3d; }
 .nimbus-chip-muted { color: #6d7a9c; }
 .nimbus-chip-muted .nimbus-chip-dot { background: #4a5573; }
@@ -256,37 +287,70 @@
   }
 }
 
-/* Trouble strip: what broke on one line, what to do about it on the next.
-   A symptom without a fix is not a useful thing to read at seven in the
-   morning, so the two always travel together. */
+/* The attention card: the ONE bordered object on the stage. Everything that
+   needs Jack (the watch headline and each check that could not run) lives
+   inside this single frame, so the middle reads as one composition with one
+   focal point instead of a stack of differently coloured outlines. Rows inside
+   are separate buttons because they lead to different places, but they share a
+   border rather than each drawing their own. */
 .nimbus-troubles {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-top: 8px;
-  max-width: min(420px, 92vw);
+  width: 100%;
+  max-width: min(400px, 90vw);
+  border-radius: 12px;
+  border: 1px solid rgba(226, 136, 79, 0.3);
+  background: rgba(226, 136, 79, 0.075);
+  overflow: hidden;
 }
 
 /* One tappable row: what broke, and the first move under it. It stays short on
-   purpose, because it competes for room with the status chips, and the full fix
+   purpose, because it competes for room with the status lines, and the full fix
    belongs in the chat where there is space to say it properly. */
 .nimbus-trouble {
   display: flex;
   flex-direction: column;
   gap: 1px;
-  padding: 7px 12px;
-  border-radius: 10px;
-  border: 1px solid rgba(226, 136, 79, 0.32);
-  background: rgba(226, 136, 79, 0.09);
+  padding: 8px 12px;
+  border: 0;
+  /* A hairline between rows, never above the first one, so the card does not
+     grow an internal border it did not need. */
+  border-top: 1px solid rgba(226, 136, 79, 0.16);
+  background: transparent;
   text-align: left;
   font: inherit;
   cursor: pointer;
   appearance: none;
 }
+.nimbus-trouble:first-child { border-top: 0; }
 .nimbus-trouble:hover,
 .nimbus-trouble:focus-visible {
-  border-color: rgba(240, 180, 135, 0.6);
-  background: rgba(226, 136, 79, 0.16);
+  background: rgba(226, 136, 79, 0.14);
+}
+
+/* The headline row states the count. It leads the card because it is the
+   summary the rest of the rows detail. */
+/* The lead is a single row: sentence on the left, chevron on the right. */
+.nimbus-trouble-lead {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+}
+.nimbus-trouble-lead .nimbus-trouble-what { flex: 1 1 auto; min-width: 0; }
+.nimbus-trouble-go {
+  flex: 0 0 auto;
+  color: #e2884f99;
+  font-size: 13px;
+  line-height: 1;
+}
+.nimbus-trouble-lead .nimbus-trouble-what {
+  font-size: 13px;
+  color: #f6c79c;
+  /* Two lines, because this sentence carries both the count and the "N checks
+     could not run" clause, and clamping that clause away would turn an honest
+     partial report into a confident one. */
+  -webkit-line-clamp: 2;
 }
 .nimbus-trouble-what {
   color: #f0b487;
@@ -308,8 +372,9 @@
   -webkit-box-orient: vertical;
 }
 
-/* An askable chip is a button, so it must not inherit the browser's button
-   chrome, and it should say plainly that it can be pressed. */
+/* An askable status line is a button, so it must not inherit the browser's
+   button chrome, and it must still say plainly that it can be pressed. It does
+   that on hover and focus rather than by wearing a border at rest. */
 button.nimbus-chip {
   font: inherit;
   cursor: pointer;
@@ -317,11 +382,17 @@ button.nimbus-chip {
 }
 button.nimbus-chip:hover,
 button.nimbus-chip:focus-visible {
-  border-color: rgba(111, 146, 255, 0.55);
-  background: rgba(61, 107, 240, 0.16);
+  border-color: rgba(111, 146, 255, 0.4);
+  background: rgba(61, 107, 240, 0.13);
+  color: #d3ddf6;
+}
+button.nimbus-chip:hover .nimbus-chip-go,
+button.nimbus-chip:focus-visible .nimbus-chip-go {
+  color: #9fb2e6;
 }
 button.nimbus-chip.nimbus-chip-alert:hover,
 button.nimbus-chip.nimbus-chip-alert:focus-visible {
-  border-color: rgba(240, 180, 135, 0.6);
-  background: rgba(226, 136, 79, 0.16);
+  border-color: rgba(240, 180, 135, 0.45);
+  background: rgba(226, 136, 79, 0.14);
+  color: #f2cea8;
 }

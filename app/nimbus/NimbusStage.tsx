@@ -133,12 +133,17 @@ const MOOD_HOLD_MS = 5000;
 const PAD = 22; // hero padding, top and bottom
 const HERO_GAP = 8; // the hero's flex gap
 const FLOOR = 18; // reflection height; its -8 margin cancels the gap above it
+// The breathing room between the orb group and the text block. It is a margin
+// on the body, so it sits outside the body's own offsetHeight and has to be
+// paid for here or the plan quietly overruns the room by exactly this much.
+const BODY_TOP = 10;
 
 // Fallbacks used only for the very first frame, before anything has been
 // measured. They are deliberately generous: over-reserving shrinks the orb a
 // little, under-reserving used to push it off the top of the window.
 const FALLBACK_DATE = 20;
-const FALLBACK_CHIPS = 96;
+// Status lines are borderless now, so they cost less than the old pills did.
+const FALLBACK_CHIPS = 74;
 
 type RowHeights = { date: number; chips: number };
 
@@ -160,6 +165,7 @@ function planLayout({ w, room, bodyFull, dateCost, chipsCost }: PlanInput): Layo
     room -
     PAD -
     HERO_GAP -
+    BODY_TOP -
     (bodyFull - (withDate ? 0 : dateCost) - (withChips ? 0 : chipsCost)) -
     FLOOR;
 
@@ -171,11 +177,19 @@ function planLayout({ w, room, bodyFull, dateCost, chipsCost }: PlanInput): Layo
   let showDate = true;
   let showChips = true;
   let forOrb = spaceFor(true, true);
-  if (forOrb < 132) {
+  // Was 132. The date line is where the next scheduled agent run lives, which
+  // is a fact about the day and not decoration, so it now buys its place down
+  // to a 108px orb before it is dropped. Below that the orb stops reading as a
+  // mascot and the trade stops being worth it.
+  if (forOrb < 108) {
     showDate = false;
     forOrb = spaceFor(false, true);
   }
-  if (forOrb < 96) {
+  // Was 96. The status lines are the business facts (what is being paid, and
+  // by whom), and on a bad morning the attention card is tall enough that the
+  // old threshold quietly hid the money to keep the orb large. A smaller
+  // Nimbus above a real number beats a big Nimbus above nothing.
+  if (forOrb < 78) {
     showChips = false;
     forOrb = spaceFor(false, false);
   }
@@ -282,7 +296,13 @@ export default function NimbusStage() {
       tone: "normal",
       ask: "Break down MRR: who is paying, on what basis, and what ends soonest?",
     });
-  const hasChips = chips.length > 0;
+  // When the watch is actually reporting problems, its headline is not a status
+  // line, it is the headline of the attention card: it summarises the very rows
+  // that card lists. Keeping it outside meant two amber outlines saying almost
+  // the same thing. When there is nothing wrong it drops back to a quiet line.
+  const leadAlert = chips.find((c) => c.tone === "alert") ?? null;
+  const quietChips = chips.filter((c) => c !== leadAlert);
+  const hasChips = quietChips.length > 0;
 
   // Every row is measured off the real DOM. Optional rows that are currently
   // hidden are remembered from the last time they were on screen, so dropping
@@ -579,8 +599,26 @@ export default function NimbusStage() {
                 {nextRunText ? <span className="nimbus-nextrun">{nextRunText}</span> : null}
               </p>
             ) : null}
-            {troubles.length > 0 ? (
+            {troubles.length > 0 || leadAlert ? (
               <div className="nimbus-troubles" ref={troublesRef} role="status">
+                {leadAlert ? (
+                  <button
+                    key="lead"
+                    type="button"
+                    className="nimbus-trouble nimbus-trouble-lead"
+                    onClick={() => setProblemsOpen(true)}
+                  >
+                    {/* The API's own sentence, unedited. The count and the
+                        could-not-run clause both come straight from it. There is
+                        no "tap to see them" line under it: the chevron says the
+                        same thing in one glyph, and the height it saves goes to
+                        the orb and the date line. */}
+                    <span className="nimbus-trouble-what">{leadAlert.text}</span>
+                    <span className="nimbus-trouble-go" aria-hidden="true">
+                      &rsaquo;
+                    </span>
+                  </button>
+                ) : null}
                 {troubles.map((t) => (
                   <button
                     key={t.key}
@@ -597,7 +635,7 @@ export default function NimbusStage() {
             ) : null}
             {showChips ? (
               <div className="nimbus-chips" ref={chipsRef}>
-                {chips.slice(0, 2).map((c) => {
+                {quietChips.slice(0, 2).map((c) => {
                   const cls =
                     "nimbus-chip" +
                     (c.tone === "alert" ? " nimbus-chip-alert" : "") +
@@ -611,6 +649,13 @@ export default function NimbusStage() {
                         <span className="nimbus-chip-text">{head}</span>
                         {caveat ? <span className="nimbus-chip-caveat">{caveat}</span> : null}
                       </span>
+                      {/* Only pressable lines get the chevron, so it never
+                          promises an action that is not there. */}
+                      {c.ask || c.opens ? (
+                        <span className="nimbus-chip-go" aria-hidden="true">
+                          &rsaquo;
+                        </span>
+                      ) : null}
                     </>
                   );
                   // A chip either opens the problems list or asks a question.

@@ -52,6 +52,33 @@ function newConversationId(): string {
     : `conv-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+/**
+ * Squash runs of the same activity line into one counted line. Claude Code
+ * calls Bash many times in a single answer and the raw list buries the reply
+ * it belongs to.
+ */
+function collapseTools(tools: string[]): string[] {
+  const out: string[] = [];
+  let last = "";
+  let run = 0;
+  const flush = () => {
+    if (!run) return;
+    out.push(run === 1 ? last : `${last} x${run}`);
+    run = 0;
+  };
+  for (const t of tools) {
+    if (t === last) {
+      run++;
+    } else {
+      flush();
+      last = t;
+      run = 1;
+    }
+  }
+  flush();
+  return out;
+}
+
 function loadHistory(): Message[] {
   try {
     const raw = sessionStorage.getItem(HISTORY_KEY);
@@ -117,6 +144,11 @@ export default function JarvisButton() {
   const [speaking, setSpeaking] = useState(false);
 
   useEffect(() => { voiceOnRef.current = voiceOn; }, [voiceOn]);
+  // The hotkey window is the agent, full stop, so the CLI flag there must not
+  // depend on a toggle Jack can no longer see. runTurn reads this ref instead
+  // of closing over `solo`.
+  const soloRef = useRef(solo);
+  useEffect(() => { soloRef.current = solo; }, [solo]);
 
   // ── Nimbus's face: both orbs always express the same mood ─────────────────
   // Every mood below is driven by a real stream event or a real state flag.
@@ -272,7 +304,7 @@ export default function JarvisButton() {
         body: JSON.stringify({
           messages: history.slice(-MAX_TURNS * 2).map((m) => ({ role: m.role, content: m.content })),
           conversationId,
-          ...(agentModeRef.current ? { engine: "cli" } : {}),
+          ...(soloRef.current || agentModeRef.current ? { engine: "cli" } : {}),
           ...(confirm ? { confirm_action_id: confirm } : {}),
         }),
       });
@@ -702,10 +734,46 @@ export default function JarvisButton() {
         .jarvis-solo .jarvis-mic, .jarvis-solo .jarvis-send { width: 44px !important; height: 44px !important; }
         .jarvis-solo .jarvis-send { box-shadow: 0 4px 16px rgba(61,107,240,0.28); }
         .jarvis-solo .jarvis-send svg, .jarvis-solo .jarvis-mic svg { width: 17px; height: 17px; }
-        /* The pill lives in the header row in solo mode: part of the card's
-           own chrome, and structurally unable to reach the Send button. */
         .jarvis-solo .jarvis-exit { position: static !important; margin: 0; }
-        .jarvis-solo .jarvis-exit:hover { border-color: rgba(61,107,240,0.55); background: rgba(61,107,240,0.08); }
+
+        /* Controls sit on the composer's shoulder: one quiet 11px row on the
+           same 764px axis as the input, dim until you go near it. */
+        .jarvis-solo .jarvis-solobar {
+          display: flex; align-items: center; gap: 10px;
+          width: 100%; max-width: 764px; margin: 0 auto;
+          padding: 0 20px 2px;
+          opacity: 0.38; transition: opacity 180ms ease;
+        }
+        .jarvis-solo .jarvis-solobar:hover,
+        .jarvis-solo .jarvis-solobar:focus-within { opacity: 1; }
+        .jarvis-solo .jarvis-solobar-spacer { flex: 1 1 auto; }
+        .jarvis-solo .jarvis-solobar-dot { width: 3px; height: 3px; border-radius: 50%; background: rgba(155,187,204,0.35); }
+        .jarvis-solo .jarvis-solobar-btn {
+          display: inline-flex; align-items: center; gap: 5px;
+          background: none; border: none; padding: 4px 2px;
+          color: #6b7787; font-size: 11px; font-family: Inter, sans-serif;
+          letter-spacing: 0.02em; text-decoration: none; cursor: pointer;
+          transition: color 140ms ease;
+        }
+        .jarvis-solo .jarvis-solobar-btn:hover:not(:disabled) { color: #cfe0f5; }
+        .jarvis-solo .jarvis-solobar-btn:disabled { cursor: default; opacity: 0.5; }
+        .jarvis-solo .jarvis-solobar-btn.jarvis-exit:hover { color: #3D6BF0; }
+
+        /* One left edge for the whole thread: the muted tool lines and the link
+           pills used to sit 6px and 2px off the bubbles, which read as three
+           different columns in a 520px window. */
+        .jarvis-solo .jarvis-tools,
+        .jarvis-solo .jarvis-links { padding-left: 2px !important; }
+        .jarvis-solo .jarvis-tools { gap: 3px !important; margin-bottom: 2px; }
+        .jarvis-solo .jarvis-links { margin-top: 2px; }
+
+        /* Empty state: a titled block on the same centre line as the thread. */
+        .jarvis-solo .jarvis-empty-title { margin-bottom: 12px; }
+        .jarvis-solo .jarvis-empty-rule {
+          width: 34px; height: 1px; margin: 0 auto 12px;
+          background: linear-gradient(90deg, transparent, rgba(61,107,240,0.55), transparent);
+        }
+        .jarvis-solo .jarvis-empty-sub { max-width: 340px; margin: 0 auto; }
 
         @media (prefers-reduced-motion: reduce) {
           .jarvis-panel.jarvis-solo, .jarvis-panel.jarvis-solo * { animation: none !important; transition: none !important; }
@@ -768,50 +836,42 @@ export default function JarvisButton() {
                 </button>
               )}
               {engine && (
-                <span style={{ color: engine === "limited" ? "var(--orange)" : "#556", fontSize: 10, fontFamily: FONT, border: `1px solid ${engine === "limited" ? "rgba(251,146,60,0.4)" : "rgba(61,107,240,0.2)"}`, borderRadius: 6, padding: "1px 6px", whiteSpace: "nowrap" }}>
-                  {engine === "claude-code" ? "via Claude Code" : engine === "limited" ? "limited mode" : "via API"}
+                <span className="jarvis-engine" style={{ color: engine === "limited" || (solo && engine !== "claude-code") ? "var(--orange)" : "#556", fontSize: 10, fontFamily: FONT, border: `1px solid ${engine === "limited" || (solo && engine !== "claude-code") ? "rgba(251,146,60,0.4)" : "rgba(61,107,240,0.2)"}`, borderRadius: 6, padding: "1px 6px", whiteSpace: "nowrap" }}>
+                  {engine === "claude-code"
+                    ? "via Claude Code"
+                    : engine === "limited"
+                      ? "limited mode"
+                      /* The window promises the agent, so a silent drop to the
+                         API lane has to name itself rather than read as normal. */
+                      : solo ? "via API, Claude Code did not start" : "via API"}
                 </span>
               )}
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-              <button className="jarvis-headbtn" onClick={() => { const next = !voiceOn; setVoiceOn(next); if (!next) stopAudio(); }} title={voiceOn ? "Voice replies on" : "Voice replies off"} style={{ ...smallBtn, color: voiceOn ? ACCENT : "#556" }}>
-                {voiceOn ? "Voice on" : "Voice off"}
-              </button>
-              <button
-                className="jarvis-headbtn"
-                onClick={() => { const next = !agentMode; setAgentMode(next); agentModeRef.current = next; try { localStorage.setItem("nimbus:agent", next ? "1" : "0"); } catch { /* private mode */ } }}
-                disabled={streaming}
-                title={agentMode
-                  ? "Agent mode: runs through Claude Code on this PC, so he can read and change files and run commands. No confirmation cards in this mode."
-                  : "Chat mode: the OS tool set, and every write stops at a confirmation card."}
-                style={{ ...smallBtn, color: agentMode ? "#7ee0a8" : "#556", borderColor: agentMode ? "rgba(126,224,168,0.45)" : undefined, cursor: streaming ? "default" : "pointer" }}
-              >
-                {agentMode ? "Agent" : "Chat"}
-              </button>
-              <button className="jarvis-headbtn" onClick={clearChat} disabled={streaming} title="Clear this chat" style={{ ...smallBtn, cursor: streaming ? "default" : "pointer" }}>Clear chat</button>
-              {/* The way out of the solo window and into the full OS. It sits
-                  in the header so it reads as part of the card's chrome and can
-                  never crowd the Send button. */}
-              {solo && (
-                <Link
-                  href="/"
-                  className="jarvis-exit"
-                  title="Open the full OS in the browser"
-                  style={{
-                    display: "inline-flex", alignItems: "center", gap: 5,
-                    background: "rgba(61,107,240,0.10)", border: "1px solid rgba(61,107,240,0.30)",
-                    borderRadius: 999, padding: "5px 11px", color: "#9bc",
-                    fontSize: 11, fontFamily: FONT, textDecoration: "none", whiteSpace: "nowrap",
-                  }}
-                >
-                  Open the OS
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M7 17 17 7" /><path d="M8 7h9v9" />
-                  </svg>
-                </Link>
-              )}
+              {/* The OS panel keeps its full header controls, including the
+                  Chat/Agent toggle and the confirmation-card lane it selects.
+                  The hotkey window renders none of them here: it is always the
+                  agent, and its Voice / Clear / Open the OS controls live down
+                  by the composer instead. */}
               {!solo && (
-                <button onClick={() => { sfx.play("close"); setOpen(false); }} aria-label="Close" style={{ background: "none", border: "none", color: "#666", cursor: "pointer", fontSize: 18, lineHeight: 1 }}>×</button>
+                <>
+                  <button className="jarvis-headbtn" onClick={() => { const next = !voiceOn; setVoiceOn(next); if (!next) stopAudio(); }} title={voiceOn ? "Voice replies on" : "Voice replies off"} style={{ ...smallBtn, color: voiceOn ? ACCENT : "#556" }}>
+                    {voiceOn ? "Voice on" : "Voice off"}
+                  </button>
+                  <button
+                    className="jarvis-headbtn"
+                    onClick={() => { const next = !agentMode; setAgentMode(next); agentModeRef.current = next; try { localStorage.setItem("nimbus:agent", next ? "1" : "0"); } catch { /* private mode */ } }}
+                    disabled={streaming}
+                    title={agentMode
+                      ? "Agent mode: runs through Claude Code on this PC, so he can read and change files and run commands. No confirmation cards in this mode."
+                      : "Chat mode: the OS tool set, and every write stops at a confirmation card."}
+                    style={{ ...smallBtn, color: agentMode ? "#7ee0a8" : "#556", borderColor: agentMode ? "rgba(126,224,168,0.45)" : undefined, cursor: streaming ? "default" : "pointer" }}
+                  >
+                    {agentMode ? "Agent" : "Chat"}
+                  </button>
+                  <button className="jarvis-headbtn" onClick={clearChat} disabled={streaming} title="Clear this chat" style={{ ...smallBtn, cursor: streaming ? "default" : "pointer" }}>Clear chat</button>
+                  <button onClick={() => { sfx.play("close"); setOpen(false); }} aria-label="Close" style={{ background: "none", border: "none", color: "#666", cursor: "pointer", fontSize: 18, lineHeight: 1 }}>×</button>
+                </>
               )}
             </div>
           </div>
@@ -820,11 +880,24 @@ export default function JarvisButton() {
           <div ref={msgsRef} className={messages.length === 0 ? "jarvis-msgs jarvis-msgs-empty" : "jarvis-msgs"} style={{ flex: 1, overflowY: "auto", padding: "12px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
             {messages.length === 0 && (
               <>
-                <div className="jarvis-empty" style={{ color: "#556", fontSize: 13, textAlign: "center", marginTop: solo ? 0 : 28, fontFamily: FONT, lineHeight: 1.5 }}>
-                  {solo
-                    ? "Ask me anything. Anything that changes data waits for your OK."
-                    : "Ask about today, a contact, a task, an automation, or tell me to do something. Anything that changes data waits for your OK."}
-                </div>
+                {/* An empty window should look like a room waiting for you, not
+                    like a page that failed to load, so solo gets a composed
+                    block instead of one orphaned grey sentence. */}
+                {solo ? (
+                  <div className="jarvis-empty" style={{ textAlign: "center", fontFamily: FONT }}>
+                    <div className="jarvis-empty-title" style={{ fontFamily: "Space Grotesk, sans-serif", fontSize: 15, color: "#c7d3e3", letterSpacing: "0.01em" }}>
+                      Ready when you are
+                    </div>
+                    <div className="jarvis-empty-rule" aria-hidden="true" />
+                    <div className="jarvis-empty-sub" style={{ color: "#5b6675", fontSize: 12.5, lineHeight: 1.6 }}>
+                      Ask a question or hand over a job. Nimbus works on this PC and can read files, run commands and change things.
+                    </div>
+                  </div>
+                ) : (
+                  <div className="jarvis-empty" style={{ color: "#556", fontSize: 13, textAlign: "center", marginTop: 28, fontFamily: FONT, lineHeight: 1.5 }}>
+                    Ask about today, a contact, a task, an automation, or tell me to do something. Anything that changes data waits for your OK.
+                  </div>
+                )}
                 {/* No suggested prompts in the solo window: Jack opens it knowing
                     what he wants, and a wall of canned questions is clutter. The
                     OS panel keeps them, where a first-time user might need them. */}
@@ -849,8 +922,8 @@ export default function JarvisButton() {
                 <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: isUser ? "flex-end" : "flex-start", gap: 4 }}>
                   {/* tool activity lines */}
                   {!isUser && (msg.tools?.length ?? 0) > 0 && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 2, paddingLeft: 6 }}>
-                      {msg.tools!.map((t, k) => (
+                    <div className="jarvis-tools" style={{ display: "flex", flexDirection: "column", gap: 2, paddingLeft: 6 }}>
+                      {collapseTools(msg.tools!).map((t, k) => (
                         <span key={k} className="jarvis-tool" style={{ color: "#4a5568", fontSize: 11, fontFamily: FONT }}>{t}</span>
                       ))}
                     </div>
@@ -902,7 +975,7 @@ export default function JarvisButton() {
                   )}
                   {/* links into the OS */}
                   {!isUser && (msg.links?.length ?? 0) > 0 && !(isLast && streaming) && (
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, paddingLeft: 2 }}>
+                    <div className="jarvis-links" style={{ display: "flex", flexWrap: "wrap", gap: 6, paddingLeft: 2 }}>
                       {msg.links!.map((l, k) => (
                         <button key={k} className="jarvis-chip jarvis-linkchip" onClick={() => openLink(l)} style={{
                           background: "none", border: "1px solid rgba(61,107,240,0.25)", borderRadius: 99,
@@ -924,6 +997,31 @@ export default function JarvisButton() {
             )}
             <div ref={messagesEndRef}/>
           </div>
+
+          {/* The window's own controls. They sit on the composer's edge rather
+              than across the middle of the card, and stay dim until the mouse
+              or keyboard is near them, so the conversation owns the space. */}
+          {solo && (
+            <div className="jarvis-solobar">
+              <button
+                className="jarvis-solobar-btn"
+                onClick={() => { const next = !voiceOn; setVoiceOn(next); if (!next) stopAudio(); }}
+                title={voiceOn ? "Voice replies on" : "Voice replies off"}
+                style={{ color: voiceOn ? ACCENT : undefined }}
+              >
+                {voiceOn ? "Voice on" : "Voice off"}
+              </button>
+              <span className="jarvis-solobar-dot" aria-hidden="true" />
+              <button className="jarvis-solobar-btn" onClick={clearChat} disabled={streaming} title="Clear this chat">Clear chat</button>
+              <span className="jarvis-solobar-spacer" />
+              <Link href="/" className="jarvis-solobar-btn jarvis-exit" title="Open the full OS in the browser">
+                Open the OS
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M7 17 17 7" /><path d="M8 7h9v9" />
+                </svg>
+              </Link>
+            </div>
+          )}
 
           {/* Input */}
           <form onSubmit={handleSubmit} className="jarvis-composer" style={{ display: "flex", gap: 8, padding: "10px 12px", borderTop: "1px solid rgba(61,107,240,0.15)", background: "#0d1117" }}>

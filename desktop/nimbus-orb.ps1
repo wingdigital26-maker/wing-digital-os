@@ -134,6 +134,16 @@ public class OrbWin {
   [DllImport("user32.dll")] static extern bool IsWindow(IntPtr h);
   [DllImport("user32.dll")] static extern bool IsIconic(IntPtr h);
   [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] static extern bool GetCursorPos(out POINT p);
+
+  /// Distance from the cursor to a point, in pixels. Used to decide how much
+  /// animation is worth paying for.
+  public static double CursorDistance(int x, int y) {
+    POINT p;
+    if (!GetCursorPos(out p)) return 99999;
+    double dx = p.X - x, dy = p.Y - y;
+    return Math.Sqrt(dx * dx + dy * dy);
+  }
   delegate bool EnumProc(IntPtr h, IntPtr p);
   const int SW_HIDE = 0, SW_SHOW = 5, SW_RESTORE = 9;
 
@@ -253,7 +263,7 @@ if (-not ("OrbWin" -as [type])) { Add-Type -TypeDefinition $sig -ReferencedAssem
 # is where the clean edges come from: GDI+ anti-aliasing alone is coarse at
 # 68px, and this orb is mostly curves.
 
-$FrameCount = 36          # one full breath, and one slow ring revolution
+$FrameCount = 60          # one full breath, and one slow ring revolution, at 30fps
 $SS     = 4           # supersample factor
 
 # frames[mood + ":" + badge] -> Bitmap[]. Rebuilt only when the state changes.
@@ -376,7 +386,7 @@ function New-OrbFrame([int]$i, [string]$mood, $badge) {
 
   # 5. Eyes, with a soft glow behind each so they read as lit rather than
   #    painted on. Blink on two frames of the cycle.
-  $blink = ($i -eq 8 -or $i -eq 9)
+  $blink = ($i -ge 13 -and $i -le 15)
   $eyeW = $d * 0.115
   $eyeH = if ($blink) { $d * 0.035 } else { $d * 0.275 }
   $eyeY = $rect.Y + $d * 0.34 + (($d * 0.275 - $eyeH) / 2)
@@ -517,10 +527,26 @@ $form.Add_Shown({
 # 20 frames a second while there is something to animate. When Nimbus is calm
 # and nothing is wrong he still breathes, so the strip keeps playing, but every
 # tick is one blit of a bitmap that already exists.
+# 30fps within reach of the cursor or while a mood is showing, 8fps otherwise.
+$FAST_MS = 33
+$IDLE_MS = 125
+$NEAR_PX = 320
+
 $anim = New-Object System.Windows.Forms.Timer
-$anim.Interval = 83
+$anim.Interval = $FAST_MS
 $anim.Add_Tick({
-  $script:frame++
+  # Advance by real time rather than by tick, so the breath runs at the same
+  # speed whichever rate is currently in force.
+  $step = if ($anim.Interval -ge $IDLE_MS) { 4 } else { 1 }
+  $script:frame += $step
+
+  # Retune the rate. Cheap: one GetCursorPos per tick.
+  try {
+    $near = [OrbWin]::CursorDistance(($form.Left + $Size / 2), ($form.Top + $Size / 2)) -lt $NEAR_PX
+    $busy = $near -or ($null -ne $script:moodUntil)
+    $want = if ($busy) { $FAST_MS } else { $IDLE_MS }
+    if ($anim.Interval -ne $want) { $anim.Interval = $want }
+  } catch { }
   if ($script:moodUntil -and (Get-Date) -gt $script:moodUntil) {
     # Wear the feeling, then let it go. The badge stays, because the count is a
     # fact; the mood is just how he is holding it.

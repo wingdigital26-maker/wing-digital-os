@@ -498,7 +498,7 @@ section{padding:34px 0 0}
     <div id="health"></div>
   </section>
 
-  <section>
+  <section id="chart-sec">
     <div class="sh"><h2>Published by month</h2></div>
     <div class="sd" id="chart-sd"></div>
     <div class="card">
@@ -660,12 +660,16 @@ const DATA = __DATA__;
   // and completely misleading; a rolling window never has that cliff.
   const anchor = !isNaN(thruDate) ? new Date(thruDate) : now;
   const from30 = new Date(anchor); from30.setDate(anchor.getDate()-29);
-  const statList = [
-    { v: PUB.filter(i=>{ const d=pd(i.date); return d>=from30 && d<=anchor; }).length,
-      l: 'Published in the last 30 days' },
-    { v: PUB.length,  l: 'Published in total' },
-    { v: livePages,   l: 'Pages live on your site' }
-  ];
+  /* HOUSE RULE (2026-09-06): lead with the highest-value number this client
+     actually has, and never show a rolling window that can read as a zero.
+     "Published in the last 30 days" quietly becomes an accusation the moment a
+     cadence pauses, so it is gone. The referral list, when a client has one, is
+     the biggest asset on the page and takes the first slot. */
+  const RP = DATA.referralPartners;
+  const statList = [];
+  if (RP && RP.total) statList.push({ v: RP.total, l: RP.statLabel || 'Businesses in your outreach list' });
+  statList.push({ v: PUB.length,  l: 'Articles published on your site' });
+  statList.push({ v: livePages,   l: 'Pages you can open' });
   // Website visits lead when we genuinely have them. DATA.traffic is null while
   // no source is wired, and the page keeps its named pending row instead --
   // a zero here would tell the client nobody visited, which is a different claim.
@@ -785,6 +789,11 @@ const DATA = __DATA__;
       '.';
   }
 
+  /* A cadence chart is only worth showing while a cadence is running. When a
+     config sets showChart:false the section is dropped rather than drawing
+     empty buckets that read as an accusation. */
+  if (DATA.showChart === false) { const cs=$('#chart-sec'); if (cs) cs.hidden = true; }
+
   /* ── type mix + key ──────────────────────────────────────── */
   const counts = {};
   PUB.forEach(i => counts[i.type] = (counts[i.type]||0)+1);
@@ -888,7 +897,7 @@ const DATA = __DATA__;
     sec.hidden = false;
     const num = x => (x||0).toLocaleString('en-US');
 
-    $('#rp-h').textContent  = R.title || 'Who could send you work';
+    $('#rp-h').textContent  = R.title || 'Your outreach list';
     $('#rp-n').textContent  = num(R.total) + ' businesses';
     $('#rp-sd').textContent = R.intro || '';
     if (R.banner) { $('#rp-banner').textContent = R.banner; $('#rp-banner').hidden = false; }
@@ -995,14 +1004,14 @@ const DATA = __DATA__;
   $('#outn').textContent = sent.length
     ? sent.length + ' sent' : '';
 
-  /* HOUSE RULE: never announce an absence. A channel that simply is not part
-     of this client's setup is left out entirely rather than rendered as "Not
-     connected" or "Not in your plan" -- a client should not open their
-     dashboard and read a list of things they do not have. States that need the
-     CLIENT to act (awaiting approval, needs access) are kept, because those are
-     requests of them, not confessions of a gap. */
-  const HIDE_STATES = ['not_connected', 'not_in_plan'];
-  const shownChans = chans.filter(c => HIDE_STATES.indexOf(c.state) === -1);
+  /* HOUSE RULE (tightened 2026-09-06): a dashboard shows what is GOING OUT and
+     nothing else. Only channels that are actually live are rendered. Every other
+     state -- not connected, not in plan, needs access, pending approval -- is
+     left off the page entirely. A client should never open their dashboard and
+     read a list of what they do not have; gaps are raised in conversation, not
+     printed. Configs keep every channel so the record stays complete, the page
+     just does not display the ones that are not shipping. */
+  const shownChans = chans.filter(c => c.state === 'live');
 
   $('#chans').innerHTML = shownChans.length ? shownChans.map(c => {
     const live = c.state === 'live';

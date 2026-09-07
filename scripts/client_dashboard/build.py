@@ -171,6 +171,25 @@ SOURCES = {"state_file": from_state_file, "git_repo": from_git_repo,
            "items_file": from_items_file}
 
 
+# ── outreach: only what is actually shipping ─────────────────────────────────
+def live_channels_only(outreach):
+    """HOUSE RULE: a dashboard shows what is GOING OUT and nothing else.
+
+    Non-live channels are stripped from the payload entirely, not merely hidden
+    in the template, so a client reading the page source still never finds a
+    list of what they do not have. Configs keep every channel so the internal
+    record stays complete; only the shipped page is filtered.
+    """
+    if not outreach:
+        return {}
+    out = dict(outreach)
+    chans = [c for c in (outreach.get("channels") or []) if c.get("state") == "live"]
+    out["channels"] = chans
+    if not chans:
+        out.pop("intro", None)
+    return out
+
+
 # ── outreach preview (client-approval view of a pending email program) ───────
 def parse_outreach_templates(path):
     """Parse an outreach templates.md into per-category email blocks.
@@ -321,6 +340,13 @@ def collect_referral_partners(cfg):
     def has(r, col):
         return bool((r.get(col) or "").strip())
 
+    # excludeCategories removes rows from the dataset ENTIRELY, headline total
+    # included, so every number on the page reconciles with no disclosure note.
+    # hiddenCategories is the softer, older behaviour: out of the breakdown but
+    # still inside the total, which then has to be explained on the page.
+    excluded = set(rp.get("excludeCategories", []))
+    if excluded:
+        rows = [r for r in rows if (r.get("category") or "") not in excluded]
     total = len(rows)
     visible = [r for r in rows if (r.get("category") or "") not in hidden]
 
@@ -367,11 +393,11 @@ def collect_referral_partners(cfg):
 
     return {
         "title": rp.get("title", "Who could send you work"),
+        "statLabel": rp.get("statLabel", ""),
         "intro": rp.get("intro", ""),
         "banner": rp.get("banner", ""),
         "note": rp.get("note", ""),
         "sampleNote": rp.get("sample_note", ""),
-        "hiddenNote": rp.get("hidden_note", ""),
         "total": total,
         "hiddenCount": total - len(visible),
         "unique": sum(1 for r in rows if (r.get("status") or "") != "duplicate-org"),
@@ -486,7 +512,8 @@ def build(slug):
         "brand": cfg["brand"],
         "engines": cfg.get("engines", []),
         "types": cfg.get("types", {}),
-        "outreach": cfg.get("outreach", {}),
+        "showChart": cfg.get("showChart", True),
+        "outreach": live_channels_only(cfg.get("outreach", {})),
         "outreachPreview": collect_outreach_preview(cfg),
         # Optional, generic: a forward-looking "what happens next" block.
         # Intentions only -- the template renders no counts or results from

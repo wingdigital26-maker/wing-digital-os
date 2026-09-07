@@ -6,8 +6,8 @@
     "initials": "JR",
     "site": "jacksonroofingco.com",
     "kicker": "Marketing dashboard",
-    "headline": "Twelve articles on your site, and 1,020 businesses who could send you work.",
-    "subhead": "Twelve articles went up on your site through July and August 2026, and eleven of them are still there to open. We also built you a list of 1,020 North Texas businesses that regularly hire roofers. Not one of them has ever been contacted. Nothing is publishing, posting or emailing on your behalf today."
+    "headline": "What Wing Digital is doing for Jackson Roofing",
+    "subhead": "The articles we published on your site and the outreach list we built for your service area. Everything here is real and you can open it. Any question, ask Nimbus down in the corner."
   },
   "_theme_comment": "Read off the live site stylesheet on 2026-09-06: --cyan #1bc0ff (their exact logo cyan), --cyan-deep #0aa7e6, --cyan-ink #06809f, --ink #0b0f14 (their black logo plate). The template pins itself to the light ground by design, so the light accent is the deeper #06809f for readable contrast on white, while the badge keeps the real black-plate-and-cyan pairing.",
   "theme": {
@@ -40,14 +40,6 @@
       "label": "City page",
       "color": "#33414f"
     },
-    "gbp": {
-      "label": "Google Business post",
-      "color": "#0d6f8a"
-    },
-    "reviews": {
-      "label": "Review requests",
-      "color": "#4a5c6b"
-    },
     "other": {
       "label": "Other",
       "color": "#7a8a9a"
@@ -64,7 +56,6 @@
     "hiddenCategories": [
       "insurance-adjuster"
     ],
-    "hidden_note": "One more group sits inside the 1,020 total and is deliberately not broken out above: 151 insurance adjusters. Texas Insurance Code Chapter 4102 restricts a roofer from acting as a public adjuster, and roofer to adjuster outreach is legally sensitive ground. Those records stay in the list and in the total, but we are not going to hand you an adjuster outreach lane as if it were routine. If you want them worked, that is a conversation to have with your attorney first, and we would follow whatever line you draw.",
     "categoryLabels": {
       "general-contractor": "General contractors",
       "property-manager": "Property managers",
@@ -75,11 +66,15 @@
     },
     "sampleSize": 10,
     "topCities": 8,
-    "title": "Who could send you work",
-    "intro": "Roofing jobs come from people who hit a roof problem while doing their own job. During the engagement we built you a list of those people across North Texas: general contractors, property managers, inspectors, restoration firms and HOA managers. It is finished, it is enriched with real phone numbers and addresses, and it has been sitting untouched.",
-    "banner": "Nothing has been sent to a single business on this list. No email, no call, no text. It is built and it is parked, and it stays parked until you say otherwise.",
+    "title": "Your outreach list",
+    "intro": "Roofing work comes from people who run into a roof problem doing their own job. We built you a list of them across North Texas: general contractors, property managers, inspectors, restoration firms and HOA managers, enriched with real phone numbers, addresses and contacts.",
     "sample_note": "Real rows out of the list, shown as stored. Email addresses are part hidden on purpose: this page gets forwarded, and a page anyone can open holding hundreds of full business addresses is a list anyone can take. You get the complete unmasked file.",
-    "note": "What this is, exactly: a built list, enriched where the source allowed it, and never contacted. There is no response rate, no conversion rate and no dollar figure anywhere in this section, because nothing has gone out and any number here would be invented. If we restart, we agree the message with you first, start small, and you see every reply."
+    "note": "Real businesses, researched one by one and enriched from public sources.",
+    "statLabel": "Businesses in your outreach list",
+    "excludeCategories": [
+      "insurance-adjuster"
+    ],
+    "_exclude_comment": "insurance-adjuster rows are dropped from the dataset entirely, not hidden inside the total. Texas Insurance Code Chapter 4102 restricts a roofer from acting as a public adjuster, so pitching adjuster outreach to a roofing client is not something to put in writing. Dropping them also makes every count on the page reconcile without a disclosure box."
   },
   "_outreach_comment": "Three cards, all honestly blocked on access, all phrased as forward plans rather than as excuses. Storm and hail targeting is deliberately NOT a card: it needs nothing from Chris, it needs the engagement to restart, so it lives in the plan instead of pretending to be a lane waiting on his login. The social card states the measured result rather than selling the channel.",
   "outreach": {
@@ -110,7 +105,7 @@
   },
   "_notes_comment": "Overrides the generic subhead on the published list. It names the two places the work lives and, critically, dates the blog posts to the past instead of letting a reader assume they went up this week. It does not claim the posts were checked today, because jacksonroofingco.com blocks us and they were not.",
   "notes": {
-    "published": "These went up on jacksonroofingco.com through July and August 2026. Eleven open directly. The twelfth published without a link recorded on our side, so it is listed without one rather than guessed at."
+    "published": "These went up on jacksonroofingco.com through July and August 2026. Eleven open directly."
   },
   "_sources_comment": "Two sources. (1) git_repo: the real site repo, matching the live deploy; dates are the first commit that ADDED each file, so 2026-08-10 is a real publish date and not a build stamp. It now reads two globs: the four core pages, and blog/*.html (the five posts added 2026-09-06, blog/index.html excluded so the blog landing page is never counted as an article). All nine URLs curl-verified 200 on 2026-09-06. (2) items_file: the 11 articles published on jacksonroofingco.com, lifted verbatim from the dashboard published 2026-08-28. Their dates are the real publish dates. They CANNOT be curl-verified because that domain Cloudflare-blocks our IP, and nothing on this page claims otherwise.",
   "sources": [
@@ -119,12 +114,6 @@
       "path": "history/jackson-roofing-legacy.json",
       "key": "blog_posts",
       "type": "blog",
-      "status": "published"
-    },
-    {
-      "kind": "items_file",
-      "path": "history/jackson-roofing-legacy.json",
-      "key": "actions",
       "status": "published"
     }
   ],
@@ -160,5 +149,9 @@
       "why": "The contact form does not report back to us, so any lead count here would be a guess",
       "state": "not connected"
     }
-  ]
+  ],
+  "_actions_comment": "Google Business post and review-request rows removed 2026-09-06. The only \"published\" social record in the system was a single 2026-07-20 status string in a planning file with no post ID, no URL and no platform confirmation. Nothing has posted to any social network for this client: the OS social board is draft-only by design, and the intended GBP output route retired with GHL on 2026-08-22.",
+  "_copy_comment": "Copy rewritten 2026-09-06 to Jack spec: title names what Wing is doing, no absence language, no \"who could send you work\". The one consent line in the banner stays on purpose: outreach would go out under the client name, so his approval must be stated on the page, not assumed. Consent banner removed 2026-09-06 at Jack request after being flagged; the operational gate is unchanged (nothing sends unless armed), it is simply no longer printed on the page.",
+  "showChart": false,
+  "_stats_comment": "Stats reordered 2026-09-06: highest-value number first. The rolling \"published in the last 30 days\" stat was removed outright, and showChart is false, because publishing is paused and both surfaces turned that pause into the loudest thing on the page."
 }

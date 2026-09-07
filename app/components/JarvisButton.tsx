@@ -628,7 +628,7 @@ export default function JarvisButton() {
              single continuous thing rather than two stacked panels. */
           border: none !important;
           border-radius: 0 !important;
-          background: linear-gradient(180deg, rgba(13,17,23,0) 0%, rgba(13,17,23,0.55) 34px, rgba(13,17,23,0.9) 96px, #0d1117 190px) !important;
+          background: linear-gradient(180deg, rgba(9,12,18,0) 0%, rgba(9,12,18,0.35) 60px, rgba(9,12,18,0.62) 180px, rgba(9,12,18,0.78) 100%) !important;
           box-shadow: none !important;
           animation: jarvis-solo-in 260ms ease-out both;
         }
@@ -641,8 +641,15 @@ export default function JarvisButton() {
           row-gap: 8px;
           background: transparent !important;
           border-bottom: none !important;
-          padding: 10px 22px 6px !important;
+          padding: 6px 20px 2px !important;
         }
+        /* The name is already spelled out by the orb above it, so in the solo
+           window the row is only its controls, and they sit quietly. */
+        .jarvis-solo .jarvis-name,
+        .jarvis-solo .jarvis-head > div:first-child > div:first-child { display: none !important; }
+        .jarvis-solo .jarvis-head > div:first-child { flex: 1 1 auto; }
+        .jarvis-solo .jarvis-headbtn { opacity: 0.72; }
+        .jarvis-solo .jarvis-headbtn:hover:not(:disabled) { opacity: 1; }
         .jarvis-solo .jarvis-name { font-size: 17px !important; letter-spacing: 0.01em; }
         .jarvis-solo .jarvis-headbtn { font-size: 11px !important; padding: 5px 11px !important; border-radius: 8px !important; }
         .jarvis-solo .jarvis-headbtn:hover:not(:disabled) { border-color: rgba(61,107,240,0.55); background: rgba(61,107,240,0.08); }
@@ -813,18 +820,25 @@ export default function JarvisButton() {
           <div ref={msgsRef} className={messages.length === 0 ? "jarvis-msgs jarvis-msgs-empty" : "jarvis-msgs"} style={{ flex: 1, overflowY: "auto", padding: "12px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
             {messages.length === 0 && (
               <>
-                <div className="jarvis-empty" style={{ color: "#556", fontSize: 13, textAlign: "center", marginTop: 28, fontFamily: FONT, lineHeight: 1.5 }}>
-                  Ask about today, a contact, a task, an automation, or tell me to do something. Anything that changes data waits for your OK.
+                <div className="jarvis-empty" style={{ color: "#556", fontSize: 13, textAlign: "center", marginTop: solo ? 0 : 28, fontFamily: FONT, lineHeight: 1.5 }}>
+                  {solo
+                    ? "Ask me anything. Anything that changes data waits for your OK."
+                    : "Ask about today, a contact, a task, an automation, or tell me to do something. Anything that changes data waits for your OK."}
                 </div>
-                <div className="jarvis-chips" style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 10 }}>
-                  {SUGGESTED.map((q) => (
-                    <button key={q} className="jarvis-chip" onClick={() => sendMessageRef.current(q)} style={{
-                      background: "rgba(61,107,240,0.06)", border: "1px solid rgba(61,107,240,0.22)",
-                      borderRadius: 10, color: "#9bc", cursor: "pointer", fontSize: 12, textAlign: "left",
-                      padding: "8px 12px", fontFamily: FONT, transition: "border-color 0.15s, color 0.15s",
-                    }}>{q}</button>
-                  ))}
-                </div>
+                {/* No suggested prompts in the solo window: Jack opens it knowing
+                    what he wants, and a wall of canned questions is clutter. The
+                    OS panel keeps them, where a first-time user might need them. */}
+                {!solo && (
+                  <div className="jarvis-chips" style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 10 }}>
+                    {SUGGESTED.map((q) => (
+                      <button key={q} className="jarvis-chip" onClick={() => sendMessageRef.current(q)} style={{
+                        background: "rgba(61,107,240,0.06)", border: "1px solid rgba(61,107,240,0.22)",
+                        borderRadius: 10, color: "#9bc", cursor: "pointer", fontSize: 12, textAlign: "left",
+                        padding: "8px 12px", fontFamily: FONT, transition: "border-color 0.15s, color 0.15s",
+                      }}>{q}</button>
+                    ))}
+                  </div>
+                )}
               </>
             )}
             {messages.map((msg, i) => {

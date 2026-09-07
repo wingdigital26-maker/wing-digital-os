@@ -14,7 +14,7 @@
 # -Remove, or from the orb's own right-click menu.
 
 param(
-  [int]$PollSeconds = 300,
+  [int]$PollSeconds = 90,
   [int]$Size = 68
 )
 
@@ -126,6 +126,45 @@ public class OrbWin {
   const int WS_EX_LAYERED = 0x00080000, WS_EX_TOOLWINDOW = 0x00000080;
 
   public static void Raise(IntPtr h) { SetWindowPos(h, HWND_TOPMOST, 0, 0, 0, 0, NOMOVE | NOSIZE | NOACTIVATE); }
+
+  [DllImport("user32.dll")] static extern bool EnumWindows(EnumProc cb, IntPtr p);
+  [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr h, System.Text.StringBuilder s, int n);
+  [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr h, int cmd);
+  [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr h);
+  [DllImport("user32.dll")] static extern bool IsWindow(IntPtr h);
+  delegate bool EnumProc(IntPtr h, IntPtr p);
+  const int SW_HIDE = 0, SW_SHOW = 5, SW_RESTORE = 9;
+
+  /// The Nimbus window, if one exists. Title match, because it is a Chrome app
+  /// window and has no class of its own worth keying on.
+  public static IntPtr FindNimbus() {
+    IntPtr found = IntPtr.Zero;
+    EnumWindows((h, p) => {
+      var sb = new System.Text.StringBuilder(256);
+      GetWindowText(h, sb, sb.Capacity);
+      string t = sb.ToString();
+      if (t.Length > 0 && t.IndexOf("Nimbus", StringComparison.OrdinalIgnoreCase) >= 0) { found = h; return false; }
+      return true;
+    }, IntPtr.Zero);
+    return found;
+  }
+
+  /// Show and focus an existing window. Returns false when there is none, and
+  /// the caller falls back to launching one.
+  public static bool ShowNimbus() {
+    IntPtr h = FindNimbus();
+    if (h == IntPtr.Zero || !IsWindow(h)) return false;
+    ShowWindow(h, SW_RESTORE);
+    SetForegroundWindow(h);
+    return true;
+  }
+
+  public static bool HideNimbus() {
+    IntPtr h = FindNimbus();
+    if (h == IntPtr.Zero) return false;
+    ShowWindow(h, SW_HIDE);
+    return true;
+  }
 
   /// Layered for real alpha, and TOOLWINDOW so it never appears in alt-tab.
   public static void MakeLayered(IntPtr h) {
@@ -488,13 +527,111 @@ $notify = New-Object System.Windows.Forms.NotifyIcon
 $notify.Icon = [System.Drawing.SystemIcons]::Information
 $notify.Visible = $false   # only ever shown to carry a balloon, never as a tray icon
 
+$script:toast = $null
+$script:toastTimer = $null
+
 function Show-Popup([string]$title, [string]$text) {
   try {
-    $notify.Visible = $true
-    $notify.BalloonTipTitle = $title
-    $notify.BalloonTipText = $text
-    $notify.ShowBalloonTip(6000)
-  } catch { }
+    if ($script:toast -and -not $script:toast.IsDisposed) { $script:toast.Close(); $script:toast = $null }
+
+    # This process is per-monitor DPI aware, so window sizes are real pixels
+    # while point-sized fonts are scaled by Windows. Mixing the two is what made
+    # the first toast overlap its own title. Everything below is in pixels, and
+    # the whole card is scaled by the display's factor.
+    $tmp = New-Object System.Drawing.Bitmap(1, 1)
+    $gg = [System.Drawing.Graphics]::FromImage($tmp)
+    $scale = $gg.DpiX / 96.0
+    $gg.Dispose(); $tmp.Dispose()
+    if ($scale -lt 1) { $scale = 1 }
+
+    $padX = [int](14 * $scale)
+    $w = [int](330 * $scale)
+
+    $t = New-Object System.Windows.Forms.Form
+    $t.FormBorderStyle = "None"
+    $t.ShowInTaskbar = $false
+    $t.TopMost = $true
+    $t.StartPosition = "Manual"
+    $t.BackColor = [System.Drawing.Color]::FromArgb(11, 15, 22)
+    $t.Width = $w
+
+    $headFont = New-Object System.Drawing.Font("Segoe UI Semibold", (12.5 * $scale), [System.Drawing.FontStyle]::Regular, [System.Drawing.GraphicsUnit]::Pixel)
+    $bodyFont = New-Object System.Drawing.Font("Segoe UI", (13 * $scale), [System.Drawing.FontStyle]::Regular, [System.Drawing.GraphicsUnit]::Pixel)
+
+    $head = New-Object System.Windows.Forms.Label
+    $head.Text = $title
+    $head.ForeColor = [System.Drawing.Color]::FromArgb(150, 182, 255)
+    $head.Font = $headFont
+    $head.AutoSize = $false
+    $head.BackColor = [System.Drawing.Color]::Transparent
+    $head.SetBounds($padX, [int](12 * $scale), ($w - $padX * 2), [int](18 * $scale))
+    $t.Controls.Add($head)
+
+    # Measure the body so the card is exactly as tall as the words need, and
+    # nothing is ever cut off mid sentence.
+    $tmp2 = New-Object System.Drawing.Bitmap(1, 1)
+    $g2 = [System.Drawing.Graphics]::FromImage($tmp2)
+    $measured = $g2.MeasureString($text, $bodyFont, ($w - $padX * 2))
+    $g2.Dispose(); $tmp2.Dispose()
+    $bodyH = [int]([Math]::Ceiling($measured.Height)) + [int](4 * $scale)
+
+    $body = New-Object System.Windows.Forms.Label
+    $body.Text = $text
+    $body.ForeColor = [System.Drawing.Color]::FromArgb(210, 218, 234)
+    $body.Font = $bodyFont
+    $body.AutoSize = $false
+    $body.BackColor = [System.Drawing.Color]::Transparent
+    $body.SetBounds($padX, [int](34 * $scale), ($w - $padX * 2), $bodyH)
+    $t.Controls.Add($body)
+
+    $t.Height = [int](34 * $scale) + $bodyH + [int](14 * $scale)
+
+    $t.Add_Paint({
+      param($snd, $e)
+      $pen = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(70, 110, 200), 1)
+      $e.Graphics.DrawRectangle($pen, 0, 0, ($snd.Width - 1), ($snd.Height - 1))
+      $pen.Dispose()
+    })
+
+    # Rounded corners, so it reads as Nimbus rather than as a system dialog.
+    $path = New-Object System.Drawing.Drawing2D.GraphicsPath
+    $r = [int](14 * $scale)
+    $path.AddArc(0, 0, $r, $r, 180, 90)
+    $path.AddArc(($t.Width - $r), 0, $r, $r, 270, 90)
+    $path.AddArc(($t.Width - $r), ($t.Height - $r), $r, $r, 0, 90)
+    $path.AddArc(0, ($t.Height - $r), $r, $r, 90, 90)
+    $path.CloseFigure()
+    $t.Region = New-Object System.Drawing.Region($path)
+
+    # Just above the orb, and never hanging off the screen.
+    $wa2 = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
+    $tx = [Math]::Min([Math]::Max(($form.Left + $Size - $t.Width), ($wa2.Left + 8)), ($wa2.Right - $t.Width - 8))
+    $ty = [Math]::Max(($form.Top - $t.Height - [int](10 * $scale)), ($wa2.Top + 8))
+    $t.Location = New-Object System.Drawing.Point($tx, $ty)
+
+    $openList = {
+      Open-Nimbus "#problems"
+      try { if ($script:toast -and -not $script:toast.IsDisposed) { $script:toast.Close(); $script:toast = $null } } catch { }
+    }
+    $t.Add_Click($openList)
+    $head.Add_Click($openList)
+    $body.Add_Click($openList)
+
+    $t.Show()
+    try { [OrbWin]::Raise($t.Handle) } catch { }
+    $script:toast = $t
+
+    if ($script:toastTimer) { $script:toastTimer.Stop() }
+    $script:toastTimer = New-Object System.Windows.Forms.Timer
+    $script:toastTimer.Interval = 10000
+    $script:toastTimer.Add_Tick({
+      $script:toastTimer.Stop()
+      try { if ($script:toast -and -not $script:toast.IsDisposed) { $script:toast.Close(); $script:toast = $null } } catch { }
+    })
+    $script:toastTimer.Start()
+  } catch {
+    Write-OrbLog ("toast failed: " + $_.Exception.Message)
+  }
 }
 
 function Poll-Status {
@@ -523,11 +660,18 @@ function Poll-Status {
     $script:lastKnown = $n
 
     if ($n -gt 0 -and ($null -eq $was -or $n -gt $was)) {
-      # Only popup when it got worse, so a standing problem does not nag.
+      # Only speak up when it got WORSE. A standing problem keeps its badge and
+      # stops nagging; a new one is what deserves interrupting Jack.
       $script:mood = "alert"
       $script:moodUntil = (Get-Date).AddSeconds(5)
-      $word = if ($n -eq 1) { "1 thing needs" } else { "$n things need" }
-      Show-Popup "Nimbus" "$word attention. Click the orb to see them."
+      $label = ""
+      try {
+        $newest = @($json.watch.newest)[0]
+        if ($newest) { $label = [string]$newest }
+      } catch { }
+      $word = if ($n -eq 1) { "1 thing needs attention" } else { "$n things need attention" }
+      $text = if ($label) { "$label. ($word in total.)" } else { "$word. Click to see them." }
+      Show-Popup "Something just broke" $text
     } elseif ($script:mood -eq "offline") {
       $script:mood = "calm"
     }
@@ -552,9 +696,35 @@ $first.Start()
 
 # ── Interaction ─────────────────────────────────────────────────────────────
 function Open-Nimbus([string]$hash) {
+  # An existing window is shown directly from this process, which is instant.
+  # Only a missing window pays for a launch.
+  try { if ([OrbWin]::ShowNimbus()) { return } } catch { }
   $env:NIMBUS_OPEN_HASH = $hash
   Start-Process -FilePath "$env:SystemRoot\System32\wscript.exe" -ArgumentList """$vbs""" -WindowStyle Hidden
 }
+
+# Open one quietly in the background a little after login and hide it, so the
+# first real click is as fast as every click after it. Costs one idle Chrome
+# window; set NIMBUS_NO_PREWARM=1 to skip it.
+$prewarm = New-Object System.Windows.Forms.Timer
+$prewarm.Interval = 45000
+$prewarm.Add_Tick({
+  $prewarm.Stop()
+  if ($env:NIMBUS_NO_PREWARM -eq "1") { return }
+  try {
+    if ([OrbWin]::FindNimbus() -ne [IntPtr]::Zero) { return }
+    $env:NIMBUS_OPEN_HASH = ""
+    Start-Process -FilePath "$env:SystemRoot\System32\wscript.exe" -ArgumentList """$vbs""" -WindowStyle Hidden
+    # Give it time to draw once, then put it away until it is wanted.
+    $hide = New-Object System.Windows.Forms.Timer
+    $hide.Interval = 9000
+    $hide.Add_Tick({ $hide.Stop(); try { [void][OrbWin]::HideNimbus() } catch { } })
+    $hide.Start()
+  } catch {
+    Write-OrbLog "prewarm failed"
+  }
+})
+$prewarm.Start()
 
 $menu = New-Object System.Windows.Forms.ContextMenuStrip
 [void]$menu.Items.Add("Open Nimbus", $null, { Open-Nimbus "" })

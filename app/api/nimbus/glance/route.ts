@@ -218,6 +218,8 @@ export async function GET() {
     | ({
         problems: number;
         headline: string;
+        /** The worst open problem, by name, so a notification can say what broke. */
+        newest: string | null;
         /**
          * The checks the WATCH itself could not run, each with its own reason.
          * The headline already counts these ("and 1 check could not run"), and
@@ -237,6 +239,8 @@ export async function GET() {
     watch = {
       problems: r.problems.length,
       headline: r.headline,
+      // problems is already ordered worst first by the watch.
+      newest: r.problems.length ? r.problems[0].label : null,
       unknowns: r.unknowns.map((u) => ({
         id: u.id,
         label: u.label,

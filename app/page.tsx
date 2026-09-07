@@ -542,7 +542,7 @@ function MobileNav({ active, onNavigate, newLeadCount }: {
         })}
         <button className="mobile-nav-btn jarvis" onClick={() => { setMoreOpen(false); sfx.play("nav"); window.dispatchEvent(new CustomEvent("jarvis:open")); }}>
           <span className="mobile-nav-ico"><Sparkles size={21} /></span>
-          <span>Zephyr</span>
+          <span>Nimbus</span>
         </button>
         <button className={`mobile-nav-btn${moreOpen || moreGroups.has(activeGroup) ? " on" : ""}`} aria-expanded={moreOpen}
           onClick={() => { sfx.play(moreOpen ? "toggle-off" : "toggle-on"); setMoreOpen(o => !o); }}>

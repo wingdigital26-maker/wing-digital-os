@@ -29,7 +29,7 @@ const SUGGESTED = [
 const ACCENT = "#3D6BF0";
 const FONT = "Inter, sans-serif";
 
-// Zephyr's orb API (public/mascot/wing-mascot.js). Everything is optional
+// Nimbus's orb API (public/mascot/wing-mascot.js). Everything is optional
 // because the script is loaded at runtime and may be an older build.
 type Orb = {
   setState?: (s: string) => void;
@@ -84,7 +84,7 @@ export default function JarvisButton() {
   const [engine, setEngine] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  // Zephyr orb: the shared mascot component (vanilla) mounted into the FAB.
+  // Nimbus orb: the shared mascot component (vanilla) mounted into the FAB.
   const orbSlotRef = useRef<HTMLDivElement>(null);
   const orbRef = useRef<Orb | null>(null);
   const [orbOn, setOrbOn] = useState(false);
@@ -106,7 +106,7 @@ export default function JarvisButton() {
 
   useEffect(() => { voiceOnRef.current = voiceOn; }, [voiceOn]);
 
-  // ── Zephyr's face: both orbs always express the same mood ─────────────────
+  // ── Nimbus's face: both orbs always express the same mood ─────────────────
   // Every mood below is driven by a real stream event or a real state flag.
   // Nothing here invents an outcome the server did not report.
   const expressAll = useCallback((fn: (orb: Orb) => void) => {
@@ -121,7 +121,7 @@ export default function JarvisButton() {
     expressAll((orb) => orb.setState?.(orb.getPinned?.() || "calm"));
   }, [expressAll]);
   // Sound cue that never fires under reduced motion and never before a gesture.
-  const cue = useCallback((name: "reply" | "zephyr-error" | "confirmed") => {
+  const cue = useCallback((name: "reply" | "nimbus-error" | "confirmed") => {
     if (reducedMotion()) return;
     sfx.playWhenReady(name);
   }, []);
@@ -152,7 +152,7 @@ export default function JarvisButton() {
     const pick = () => {
       const voices = window.speechSynthesis.getVoices();
       if (!voices.length) return;
-      // Zephyr sounds young and friendly, so prefer natural US voices and
+      // Nimbus sounds young and friendly, so prefer natural US voices and
       // never the stately British assistant set.
       const prefer = [
         (v: SpeechSynthesisVoice) => /aria|jenny|guy|natural/i.test(v.name) && v.lang.startsWith("en-US"),
@@ -268,7 +268,7 @@ export default function JarvisButton() {
             const lineText = typeof ev.line === "string" && ev.line ? ev.line : `Running ${ev.tool}`;
             setToolLabel(lineText);
             // A tool actually starting is worth more than plain streaming:
-            // Zephyr stays in thinking and flares once per tool step.
+            // Nimbus stays in thinking and flares once per tool step.
             expressAll((orb) => { orb.setState?.("thinking"); orb.flare?.(); });
             patchLast((m) => ({ ...m, tools: [...(m.tools ?? []), lineText] }));
           }
@@ -325,7 +325,7 @@ export default function JarvisButton() {
       const { failed, actionSucceeded } = turnOutcomeRef.current;
       if (failed) {
         expressAll((orb) => orb.pulse?.("alert", 4200));
-        cue("zephyr-error");
+        cue("nimbus-error");
       } else if (actionSucceeded) {
         expressAll((orb) => orb.pulse?.("party", 3500));
         cue("confirmed");
@@ -394,7 +394,7 @@ export default function JarvisButton() {
     };
     window.addEventListener("jarvis:open", onOpen);
     window.addEventListener("jarvis:ask", onAsk);
-    // Mount the Zephyr orb into the FAB (loads the shared mascot script once).
+    // Mount the Nimbus orb into the FAB (loads the shared mascot script once).
     let orbCancelled = false;
     const mountOrb = () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -410,11 +410,11 @@ export default function JarvisButton() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     if ((window as any).WingMascot) mountOrb();
     else {
-      let s = document.querySelector('script[data-zephyr]') as HTMLScriptElement | null;
+      let s = document.querySelector('script[data-nimbus]') as HTMLScriptElement | null;
       if (!s) {
         s = document.createElement("script");
         s.src = "/mascot/wing-mascot.js?v=9";
-        s.dataset.zephyr = "1";
+        s.dataset.nimbus = "1";
         document.head.appendChild(s);
       }
       s.addEventListener("load", mountOrb);
@@ -427,7 +427,7 @@ export default function JarvisButton() {
     };
   }, [openPanel]);
 
-  // A mini Zephyr lives in the panel header (the only avatar on mobile,
+  // A mini Nimbus lives in the panel header (the only avatar on mobile,
   // where the bottom tab bar replaces the floating orb).
   useEffect(() => {
     if (!open || headerOrbRef.current || !headerSlotRef.current) return;
@@ -448,7 +448,7 @@ export default function JarvisButton() {
     };
   }, [open, streaming]);
 
-  // Zephyr thinks while a turn is in flight. He does NOT reset to calm here:
+  // Nimbus thinks while a turn is in flight. He does NOT reset to calm here:
   // how a turn ended (excited, party, alert) is decided in runTurn's finally,
   // and those pulses fall back to the pinned mood or calm on their own.
   useEffect(() => {
@@ -556,8 +556,8 @@ export default function JarvisButton() {
       <button
         className="jarvis-fab"
         onClick={() => { sfx.play(open ? "close" : "chime"); if (open) setOpen(false); else openPanel(); }}
-        title="Zephyr"
-        aria-label="Open Zephyr"
+        title="Nimbus"
+        aria-label="Open Nimbus"
         style={{
           position: "fixed", bottom: 18, right: 18, width: 84, height: 84, borderRadius: "50%",
           background: orbOn ? "transparent" : (listening ? "#5f82f5" : ACCENT),
@@ -570,7 +570,7 @@ export default function JarvisButton() {
         onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.08)")}
         onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
       >
-        {/* Zephyr himself; the plain glyph only shows until his script mounts */}
+        {/* Nimbus himself; the plain glyph only shows until his script mounts */}
         <div ref={orbSlotRef} style={{ width: 76, height: 76, display: orbOn ? "block" : "none", pointerEvents: "none" }} aria-hidden="true" />
         {!orbOn && (
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -600,7 +600,7 @@ export default function JarvisButton() {
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", borderBottom: "1px solid rgba(61,107,240,0.15)", background: "#0d1117", gap: 8 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
               <div ref={headerSlotRef} style={{ width: 38, height: 38, flexShrink: 0 }} aria-hidden="true" />
-              <span style={{ color: ACCENT, fontWeight: 700, fontSize: 15, fontFamily: "Space Grotesk, sans-serif" }}>Zephyr</span>
+              <span style={{ color: ACCENT, fontWeight: 700, fontSize: 15, fontFamily: "Space Grotesk, sans-serif" }}>Nimbus</span>
               {speaking && (
                 <button onClick={stopAudio} title="Stop speaking" style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "rgba(61,107,240,0.12)", border: "1px solid rgba(61,107,240,0.4)", borderRadius: 6, padding: "2px 7px", cursor: "pointer" }}>
                   {[0, 1, 2].map((n) => (
@@ -683,7 +683,7 @@ export default function JarvisButton() {
                       borderRadius: 12, padding: "10px 12px", fontFamily: FONT,
                     }}>
                       <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em", color: msg.pendingState === "open" ? "var(--orange)" : "#556", marginBottom: 4 }}>
-                        {msg.pendingState === "open" ? "Zephyr wants to" : msg.pendingState === "done" ? "Confirmed" : msg.pendingState === "expired" ? "Expired, not run" : "Cancelled, not run"}
+                        {msg.pendingState === "open" ? "Nimbus wants to" : msg.pendingState === "done" ? "Confirmed" : msg.pendingState === "expired" ? "Expired, not run" : "Cancelled, not run"}
                       </div>
                       <div style={{ fontSize: 13, color: "#e0e0e0", lineHeight: 1.45 }}>{msg.pending.human_summary}</div>
                       {msg.pendingState === "open" && (
@@ -732,7 +732,7 @@ export default function JarvisButton() {
               onChange={(e) => setInput(e.target.value)}
               disabled={listening || streaming}
               placeholder={listening ? "Listening..." : hasSpeechAPI ? "Type or tap mic..." : "Type a message..."}
-              aria-label="Message Zephyr"
+              aria-label="Message Nimbus"
               style={{ flex: 1, minWidth: 0, background: "#161b22", border: "1px solid rgba(61,107,240,0.2)", borderRadius: 10, color: "#e0e0e0", padding: "8px 12px", fontSize: 13, fontFamily: FONT, outline: "none" }}
             />
             {hasSpeechAPI && (

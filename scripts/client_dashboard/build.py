@@ -389,6 +389,10 @@ def collect_referral_partners(cfg):
 def collect_pages(cfg, items):
     """Live-page groups for the Pages tab, read off the real site repo."""
     out = []
+    # A live URL belongs on this tab once. The same page can be read off the
+    # site repo AND recorded by a content item; listing it in two groups would
+    # inflate the "pages live on your site" count the client can check by hand.
+    seen_urls = set()
     for grp in cfg.get("pages", []):
         repo, base = grp["repo"], grp["base_url"].rstrip("/")
         directory = os.path.join(repo, grp["dir"]) if grp["dir"] else repo
@@ -399,20 +403,29 @@ def collect_pages(cfg, items):
             if not name.endswith(".html") or name in grp.get("skip", []):
                 continue
             rel = (grp["dir"] + "/" + name if grp["dir"] else name).replace("\\", "/")
+            url = base + "/" + rel
+            key = url.rstrip("/").lower()
+            if key in seen_urls:
+                continue
+            seen_urls.add(key)
             links.append({
                 "title": page_title(os.path.join(directory, name), name),
-                "url": base + "/" + rel,
+                "url": url,
             })
         if links:
             out.append({"group": grp["group"], "icon": grp.get("icon", "file"), "links": links})
     # Some clients have no local repo (site lives on WordPress) -- fall back to
     # the URLs the content items themselves recorded, grouped by content type.
     for grp in cfg.get("pages_from_items", []):
-        seen, links = set(), []
+        links = []
         for it in items:
-            if it["type"] in grp["types"] and it.get("url") and it["url"] not in seen:
-                seen.add(it["url"])
-                links.append({"title": it["title"], "url": it["url"]})
+            if it["type"] not in grp["types"] or not it.get("url"):
+                continue
+            key = it["url"].rstrip("/").lower()
+            if key in seen_urls:
+                continue
+            seen_urls.add(key)
+            links.append({"title": it["title"], "url": it["url"]})
         if links:
             out.append({"group": grp["group"], "icon": grp.get("icon", "file"), "links": links})
     return out
@@ -486,7 +499,7 @@ def build(slug):
         # Optional, generic: per-section copy overrides (see template).
         "notes": cfg.get("notes", {}),
         # Optional REAL numbers only (e.g. {"emailsSent30d": 120, "asOf": "2026-09-06"}).
-        # Zephyr's arrival reaction reads these; leaving it absent is always
+        # Nimbus's arrival reaction reads these; leaving it absent is always
         # honest, inventing a number here never is.
         "metrics": cfg.get("metrics", {}),
         "items": items,
@@ -539,7 +552,7 @@ def build(slug):
             js = fh.read().replace("</script>", "<\\/script>")
         for tag in ('<script src="/mascot/%s"></script>' % fname,
                     '<script src="/mascot/%s?v=1"></script>' % fname,
-                    '<script src="/mascot/%s?v=11"></script>' % fname):
+                    '<script src="/mascot/%s?v=12"></script>' % fname):
             art = art.replace(tag, "<script>\n%s\n</script>" % js)
     # In the Artifact gallery the title is the page's NAME, sat beside dozens of
     # others -- so it carries the client, not the word "dashboard" twice over.

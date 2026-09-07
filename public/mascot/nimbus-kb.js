@@ -1,10 +1,10 @@
-/* Zephyr's public knowledge base.
+/* Nimbus's public knowledge base.
  * Curated for CLIENT-FACING pages: only facts already public on wingdigital.co
  * or vetted for the pitch page. Never put private vault data, revenue, client
  * internals, or pricing guesses in here. Unknown questions fall back honestly.
  * Format: k = keywords (phrases score higher), a = answer HTML (trusted, no user input).
  */
-window.ZEPHYR_KB = [
+window.NIMBUS_KB = [
   { k: ['what do you do', 'services', 'offer', 'what is wing', 'about wing', 'who are you', 'company'],
     a: 'Wing Digital builds websites and runs local SEO, social media, and lead generation for DFW businesses. One team handles all of it: the site, the content, the follow-up, and a live dashboard that shows the work.' },
   { k: ['website', 'web design', 'site', 'build a site', 'new website', 'redesign'],
@@ -45,8 +45,8 @@ window.ZEPHYR_KB = [
     a: 'A simple booking link lets a homeowner lock in a time without phone tag. It plugs into the follow-up system so every new lead gets a fast response.' },
   { k: ['hosting', 'domain', 'maintain', 'maintenance', 'own my site', 'ownership'],
     a: 'Domain, hosting, and the contact form are set up as part of the website build, and the site is maintained as part of an ongoing program. Ask through the contact form about ownership specifics for your situation.' },
-  { k: ['zephyr', 'mascot', 'who are you', 'your name', 'orb'],
-    a: 'I am Zephyr, named for the west wind. I am Wing Digital’s assistant: I float around the site and the client dashboards, answer questions, and point you at the right page. The humans do the actual building.' },
+  { k: ['nimbus', 'mascot', 'who are you', 'your name', 'orb'],
+    a: 'I am Nimbus. A nimbus is the ring of light around a figure, and it is also a cloud, which suits a glowing orb that floats. I am Wing Digital’s assistant: I live on the site and the client dashboards, answer questions, and point you at the right page. The humans do the actual building.' },
   { k: ['ai', 'automation', 'automated', 'robot', 'chatgpt'],
     a: 'Wing runs on serious automation: the content engine, follow-up, review requests, and dashboards run around the clock. The strategy, the voice, and the client relationships are human. I am the friendly face on top.' },
   { k: ['guarantee', 'contract', 'commitment', 'cancel', 'lock in'],

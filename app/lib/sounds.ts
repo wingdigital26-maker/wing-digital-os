@@ -30,9 +30,9 @@ type SoundName =
   | "tree-close" // folder close: paper-ish tick down
   | "graph-arrive" // graph settle/load complete: quiet three-note arrival chime
   | "blip-watchdog" // watchdog overseer node click: distinct lower-toned click
-  // ── Zephyr assistant set ──
+  // ── Nimbus assistant set ──
   | "reply" // assistant turn finished with content: soft two-note settle
-  | "zephyr-error" // assistant turn failed or hit a rate/spend limit: low double blip
+  | "nimbus-error" // assistant turn failed or hit a rate/spend limit: low double blip
   | "confirmed"; // a pending action ran and reported success: small three-note flourish
 
 class SfxEngine {
@@ -276,7 +276,7 @@ class SfxEngine {
         this.tone({ freq: 784, type: "sine", decay: 0.11, gain: 0.28 });
         this.tone({ freq: 587.33, type: "sine", decay: 0.16, gain: 0.24, delay: 0.07 });
         break;
-      case "zephyr-error": // limit or failure: low, flat double blip (no alarm)
+      case "nimbus-error": // limit or failure: low, flat double blip (no alarm)
         this.tone({ freq: 233, type: "triangle", decay: 0.1, gain: 0.4 });
         this.tone({ freq: 196, type: "triangle", decay: 0.14, gain: 0.36, delay: 0.11 });
         break;

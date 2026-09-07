@@ -1,16 +1,14 @@
 {
-  "_comment": "Jackson Roofing (Chris Jackson, Plano TX). WIN-BACK PITCH, rebuilt 2026-09-06 on top of the dashboard published 2026-08-28, so the same link keeps working and now carries the full record. HONESTY DECISIONS, all deliberate: (1) The 12 blog posts are REAL work published on jacksonroofingco.com during the engagement, reconciled 2026-09-06 against the content-engine state file (see history/jackson-roofing-legacy.json for the full reconciliation): one post was logged twice under the same URL and is now listed once at its first publish date, and a twelfth post that published with no URL recorded is listed as a non-linked row. Two non-blog rows from 2026-07-20 (a Google Business post and a round of review requests) are carried under their own types so they read as the actions they were. jacksonroofingco.com now Cloudflare-blocks our IP (403 from curl and from a real browser), so we CANNOT re-verify those URLs today and this page never claims we did. They carry their real 2026-07 and 2026-08 dates and sit under a group that names the period, so nothing reads as work happening now. Chris can open every one of them from his own network. (2) Every wingdigital26-maker.github.io link on this page was curl-verified 200 on 2026-09-06. (3) Nothing has published since 2026-08-28 and this config claims nothing has. The gap is visible in the chart as an empty September bar, on purpose, and the plan section is what explains it. (4) No traffic, ranking, call, lead or revenue number appears anywhere; pendingMetrics records why for each one. (5) The one measured fact we hold on this account is that social produced no leads, and the social card says exactly that instead of selling social. GoHighLevel is retired and is referenced nowhere in this file. No em dashes or en dashes in any client-facing string.",
-
-  "_brand_comment": "brand.site is the GitHub Pages build because that is the deploy we can verify and every site link on this page points there. The subhead states the record plainly: work was published, it stopped, and the plan says what restarts.",
+  "_comment": "Jackson Roofing (Chris Jackson, Plano TX). WIN-BACK PITCH, rebuilt 2026-09-06 on top of the dashboard published 2026-08-28, so the same link keeps working and now carries the full record. HONESTY DECISIONS, all deliberate: (1) Seventeen blog posts total. FIVE were published 2026-09-06 to the rebuilt site repo (blog/*.html), read live off git history, and all five URLs were curl-verified 200 that day. The other TWELVE are REAL work published on jacksonroofingco.com during the engagement, reconciled 2026-09-06 against the content-engine state file (see history/jackson-roofing-legacy.json for the full reconciliation): one post was logged twice under the same URL and is now listed once at its first publish date, and a twelfth post that published with no URL recorded is listed as a non-linked row. Two non-blog rows from 2026-07-20 (a Google Business post and a round of review requests) are carried under their own types so they read as the actions they were. jacksonroofingco.com now Cloudflare-blocks our IP (403 from curl and from a real browser), so we CANNOT re-verify those URLs today and this page never claims we did. They carry their real 2026-07 and 2026-08 dates and sit under a group that names the period, so nothing reads as work happening now. Chris can open every one of them from his own network. (2) Every wingdigital26-maker.github.io link on this page was curl-verified 200 on 2026-09-06. (3) Between 2026-08-28 and 2026-09-06 nothing published, and the September bar in the chart carries only the five posts from 2026-09-06. No weekly cadence, Google posting or emailing is running today, and the banner and subhead both say so rather than letting five posts read as a live program. (4) No traffic, ranking, call, lead or revenue number appears anywhere; pendingMetrics records why for each one. (5) The one measured fact we hold on this account is that social produced no leads, and the social card says exactly that instead of selling social. GoHighLevel is retired and is referenced nowhere in this file. No em dashes or en dashes in any client-facing string.",
+  "_brand_comment": "Site shown as plain text, not a link: jacksonroofingco.com Cloudflare-blocks our IP so we cannot verify it from here, and an unverified link is worse than none. Headline leads with the referral list because that is the asset that has never been used. Rebuilt-site showcase and the month-by-month plan were both cut by Jack on 2026-09-06.",
   "brand": {
     "name": "Jackson Roofing",
     "initials": "JR",
-    "site": "https://wingdigital26-maker.github.io/jackson-roofing/",
+    "site": "jacksonroofingco.com",
     "kicker": "Marketing dashboard",
-    "headline": "Here is everything we built. Here is what turns back on.",
-    "subhead": "Twelve articles went live on your site through July and August, and the rebuilt Jackson Roofing site is up right now. We also built you a list of 1,020 North Texas businesses who could send you work, and not one of them has ever been contacted. Publishing stopped at the end of August and nothing is posting or emailing on your behalf today. The plan below is what starts again on day one."
+    "headline": "Twelve articles on your site, and 1,020 businesses who could send you work.",
+    "subhead": "Twelve articles went up on your site through July and August 2026, and eleven of them are still there to open. We also built you a list of 1,020 North Texas businesses that regularly hire roofers. Not one of them has ever been contacted. Nothing is publishing, posting or emailing on your behalf today."
   },
-
   "_theme_comment": "Read off the live site stylesheet on 2026-09-06: --cyan #1bc0ff (their exact logo cyan), --cyan-deep #0aa7e6, --cyan-ink #06809f, --ink #0b0f14 (their black logo plate). The template pins itself to the light ground by design, so the light accent is the deeper #06809f for readable contrast on white, while the badge keeps the real black-plate-and-cyan pairing.",
   "theme": {
     "accent": "#1bc0ff",
@@ -24,77 +22,37 @@
     "mark_bg": "#0b0f14",
     "mark_fg": "#1bc0ff"
   },
-
   "_types_comment": "core and blog are the only types with real items, so they are the only keys, bars and counts the template can draw. service and city are declared so their colors stay stable the moment those pages are real; with no items they render nothing at all, which is why this page can never show a fabricated zero.",
   "types": {
-    "core":    { "label": "Site page",    "color": "#0aa7e6" },
-    "blog":    { "label": "Blog post",    "color": "#1bc0ff" },
-    "service": { "label": "Service page", "color": "#06809f" },
-    "city":    { "label": "City page",    "color": "#33414f" },
-    "gbp":     { "label": "Google Business post", "color": "#0d6f8a" },
-    "reviews": { "label": "Review requests", "color": "#4a5c6b" },
-    "other":   { "label": "Other",        "color": "#7a8a9a" }
-  },
-
-  "_plan_comment": "The spine of the win-back. Every line is future work, never work in progress. The banner names the gap out loud so the empty September bar in the chart above it reads as the honest record it is, not as something we hoped nobody would notice. The intro carries the real diagnosis including the measured fact that social produced no leads. No lead volume, ranking position or revenue figure is promised anywhere, and the closing note says so.",
-  "plan": {
-    "banner": "Publishing stopped at the end of August and nothing on this page is running today. Everything below restarts the week we begin.",
-    "title": "What $1,000 a month turns on",
-    "intro": "The honest diagnosis first. You have a rebuilt site, twelve articles already live and a list of 1,020 businesses who could refer you work, and right now nothing is feeding any of it. When we measured social for this account it produced no leads, so we are not going to sell you social. Search, your Google profile and storm damage are the three levers that actually move roofing work in North Texas, and none of them are switched on today. That is what the plan below goes after.",
-    "phases": [
-      {
-        "when": "Week one",
-        "name": "Turn the lights back on",
-        "points": [
-          "Four blog posts a week begin again, written for what Plano homeowners actually type into Google.",
-          "Google Business Profile connected and posting every week.",
-          "Search Console connected, so the numbers on this dashboard become real readings instead of guesses.",
-          "Review requests wired to your job list, so finished jobs turn into Google reviews."
-        ],
-        "state": "Starts on day one"
-      },
-      {
-        "when": "Month one",
-        "name": "Pages that can rank",
-        "points": [
-          "A page for every service you sell: replacement, repair, storm and hail, inspection, commercial.",
-          "A page for every town you work: Plano, Rockwall, McKinney, and out from there.",
-          "On-page SEO and internal linking across the whole site, so new pages lift the older ones.",
-          "Roughly sixteen more posts live by the end of the month, all on your site, all clickable from here."
-        ],
-        "state": "Included every month"
-      },
-      {
-        "when": "Month two",
-        "name": "Storm targeting",
-        "points": [
-          "NOAA hail history mapped against your service area, so we know which streets took damage and when.",
-          "Storm and hail pages aimed at those neighborhoods while the damage is still fresh.",
-          "Google posts timed to the storms instead of to the calendar.",
-          "This is the one lever in North Texas roofing that does not come down to outspending somebody."
-        ],
-        "state": "The seasonal lever"
-      },
-      {
-        "when": "Every month",
-        "name": "You watch all of it",
-        "points": [
-          "This dashboard stays live and fills in as work goes out.",
-          "Every page and post is a link you can click and read for yourself.",
-          "A short monthly readout: what went live, what moved, what is next.",
-          "Anything we have no real source for stays blank instead of being filled in with a number."
-        ],
-        "state": "Ongoing"
-      }
-    ],
-    "note": "No lead volume, ranking position or revenue result is promised on this page. What is committed is the work, the pace it goes out at, and a page like this one where you can check it yourself at any time.",
-    "cta": {
-      "label": "Open your live site",
-      "url": "https://wingdigital26-maker.github.io/jackson-roofing/"
+    "core": {
+      "label": "Site page",
+      "color": "#0aa7e6"
+    },
+    "blog": {
+      "label": "Blog post",
+      "color": "#1bc0ff"
+    },
+    "service": {
+      "label": "Service page",
+      "color": "#06809f"
+    },
+    "city": {
+      "label": "City page",
+      "color": "#33414f"
+    },
+    "gbp": {
+      "label": "Google Business post",
+      "color": "#0d6f8a"
+    },
+    "reviews": {
+      "label": "Review requests",
+      "color": "#4a5c6b"
+    },
+    "other": {
+      "label": "Other",
+      "color": "#7a8a9a"
     }
   },
-
-
   "_referralPartners_comment": "The referral partner asset. Sourced live at build time from ghl-cli/jackson_roofing_leads.db (table leads), so every number on the page is a straight count of rows and nothing is transcribed by hand. HONESTY DECISIONS: (1) emailMask is on, so build.py part hides every address before it reaches the HTML. A texted dashboard link is effectively public and 460 harvestable business addresses must not be published; Chris gets the full file directly. (2) hiddenCategories drops insurance-adjuster (151 rows) from the VISIBLE category breakdown while keeping it inside the headline total, because Texas Insurance Code Chapter 4102 restricts roofers acting as public adjusters and roofer to adjuster outreach is legally sensitive. hidden_note says so on the page, out loud, so the 869 visible plus 151 held back still adds to 1,020 for anyone who checks. Flip this key to an empty list to show them. (3) status is 'staged' on every row in the table, so the claim that nothing has been sent is literally true. (4) No response rate, conversion rate or revenue projection appears anywhere; none exists in the source.",
   "referralPartners": {
     "db": "C:\\Users\\wjack\\ghl-cli\\jackson_roofing_leads.db",
@@ -123,7 +81,6 @@
     "sample_note": "Real rows out of the list, shown as stored. Email addresses are part hidden on purpose: this page gets forwarded, and a page anyone can open holding hundreds of full business addresses is a list anyone can take. You get the complete unmasked file.",
     "note": "What this is, exactly: a built list, enriched where the source allowed it, and never contacted. There is no response rate, no conversion rate and no dollar figure anywhere in this section, because nothing has gone out and any number here would be invented. If we restart, we agree the message with you first, start small, and you see every reply."
   },
-
   "_outreach_comment": "Three cards, all honestly blocked on access, all phrased as forward plans rather than as excuses. Storm and hail targeting is deliberately NOT a card: it needs nothing from Chris, it needs the engagement to restart, so it lives in the plan instead of pretending to be a lane waiting on his login. The social card states the measured result rather than selling the channel.",
   "outreach": {
     "intro": "Nothing is being posted, sent or emailed on your behalf today. These are the lanes we would switch on, and what each one needs from you first.",
@@ -151,22 +108,12 @@
       }
     ]
   },
-
   "_notes_comment": "Overrides the generic subhead on the published list. It names the two places the work lives and, critically, dates the blog posts to the past instead of letting a reader assume they went up this week. It does not claim the posts were checked today, because jacksonroofingco.com blocks us and they were not.",
   "notes": {
-    "published": "Everything Wing Digital put live for you. Twelve blog posts went up on jacksonroofingco.com through July and August 2026. Eleven of them are links you can click; the twelfth published without a URL being recorded on our side, so it is listed here plainly rather than pointed at a guess. The two July items that are not articles were real one-off actions from the same period. The site pages sit on the rebuilt site. Click any title that is a link to open it."
+    "published": "These went up on jacksonroofingco.com through July and August 2026. Eleven open directly. The twelfth published without a link recorded on our side, so it is listed without one rather than guessed at."
   },
-
-  "_sources_comment": "Two sources. (1) git_repo: the real site repo, fast-forwarded to origin/main on 2026-09-06 so it matches the live deploy byte for byte; dates are the first commit that ADDED each file, so 2026-08-10 is a real publish date and not a build stamp. All four URLs curl-verified 200 on 2026-09-06. (2) items_file: the 11 articles published on jacksonroofingco.com, lifted verbatim from the dashboard published 2026-08-28. Their dates are the real publish dates. They CANNOT be curl-verified because that domain Cloudflare-blocks our IP, and nothing on this page claims otherwise.",
+  "_sources_comment": "Two sources. (1) git_repo: the real site repo, matching the live deploy; dates are the first commit that ADDED each file, so 2026-08-10 is a real publish date and not a build stamp. It now reads two globs: the four core pages, and blog/*.html (the five posts added 2026-09-06, blog/index.html excluded so the blog landing page is never counted as an article). All nine URLs curl-verified 200 on 2026-09-06. (2) items_file: the 11 articles published on jacksonroofingco.com, lifted verbatim from the dashboard published 2026-08-28. Their dates are the real publish dates. They CANNOT be curl-verified because that domain Cloudflare-blocks our IP, and nothing on this page claims otherwise.",
   "sources": [
-    {
-      "kind": "git_repo",
-      "repo": "C:\\Users\\wjack\\jackson-roofing-site",
-      "base_url": "https://wingdigital26-maker.github.io/jackson-roofing",
-      "globs": [
-        { "glob": "*.html", "type": "core", "skip": [] }
-      ]
-    },
     {
       "kind": "items_file",
       "path": "history/jackson-roofing-legacy.json",
@@ -181,31 +128,37 @@
       "status": "published"
     }
   ],
-
-  "_pages_comment": "Two groups. The core group is read off the real repo, so it is a real count of real verified URLs. The blog group is built from the items above and its title names the period out loud, so eleven links to a domain we cannot reach today can never be misread as work happening now.",
-  "pages": [
-    {
-      "group": "Core site pages, live now",
-      "icon": "globe",
-      "repo": "C:\\Users\\wjack\\jackson-roofing-site",
-      "base_url": "https://wingdigital26-maker.github.io/jackson-roofing",
-      "dir": "",
-      "skip": []
-    }
-  ],
+  "pages": [],
   "pages_from_items": [
     {
       "group": "Blog posts you can open on your site, July to August 2026",
       "icon": "file",
-      "types": ["blog"]
+      "types": [
+        "blog"
+      ]
     }
   ],
-
   "_pendingMetrics_comment": "Not rendered on the page today (the template hides that section by house rule) but kept as the written record of exactly why this dashboard shows no traffic, ranking, profile or lead numbers. Each one is a missing connection, not a zero.",
   "pendingMetrics": [
-    { "name": "Google Search clicks and impressions", "why": "Needs Search Console access for the site connected to the reporting account", "state": "needs access" },
-    { "name": "Keyword rankings", "why": "Comes online with the same Search Console connection", "state": "needs access" },
-    { "name": "Google Business Profile views and calls", "why": "Needs manager access to the Google Business Profile", "state": "needs access" },
-    { "name": "Calls and form leads", "why": "The contact form does not report back to us, so any lead count here would be a guess", "state": "not connected" }
+    {
+      "name": "Google Search clicks and impressions",
+      "why": "Needs Search Console access for the site connected to the reporting account",
+      "state": "needs access"
+    },
+    {
+      "name": "Keyword rankings",
+      "why": "Comes online with the same Search Console connection",
+      "state": "needs access"
+    },
+    {
+      "name": "Google Business Profile views and calls",
+      "why": "Needs manager access to the Google Business Profile",
+      "state": "needs access"
+    },
+    {
+      "name": "Calls and form leads",
+      "why": "The contact form does not report back to us, so any lead count here would be a guess",
+      "state": "not connected"
+    }
   ]
 }

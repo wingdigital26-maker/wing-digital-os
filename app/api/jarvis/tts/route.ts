@@ -9,7 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 
 // Voice: "Will" (ElevenLabs premade) — young, warm, conversational male.
-// Picked for Zephyr: friendly and a little playful, nothing robotic or grave.
+// Picked for Nimbus: friendly and a little playful, nothing robotic or grave.
 // Livelier settings than the old butler voice: lower stability lets the
 // delivery bounce, higher style leans into personality.
 const VOICE_ID = "bIHbv24MWmeRgasZH58o";

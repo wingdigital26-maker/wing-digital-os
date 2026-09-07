@@ -1,4 +1,4 @@
-/* Wing Digital entity: Zephyr.
+/* Wing Digital entity: Nimbus.
  * Floating orb with counter-rotating orbit rings and a blinking lens.
  * Self-contained interactive SVG component. No dependencies.
  * Usage:
@@ -163,12 +163,12 @@
 
   /* Sound: tiny synthesized cue engine. No files, no libraries, CSP safe.
    * Rules that keep a client dashboard quiet:
-   *  - default OFF, choice persisted in localStorage under zephyr:sound
+   *  - default OFF, choice persisted in localStorage under nimbus:sound
    *  - nothing ever plays until a real user gesture has happened on the page
    *  - the AudioContext is built lazily inside that gesture, never at load
    *  - silent under prefers-reduced-motion, silent if AudioContext is missing
    *  - every cue is under 400ms and peaks at or below 0.09 gain */
-  var SOUND_KEY = 'zephyr:sound';
+  var SOUND_KEY = 'nimbus:sound';
   var sound = (function () {
     var enabled = false, ctx = null, gestured = false;
     try {
@@ -254,7 +254,7 @@
     root.innerHTML = SVG;
     root.setAttribute('role', 'button');
     root.setAttribute('tabindex', '0');
-    root.setAttribute('aria-label', 'Zephyr, the Wing Digital assistant');
+    root.setAttribute('aria-label', 'Nimbus, the Wing Digital assistant');
     root.style.cursor = 'pointer';
     root.addEventListener('keydown', function (e) {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); root.click(); }
@@ -452,7 +452,7 @@
   window.WingMascot = { mount: mount, autoMood: autoMood, sound: sound };
 })();
 
-/* Zephyr assistant panel: a guided, scripted Q&A that makes the entity feel
+/* Nimbus assistant panel: a guided, scripted Q&A that makes the entity feel
  * like an AI you can talk to. No backend needed; swap answerFn for a real
  * API route later without touching the UI. */
 (function () {
@@ -502,13 +502,13 @@
     var p = document.createElement('div');
     p.className = 'wmp';
     p.setAttribute('role', 'dialog');
-    p.setAttribute('aria-label', 'Zephyr assistant');
-    p.innerHTML = '<div class="wmp-head"><span class="dot"></span><b>Zephyr</b>' +
+    p.setAttribute('aria-label', 'Nimbus assistant');
+    p.innerHTML = '<div class="wmp-head"><span class="dot"></span><b>Nimbus</b>' +
       '<span style="color:#8fa3d8;font-size:12px">Wing Digital</span>' +
-      '<button class="wmp-snd" type="button" aria-pressed="false" aria-label="Turn Zephyr sound on"></button>' +
+      '<button class="wmp-snd" type="button" aria-pressed="false" aria-label="Turn Nimbus sound on"></button>' +
       '<button class="wmp-x" aria-label="Close">&times;</button></div>' +
       '<div class="wmp-body"></div><div class="wmp-q"></div>' +
-      '<div class="wmp-ask" hidden><input type="text" maxlength="200" placeholder="Ask Zephyr anything..." aria-label="Ask Zephyr">' +
+      '<div class="wmp-ask" hidden><input type="text" maxlength="200" placeholder="Ask Nimbus anything..." aria-label="Ask Nimbus">' +
       '<button type="button">Ask</button></div>';
     document.body.appendChild(p);
     var body = p.querySelector('.wmp-body');
@@ -561,7 +561,7 @@
         qwrap.appendChild(b);
       });
     }
-    var greetedKey = 'zephyr:greeted';
+    var greetedKey = 'nimbus:greeted';
     function firstOpenOfSession() {
       try {
         if (!window.sessionStorage) return false;
@@ -580,7 +580,7 @@
         mascot.flare();
         /* a greeting flourish the very first time he is opened this session */
         if (firstOpenOfSession() && mascot.pulse && !reduced) mascot.pulse('party', 2200);
-        say(opts.greeting || 'Hey, I am Zephyr. What do you want to know?');
+        say(opts.greeting || 'Hey, I am Nimbus. What do you want to know?');
         renderQuestions();
       } else if (was) {
         sound.play('hush');
@@ -595,7 +595,7 @@
       var on = sound.isEnabled();
       sndBtn.textContent = on ? 'Sound on' : 'Sound off';
       sndBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
-      sndBtn.setAttribute('aria-label', on ? 'Turn Zephyr sound off' : 'Turn Zephyr sound on');
+      sndBtn.setAttribute('aria-label', on ? 'Turn Nimbus sound off' : 'Turn Nimbus sound on');
     }
     paintSound();
     sndBtn.addEventListener('click', function () {
@@ -604,9 +604,9 @@
       if (on) sound.play('blip');
     });
     /* Knowledge base: entries of {k:[keywords], a:'answer html'} from opts.kb or
-     * window.ZEPHYR_KB. Pure client-side keyword scoring; unknown questions get
+     * window.NIMBUS_KB. Pure client-side keyword scoring; unknown questions get
      * an honest fallback, never a made-up answer. */
-    var kb = opts.kb || window.ZEPHYR_KB || null;
+    var kb = opts.kb || window.NIMBUS_KB || null;
     var askRow = p.querySelector('.wmp-ask');
     if (kb && kb.length) {
       askRow.hidden = false;

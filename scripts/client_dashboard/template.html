@@ -1535,9 +1535,9 @@ const DATA = __DATA__;
   })();
 })();
 </script>
-<div id="wing-helper" title="Zephyr, from Wing Digital"
+<div id="wing-helper" title="Nimbus, from Wing Digital"
   style="position:fixed;right:16px;bottom:14px;z-index:60;opacity:0;pointer-events:none;transition:opacity .8s"></div>
-<script src="/mascot/wing-mascot.js?v=11"></script>
+<script src="/mascot/wing-mascot.js?v=12"></script>
 <script>
 (function(){
   if (!window.WingMascot) return;
@@ -1545,12 +1545,12 @@ const DATA = __DATA__;
   if (!slot) return;
   var z = WingMascot.mount(slot, { size: 78 });
   // A sample/preview dashboard carries demo-only brand keys and says SAMPLE in
-  // its subhead; Zephyr must never claim demo rows are delivered work.
+  // its subhead; Nimbus must never claim demo rows are delivered work.
   var isSample = false;
   try {
     isSample = !!(DATA.brand && (DATA.brand.leadsFeed || /sample/i.test(DATA.brand.subhead || '')));
   } catch (e) {}
-  // Data-aware answers: Zephyr can answer questions about THIS dashboard from
+  // Data-aware answers: Nimbus can answer questions about THIS dashboard from
   // its own DATA blob, so counts, dates, and titles are always the real ones.
   var kbLocal = [];
   try {
@@ -1598,14 +1598,14 @@ const DATA = __DATA__;
   var dashFallback = 'Let me point you at what I do know: what published and when, and how current this record is. For anything else, reply to the person who sent you this link and a real person answers fast.';
 
   var chatOpts = isSample ? {
-    greeting: 'Hey, I am Zephyr from Wing Digital. This is a sample dashboard; ask me how the real one works.',
+    greeting: 'Hey, I am Nimbus from Wing Digital. This is a sample dashboard; ask me how the real one works.',
     items: [
       { q: 'What am I looking at?', a: 'A preview built with example content. It shows the exact dashboard a real account gets: blog posts, service pages, city pages, and the systems behind them. The figures here are illustrative, not delivered work.' },
       { q: 'What would my real one show?', a: 'Your own published pages and posts, each linking to the live page on your site, updated as Wing publishes. Real clients watch their site fill in from this exact view.' },
       { q: 'How do I get one?', a: 'Ask the person who sent you this link. Your dashboard turns on in the first week.' }
     ]
   } : {
-    greeting: 'Hey, I am Zephyr from Wing Digital. This dashboard is yours; ask me about it.',
+    greeting: 'Hey, I am Nimbus from Wing Digital. This dashboard is yours; ask me about it.',
     items: [
       { q: 'What am I looking at?', a: 'Everything Wing Digital has published for your business. Every row links to the live page on your site.' },
       { q: 'How current is this?', a: 'It refreshes when we publish. When a new page or post goes live on your site, it shows up here on the next update. No monthly PDF, no waiting.' },
@@ -1632,7 +1632,7 @@ const DATA = __DATA__;
   chatOpts.fallback = dashFallback;
   if (WingMascot.chat) WingMascot.chat(z, chatOpts);
   setTimeout(function(){ slot.style.opacity = 1; slot.style.pointerEvents = 'auto'; z.flare(); }, 1200);
-  // Arrival reaction: Zephyr greets the client based on what REALLY happened.
+  // Arrival reaction: Nimbus greets the client based on what REALLY happened.
   // Signals are computed from the dashboard's own data (published items) plus
   // optional real metrics build.py passed through (e.g. emailsSent30d). Tiers:
   // big week -> party, activity -> excited, 30+ silent days -> pinned dim with

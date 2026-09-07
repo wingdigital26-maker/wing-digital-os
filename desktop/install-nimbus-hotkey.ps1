@@ -1,47 +1,108 @@
-# One-time setup: put Nimbus on a global hotkey using only built-in Windows.
-#
-# Creates a Start Menu shortcut whose hotkey is Ctrl+Shift+N. Windows itself
-# watches that key, so nothing extra runs in the background and nothing needs
-# installing. Press it from anywhere and the Nimbus window opens focused.
+# One-time setup: put Nimbus on a global hotkey.
 #
 #   powershell -ExecutionPolicy Bypass -File .\install-nimbus-hotkey.ps1
 #
-# Undo:  powershell -File .\install-nimbus-hotkey.ps1 -Remove
+# Default is Ctrl+Space. Windows shortcut hotkeys cannot be Ctrl+Space, so that
+# chord is claimed properly by a tiny background listener (nimbus-hotkey.ps1)
+# that starts at login and toggles the window: press to open or focus, press
+# again while it is in front to send it away.
+#
+# Any Ctrl+Shift+<letter> or Ctrl+Alt+<letter> chord is installed the lighter
+# way instead, as a Start Menu shortcut Windows itself watches, with nothing
+# running in the background:
+#
+#   .\install-nimbus-hotkey.ps1 -Hotkey "Ctrl+Shift+N"
+#
+# Undo either of them:  .\install-nimbus-hotkey.ps1 -Remove
 
 param(
   [switch]$Remove,
-  [string]$Hotkey = "Ctrl+Shift+N"
+  [string]$Hotkey = "Ctrl+Space"
 )
 
 $ErrorActionPreference = "Stop"
-$here = Split-Path -Parent $MyInvocation.MyCommand.Path
-$vbs  = Join-Path $here "nimbus.vbs"
-$link = Join-Path ([Environment]::GetFolderPath("Programs")) "Nimbus.lnk"
+$here      = Split-Path -Parent $MyInvocation.MyCommand.Path
+$vbs       = Join-Path $here "nimbus.vbs"
+$listener  = Join-Path $here "nimbus-hotkey.vbs"
+$link      = Join-Path ([Environment]::GetFolderPath("Programs")) "Nimbus.lnk"
+$startup   = Join-Path ([Environment]::GetFolderPath("Startup")) "Nimbus hotkey.lnk"
+
+function Get-ListenerProcesses {
+  # NOTE the leading backslash and the install- exclusion. Matching a bare
+  # "nimbus-hotkey.ps1" also matches THIS script's own command line, and the
+  # installer cheerfully killed itself.
+  Get-CimInstance Win32_Process -Filter "Name = 'powershell.exe'" |
+    Where-Object {
+      $_.CommandLine -and
+      $_.CommandLine -like "*\nimbus-hotkey.ps1*" -and
+      $_.CommandLine -notlike "*install-nimbus-hotkey.ps1*" -and
+      $_.ProcessId -ne $PID
+    }
+}
+
+function Stop-Listener {
+  # The listener holds a named mutex, so killing the powershell that owns the
+  # script is enough; nothing else is left behind.
+  Get-ListenerProcesses | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+}
 
 if ($Remove) {
-  if (Test-Path $link) { Remove-Item $link -Force; Write-Host "Removed $link" }
-  else { Write-Host "Nothing to remove." }
+  Stop-Listener
+  foreach ($f in @($link, $startup)) {
+    if (Test-Path $f) { Remove-Item $f -Force; Write-Host "Removed $f" }
+  }
+  Write-Host "Nimbus is off the hotkey."
   return
 }
 
 if (-not (Test-Path $vbs)) { throw "nimbus.vbs is missing from $here" }
 
-# Windows .lnk hotkeys must include Ctrl+Alt or Ctrl+Shift. Ctrl+Space is not
-# available this way, which is why the AutoHotkey script exists as the
-# alternative for anyone who wants that exact chord.
-$chord = ($Hotkey.ToUpper() -replace "\s", "")
+$chord   = ($Hotkey.ToUpper() -replace "\s", "")
 $keyName = ($chord -split "\+")[-1]
-if ($keyName.Length -ne 1) { throw "Hotkey must end in a single letter, e.g. Ctrl+Shift+N" }
-if (-not ($chord -match "CTRL" -and ($chord -match "SHIFT" -or $chord -match "ALT"))) {
-  throw "Windows shortcut hotkeys need Ctrl+Shift or Ctrl+Alt, e.g. Ctrl+Shift+N"
+$shell   = New-Object -ComObject WScript.Shell
+
+# ── Ctrl+Space (and anything else Windows shortcuts cannot express) ──────────
+if ($keyName -eq "SPACE") {
+  if (-not (Test-Path $listener)) { throw "nimbus-hotkey.vbs is missing from $here" }
+  Stop-Listener
+  if (Test-Path $link) { Remove-Item $link -Force }   # drop the old .lnk chord
+
+  $sc = $shell.CreateShortcut($startup)
+  $sc.TargetPath       = "$env:SystemRoot\System32\wscript.exe"
+  $sc.Arguments        = """$listener"""
+  $sc.WorkingDirectory = $here
+  $sc.WindowStyle      = 7
+  $sc.Description      = "Nimbus hotkey listener"
+  $sc.Save()
+
+  Start-Process -FilePath "$env:SystemRoot\System32\wscript.exe" -ArgumentList """$listener""" -WindowStyle Hidden
+  Start-Sleep -Milliseconds 700
+
+  $running = Get-ListenerProcesses
+  if ($running) {
+    Write-Host "Nimbus is on $Hotkey. Press it to open him, press it again to send him away."
+  } else {
+    Write-Host "The listener did not stay running. Something else may already own $Hotkey."
+    Write-Host "Try: .\install-nimbus-hotkey.ps1 -Hotkey 'Ctrl+Alt+Space'"
+  }
+  Write-Host "Starts again at login: $startup"
+  return
 }
 
-$shell = New-Object -ComObject WScript.Shell
+# ── Ctrl+Shift+<letter> / Ctrl+Alt+<letter>: no background process needed ────
+if ($keyName.Length -ne 1) { throw "Hotkey must end in a single letter or be Ctrl+Space" }
+if (-not ($chord -match "CTRL" -and ($chord -match "SHIFT" -or $chord -match "ALT"))) {
+  throw "Windows shortcut hotkeys need Ctrl+Shift or Ctrl+Alt, for example Ctrl+Shift+N"
+}
+
+Stop-Listener
+if (Test-Path $startup) { Remove-Item $startup -Force }
+
 $sc = $shell.CreateShortcut($link)
 $sc.TargetPath       = "$env:SystemRoot\System32\wscript.exe"
 $sc.Arguments        = """$vbs"""
 $sc.WorkingDirectory = $here
-$sc.WindowStyle      = 7                       # minimized, no flash
+$sc.WindowStyle      = 7
 $sc.Description      = "Open Nimbus"
 $sc.IconLocation     = "$env:SystemRoot\System32\shell32.dll,13"
 $sc.Hotkey           = $chord

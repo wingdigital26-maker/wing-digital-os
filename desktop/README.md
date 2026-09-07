@@ -1,7 +1,7 @@
 # Nimbus on your machine
 
 Phase 1 of the build spec: Nimbus a keystroke away, in his own window, with no
-console box and nothing extra running in the background.
+console box.
 
 ## Install (one command)
 
@@ -9,12 +9,27 @@ console box and nothing extra running in the background.
 powershell -ExecutionPolicy Bypass -File .\install-nimbus-hotkey.ps1
 ```
 
-That creates a Start Menu shortcut whose hotkey is **Ctrl+Shift+N**. Windows
-itself watches the key, so there is no daemon. Press it anywhere and Nimbus
-opens in a frameless Chrome app window: **Nimbus alone, not the OS**, with his
-panel filling the window and a small "Open the OS" link bottom right for when
-you do want the full thing. Press it again while the window is behind something
-and it comes to the front instead of opening a second one.
+That puts Nimbus on **Ctrl+Space**. Press it anywhere and he opens in a
+frameless Chrome app window: **Nimbus alone, not the OS**, with his panel
+filling the window and a small "Open the OS" link for when you do want the full
+thing. Press it again while he is in front and he goes away.
+
+Undo: `powershell -File .\install-nimbus-hotkey.ps1 -Remove`
+
+**How Ctrl+Space works.** Windows shortcut hotkeys have to include Ctrl+Shift or
+Ctrl+Alt, so Ctrl+Space cannot be a shortcut. A small listener
+(`nimbus-hotkey.ps1`) claims the chord properly through RegisterHotKey and runs
+hidden from a Startup shortcut. If something else already owns Ctrl+Space it
+says so once and exits, rather than sitting there doing nothing. In that case
+pick another chord:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install-nimbus-hotkey.ps1 -Hotkey "Ctrl+Alt+Space"
+```
+
+Any `Ctrl+Shift+<letter>` or `Ctrl+Alt+<letter>` chord is installed the lighter
+way instead, as a Start Menu shortcut Windows itself watches, with nothing
+running in the background at all.
 
 **No login.** The window carries a machine key (`NIMBUS_LOCAL_KEY` in
 `.env.local`, generated on install) that opens the Nimbus page and his own API
@@ -31,23 +46,16 @@ a password exactly as before. Clear it by deleting the line from `.env.local`.
   confirmation cards in that mode, which is the trade for it being able to do
   real work. The choice is remembered per machine.
 
-Undo: `powershell -File .\install-nimbus-hotkey.ps1 -Remove`
-
-## Why not Ctrl+Space
-
-Windows shortcut hotkeys have to include Ctrl+Shift or Ctrl+Alt, so Ctrl+Space
-is not reachable without extra software. If you want that exact chord, install
-AutoHotkey v2 and run `nimbus.ahk`, which toggles the window with Ctrl+Space.
-Both routes end at the same `nimbus.vbs`.
-
 ## Files
 
 | File | What it does |
 | --- | --- |
-| `install-nimbus-hotkey.ps1` | Creates or removes the hotkey shortcut. |
-| `nimbus.vbs` | Hidden launcher. No console box, ever. |
+| `install-nimbus-hotkey.ps1` | Installs or removes the hotkey, either way. |
+| `nimbus-hotkey.ps1` | The Ctrl+Space listener. Hidden message loop, toggles the window. |
+| `nimbus-hotkey.vbs` | Starts the listener with no console box. |
+| `nimbus.vbs` | Opens the window itself, also with no console box. |
 | `nimbus.ps1` | Opens or focuses the app window. Says so plainly if the OS is not running. |
-| `nimbus.ahk` | Optional Ctrl+Space toggle, needs AutoHotkey v2. |
+| `nimbus.ahk` | Optional AutoHotkey version of the same toggle, if you would rather use that. |
 
 Set `NIMBUS_PORT` if the OS is not on 3000.
 

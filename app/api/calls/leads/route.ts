@@ -29,7 +29,60 @@ type Lead = {
   next_action_at: string | null;
   assigned_to: string | null;
   assigned_to_email: string | null;
+  // Dial-sheet intel (migration 0032). Every one is nullable: the backfill
+  // lands progressively, so a row with none of it is normal, not an error.
+  angle: string | null;
+  cautions: unknown;
+  chips: unknown;
+  socials: unknown;
+  google_reviews: number | null;
+  google_rating: number | null;
+  site_pages: number | null;
+  has_blog: boolean | null;
+  service_pages: number | null;
 };
+
+// Buy-likelihood tier. A separate pipeline owns this column and is still
+// choosing its name, so the room discovers it instead of assuming one. If none
+// of these exist yet, the tier pills simply do not appear and everything else
+// works exactly as before.
+const TIER_COLUMN_CANDIDATES = ["tier", "buy_tier", "lead_tier", "likelihood_tier"] as const;
+const TIER_VALUES = ["A", "B", "C"] as const;
+
+let tierColumnCache: { name: string | null; at: number } | null = null;
+const TIER_CACHE_MS = 60_000;
+
+// Ask PostgREST for one row of a candidate column. A missing column 400s, which
+// is the signal we want; a real row (or an empty table) 200s.
+async function columnExists(table: string, column: string): Promise<boolean> {
+  const url = sbUrl();
+  const key = sbService();
+  if (!url || !key) return false;
+  try {
+    const r = await fetch(`${url}/rest/v1/${table}?select=${column}&limit=1`, {
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+      cache: "no-store",
+    });
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function tierColumn(): Promise<string | null> {
+  if (tierColumnCache && Date.now() - tierColumnCache.at < TIER_CACHE_MS) {
+    return tierColumnCache.name;
+  }
+  let found: string | null = null;
+  for (const c of TIER_COLUMN_CANDIDATES) {
+    if (await columnExists("call_leads", c)) {
+      found = c;
+      break;
+    }
+  }
+  tierColumnCache = { name: found, at: Date.now() };
+  return found;
+}
 
 // Every status a lead can sit at. Counts are computed per status with real
 // count queries so the pills are true even when only a page of rows is sent.
@@ -116,15 +169,25 @@ export async function GET(req: Request) {
         : `assigned_to_email=eq.${encodeURIComponent(assigned.toLowerCase())}`
     );
   }
+  // Buy-likelihood tier filter. The column name is discovered, never assumed,
+  // and the clause is only added when the column really exists -- otherwise a
+  // caller tapping a stale pill would 400 the whole list.
+  const tierName = await tierColumn();
+  const tier = url.searchParams.get("tier");
+  const baseBeforeTier = [...base];
+  if (tierName && tier && tier !== "all") {
+    base.push(`${tierName}=ilike.${encodeURIComponent(tier)}`);
+  }
+
   if (q) {
     const safe = q.replace(/[(),*]/g, " ").trim();
     if (safe) {
       const pat = `*${safe}*`;
-      base.push(
-        `or=(company.ilike.${encodeURIComponent(pat)},contact_name.ilike.${encodeURIComponent(
-          pat
-        )},city.ilike.${encodeURIComponent(pat)},vertical.ilike.${encodeURIComponent(pat)})`
-      );
+      const clause = `or=(company.ilike.${encodeURIComponent(pat)},contact_name.ilike.${encodeURIComponent(
+        pat
+      )},city.ilike.${encodeURIComponent(pat)},vertical.ilike.${encodeURIComponent(pat)})`;
+      base.push(clause);
+      baseBeforeTier.push(clause);
     }
   }
 
@@ -143,13 +206,25 @@ export async function GET(req: Request) {
   // Rows, per-status counts, and the total for the current query all run in
   // parallel. Counts are computed with count=exact HEAD requests against the
   // full table, so they are true regardless of the page size.
-  const [rows, total, ...statusCounts] = await Promise.all([
+  const [rows, total, ...allCounts] = await Promise.all([
     sbGet<Lead>("call_leads", rowParts.join("&")),
     sbCount("call_leads", ["select=id", ...base, ...statusPart].join("&")),
     ...STATUSES.map((s) =>
       sbCount("call_leads", ["select=id", ...base, `status=eq.${s}`].join("&"))
     ),
+    // Tier counts describe the current status/sheet/search view but ignore the
+    // tier filter itself, so the pills never zero each other out.
+    ...(tierName
+      ? TIER_VALUES.map((t) =>
+          sbCount(
+            "call_leads",
+            ["select=id", ...baseBeforeTier, ...statusPart, `${tierName}=ilike.${t}`].join("&")
+          )
+        )
+      : []),
   ]);
+  const statusCounts = allCounts.slice(0, STATUSES.length);
+  const tierCountsRaw = allCounts.slice(STATUSES.length);
   if (rows === null) {
     return NextResponse.json({ error: "could not read leads" }, { status: 502 });
   }
@@ -182,6 +257,18 @@ export async function GET(req: Request) {
     new Set((assignedRows ?? []).map((r) => (r.assigned_to_email ?? "").toLowerCase()).filter(Boolean))
   ).sort();
 
+  // Counts are published whenever the column exists, zeroes included. The UI
+  // hides the pills while every count is zero, but it still needs the numbers
+  // to know that -- and a caller who arrives on a ?tier= link that matches
+  // nothing must still be shown a pill that clears it.
+  const tierCounts: Record<string, number> = {};
+  if (tierName) {
+    TIER_VALUES.forEach((t, i) => {
+      const n = tierCountsRaw[i];
+      if (n !== null && n !== undefined) tierCounts[t] = n;
+    });
+  }
+
   const trueTotal = total ?? offset + rows.length;
   return NextResponse.json({
     leads,
@@ -191,6 +278,8 @@ export async function GET(req: Request) {
     limit,
     offset,
     assignedEmails,
+    tierField: tierName,
+    tierCounts,
     me: { email: user.email, role: user.role, isAdmin: user.isAdmin },
   });
 }

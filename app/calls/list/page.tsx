@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import SignalLinks from "../SignalLinks";
 import { displayName } from "../names";
 
@@ -28,6 +29,96 @@ type Lead = {
   excluded: boolean | null;
   excluded_reason: string | null;
   assigned_to_email: string | null;
+  // Dial-sheet intel. All optional: the enrichment backfill lands row by row,
+  // so most of these are null on most leads and the UI must simply say less.
+  angle?: string | null;
+  cautions?: unknown;
+  chips?: unknown;
+  socials?: unknown;
+  google_reviews?: number | null;
+  google_rating?: number | null;
+  site_pages?: number | null;
+  has_blog?: boolean | null;
+  service_pages?: number | null;
+  // Buy-likelihood tier. The column name is chosen by the enrichment pipeline
+  // and reported by the API as `tierField`, so it is read dynamically.
+  [key: string]: unknown;
+};
+
+type Chip = { label: string; tone: string };
+type Social = { platform: string; handle: string | null; url: string | null };
+
+// jsonb comes back parsed, but a column backfilled as text arrives as a JSON
+// string. Accept both, and treat anything else as "nothing to show".
+const asArray = (v: unknown): unknown[] => {
+  if (Array.isArray(v)) return v;
+  if (typeof v === "string" && v.trim().startsWith("[")) {
+    try {
+      const p = JSON.parse(v);
+      return Array.isArray(p) ? p : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+};
+
+const str = (v: unknown): string => (typeof v === "string" ? v.trim() : v == null ? "" : String(v).trim());
+
+// Evidence chips: {label, tone} where tone is has | miss | neutral. A bare
+// string is accepted too and rendered neutral.
+const readChips = (v: unknown): Chip[] =>
+  asArray(v)
+    .map((c) => {
+      if (typeof c === "string") return { label: c.trim(), tone: "neutral" };
+      if (c && typeof c === "object") {
+        const o = c as Record<string, unknown>;
+        return { label: str(o.label ?? o.text ?? o.name), tone: str(o.tone) || "neutral" };
+      }
+      return { label: "", tone: "neutral" };
+    })
+    .filter((c) => c.label);
+
+const readCautions = (v: unknown): string[] =>
+  asArray(v)
+    .map((c) => (typeof c === "string" ? c.trim() : str((c as Record<string, unknown>)?.text)))
+    .filter(Boolean);
+
+// Only accounts the enrichment could confirm reach this column. Anything that
+// was merely name-matched belongs in cautions, so nothing here is hedged.
+const readSocials = (v: unknown): Social[] =>
+  asArray(v)
+    .map((s) => {
+      if (!s || typeof s !== "object") return null;
+      const o = s as Record<string, unknown>;
+      const platform = str(o.platform ?? o.network ?? o.site);
+      const handle = str(o.handle ?? o.username);
+      const url = str(o.url ?? o.link);
+      if (!platform && !handle && !url) return null;
+      return { platform: platform || "Profile", handle: handle || null, url: url || null };
+    })
+    .filter(Boolean) as Social[];
+
+const chipTone = (tone: string): { fg: string; bg: string; bd: string } => {
+  const t = tone.toLowerCase();
+  if (t === "has" || t === "good" || t === "yes") return { fg: "#4ade80", bg: "rgba(34,197,94,0.10)", bd: "rgba(34,197,94,0.30)" };
+  if (t === "miss" || t === "gap" || t === "no") return { fg: "#fbbf24", bg: "rgba(251,191,36,0.10)", bd: "rgba(251,191,36,0.30)" };
+  return { fg: "var(--text-muted)", bg: "var(--bg-hover)", bd: "var(--border)" };
+};
+
+// Tier values arrive as "A" / "b" / "tier-c" / "not callable". Normalise to a
+// single letter, or null when it is not one of the three callable tiers.
+const readTier = (v: unknown): "A" | "B" | "C" | null => {
+  const t = str(v).toUpperCase();
+  const m = t.match(/(?:^|[^A-Z])([ABC])(?:$|[^A-Z])/) ?? t.match(/^([ABC])$/);
+  if (t.includes("NOT")) return null;
+  return (m?.[1] as "A" | "B" | "C") ?? null;
+};
+
+const TIER_META: Record<string, { label: string; tone: string }> = {
+  A: { label: "A", tone: "#4ade80" },
+  B: { label: "B", tone: "#38bdf8" },
+  C: { label: "C", tone: "#94a3b8" },
 };
 
 // "maddox@wingdigital.co" -> "Maddox's sheet". Names come from the data, never
@@ -91,6 +182,9 @@ export default function CallRoom() {
   const [filter, setFilter] = useState("new");
   const [assigned, setAssigned] = useState("all");
   const [assignedEmails, setAssignedEmails] = useState<string[]>([]);
+  const [tier, setTier] = useState("all");
+  const [tierField, setTierField] = useState<string | null>(null);
+  const [tierCounts, setTierCounts] = useState<Record<string, number>>({});
   const [q, setQ] = useState("");
   const [active, setActive] = useState<Lead | null>(null);
   const [history, setHistory] = useState<Activity[]>([]);
@@ -108,11 +202,12 @@ export default function CallRoom() {
   // the first page.
   useEffect(() => {
     setPageSize(PAGE);
-  }, [filter, assigned, q]);
+  }, [filter, assigned, q, tier]);
 
   const load = useCallback(async () => {
     const p = new URLSearchParams({ status: filter, limit: String(pageSize), offset: "0" });
     if (assigned !== "all") p.set("assigned", assigned);
+    if (tier !== "all") p.set("tier", tier);
     if (q.trim()) p.set("q", q.trim());
     const r = await fetch(`/api/calls/leads?${p}`, { cache: "no-store" });
     if (!r.ok) {
@@ -132,10 +227,12 @@ export default function CallRoom() {
     setTotal(typeof d.total === "number" ? d.total : rows.length);
     setHasMore(Boolean(d.hasMore));
     setAssignedEmails(d.assignedEmails ?? []);
+    setTierField(d.tierField ?? null);
+    setTierCounts(d.tierCounts ?? {});
     setMe(d.me ?? null);
     setError(null);
     setLoading(false);
-  }, [filter, assigned, q, pageSize]);
+  }, [filter, assigned, q, tier, pageSize]);
 
   useEffect(() => {
     load();
@@ -219,6 +316,32 @@ export default function CallRoom() {
     load();
   }
 
+  // Everything the list card needs from the jsonb columns is derived ONCE per
+  // load, keyed by lead id, so scrolling hundreds of rows never re-parses JSON.
+  const derived = useMemo(() => {
+    const m = new Map<string, { chips: Chip[]; cautions: number; tier: "A" | "B" | "C" | null }>();
+    for (const l of leads) {
+      m.set(l.id, {
+        chips: readChips(l.chips).slice(0, 4),
+        cautions: readCautions(l.cautions).length,
+        tier: tierField ? readTier(l[tierField]) : null,
+      });
+    }
+    return m;
+  }, [leads, tierField]);
+
+  const activeIntel = useMemo(() => {
+    if (!active) return null;
+    return {
+      angle: str(active.angle),
+      chips: readChips(active.chips),
+      cautions: readCautions(active.cautions),
+      socials: readSocials(active.socials),
+      tier: tierField ? readTier(active[tierField]) : null,
+      tierReason: tierField ? str(active[`${tierField}_reason`]) : "",
+    };
+  }, [active, tierField]);
+
   const shown = useMemo(() => leads, [leads]);
 
   return (
@@ -262,6 +385,29 @@ export default function CallRoom() {
               </button>
             );
           })}
+          {/* Buy-likelihood pills, in the same row as the status filters. They
+              appear only once the enrichment has tiered at least one lead. */}
+          {(Object.values(tierCounts).some((n) => n > 0) || tier !== "all") && (
+            <>
+              <span style={{ width: 1, alignSelf: "stretch", background: "var(--border)", margin: "0 2px" }} />
+              {[{ key: "all", label: "Any tier" }, ...["A", "B", "C"].filter((t) => (tierCounts[t] ?? 0) > 0).map((t) => ({ key: t, label: `Tier ${t}` }))].map((f) => {
+                const on = tier === f.key;
+                const tone = TIER_META[f.key]?.tone ?? "#3D6BF0";
+                const n = f.key === "all" ? null : tierCounts[f.key] ?? 0;
+                return (
+                  <button key={f.key} onClick={() => setTier(f.key)} style={{
+                    ...chip,
+                    background: on ? `${tone}22` : "var(--bg-card)",
+                    borderColor: on ? tone : "var(--border)",
+                    color: on ? tone : "var(--text-muted)",
+                    fontWeight: on ? 700 : 500,
+                  }}>
+                    {f.label} {n !== null && n > 0 && <span style={{ opacity: 0.75 }}>{n}</span>}
+                  </button>
+                );
+              })}
+            </>
+          )}
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
@@ -337,11 +483,47 @@ export default function CallRoom() {
                       on a call with {l.claimed_by_email ? displayName(l.claimed_by_email) : "someone"}
                     </span>
                   )}
+                  {(() => {
+                    const d = derived.get(l.id);
+                    if (!d) return null;
+                    return (
+                      <>
+                        {d.tier && (
+                          <span
+                            title="How likely they are to buy"
+                            style={{ ...pill, borderColor: TIER_META[d.tier].tone, color: TIER_META[d.tier].tone }}
+                          >
+                            tier {d.tier}
+                          </span>
+                        )}
+                        {d.cautions > 0 && (
+                          <span
+                            title={`${d.cautions} thing${d.cautions === 1 ? "" : "s"} to check before you dial`}
+                            style={{ ...pill, borderColor: "#fbbf24", color: "#fbbf24" }}
+                          >
+                            ! check {d.cautions}
+                          </span>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
                 <p style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 4 }}>
                   {[l.contact_name, isResearchDump(l.title) ? null : l.title, l.city, l.vertical, l.employees ? `${l.employees} emp` : null]
                     .filter(Boolean).join(" · ")}
                 </p>
+                {(derived.get(l.id)?.chips.length ?? 0) > 0 && (
+                  <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginTop: 6 }}>
+                    {derived.get(l.id)!.chips.map((c, i) => {
+                      const t = chipTone(c.tone);
+                      return (
+                        <span key={i} style={{ ...miniChip, color: t.fg, background: t.bg, borderColor: t.bd }}>
+                          {c.label}
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
                 {isResearchDump(l.title) && (
                   <details style={{ marginTop: 5 }}>
                     <summary style={{ fontSize: 12, color: "var(--text-muted)", cursor: "pointer" }}>
@@ -408,8 +590,11 @@ export default function CallRoom() {
         </div>
       </div>
 
-      {/* call panel */}
-      {active && (
+      {/* call panel. Portalled to <body> because the app shell puts the sticky
+          header in a stacking context this component sits below -- without the
+          portal a tall panel (one carrying an angle) has its top, including the
+          company name, painted over by the nav. */}
+      {active && createPortal(
         <div
           onClick={(e) => e.target === e.currentTarget && closeLead()}
           style={{
@@ -435,6 +620,66 @@ export default function CallRoom() {
               <button onClick={() => closeLead()} style={btnGhost}>Close</button>
             </div>
 
+            {/* The angle is the first thing on the panel because it is the last
+                thing read before the call connects. */}
+            {activeIntel?.angle && (
+              <div style={{
+                marginTop: 14, padding: "13px 15px", borderRadius: 12,
+                background: "linear-gradient(135deg,rgba(61,107,240,0.16),rgba(30,68,184,0.10))",
+                border: "1px solid rgba(61,107,240,0.45)",
+              }}>
+                <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: "#93b4ff", fontWeight: 700 }}>
+                  Say this
+                </p>
+                <p style={{ fontSize: 15.5, lineHeight: 1.5, marginTop: 6, fontWeight: 600 }}>
+                  {activeIntel.angle}
+                </p>
+              </div>
+            )}
+
+            {activeIntel?.tier && (
+              <p style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 12, lineHeight: 1.45 }}>
+                <span style={{ ...pill, borderColor: TIER_META[activeIntel.tier].tone, color: TIER_META[activeIntel.tier].tone, marginRight: 7 }}>
+                  tier {activeIntel.tier}
+                </span>
+                {activeIntel.tierReason || "How likely they are to buy."}
+              </p>
+            )}
+
+            {(activeIntel?.chips.length ?? 0) > 0 && (
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 12 }}>
+                {activeIntel!.chips.map((c, i) => {
+                  const t = chipTone(c.tone);
+                  return (
+                    <span key={i} style={{ ...miniChip, fontSize: 12, padding: "5px 10px", color: t.fg, background: t.bg, borderColor: t.bd }}>
+                      {c.label}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+
+            {(activeIntel?.socials.length ?? 0) > 0 && (
+              <div style={{ marginTop: 14 }}>
+                <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: "var(--text-muted)", fontWeight: 700 }}>
+                  Where they post
+                </p>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 7 }}>
+                  {activeIntel!.socials.map((sc, i) =>
+                    sc.url ? (
+                      <a key={i} href={sc.url} target="_blank" rel="noreferrer" style={btnGhost}>
+                        {sc.platform}{sc.handle ? ` ${sc.handle}` : ""}
+                      </a>
+                    ) : (
+                      <span key={i} style={{ ...btnGhost, cursor: "default" }}>
+                        {sc.platform}{sc.handle ? ` ${sc.handle}` : ""}
+                      </span>
+                    )
+                  )}
+                </div>
+              </div>
+            )}
+
             {isResearchDump(active.title) && (
               <details style={{ marginTop: 10 }}>
                 <summary style={{ fontSize: 12.5, color: "var(--text-muted)", cursor: "pointer", fontWeight: 600 }}>
@@ -457,6 +702,24 @@ export default function CallRoom() {
                 <p style={{ fontSize: 13, marginTop: 5, lineHeight: 1.5 }}>
                   <SignalLinks signals={displaySignals(active.signals)!} company={active.company} city={active.city} website={active.website} />
                 </p>
+              </div>
+            )}
+
+            {/* Facts the enrichment could NOT confirm. Directly above the phone
+                button so it is impossible to dial past. */}
+            {(activeIntel?.cautions.length ?? 0) > 0 && (
+              <div style={{
+                marginTop: 16, padding: "13px 15px", borderRadius: 12,
+                background: "rgba(251,191,36,0.10)", border: "1px solid rgba(251,191,36,0.45)",
+              }}>
+                <p style={{ fontSize: 11.5, textTransform: "uppercase", letterSpacing: 0.6, color: "#fbbf24", fontWeight: 800 }}>
+                  Check before you dial
+                </p>
+                <ul style={{ margin: "7px 0 0", paddingLeft: 18 }}>
+                  {activeIntel!.cautions.map((c, i) => (
+                    <li key={i} style={{ fontSize: 13, lineHeight: 1.5, marginTop: i ? 4 : 0 }}>{c}</li>
+                  ))}
+                </ul>
               </div>
             )}
 
@@ -544,7 +807,8 @@ export default function CallRoom() {
               finish scheduling.
             </p>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
@@ -556,6 +820,10 @@ const card: React.CSSProperties = {
 };
 const chip: React.CSSProperties = {
   padding: "7px 13px", borderRadius: 999, border: "1px solid", fontSize: 12.5, cursor: "pointer",
+};
+const miniChip: React.CSSProperties = {
+  padding: "3px 8px", borderRadius: 7, border: "1px solid",
+  fontSize: 11, fontWeight: 600, lineHeight: 1.35, whiteSpace: "nowrap",
 };
 const pill: React.CSSProperties = {
   padding: "2px 8px", borderRadius: 999, border: "1px solid", fontSize: 10.5, fontWeight: 700,

@@ -34,6 +34,7 @@ RAW = "https://raw.githubusercontent.com/wingdigital26-maker/wing-dial-sheet/mas
 SHEETS = [
     ("index.html", "wing-dial-sheet"),
     ("verified/index.html", "wing-dial-sheet-verified"),
+    ("high/index.html", "wing-dial-sheet-high"),
 ]
 MADDOX_ID = "b31af255-1720-4b7d-a126-1e6e23ba8791"
 MADDOX_EMAIL = "maddox@wingdigital.co"

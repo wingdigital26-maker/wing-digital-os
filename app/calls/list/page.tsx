@@ -8,6 +8,7 @@ type Lead = {
   id: string;
   company: string;
   contact_name: string | null;
+  contact_title: string | null;
   title: string | null;
   phone: string | null;
   email: string | null;
@@ -155,6 +156,7 @@ type Activity = {
 };
 
 const OUTCOMES: { key: string; label: string; tone: string }[] = [
+  { key: "signed", label: "Signed", tone: "#10b981" },
   { key: "booked", label: "Booked a call", tone: "#22c55e" },
   { key: "callback", label: "Call back later", tone: "#eab308" },
   { key: "contacted", label: "Spoke, no yes", tone: "#38bdf8" },
@@ -164,11 +166,23 @@ const OUTCOMES: { key: string; label: string; tone: string }[] = [
   { key: "dnc", label: "Do not call", tone: "#ef4444" },
 ];
 
+// The outcomes that cover nearly every cold call, offered one tap deep on the
+// card itself. Anything rarer (do not call, bad number, notes, a callback date)
+// still lives in the panel.
+const QUICK: { key: string; short: string; tone: string }[] = [
+  { key: "signed", short: "Signed", tone: "#10b981" },
+  { key: "booked", short: "Booked", tone: "#22c55e" },
+  { key: "callback", short: "Call back", tone: "#eab308" },
+  { key: "no_answer", short: "No answer", tone: "#94a3b8" },
+  { key: "not_interested", short: "Not interested", tone: "#f97316" },
+];
+
 const FILTERS = [
   { key: "new", label: "Not called yet" },
   { key: "callback", label: "Call backs" },
   { key: "contacted", label: "Spoken to" },
   { key: "booked", label: "Booked" },
+  { key: "signed", label: "Signed" },
   { key: "all", label: "Everything" },
 ];
 
@@ -313,6 +327,28 @@ export default function CallRoom() {
     setTimeout(() => setFlash(null), 3500);
     setActive(null);
     setHistory([]);
+    load();
+  }
+
+  // Log an outcome straight off the list card, the way the dial sheet does it.
+  // Opening the panel to record "no answer" is three taps for the most common
+  // result of a cold call, and the sheet Maddox already works needs one.
+  async function quickLog(lead: Lead, outcome: string) {
+    setBusy(true);
+    setError(null);
+    const r = await fetch("/api/calls/disposition", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ leadId: lead.id, outcome }),
+    });
+    setBusy(false);
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok && r.status !== 207) {
+      setError(d.error ?? "Could not save that");
+      return;
+    }
+    setFlash(`${lead.company}: ${OUTCOMES.find((o) => o.key === outcome)?.label ?? outcome}`);
+    setTimeout(() => setFlash(null), 3000);
     load();
   }
 
@@ -508,8 +544,27 @@ export default function CallRoom() {
                     );
                   })()}
                 </div>
-                <p style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 4 }}>
-                  {[l.contact_name, isResearchDump(l.title) ? null : l.title, l.city, l.vertical, l.employees ? `${l.employees} emp` : null]
+                {/* Who to ask for is the first thing a caller needs and it used
+                    to be one comma-separated item in a muted grey line. It gets
+                    its own line, in the body colour, at the size of a thing you
+                    read rather than scan. */}
+                {l.contact_name ? (
+                  <p style={{ fontSize: 14, marginTop: 5, fontWeight: 700 }}>
+                    <span style={{ color: "var(--text-muted)", fontWeight: 600 }}>Ask for </span>
+                    {l.contact_name}
+                    {l.contact_title && (
+                      <span style={{ color: "var(--text-muted)", fontWeight: 500 }}>
+                        {" "}· {l.contact_title}
+                      </span>
+                    )}
+                  </p>
+                ) : (
+                  <p style={{ fontSize: 13, marginTop: 5, color: "var(--text-muted)", fontStyle: "italic" }}>
+                    No name yet, ask who handles marketing
+                  </p>
+                )}
+                <p style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 3 }}>
+                  {[isResearchDump(l.title) ? null : l.title, l.city, l.vertical, l.employees ? `${l.employees} emp` : null]
                     .filter(Boolean).join(" · ")}
                 </p>
                 {(derived.get(l.id)?.chips.length ?? 0) > 0 && (
@@ -545,6 +600,33 @@ export default function CallRoom() {
                     {l.last_called_at ? ` · last ${new Date(l.last_called_at).toLocaleDateString()}` : ""}
                   </p>
                 )}
+
+                {/* One tap to record how the call went, same as the dial sheet.
+                    The four that cover nearly every call; the rest, and notes,
+                    stay in the panel. */}
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
+                  {QUICK.map((o) => {
+                    const on = l.status === o.key;
+                    return (
+                      <button
+                        key={o.key}
+                        onClick={(e) => { e.stopPropagation(); quickLog(l, o.key); }}
+                        disabled={busy}
+                        style={{
+                          ...miniChip,
+                          cursor: busy ? "not-allowed" : "pointer",
+                          fontWeight: 700,
+                          color: on ? "#0b1220" : o.tone,
+                          background: on ? o.tone : "transparent",
+                          borderColor: o.tone,
+                          opacity: busy ? 0.5 : 1,
+                        }}
+                      >
+                        {o.short}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
@@ -612,9 +694,21 @@ export default function CallRoom() {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
               <div>
                 <h2 style={{ fontSize: 20, fontWeight: 800 }}>{active.company}</h2>
-                <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 3 }}>
-                  {[active.contact_name, isResearchDump(active.title) ? null : active.title]
-                    .filter(Boolean).join(" · ") || "No named contact"}
+                {/* The name he asks for, at a size he can read while the phone
+                    is already ringing. */}
+                {active.contact_name ? (
+                  <p style={{ fontSize: 17, fontWeight: 800, marginTop: 5 }}>
+                    <span style={{ color: "var(--text-muted)", fontWeight: 600, fontSize: 14 }}>Ask for </span>
+                    {active.contact_name}
+                  </p>
+                ) : (
+                  <p style={{ fontSize: 13.5, color: "var(--text-muted)", marginTop: 5, fontStyle: "italic" }}>
+                    No name yet, ask who handles marketing
+                  </p>
+                )}
+                <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 2 }}>
+                  {[active.contact_title, isResearchDump(active.title) ? null : active.title]
+                    .filter(Boolean).join(" · ")}
                 </p>
               </div>
               <button onClick={() => closeLead()} style={btnGhost}>Close</button>

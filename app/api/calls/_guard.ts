@@ -129,6 +129,7 @@ export async function sbPost<T = unknown>(
 export const CLAIM_MINUTES = 20;
 
 export const OUTCOMES = [
+  "signed",
   "contacted",
   "callback",
   "booked",

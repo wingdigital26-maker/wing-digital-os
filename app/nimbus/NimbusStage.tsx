@@ -137,6 +137,9 @@ const FLOOR = 18; // reflection height; its -8 margin cancels the gap above it
 // on the body, so it sits outside the body's own offsetHeight and has to be
 // paid for here or the plan quietly overruns the room by exactly this much.
 const BODY_TOP = 10;
+// Breathing room between the last row and the chat below it. Fitting exactly
+// means any late growth lands on top of the card.
+const BODY_BOTTOM = 12;
 
 // Fallbacks used only for the very first frame, before anything has been
 // measured. They are deliberately generous: over-reserving shrinks the orb a
@@ -164,6 +167,7 @@ function planLayout({ w, room, bodyFull, dateCost, chipsCost }: PlanInput): Layo
   const spaceFor = (withDate: boolean, withChips: boolean) =>
     room -
     PAD -
+    BODY_BOTTOM -
     HERO_GAP -
     BODY_TOP -
     (bodyFull - (withDate ? 0 : dateCost) - (withChips ? 0 : chipsCost)) -

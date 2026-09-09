@@ -1,22 +1,120 @@
 {
-  "_comment": "Real PUBLISHED work from the WordPress era on jacksonroofingco.com. Reconciled 2026-09-06 against the authoritative content-engine record at C:\\Users\\wjack\\ghl-cli\\outreach_logs\\jackson-content-state.json, which holds 15 rows with status=published. Only status=published rows are carried here; planned/drafted rows were internal scheduling state and are deliberately dropped. RECONCILIATION, all deliberate: (1) 'Getting Your North Texas Roof Ready for Hail Season' is logged twice, on 2026-08-11 and 2026-08-28, with the SAME url, so it is one post published once. It is listed once here at its FIRST publish date, 2026-08-11, which is the date that is true. The earlier version of this file carried it at 2026-08-28; that was the re-run, not the publish. (2) That leaves 12 unique blog posts, not 11. The twelfth, 'How Long Does a Roof Last in North Texas?' (2026-07-21), is recorded as published with no url captured, so it is listed here with an empty url and renders as a non-linked row. No url is invented for it. (3) The two non-blog rows on 2026-07-20 were real actions, not articles, and carry their own types (gbp, reviews) so they read as the Google Business post and the review requests they actually were rather than padding the blog count. Their titles are rewritten to drop the internal tool name from the source file. (4) jacksonroofingco.com Cloudflare-blocks our IP so none of these urls can be re-verified from here; they were real when published and Chris can reach his own site.",
-  "base_url": "https://jacksonroofingco.com",
-  "blog_posts": [
-    {"date":"2026-08-28","title":"How to Choose a Roofer in Allen Without Getting Burned","url":"https://jacksonroofingco.com/how-to-choose-a-roofer-allen/"},
-    {"date":"2026-08-14","title":"How to Choose a Roofer in McKinney Without Getting Burned","url":"https://jacksonroofingco.com/how-to-choose-a-roofer-mckinney/"},
-    {"date":"2026-08-11","title":"Getting Your North Texas Roof Ready for Hail Season","url":"https://jacksonroofingco.com/roof-hail-season-prep/"},
-    {"date":"2026-08-07","title":"Do Your Gutters Need Attention Before the Next Big Rain?","url":"https://jacksonroofingco.com/gutters-before-the-next-big-rain/"},
-    {"date":"2026-08-04","title":"How Much Does a New Roof Cost in Plano in 2026?","url":"https://jacksonroofingco.com/new-roof-cost-plano/"},
-    {"date":"2026-07-30","title":"Signs You Need a New Roof: A Plano Roofer Checklist","url":"https://jacksonroofingco.com/signs-you-need-a-new-roof/"},
-    {"date":"2026-07-27","title":"What to Do After a North Texas Hailstorm","url":"https://jacksonroofingco.com/what-to-do-after-a-hailstorm/"},
-    {"date":"2026-07-24","title":"Repair or Replace? A North Texas Roofer Honest Guide","url":"https://jacksonroofingco.com/repair-or-replace-roof/"},
-    {"date":"2026-07-22","title":"What Actually Happens During a Free Roof Inspection","url":"https://jacksonroofingco.com/free-roof-inspection-explained/"},
-    {"date":"2026-07-22","title":"Hail Damage vs Roof Wear: How to Tell the Difference","url":"https://jacksonroofingco.com/hail-damage-vs-roof-wear/"},
-    {"date":"2026-07-22","title":"Do You Need a Roof Permit in Richardson, TX?","url":"https://jacksonroofingco.com/roof-permit-richardson-tx/"},
-    {"date":"2026-07-21","title":"How Long Does a Roof Last in North Texas?","url":""}
-  ],
-  "actions": [
-    {"date":"2026-07-20","type":"gbp","title":"Google Business post with a fresh job photo","url":""},
-    {"date":"2026-07-20","type":"reviews","title":"Review requests sent out to recent jobs","url":""}
-  ]
+ "_comment": "Synced from the client's own WordPress site by sync_wp_posts.py. Do not hand-edit: it drifted to 12 entries while the site had 20, and the dashboard under-reported the work for weeks.",
+ "base_url": "https://jacksonroofingco.com",
+ "blog_posts": [
+  {
+   "date": "2026-08-31",
+   "title": "7 Signs Your Frisco Home Needs a New Roof",
+   "url": "https://jacksonroofingco.com/signs-you-need-a-new-roof-frisco/"
+  },
+  {
+   "date": "2026-08-31",
+   "title": "How to Choose a Roofer in Plano Without Getting Burned",
+   "url": "https://jacksonroofingco.com/how-to-choose-a-roofer-plano/"
+  },
+  {
+   "date": "2026-08-28",
+   "title": "How to Choose a Roofer in Allen Without Getting Burned",
+   "url": "https://jacksonroofingco.com/how-to-choose-a-roofer-allen/"
+  },
+  {
+   "date": "2026-08-18",
+   "title": "How to Choose a Roofing Contractor in North Texas",
+   "url": "https://jacksonroofingco.com/how-to-choose-a-roofing-contractor/"
+  },
+  {
+   "date": "2026-08-18",
+   "title": "What Happens During a Roof Replacement, Step by Step",
+   "url": "https://jacksonroofingco.com/roof-replacement-process/"
+  },
+  {
+   "date": "2026-08-13",
+   "title": "Hail Damage Roof Signs You Can Spot From the Ground",
+   "url": "https://jacksonroofingco.com/hail-damage-roof-signs/"
+  },
+  {
+   "date": "2026-08-13",
+   "title": "Texas Heat and Roof Damage: Why Roofs Age Faster",
+   "url": "https://jacksonroofingco.com/texas-heat-roof-damage/"
+  },
+  {
+   "date": "2026-08-10",
+   "title": "How to Choose a Roofer in McKinney Without Getting Burned",
+   "url": "https://jacksonroofingco.com/how-to-choose-a-roofer-mckinney/"
+  },
+  {
+   "date": "2026-08-10",
+   "title": "Getting Your North Texas Roof Ready for Hail Season",
+   "url": "https://jacksonroofingco.com/roof-hail-season-prep/"
+  },
+  {
+   "date": "2026-08-09",
+   "title": "A Roof Maintenance Checklist for Texas Homeowners",
+   "url": "https://jacksonroofingco.com/roof-maintenance-checklist-texas/"
+  },
+  {
+   "date": "2026-08-09",
+   "title": "Attic Ventilation and Roof Lifespan in North Texas",
+   "url": "https://jacksonroofingco.com/attic-ventilation-roof-lifespan/"
+  },
+  {
+   "date": "2026-08-03",
+   "title": "How Much Does a New Roof Cost in Plano in 2026?",
+   "url": "https://jacksonroofingco.com/new-roof-cost-plano/"
+  },
+  {
+   "date": "2026-08-01",
+   "title": "How Long Do Roofs Last in Texas? An Honest Answer",
+   "url": "https://jacksonroofingco.com/how-long-do-roofs-last-in-texas/"
+  },
+  {
+   "date": "2026-08-01",
+   "title": "Metal Roof vs Shingles in Texas: Cost and What to Know",
+   "url": "https://jacksonroofingco.com/metal-roof-vs-shingles-cost-texas/"
+  },
+  {
+   "date": "2026-07-30",
+   "title": "Signs You Need a New Roof: A Plano Roofer’s Checklist",
+   "url": "https://jacksonroofingco.com/signs-you-need-a-new-roof/"
+  },
+  {
+   "date": "2026-07-27",
+   "title": "What to Do After a North Texas Hailstorm",
+   "url": "https://jacksonroofingco.com/what-to-do-after-a-hailstorm/"
+  },
+  {
+   "date": "2026-07-24",
+   "title": "Repair or Replace? A North Texas Roofer’s Honest Guide",
+   "url": "https://jacksonroofingco.com/repair-or-replace-roof/"
+  },
+  {
+   "date": "2026-07-22",
+   "title": "Hail Damage vs Roof Wear: How to Tell the Difference",
+   "url": "https://jacksonroofingco.com/hail-damage-vs-roof-wear/"
+  },
+  {
+   "date": "2026-07-22",
+   "title": "What Actually Happens During a Free Roof Inspection",
+   "url": "https://jacksonroofingco.com/free-roof-inspection-explained/"
+  },
+  {
+   "date": "2026-07-22",
+   "title": "Do You Need a Roof Permit in Richardson, TX?",
+   "url": "https://jacksonroofingco.com/roof-permit-richardson-tx/"
+  }
+ ],
+ "actions": [
+  {
+   "date": "2026-07-20",
+   "type": "gbp",
+   "title": "Google Business post with a fresh job photo",
+   "url": ""
+  },
+  {
+   "date": "2026-07-20",
+   "type": "reviews",
+   "title": "Review requests sent out to recent jobs",
+   "url": ""
+  }
+ ]
 }

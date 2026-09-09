@@ -250,10 +250,10 @@
   },
   "source_line": "Measured hail across Collin, Denton, Dallas and Rockwall counties, March 2021 through August 2026.",
   "note": "1 inch is the size that typically damages asphalt shingles, which is why it is counted separately. We have not contacted anyone off this data or run any campaign from it. It is the targeting layer we would build on, and it is here so you can check it yourself.",
-  "mapUrl": "https://wingdigital26-maker.github.io/storm-map/jackson/",
+  "mapUrl": "https://wingdigital26-maker.github.io/storm-map/jackson/map/",
   "mapLabel": "Jackson Roofing hail map",
   "mapNote": "Search a ZIP or city, pick a storm from the timeline, then zoom in to see individual homes and the hail each one took.",
-  "_mapUrl_comment": "Built from the same NOAA MRMS MESH radar grids as the figures above, joined to Collin/Denton/Dallas/Rockwall appraisal parcels. Branded copy of the Wing storm map; shares one dataset.",
+  "_mapUrl_comment": "Must end in /map/. /storm-map/jackson/ is the published copy of THIS dashboard; pointing the iframe there makes the page embed itself. Verify the URL renders a map before shipping.",
   "_source_line_comment": "Jack 2026-09-09: do not name our data sources on client-facing pages. State the coverage and the window, not where it came from. Map-tile attribution inside the embedded map is a licence condition and must stay."
  }
 }

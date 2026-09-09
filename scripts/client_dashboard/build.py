@@ -341,7 +341,11 @@ def collect_storm_history(cfg):
         "banner": sh.get("banner", ""),
         "note": sh.get("note", ""),
         "sourceLine": sh.get("source_line", ""),
-        "sourceUrl": meta.get("databaseHomepage") or meta.get("sourceUrl"),
+        # Client-facing pages state coverage and window, not where the data
+        # came from (Jack, 2026-09-09). Set stormHistory.showSourceUrl to true
+        # on a client who should see the underlying database link.
+        "sourceUrl": (meta.get("databaseHomepage") or meta.get("sourceUrl"))
+                     if sh.get("showSourceUrl") else None,
         "pulledOn": meta.get("pulledOn"),
         "coverageNote": meta.get("coverageNote", ""),
         "window": src.get("window", {}),

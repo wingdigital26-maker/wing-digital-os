@@ -367,12 +367,14 @@ section{padding:34px 0 0}
   min-width:3.4em}
 .sv-wh{font-size:.9rem;font-weight:600;color:var(--t1);overflow-wrap:break-word}
 .sv-mt{font-size:.78rem;color:var(--t3);overflow-wrap:break-word}
-.sv-map{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin:18px 0 6px}
-.sv-maplink{display:inline-block;padding:10px 18px;border-radius:10px;
-  background:var(--accent);color:#08121a;font-weight:600;text-decoration:none;
-  font-size:14px;letter-spacing:.01em}
-.sv-maplink:hover{filter:brightness(1.08)}
-.sv-mapnote{color:var(--muted);font-size:13px}
+.sv-map{margin:18px 0 6px}
+.sv-mapnote{color:var(--muted);font-size:13px;margin:0 0 12px;max-width:70ch}
+.sv-mapframe{width:100%;height:1180px;border:1px solid var(--line);
+  border-radius:12px;background:var(--card);display:block}
+.sv-mapopen{display:inline-block;margin-top:10px;color:var(--accent);
+  font-size:13px;font-weight:600;text-decoration:none}
+.sv-mapopen:hover{text-decoration:underline}
+@media(max-width:760px){.sv-mapframe{height:1420px}}
 .sv-src{margin-top:14px;font-size:.79rem;color:var(--t3);line-height:1.55;
   overflow-wrap:break-word}
 .sv-src a{color:var(--accent);text-decoration:none;overflow-wrap:anywhere}
@@ -1212,9 +1214,14 @@ const DATA = __DATA__;
        client without a published map sees nothing rather than a dead button. */
     if (S.mapUrl) {
       const m = $('#sv-map');
-      m.innerHTML = '<a class="sv-maplink" href="' + esc(S.mapUrl) +
-        '" target="_blank" rel="noopener">' + esc(S.mapLabel || 'Open the interactive map') +
-        '</a>' + (S.mapNote ? '<span class="sv-mapnote">' + esc(S.mapNote) + '</span>' : '');
+      const sep = S.mapUrl.indexOf('?') >= 0 ? '&' : '?';
+      m.innerHTML =
+        (S.mapNote ? '<p class="sv-mapnote">' + esc(S.mapNote) + '</p>' : '') +
+        '<iframe class="sv-mapframe" src="' + esc(S.mapUrl) + sep + 'embed=1"' +
+        ' title="' + esc(S.mapLabel || 'Interactive hail map') + '"' +
+        ' loading="lazy" referrerpolicy="no-referrer"></iframe>' +
+        '<a class="sv-mapopen" href="' + esc(S.mapUrl) + '" target="_blank"' +
+        ' rel="noopener">Open the map full screen</a>';
       m.hidden = false;
     }
   })();

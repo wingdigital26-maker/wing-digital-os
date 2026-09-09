@@ -495,6 +495,45 @@ section{padding:34px 0 0}
   <!-- Referral partners. Generic and config-driven: this whole section exists
        only when the payload carries `referralPartners`, and every visible word
        is injected by the referralPartners() script below. -->
+  <!-- SEO and content work leads the page: it is what Wing does for the
+       client week to week. Outreach, reviews and hail follow. -->
+<section id="health-sec" hidden>
+    <div class="sh"><h2>Your site, checked just now</h2><span class="n" id="healthn"></span></div>
+    <div class="sd">We opened every page on your site as this loaded and checked the things Google
+      looks at. These are live readings.</div>
+    <div id="health"></div>
+  </section>
+
+<section id="chart-sec">
+    <div class="sh"><h2>Published by month</h2></div>
+    <div class="sd" id="chart-sd"></div>
+    <div class="card">
+      <div class="chart" id="chart"></div>
+      <div class="cnote" id="cnote"></div>
+    </div>
+  </section>
+
+<section>
+    <div class="sh"><h2>What we published</h2><span class="n" id="pubn"></span></div>
+    <div class="sd" id="pub-sd">Colours match the chart above. Click any title to open it on your site.</div>
+    <div class="card" style="margin-bottom:14px">
+      <div class="mix" id="mix"></div>
+      <div class="keys" id="keys"></div>
+    </div>
+    <div class="search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input id="q" type="search" placeholder="Search by title" autocomplete="off" aria-label="Search published work by title">
+    </div>
+    <div id="list"></div>
+    <button class="more" id="more" hidden></button>
+  </section>
+
+<section id="pages-sec">
+    <div class="sh"><h2>Other pages we maintain</h2><span class="n" id="pagen"></span></div>
+    <div class="sd">Pages on your site beyond the list above.</div>
+    <div id="pages"></div>
+  </section>
+
   <section id="rp-sec" hidden>
     <div class="sh"><h2 id="rp-h"></h2><span class="n" id="rp-n"></span></div>
     <div class="sd" id="rp-sd"></div>
@@ -599,38 +638,7 @@ section{padding:34px 0 0}
     </div>
   </section>
 
-  <section id="health-sec" hidden>
-    <div class="sh"><h2>Your site, checked just now</h2><span class="n" id="healthn"></span></div>
-    <div class="sd">We opened every page on your site as this loaded and checked the things Google
-      looks at. These are live readings.</div>
-    <div id="health"></div>
-  </section>
-
-  <section id="chart-sec">
-    <div class="sh"><h2>Published by month</h2></div>
-    <div class="sd" id="chart-sd"></div>
-    <div class="card">
-      <div class="chart" id="chart"></div>
-      <div class="cnote" id="cnote"></div>
-    </div>
-  </section>
-
-  <section>
-    <div class="sh"><h2>What we published</h2><span class="n" id="pubn"></span></div>
-    <div class="sd" id="pub-sd">Colours match the chart above. Click any title to open it on your site.</div>
-    <div class="card" style="margin-bottom:14px">
-      <div class="mix" id="mix"></div>
-      <div class="keys" id="keys"></div>
-    </div>
-    <div class="search">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
-      <input id="q" type="search" placeholder="Search by title" autocomplete="off" aria-label="Search published work by title">
-    </div>
-    <div id="list"></div>
-    <button class="more" id="more" hidden></button>
-  </section>
-
-  <section id="out-sec">
+        <section id="out-sec">
     <div class="sh"><h2>Outreach and social</h2><span class="n" id="outn"></span></div>
     <div class="sd" id="out-sd"></div>
     <div class="chans" id="chans"></div>
@@ -689,13 +697,7 @@ section{padding:34px 0 0}
     <button class="more" id="leadmore" hidden></button>
   </section>
 
-  <section id="pages-sec">
-    <div class="sh"><h2>Other pages we maintain</h2><span class="n" id="pagen"></span></div>
-    <div class="sd">Pages on your site beyond the list above.</div>
-    <div id="pages"></div>
-  </section>
-
-  <div class="foot">
+    <div class="foot">
     Prepared by <span id="agency">Wing Digital</span>
     &middot; <span id="stamp"></span>
   </div>

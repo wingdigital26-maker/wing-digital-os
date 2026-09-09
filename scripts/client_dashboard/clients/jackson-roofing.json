@@ -114,29 +114,8 @@
  "notes": {
   "published": "These went up on jacksonroofingco.com through July and August 2026. Eleven open directly."
  },
- "_sources_comment": "Rebuilt-site blog re-added as a source 2026-09-07 so posts published by the jackson-content-weekly schedule appear on the dashboard automatically. Only blog/ is pulled, not the core pages: the site chrome still sells Commercial Roofing, a service this client dropped, so those pages stay off the dashboard until that is cleaned. Legacy jacksonroofingco.com posts remain in the items_file.",
+ "_sources_comment": "Jack 2026-09-09: the rebuilt static site (wingdigital26-maker.github.io/jackson-roofing) is NOT shown on this dashboard. Chris's dashboard lists only what is live on the domain he owns, jacksonroofingco.com. Do not re-add the git_repo source.",
  "sources": [
-  {
-   "kind": "git_repo",
-   "repo": "C:\\Users\\wjack\\jackson-roofing-site",
-   "base_url": "https://wingdigital26-maker.github.io/jackson-roofing",
-   "globs": [
-    {
-     "glob": "blog/*.html",
-     "type": "blog",
-     "skip": [
-      "index.html"
-     ]
-    },
-    {
-     "glob": "services/*.html",
-     "type": "service",
-     "skip": [
-      "index.html"
-     ]
-    }
-   ]
-  },
   {
    "kind": "items_file",
    "path": "history/jackson-roofing-legacy.json",
@@ -145,32 +124,11 @@
    "status": "published"
   }
  ],
- "pages": [
-  {
-   "group": "Posts we published for you, live now",
-   "icon": "pen",
-   "repo": "C:\\Users\\wjack\\jackson-roofing-site",
-   "base_url": "https://wingdigital26-maker.github.io/jackson-roofing",
-   "dir": "blog",
-   "skip": [
-    "index.html"
-   ]
-  },
-  {
-   "group": "Service and city pages we built for you, live now",
-   "icon": "file",
-   "repo": "C:\\Users\\wjack\\jackson-roofing-site",
-   "base_url": "https://wingdigital26-maker.github.io/jackson-roofing",
-   "dir": "services",
-   "skip": [
-    "index.html"
-   ]
-  }
- ],
+ "pages": [],
  "pages_from_items": [
   {
-   "group": "Blog posts you can open on your site, July to August 2026",
-   "icon": "file",
+   "group": "Posts we published on your site",
+   "icon": "pen",
    "types": [
     "blog"
    ]

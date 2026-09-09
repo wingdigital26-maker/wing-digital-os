@@ -353,6 +353,9 @@ def collect_storm_history(cfg):
         "cityNote": src.get("serviceCityNote", ""),
         "topEvents": top,
         "labels": sh.get("labels", {}),
+        "mapUrl": sh.get("mapUrl"),
+        "mapLabel": sh.get("mapLabel"),
+        "mapNote": sh.get("mapNote"),
     }
 
 

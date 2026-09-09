@@ -1,254 +1,258 @@
 {
-  "_comment": "Jackson Roofing (Chris Jackson, Plano TX). WIN-BACK PITCH, rebuilt 2026-09-06 on top of the dashboard published 2026-08-28, so the same link keeps working and now carries the full record. HONESTY DECISIONS, all deliberate: (1) Seventeen blog posts total. FIVE were published 2026-09-06 to the rebuilt site repo (blog/*.html), read live off git history, and all five URLs were curl-verified 200 that day. The other TWELVE are REAL work published on jacksonroofingco.com during the engagement, reconciled 2026-09-06 against the content-engine state file (see history/jackson-roofing-legacy.json for the full reconciliation): one post was logged twice under the same URL and is now listed once at its first publish date, and a twelfth post that published with no URL recorded is listed as a non-linked row. Two non-blog rows from 2026-07-20 (a Google Business post and a round of review requests) are carried under their own types so they read as the actions they were. jacksonroofingco.com now Cloudflare-blocks our IP (403 from curl and from a real browser), so we CANNOT re-verify those URLs today and this page never claims we did. They carry their real 2026-07 and 2026-08 dates and sit under a group that names the period, so nothing reads as work happening now. Chris can open every one of them from his own network. (2) Every wingdigital26-maker.github.io link on this page was curl-verified 200 on 2026-09-06. (3) Between 2026-08-28 and 2026-09-06 nothing published, and the September bar in the chart carries only the five posts from 2026-09-06. No weekly cadence, Google posting or emailing is running today, and the banner and subhead both say so rather than letting five posts read as a live program. (4) No traffic, ranking, call, lead or revenue number appears anywhere; pendingMetrics records why for each one. (5) The one measured fact we hold on this account is that social produced no leads, and the social card says exactly that instead of selling social. GoHighLevel is retired and is referenced nowhere in this file. No em dashes or en dashes in any client-facing string.",
-  "_brand_comment": "Site shown as plain text, not a link: jacksonroofingco.com Cloudflare-blocks our IP so we cannot verify it from here, and an unverified link is worse than none. Headline leads with the referral list because that is the asset that has never been used. Rebuilt-site showcase and the month-by-month plan were both cut by Jack on 2026-09-06.",
-  "brand": {
-    "name": "Jackson Roofing",
-    "initials": "JR",
-    "site": "jacksonroofingco.com",
-    "kicker": "Marketing dashboard",
-    "headline": "What Wing Digital is doing for Jackson Roofing",
-    "subhead": "The articles we published on your site and the outreach list we built for your service area. Everything here is real and you can open it. Any question, ask Nimbus down in the corner."
+ "_comment": "Jackson Roofing (Chris Jackson, Plano TX). WIN-BACK PITCH, rebuilt 2026-09-06 on top of the dashboard published 2026-08-28, so the same link keeps working and now carries the full record. HONESTY DECISIONS, all deliberate: (1) Seventeen blog posts total. FIVE were published 2026-09-06 to the rebuilt site repo (blog/*.html), read live off git history, and all five URLs were curl-verified 200 that day. The other TWELVE are REAL work published on jacksonroofingco.com during the engagement, reconciled 2026-09-06 against the content-engine state file (see history/jackson-roofing-legacy.json for the full reconciliation): one post was logged twice under the same URL and is now listed once at its first publish date, and a twelfth post that published with no URL recorded is listed as a non-linked row. Two non-blog rows from 2026-07-20 (a Google Business post and a round of review requests) are carried under their own types so they read as the actions they were. jacksonroofingco.com now Cloudflare-blocks our IP (403 from curl and from a real browser), so we CANNOT re-verify those URLs today and this page never claims we did. They carry their real 2026-07 and 2026-08 dates and sit under a group that names the period, so nothing reads as work happening now. Chris can open every one of them from his own network. (2) Every wingdigital26-maker.github.io link on this page was curl-verified 200 on 2026-09-06. (3) Between 2026-08-28 and 2026-09-06 nothing published, and the September bar in the chart carries only the five posts from 2026-09-06. No weekly cadence, Google posting or emailing is running today, and the banner and subhead both say so rather than letting five posts read as a live program. (4) No traffic, ranking, call, lead or revenue number appears anywhere; pendingMetrics records why for each one. (5) The one measured fact we hold on this account is that social produced no leads, and the social card says exactly that instead of selling social. GoHighLevel is retired and is referenced nowhere in this file. No em dashes or en dashes in any client-facing string.",
+ "_brand_comment": "Site shown as plain text, not a link: jacksonroofingco.com Cloudflare-blocks our IP so we cannot verify it from here, and an unverified link is worse than none. Headline leads with the referral list because that is the asset that has never been used. Rebuilt-site showcase and the month-by-month plan were both cut by Jack on 2026-09-06.",
+ "brand": {
+  "name": "Jackson Roofing",
+  "initials": "JR",
+  "site": "jacksonroofingco.com",
+  "kicker": "Marketing dashboard",
+  "headline": "What Wing Digital is doing for Jackson Roofing",
+  "subhead": "The articles we published on your site and the outreach list we built for your service area. Everything here is real and you can open it. Any question, ask Nimbus down in the corner."
+ },
+ "_theme_comment": "Read off the live site stylesheet on 2026-09-06: --cyan #1bc0ff (their exact logo cyan), --cyan-deep #0aa7e6, --cyan-ink #06809f, --ink #0b0f14 (their black logo plate). The template pins itself to the light ground by design, so the light accent is the deeper #06809f for readable contrast on white, while the badge keeps the real black-plate-and-cyan pairing.",
+ "theme": {
+  "accent": "#1bc0ff",
+  "accent2": "#7ad9ff",
+  "accent_bg": "rgba(27,192,255,.13)",
+  "accent_glow": "rgba(27,192,255,.20)",
+  "accent_light": "#06809f",
+  "accent2_light": "#0aa7e6",
+  "accent_bg_light": "rgba(6,128,159,.08)",
+  "accent_glow_light": "rgba(6,128,159,.13)",
+  "mark_bg": "#0b0f14",
+  "mark_fg": "#1bc0ff"
+ },
+ "_types_comment": "core and blog are the only types with real items, so they are the only keys, bars and counts the template can draw. service and city are declared so their colors stay stable the moment those pages are real; with no items they render nothing at all, which is why this page can never show a fabricated zero.",
+ "types": {
+  "core": {
+   "label": "Site page",
+   "color": "#0aa7e6"
   },
-  "_theme_comment": "Read off the live site stylesheet on 2026-09-06: --cyan #1bc0ff (their exact logo cyan), --cyan-deep #0aa7e6, --cyan-ink #06809f, --ink #0b0f14 (their black logo plate). The template pins itself to the light ground by design, so the light accent is the deeper #06809f for readable contrast on white, while the badge keeps the real black-plate-and-cyan pairing.",
-  "theme": {
-    "accent": "#1bc0ff",
-    "accent2": "#7ad9ff",
-    "accent_bg": "rgba(27,192,255,.13)",
-    "accent_glow": "rgba(27,192,255,.20)",
-    "accent_light": "#06809f",
-    "accent2_light": "#0aa7e6",
-    "accent_bg_light": "rgba(6,128,159,.08)",
-    "accent_glow_light": "rgba(6,128,159,.13)",
-    "mark_bg": "#0b0f14",
-    "mark_fg": "#1bc0ff"
+  "blog": {
+   "label": "Blog post",
+   "color": "#1bc0ff"
   },
-  "_types_comment": "core and blog are the only types with real items, so they are the only keys, bars and counts the template can draw. service and city are declared so their colors stay stable the moment those pages are real; with no items they render nothing at all, which is why this page can never show a fabricated zero.",
-  "types": {
-    "core": {
-      "label": "Site page",
-      "color": "#0aa7e6"
-    },
-    "blog": {
-      "label": "Blog post",
-      "color": "#1bc0ff"
-    },
-    "service": {
-      "label": "Service page",
-      "color": "#06809f"
-    },
-    "city": {
-      "label": "City page",
-      "color": "#33414f"
-    },
-    "other": {
-      "label": "Other",
-      "color": "#7a8a9a"
-    }
+  "service": {
+   "label": "Service page",
+   "color": "#06809f"
   },
-  "_referralPartners_comment": "The referral partner asset. Sourced live at build time from ghl-cli/jackson_roofing_leads.db (table leads), so every number on the page is a straight count of rows and nothing is transcribed by hand. HONESTY DECISIONS: (1) emailMask is on, so build.py part hides every address before it reaches the HTML. A texted dashboard link is effectively public and 460 harvestable business addresses must not be published; Chris gets the full file directly. (2) hiddenCategories drops insurance-adjuster (151 rows) from the VISIBLE category breakdown while keeping it inside the headline total, because Texas Insurance Code Chapter 4102 restricts roofers acting as public adjusters and roofer to adjuster outreach is legally sensitive. hidden_note says so on the page, out loud, so the 869 visible plus 151 held back still adds to 1,020 for anyone who checks. Flip this key to an empty list to show them. (3) status is 'staged' on every row in the table, so the claim that nothing has been sent is literally true. (4) No response rate, conversion rate or revenue projection appears anywhere; none exists in the source.",
-  "referralPartners": {
-    "db": "C:\\Users\\wjack\\ghl-cli\\jackson_roofing_leads.db",
-    "table": "leads",
-    "emailMask": {
-      "keep": 1,
-      "fill": "•••"
-    },
-    "hiddenCategories": [
-      "insurance-adjuster"
-    ],
-    "categoryLabels": {
-      "general-contractor": "General contractors",
-      "property-manager": "Property managers",
-      "real-estate-inspector": "Home and property inspectors",
-      "restoration-company": "Restoration and water damage companies",
-      "hoa-management": "HOA management companies",
-      "insurance-adjuster": "Insurance adjusters",
-      "apartment-community": "Apartment communities",
-      "real-estate-brokerage": "Real estate brokerages",
-      "home-builder": "Home builders",
-      "gutter-company": "Gutter companies",
-      "commercial-property-mgmt": "Commercial property managers",
-      "solar-installer": "Solar installers",
-      "remodeling-contractor": "Remodeling contractors"
-    },
-    "sampleSize": 10,
-    "topCities": 8,
-    "title": "Your outreach list",
-    "intro": "Roofing work comes from people who run into a roof problem doing their own job. We built you a list of them across North Texas: general contractors, property managers, inspectors, restoration firms and HOA managers, enriched with real phone numbers, addresses and contacts.",
-    "sample_note": "Real rows out of the list, shown as stored. Email addresses are part hidden on purpose: this page gets forwarded, and a page anyone can open holding hundreds of full business addresses is a list anyone can take. You get the complete unmasked file.",
-    "note": "Real businesses, researched one by one and enriched from public sources.",
-    "statLabel": "Businesses in your outreach list",
-    "excludeCategories": [
-      "insurance-adjuster"
-    ],
-    "_exclude_comment": "insurance-adjuster rows are dropped from the dataset entirely, not hidden inside the total. Texas Insurance Code Chapter 4102 restricts a roofer from acting as a public adjuster, so pitching adjuster outreach to a roofing client is not something to put in writing. Dropping them also makes every count on the page reconcile without a disclosure box."
+  "city": {
+   "label": "City page",
+   "color": "#33414f"
   },
-  "_outreach_comment": "Three cards, all honestly blocked on access, all phrased as forward plans rather than as excuses. Storm and hail targeting is deliberately NOT a card: it needs nothing from Chris, it needs the engagement to restart, so it lives in the plan instead of pretending to be a lane waiting on his login. The social card states the measured result rather than selling the channel.",
-  "outreach": {
-    "intro": "Nothing is being posted, sent or emailed on your behalf today. These are the lanes we would switch on, and what each one needs from you first.",
-    "channels": [
-      {
-        "name": "Google Business posts",
-        "icon": "star",
-        "types": [],
-        "state": "needs_access",
-        "note": "Weekly posts to your Google Business Profile, ready to start as soon as you add us as a manager. For a roofer in a hail market this is the fastest lever there is."
-      },
-      {
-        "name": "Review requests",
-        "icon": "chat",
-        "types": [],
-        "state": "needs_access",
-        "note": "An automatic review ask after every finished job. We need your job list or a phone export to connect it, then the asks go out on their own."
-      },
-      {
-        "name": "Facebook and Instagram",
-        "icon": "share",
-        "types": [],
-        "state": "needs_access",
-        "note": "Straight answer: we measured social for your account and it brought in no leads. We will keep the pages current so anyone checking you out sees a live business, but we are not going to tell you it is where the work comes from."
-      }
-    ]
-  },
-  "_notes_comment": "Overrides the generic subhead on the published list. It names the two places the work lives and, critically, dates the blog posts to the past instead of letting a reader assume they went up this week. It does not claim the posts were checked today, because jacksonroofingco.com blocks us and they were not.",
-  "notes": {
-    "published": "These went up on jacksonroofingco.com through July and August 2026. Eleven open directly."
-  },
-  "_sources_comment": "Rebuilt-site blog re-added as a source 2026-09-07 so posts published by the jackson-content-weekly schedule appear on the dashboard automatically. Only blog/ is pulled, not the core pages: the site chrome still sells Commercial Roofing, a service this client dropped, so those pages stay off the dashboard until that is cleaned. Legacy jacksonroofingco.com posts remain in the items_file.",
-  "sources": [
-    {
-      "kind": "git_repo",
-      "repo": "C:\\Users\\wjack\\jackson-roofing-site",
-      "base_url": "https://wingdigital26-maker.github.io/jackson-roofing",
-      "globs": [
-        {
-          "glob": "blog/*.html",
-          "type": "blog",
-          "skip": [
-            "index.html"
-          ]
-        },
-        {
-          "glob": "services/*.html",
-          "type": "service",
-          "skip": [
-            "index.html"
-          ]
-        }
-      ]
-    },
-    {
-      "kind": "items_file",
-      "path": "history/jackson-roofing-legacy.json",
-      "key": "blog_posts",
-      "type": "blog",
-      "status": "published"
-    }
-  ],
-  "pages": [
-    {
-      "group": "Posts we published for you, live now",
-      "icon": "pen",
-      "repo": "C:\\Users\\wjack\\jackson-roofing-site",
-      "base_url": "https://wingdigital26-maker.github.io/jackson-roofing",
-      "dir": "blog",
-      "skip": [
-        "index.html"
-      ]
-    },
-    {
-      "group": "Service and city pages we built for you, live now",
-      "icon": "file",
-      "repo": "C:\\Users\\wjack\\jackson-roofing-site",
-      "base_url": "https://wingdigital26-maker.github.io/jackson-roofing",
-      "dir": "services",
-      "skip": [
-        "index.html"
-      ]
-    }
-  ],
-  "pages_from_items": [
-    {
-      "group": "Blog posts you can open on your site, July to August 2026",
-      "icon": "file",
-      "types": [
-        "blog"
-      ]
-    }
-  ],
-  "_pendingMetrics_comment": "Not rendered on the page today (the template hides that section by house rule) but kept as the written record of exactly why this dashboard shows no traffic, ranking, profile or lead numbers. Each one is a missing connection, not a zero.",
-  "pendingMetrics": [
-    {
-      "name": "Google Search clicks and impressions",
-      "why": "Needs Search Console access for the site connected to the reporting account",
-      "state": "needs access"
-    },
-    {
-      "name": "Keyword rankings",
-      "why": "Comes online with the same Search Console connection",
-      "state": "needs access"
-    },
-    {
-      "name": "Google Business Profile views and calls",
-      "why": "Needs manager access to the Google Business Profile",
-      "state": "needs access"
-    },
-    {
-      "name": "Calls and form leads",
-      "why": "The contact form does not report back to us, so any lead count here would be a guess",
-      "state": "not connected"
-    }
-  ],
-  "_actions_comment": "Google Business post and review-request rows removed 2026-09-06. The only \"published\" social record in the system was a single 2026-07-20 status string in a planning file with no post ID, no URL and no platform confirmation. Nothing has posted to any social network for this client: the OS social board is draft-only by design, and the intended GBP output route retired with GHL on 2026-08-22.",
-  "_copy_comment": "Copy rewritten 2026-09-06 to Jack spec: title names what Wing is doing, no absence language, no \"who could send you work\". The one consent line in the banner stays on purpose: outreach would go out under the client name, so his approval must be stated on the page, not assumed. Consent banner removed 2026-09-06 at Jack request after being flagged; the operational gate is unchanged (nothing sends unless armed), it is simply no longer printed on the page.",
-  "showChart": false,
-  "_stats_comment": "Stats reordered 2026-09-06: highest-value number first. The rolling \"published in the last 30 days\" stat was removed outright, and showChart is false, because publishing is paused and both surfaces turned that pause into the loudest thing on the page.",
-  "_reviewStanding_comment": "Generic dashboard block. The figures live in history/jackson-review-gap.json, read live off the public Google listings on the pull date. The copy below is client-facing framing only; it states the standing and the gap and never predicts a result.",
-  "reviewStanding": {
-    "data": "history/jackson-review-gap.json",
-    "title": "Where you stand on Google reviews",
-    "intro": "Your Google profile next to twelve roofing contractors Google returns for Plano, Frisco, McKinney, Allen and Richardson. Every rating and count here was read off the live listings on the pull date.",
-    "banner": "Reviews carry roughly a fifth of local pack weight, second only to the profile itself, and they are the clearest lever on this list that is still open to you.",
-    "labels": {
-      "tiles": [
-        "your reviews",
-        "your rating",
-        "median reviews in this set",
-        "median rating in this set",
-        "reviews between you and the median",
-        "most reviews in this set"
-      ],
-      "tableLabel": "The field, by review count",
-      "colName": "Business",
-      "colRating": "Rating",
-      "colCount": "Reviews",
-      "droppedLabel": "Left out of this set:"
-    },
-    "source_line": "Source: Google Maps listings for Jackson Roofing and for the roofing contractors Google returns on the searches roofing contractor Plano, Frisco, McKinney, Allen and Richardson TX. Candidate list built with the same open source Google Maps scraper Wing uses for prospecting; every rating and count then read live on the listing itself.",
-    "note": "Your profile is live and complete on the basics: address, phone, website, hours, category and 6 photos. The gap is volume. The three reviews Google shows on the profile are 6, 7 and 8 years old, so the profile reads as quiet rather than as bad. Nothing on this page is a forecast: it is the standing as Google displayed it on the pull date, and the gap figures are subtraction."
-  },
-  "_stormHistory_comment": "Storm history section. Generic template block: build.py reads the data file named below and the template renders a section only because this key exists. Every number on the page is a count of records in NOAA's public Storm Events Database, pulled 2026-09-07 from https://www.ncei.noaa.gov/pub/data/swdi/stormevents/csvfiles/. Nothing here is estimated, projected or inferred: NOAA does not record roofs damaged, homes affected or revenue, so no such figure appears. This is intelligence we can act on, not work already performed. Copy must stay factual and short.",
-  "stormHistory": {
-    "data": "history/jackson-storm-events.json",
-    "topEvents": 10,
-    "title": "Hail history in your service area",
-    "intro": "Every hail report NOAA logged in Collin, Denton, Dallas, Rockwall and Kaufman counties over the 24 months from June 2024 through May 2026. These are recorded events, not estimates.",
-    "banner": "Hail is the demand signal for residential roof replacement in North Texas. This is the record for your counties.",
-    "labels": {
-      "tiles": [
-        "hail reports on record",
-        "at 1 inch or larger",
-        "separate storm days",
-        "largest hail recorded",
-        "counties covered",
-        "months of record"
-      ],
-      "countyLabel": "Hail reports by county",
-      "monthLabel": "What months the hail lands in",
-      "cityLabel": "Your cities named on the record",
-      "eventLabel": "The largest hail on record"
-    },
-    "source_line": "Source: NOAA National Centers for Environmental Information, Storm Events Database. Filters: Texas, counties Collin, Denton, Dallas, Rockwall and Kaufman, event type Hail, June 2024 through May 2026.",
-    "note": "1 inch is the size that typically damages asphalt shingles, which is why it is counted separately. We have not contacted anyone off this data or run any campaign from it. It is the targeting layer we would build on, and it is here so you can check it yourself."
+  "other": {
+   "label": "Other",
+   "color": "#7a8a9a"
   }
+ },
+ "_referralPartners_comment": "The referral partner asset. Sourced live at build time from ghl-cli/jackson_roofing_leads.db (table leads), so every number on the page is a straight count of rows and nothing is transcribed by hand. HONESTY DECISIONS: (1) emailMask is on, so build.py part hides every address before it reaches the HTML. A texted dashboard link is effectively public and 460 harvestable business addresses must not be published; Chris gets the full file directly. (2) hiddenCategories drops insurance-adjuster (151 rows) from the VISIBLE category breakdown while keeping it inside the headline total, because Texas Insurance Code Chapter 4102 restricts roofers acting as public adjusters and roofer to adjuster outreach is legally sensitive. hidden_note says so on the page, out loud, so the 869 visible plus 151 held back still adds to 1,020 for anyone who checks. Flip this key to an empty list to show them. (3) status is 'staged' on every row in the table, so the claim that nothing has been sent is literally true. (4) No response rate, conversion rate or revenue projection appears anywhere; none exists in the source.",
+ "referralPartners": {
+  "db": "C:\\Users\\wjack\\ghl-cli\\jackson_roofing_leads.db",
+  "table": "leads",
+  "emailMask": {
+   "keep": 1,
+   "fill": "•••"
+  },
+  "hiddenCategories": [
+   "insurance-adjuster"
+  ],
+  "categoryLabels": {
+   "general-contractor": "General contractors",
+   "property-manager": "Property managers",
+   "real-estate-inspector": "Home and property inspectors",
+   "restoration-company": "Restoration and water damage companies",
+   "hoa-management": "HOA management companies",
+   "insurance-adjuster": "Insurance adjusters",
+   "apartment-community": "Apartment communities",
+   "real-estate-brokerage": "Real estate brokerages",
+   "home-builder": "Home builders",
+   "gutter-company": "Gutter companies",
+   "commercial-property-mgmt": "Commercial property managers",
+   "solar-installer": "Solar installers",
+   "remodeling-contractor": "Remodeling contractors"
+  },
+  "sampleSize": 10,
+  "topCities": 8,
+  "title": "Your outreach list",
+  "intro": "Roofing work comes from people who run into a roof problem doing their own job. We built you a list of them across North Texas: general contractors, property managers, inspectors, restoration firms and HOA managers, enriched with real phone numbers, addresses and contacts.",
+  "sample_note": "Real rows out of the list, shown as stored. Email addresses are part hidden on purpose: this page gets forwarded, and a page anyone can open holding hundreds of full business addresses is a list anyone can take. You get the complete unmasked file.",
+  "note": "Real businesses, researched one by one and enriched from public sources.",
+  "statLabel": "Businesses in your outreach list",
+  "excludeCategories": [
+   "insurance-adjuster"
+  ],
+  "_exclude_comment": "insurance-adjuster rows are dropped from the dataset entirely, not hidden inside the total. Texas Insurance Code Chapter 4102 restricts a roofer from acting as a public adjuster, so pitching adjuster outreach to a roofing client is not something to put in writing. Dropping them also makes every count on the page reconcile without a disclosure box."
+ },
+ "_outreach_comment": "Three cards, all honestly blocked on access, all phrased as forward plans rather than as excuses. Storm and hail targeting is deliberately NOT a card: it needs nothing from Chris, it needs the engagement to restart, so it lives in the plan instead of pretending to be a lane waiting on his login. The social card states the measured result rather than selling the channel.",
+ "outreach": {
+  "intro": "Nothing is being posted, sent or emailed on your behalf today. These are the lanes we would switch on, and what each one needs from you first.",
+  "channels": [
+   {
+    "name": "Google Business posts",
+    "icon": "star",
+    "types": [],
+    "state": "needs_access",
+    "note": "Weekly posts to your Google Business Profile, ready to start as soon as you add us as a manager. For a roofer in a hail market this is the fastest lever there is."
+   },
+   {
+    "name": "Review requests",
+    "icon": "chat",
+    "types": [],
+    "state": "needs_access",
+    "note": "An automatic review ask after every finished job. We need your job list or a phone export to connect it, then the asks go out on their own."
+   },
+   {
+    "name": "Facebook and Instagram",
+    "icon": "share",
+    "types": [],
+    "state": "needs_access",
+    "note": "Straight answer: we measured social for your account and it brought in no leads. We will keep the pages current so anyone checking you out sees a live business, but we are not going to tell you it is where the work comes from."
+   }
+  ]
+ },
+ "_notes_comment": "Overrides the generic subhead on the published list. It names the two places the work lives and, critically, dates the blog posts to the past instead of letting a reader assume they went up this week. It does not claim the posts were checked today, because jacksonroofingco.com blocks us and they were not.",
+ "notes": {
+  "published": "These went up on jacksonroofingco.com through July and August 2026. Eleven open directly."
+ },
+ "_sources_comment": "Rebuilt-site blog re-added as a source 2026-09-07 so posts published by the jackson-content-weekly schedule appear on the dashboard automatically. Only blog/ is pulled, not the core pages: the site chrome still sells Commercial Roofing, a service this client dropped, so those pages stay off the dashboard until that is cleaned. Legacy jacksonroofingco.com posts remain in the items_file.",
+ "sources": [
+  {
+   "kind": "git_repo",
+   "repo": "C:\\Users\\wjack\\jackson-roofing-site",
+   "base_url": "https://wingdigital26-maker.github.io/jackson-roofing",
+   "globs": [
+    {
+     "glob": "blog/*.html",
+     "type": "blog",
+     "skip": [
+      "index.html"
+     ]
+    },
+    {
+     "glob": "services/*.html",
+     "type": "service",
+     "skip": [
+      "index.html"
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "items_file",
+   "path": "history/jackson-roofing-legacy.json",
+   "key": "blog_posts",
+   "type": "blog",
+   "status": "published"
+  }
+ ],
+ "pages": [
+  {
+   "group": "Posts we published for you, live now",
+   "icon": "pen",
+   "repo": "C:\\Users\\wjack\\jackson-roofing-site",
+   "base_url": "https://wingdigital26-maker.github.io/jackson-roofing",
+   "dir": "blog",
+   "skip": [
+    "index.html"
+   ]
+  },
+  {
+   "group": "Service and city pages we built for you, live now",
+   "icon": "file",
+   "repo": "C:\\Users\\wjack\\jackson-roofing-site",
+   "base_url": "https://wingdigital26-maker.github.io/jackson-roofing",
+   "dir": "services",
+   "skip": [
+    "index.html"
+   ]
+  }
+ ],
+ "pages_from_items": [
+  {
+   "group": "Blog posts you can open on your site, July to August 2026",
+   "icon": "file",
+   "types": [
+    "blog"
+   ]
+  }
+ ],
+ "_pendingMetrics_comment": "Not rendered on the page today (the template hides that section by house rule) but kept as the written record of exactly why this dashboard shows no traffic, ranking, profile or lead numbers. Each one is a missing connection, not a zero.",
+ "pendingMetrics": [
+  {
+   "name": "Google Search clicks and impressions",
+   "why": "Needs Search Console access for the site connected to the reporting account",
+   "state": "needs access"
+  },
+  {
+   "name": "Keyword rankings",
+   "why": "Comes online with the same Search Console connection",
+   "state": "needs access"
+  },
+  {
+   "name": "Google Business Profile views and calls",
+   "why": "Needs manager access to the Google Business Profile",
+   "state": "needs access"
+  },
+  {
+   "name": "Calls and form leads",
+   "why": "The contact form does not report back to us, so any lead count here would be a guess",
+   "state": "not connected"
+  }
+ ],
+ "_actions_comment": "Google Business post and review-request rows removed 2026-09-06. The only \"published\" social record in the system was a single 2026-07-20 status string in a planning file with no post ID, no URL and no platform confirmation. Nothing has posted to any social network for this client: the OS social board is draft-only by design, and the intended GBP output route retired with GHL on 2026-08-22.",
+ "_copy_comment": "Copy rewritten 2026-09-06 to Jack spec: title names what Wing is doing, no absence language, no \"who could send you work\". The one consent line in the banner stays on purpose: outreach would go out under the client name, so his approval must be stated on the page, not assumed. Consent banner removed 2026-09-06 at Jack request after being flagged; the operational gate is unchanged (nothing sends unless armed), it is simply no longer printed on the page.",
+ "showChart": false,
+ "_stats_comment": "Stats reordered 2026-09-06: highest-value number first. The rolling \"published in the last 30 days\" stat was removed outright, and showChart is false, because publishing is paused and both surfaces turned that pause into the loudest thing on the page.",
+ "_reviewStanding_comment": "Generic dashboard block. The figures live in history/jackson-review-gap.json, read live off the public Google listings on the pull date. The copy below is client-facing framing only; it states the standing and the gap and never predicts a result.",
+ "reviewStanding": {
+  "data": "history/jackson-review-gap.json",
+  "title": "Where you stand on Google reviews",
+  "intro": "Your Google profile next to twelve roofing contractors Google returns for Plano, Frisco, McKinney, Allen and Richardson. Every rating and count here was read off the live listings on the pull date.",
+  "banner": "Reviews carry roughly a fifth of local pack weight, second only to the profile itself, and they are the clearest lever on this list that is still open to you.",
+  "labels": {
+   "tiles": [
+    "your reviews",
+    "your rating",
+    "median reviews in this set",
+    "median rating in this set",
+    "reviews between you and the median",
+    "most reviews in this set"
+   ],
+   "tableLabel": "The field, by review count",
+   "colName": "Business",
+   "colRating": "Rating",
+   "colCount": "Reviews",
+   "droppedLabel": "Left out of this set:"
+  },
+  "source_line": "Source: Google Maps listings for Jackson Roofing and for the roofing contractors Google returns on the searches roofing contractor Plano, Frisco, McKinney, Allen and Richardson TX. Candidate list built with the same open source Google Maps scraper Wing uses for prospecting; every rating and count then read live on the listing itself.",
+  "note": "Your profile is live and complete on the basics: address, phone, website, hours, category and 6 photos. The gap is volume. The three reviews Google shows on the profile are 6, 7 and 8 years old, so the profile reads as quiet rather than as bad. Nothing on this page is a forecast: it is the standing as Google displayed it on the pull date, and the gap figures are subtraction."
+ },
+ "_stormHistory_comment": "Storm history section. Generic template block: build.py reads the data file named below and the template renders a section only because this key exists. Every number on the page is a count of records in NOAA's public Storm Events Database, pulled 2026-09-07 from https://www.ncei.noaa.gov/pub/data/swdi/stormevents/csvfiles/. Nothing here is estimated, projected or inferred: NOAA does not record roofs damaged, homes affected or revenue, so no such figure appears. This is intelligence we can act on, not work already performed. Copy must stay factual and short.",
+ "stormHistory": {
+  "data": "history/jackson-storm-events.json",
+  "topEvents": 10,
+  "title": "Hail history in your service area",
+  "intro": "Every hail report NOAA logged in Collin, Denton, Dallas, Rockwall and Kaufman counties over the 24 months from June 2024 through May 2026. These are recorded events, not estimates.",
+  "banner": "Hail is the demand signal for residential roof replacement in North Texas. This is the record for your counties.",
+  "labels": {
+   "tiles": [
+    "hail reports on record",
+    "at 1 inch or larger",
+    "separate storm days",
+    "largest hail recorded",
+    "counties covered",
+    "months of record"
+   ],
+   "countyLabel": "Hail reports by county",
+   "monthLabel": "What months the hail lands in",
+   "cityLabel": "Your cities named on the record",
+   "eventLabel": "The largest hail on record"
+  },
+  "source_line": "Source: NOAA National Centers for Environmental Information, Storm Events Database. Filters: Texas, counties Collin, Denton, Dallas, Rockwall and Kaufman, event type Hail, June 2024 through May 2026.",
+  "note": "1 inch is the size that typically damages asphalt shingles, which is why it is counted separately. We have not contacted anyone off this data or run any campaign from it. It is the targeting layer we would build on, and it is here so you can check it yourself.",
+  "mapUrl": "https://wingdigital26-maker.github.io/storm-map/jackson/",
+  "mapLabel": "Open your interactive hail map",
+  "mapNote": "Radar-measured hail over 421,903 mapped homes across 46 ZIP codes. Search a ZIP, pick a storm, zoom in to individual houses.",
+  "_mapUrl_comment": "Built from the same NOAA MRMS MESH radar grids as the figures above, joined to Collin/Denton/Dallas/Rockwall appraisal parcels. Branded copy of the Wing storm map; shares one dataset."
+ }
 }

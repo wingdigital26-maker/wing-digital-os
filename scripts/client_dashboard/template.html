@@ -367,6 +367,12 @@ section{padding:34px 0 0}
   min-width:3.4em}
 .sv-wh{font-size:.9rem;font-weight:600;color:var(--t1);overflow-wrap:break-word}
 .sv-mt{font-size:.78rem;color:var(--t3);overflow-wrap:break-word}
+.sv-map{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin:18px 0 6px}
+.sv-maplink{display:inline-block;padding:10px 18px;border-radius:10px;
+  background:var(--accent);color:#08121a;font-weight:600;text-decoration:none;
+  font-size:14px;letter-spacing:.01em}
+.sv-maplink:hover{filter:brightness(1.08)}
+.sv-mapnote{color:var(--muted);font-size:13px}
 .sv-src{margin-top:14px;font-size:.79rem;color:var(--t3);line-height:1.55;
   overflow-wrap:break-word}
 .sv-src a{color:var(--accent);text-decoration:none;overflow-wrap:anywhere}
@@ -541,6 +547,7 @@ section{padding:34px 0 0}
     <div class="ctbl-cap" id="sv-city-note" hidden></div>
     <div class="mgroup"><div class="mlabel" id="sv-ev-label"></div></div>
     <div id="sv-events"></div>
+    <div class="sv-map" id="sv-map" hidden></div>
     <div class="sv-src" id="sv-src"></div>
     <div class="pl-note" id="sv-note" hidden></div>
   </section>
@@ -1200,6 +1207,16 @@ const DATA = __DATA__;
     $('#sv-src').innerHTML = esc(src) + (S.sourceUrl ?
       ' <a href="'+esc(S.sourceUrl)+'" target="_blank" rel="noopener">'+esc(S.sourceUrl)+'</a>' : '');
     if (S.note) { $('#sv-note').textContent = S.note; $('#sv-note').hidden = false; }
+
+    /* Interactive map link. Rendered only when the config supplies a URL, so a
+       client without a published map sees nothing rather than a dead button. */
+    if (S.mapUrl) {
+      const m = $('#sv-map');
+      m.innerHTML = '<a class="sv-maplink" href="' + esc(S.mapUrl) +
+        '" target="_blank" rel="noopener">' + esc(S.mapLabel || 'Open the interactive map') +
+        '</a>' + (S.mapNote ? '<span class="sv-mapnote">' + esc(S.mapNote) + '</span>' : '');
+      m.hidden = false;
+    }
   })();
 
 

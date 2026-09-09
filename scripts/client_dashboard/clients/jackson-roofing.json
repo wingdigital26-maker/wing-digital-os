@@ -203,6 +203,30 @@
   "_copy_comment": "Copy rewritten 2026-09-06 to Jack spec: title names what Wing is doing, no absence language, no \"who could send you work\". The one consent line in the banner stays on purpose: outreach would go out under the client name, so his approval must be stated on the page, not assumed. Consent banner removed 2026-09-06 at Jack request after being flagged; the operational gate is unchanged (nothing sends unless armed), it is simply no longer printed on the page.",
   "showChart": false,
   "_stats_comment": "Stats reordered 2026-09-06: highest-value number first. The rolling \"published in the last 30 days\" stat was removed outright, and showChart is false, because publishing is paused and both surfaces turned that pause into the loudest thing on the page.",
+  "_reviewStanding_comment": "Generic dashboard block. The figures live in history/jackson-review-gap.json, read live off the public Google listings on the pull date. The copy below is client-facing framing only; it states the standing and the gap and never predicts a result.",
+  "reviewStanding": {
+    "data": "history/jackson-review-gap.json",
+    "title": "Where you stand on Google reviews",
+    "intro": "Your Google profile next to twelve roofing contractors Google returns for Plano, Frisco, McKinney, Allen and Richardson. Every rating and count here was read off the live listings on the pull date.",
+    "banner": "Reviews carry roughly a fifth of local pack weight, second only to the profile itself, and they are the clearest lever on this list that is still open to you.",
+    "labels": {
+      "tiles": [
+        "your reviews",
+        "your rating",
+        "median reviews in this set",
+        "median rating in this set",
+        "reviews between you and the median",
+        "most reviews in this set"
+      ],
+      "tableLabel": "The field, by review count",
+      "colName": "Business",
+      "colRating": "Rating",
+      "colCount": "Reviews",
+      "droppedLabel": "Left out of this set:"
+    },
+    "source_line": "Source: Google Maps listings for Jackson Roofing and for the roofing contractors Google returns on the searches roofing contractor Plano, Frisco, McKinney, Allen and Richardson TX. Candidate list built with the same open source Google Maps scraper Wing uses for prospecting; every rating and count then read live on the listing itself.",
+    "note": "Your profile is live and complete on the basics: address, phone, website, hours, category and 6 photos. The gap is volume. The three reviews Google shows on the profile are 6, 7 and 8 years old, so the profile reads as quiet rather than as bad. Nothing on this page is a forecast: it is the standing as Google displayed it on the pull date, and the gap figures are subtraction."
+  },
   "_stormHistory_comment": "Storm history section. Generic template block: build.py reads the data file named below and the template renders a section only because this key exists. Every number on the page is a count of records in NOAA's public Storm Events Database, pulled 2026-09-07 from https://www.ncei.noaa.gov/pub/data/swdi/stormevents/csvfiles/. Nothing here is estimated, projected or inferred: NOAA does not record roofs damaged, homes affected or revenue, so no such figure appears. This is intelligence we can act on, not work already performed. Copy must stay factual and short.",
   "stormHistory": {
     "data": "history/jackson-storm-events.json",

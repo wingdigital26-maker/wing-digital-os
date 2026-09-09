@@ -1,0 +1,146 @@
+{
+  "_comment": {
+    "what": "Live Google review standing for Jackson Roofing against real roofing contractors in Plano and the surrounding cities.",
+    "pulledOn": "2026-09-07",
+    "pulledAt": "2026-09-07T15:45:00-05:00",
+    "sources": {
+      "discovery": "gosom/google-maps-scraper v1.17.1 (MIT, no API key), the same binary ghl-cli/maps_prospector.py drives, run in fast-mode with geo coordinates for Plano. Used to build the candidate list of roofing contractors only.",
+      "figures": "Every rating and review count below was then read live on Google Maps on the pull date, because the scraper's fast-mode path returns a rating but no review count. Search pages read: google.com/maps/search/roofing+contractor+{Plano,Frisco,McKinney,Allen,Richardson}+TX. Jackson Roofing's own figures were read on its own Google Maps profile.",
+      "clientSite": "jacksonroofingco.com was NOT fetched. That domain returns 403 to our IP through Cloudflare, so nothing here comes from the client site."
+    },
+    "honesty": "Every number is a figure Google displayed on the pull date. The median, range and gap figures are plain arithmetic on those numbers. Nothing is estimated, modelled or projected: there is no 'reviews needed to rank', no lead figure and no revenue figure anywhere in this file.",
+    "dropped": [
+      {
+        "name": "The Home Depot",
+        "why": "National home improvement retailer, not a roofing contractor. Appears in the Maps results for every city."
+      },
+      {
+        "name": "Ohh Hail Contractors",
+        "why": "Appeared only as a paid Sponsored placement in all five city searches, not as an organic local result. Kept out so the comparison set is one consistent kind of result."
+      },
+      {
+        "name": "Jackson Construction And Roofing / JH Roofing Inc / Jackson Construction / Southern Roofing",
+        "why": "Surfaced by Google under 'People also search for' on Jackson Roofing's own profile rather than in a city search. Not used, to keep every competitor sourced the same way."
+      }
+    ]
+  },
+  "client": {
+    "name": "Jackson Roofing",
+    "city": "Plano",
+    "hasProfile": true,
+    "rating": 4.1,
+    "reviewCount": 14,
+    "photoCount": 6,
+    "category": "Roofing contractor",
+    "address": "1516 Municipal Ave, Plano, TX 75074",
+    "phone": "(469) 323-4626",
+    "website": "jacksonroofingco.com",
+    "hoursListed": true,
+    "profileNotes": [
+      "The profile exists and is verified enough to show hours, phone, website and a map pin.",
+      "6 photos on the profile.",
+      "The three reviews Google surfaces on the profile are dated 6, 7 and 8 years ago. The full review list was not expandable in the view we read, so the date of the single most recent review is not confirmed and is not stated."
+    ],
+    "notConfirmed": [
+      "Date of the most recent review",
+      "Whether a services list is filled in on the profile"
+    ]
+  },
+  "competitors": [
+    {
+      "name": "Qualis Roofing & Construction",
+      "city": "Plano",
+      "rating": 5.0,
+      "reviewCount": 136
+    },
+    {
+      "name": "Texas Star Roofing Inc",
+      "city": "Plano",
+      "rating": 4.9,
+      "reviewCount": 142
+    },
+    {
+      "name": "Rivertop Roofing",
+      "city": "Plano",
+      "rating": 4.9,
+      "reviewCount": 141
+    },
+    {
+      "name": "Elevated Roofing",
+      "city": "Frisco",
+      "rating": 4.9,
+      "reviewCount": 1080
+    },
+    {
+      "name": "Peak Roofing and Construction",
+      "city": "Frisco",
+      "rating": 4.9,
+      "reviewCount": 458
+    },
+    {
+      "name": "Town and Country Roofing, Inc.",
+      "city": "Frisco",
+      "rating": 4.8,
+      "reviewCount": 213
+    },
+    {
+      "name": "Performance Roofing",
+      "city": "McKinney",
+      "rating": 4.8,
+      "reviewCount": 446
+    },
+    {
+      "name": "Wortham Brothers Roofing",
+      "city": "McKinney",
+      "rating": 4.8,
+      "reviewCount": 333
+    },
+    {
+      "name": "Elite Roofing LLC",
+      "city": "McKinney",
+      "rating": 4.9,
+      "reviewCount": 315
+    },
+    {
+      "name": "New View Roofing",
+      "city": "Allen",
+      "rating": 5.0,
+      "reviewCount": 105
+    },
+    {
+      "name": "Pickle Roofing Solutions",
+      "city": "Allen",
+      "rating": 4.8,
+      "reviewCount": 194
+    },
+    {
+      "name": "Rushing Roofing & Contracting LLC",
+      "city": "Richardson",
+      "rating": 5.0,
+      "reviewCount": 141
+    }
+  ],
+  "summary": {
+    "competitorCount": 12,
+    "cities": [
+      "Plano",
+      "Frisco",
+      "McKinney",
+      "Allen",
+      "Richardson"
+    ],
+    "medianReviewCount": 203.5,
+    "lowestReviewCount": 105,
+    "highestReviewCount": 1080,
+    "medianRating": 4.9,
+    "lowestRating": 4.8,
+    "highestRating": 5.0,
+    "clientRankByCount": 13,
+    "clientRankByRating": 13,
+    "fieldSize": 13,
+    "reviewsBehindMedian": 189.5,
+    "reviewsBehindTop": 1066,
+    "reviewsBehindLowest": 91,
+    "ratingBehindMedian": 0.8
+  }
+}

@@ -356,6 +356,54 @@ def collect_storm_history(cfg):
     }
 
 
+# ── review standing (a live read of public review listings) ──────────────────
+def collect_review_standing(cfg):
+    """Summarise a review-standing data file for the dashboard.
+
+    Generic on purpose: the config names the JSON file and supplies all of the
+    copy, so any client with a public review profile gets the same section.
+    Returns None when the config omits the key, and the template then renders
+    nothing at all.
+
+    Honesty rules enforced here rather than left to the template:
+      * Nothing is computed beyond arithmetic on figures that are already in
+        the source file. There is no ranking forecast, lead figure or revenue
+        figure, because the source does not contain one.
+      * The pull date and the per-figure source note travel with the payload so
+        the page can print them and the client can check the listings himself.
+      * Competitors are only sorted by a number the source already carries.
+    """
+    rs = cfg.get("reviewStanding")
+    if not rs:
+        return None
+    path = rs["data"]
+    if not os.path.isabs(path):
+        path = os.path.join(HERE, path)
+    if not os.path.exists(path):
+        print("    ! review standing data missing: %s" % path)
+        return None
+    note_mtime(path)
+    with open(path, encoding="utf-8") as fh:
+        src = json.load(fh)
+    meta = src.get("_comment", {})
+    comps = sorted(src.get("competitors", []),
+                   key=lambda c: -(c.get("reviewCount") or 0))
+    return {
+        "title": rs.get("title", "Where you stand on reviews"),
+        "intro": rs.get("intro", ""),
+        "banner": rs.get("banner", ""),
+        "note": rs.get("note", ""),
+        "sourceLine": rs.get("source_line", ""),
+        "pulledOn": meta.get("pulledOn"),
+        "honesty": meta.get("honesty", ""),
+        "client": src.get("client", {}),
+        "competitors": comps,
+        "summary": src.get("summary", {}),
+        "dropped": meta.get("dropped", []),
+        "labels": rs.get("labels", {}),
+    }
+
+
 # ── referral partners (a staged, never-contacted list, summarised) ───────────
 def collect_referral_partners(cfg):
     """Summarise a staged partner list out of a SQLite table.
@@ -583,6 +631,10 @@ def build(slug):
         # Optional, generic: a summary of a public storm/weather record file.
         # Absent key -> no section at all. Counts only, straight off the source.
         "stormHistory": collect_storm_history(cfg),
+        # Optional, generic: a summary of a live read of public review listings.
+        # Absent key -> no section at all. Figures straight off the source, plus
+        # arithmetic (median, range, gap) on those same figures. No projection.
+        "reviewStanding": collect_review_standing(cfg),
         # Optional, generic: per-section copy overrides (see template).
         "notes": cfg.get("notes", {}),
         # Optional REAL numbers only (e.g. {"emailsSent30d": 120, "asOf": "2026-09-06"}).

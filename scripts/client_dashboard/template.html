@@ -371,6 +371,35 @@ section{padding:34px 0 0}
   overflow-wrap:break-word}
 .sv-src a{color:var(--accent);text-decoration:none;overflow-wrap:anywhere}
 @media(max-width:420px){.sv-ev{grid-template-columns:1fr}.sv-sz{grid-row:auto}}
+/* review standing -- a generic, config-driven read of public review listings.
+   Renders ONLY when the payload carries `reviewStanding`, so a client config
+   without one ships none of it. Every rating and count is a figure the public
+   listing showed on the pull date; the median, range and gap lines are plain
+   arithmetic on those same figures. No forecast, lead figure or revenue figure
+   appears anywhere in it. */
+.rs-row{display:grid;grid-template-columns:1fr auto auto;gap:4px 12px;align-items:baseline;
+  padding:9px 0;border-bottom:1px solid var(--border)}
+.rs-row:last-child{border-bottom:0}
+.rs-row.is-you{background:var(--accent-bg);border-radius:var(--r-sm);
+  padding-left:11px;padding-right:11px;border-bottom:0;margin:4px 0}
+.rs-nm{font-size:.9rem;color:var(--t1);font-weight:550;overflow-wrap:break-word;min-width:0}
+.rs-nm i{display:block;font-style:normal;font-size:.75rem;color:var(--t3);font-weight:400}
+.rs-rt{font-size:.87rem;color:var(--t2);font-variant-numeric:tabular-nums;white-space:nowrap}
+.rs-ct{font-size:.9rem;color:var(--t1);font-weight:650;font-variant-numeric:tabular-nums;
+  white-space:nowrap;min-width:4.2em;text-align:right}
+.rs-row.is-you .rs-ct,.rs-row.is-you .rs-nm{color:var(--accent)}
+.rs-head{display:grid;grid-template-columns:1fr auto auto;gap:12px;padding:0 0 7px;
+  font-size:.7rem;letter-spacing:.07em;text-transform:uppercase;color:var(--t3);
+  border-bottom:1px solid var(--border)}
+.rs-head span:last-child{text-align:right;min-width:4.2em}
+.rs-src{margin-top:14px;font-size:.79rem;color:var(--t3);line-height:1.55;
+  overflow-wrap:break-word}
+@media(max-width:420px){
+  .rs-head{display:none}
+  .rs-row{grid-template-columns:1fr auto}
+  .rs-rt{grid-column:1;grid-row:2}
+  .rs-ct{grid-column:2;grid-row:1/3;text-align:right}
+}
 /* referral partner asset -- a generic, config-driven summary of a staged list
    of businesses who could send the client work. Renders ONLY when the payload
    carries `referralPartners`, so a client config without one ships none of it.
@@ -472,6 +501,26 @@ section{padding:34px 0 0}
     <div class="pl-note" id="rp-note" hidden></div>
   </section>
 
+
+  <!-- Review standing. Generic and config-driven: this whole section exists
+       only when the payload carries `reviewStanding`, and every visible word is
+       either injected by the reviewStanding() script below or read out of the
+       source data file. Public ratings and counts as displayed on the pull
+       date, plus arithmetic on them. No forecast of any kind. -->
+  <section id="rs-sec" hidden>
+    <div class="sh"><h2 id="rs-h"></h2><span class="n" id="rs-n"></span></div>
+    <div class="sd" id="rs-sd"></div>
+    <div class="pl-banner" id="rs-banner" hidden></div>
+    <div class="lstats" id="rs-stats"></div>
+    <div class="mgroup"><div class="mlabel" id="rs-table-label"></div></div>
+    <div class="card">
+      <div class="rs-head"><span id="rs-c1"></span><span id="rs-c2"></span><span id="rs-c3"></span></div>
+      <div id="rs-rows"></div>
+    </div>
+    <div class="ctbl-cap" id="rs-dropped" hidden></div>
+    <div class="rs-src" id="rs-src"></div>
+    <div class="pl-note" id="rs-note" hidden></div>
+  </section>
 
   <!-- Storm history. Generic and config-driven: this whole section exists only
        when the payload carries `stormHistory`, and every visible word is either
@@ -998,6 +1047,74 @@ const DATA = __DATA__;
       $('#rp-cap').textContent = R.sampleNote || '';
     }
     if (R.note) { $('#rp-note').textContent = R.note; $('#rp-note').hidden = false; }
+  })();
+
+  /* -- review standing ------------------------------------------
+     Generic and config-driven. Renders nothing unless the payload carries
+     `reviewStanding`. Every rating and count printed here is the figure the
+     public listing displayed on the pull date, copied through the build without
+     transformation. The median, range and gap lines are arithmetic on those
+     same figures. Nothing is estimated, projected or ranked forward, and the
+     pull date is printed on the page. */
+  (function reviewStanding(){
+    const S = DATA.reviewStanding;
+    if (!S || !S.client || !S.summary) return;
+    $('#rs-sec').hidden = false;
+    const L = S.labels || {};
+    const C = S.client, Q = S.summary;
+    const num = x => (x == null ? '' : Number(x).toLocaleString('en-US'));
+    const one = x => (x == null ? '' : (Math.round(Number(x)*10)/10).toFixed(1));
+    const day = d => { if (!d) return ''; const p = d.split('-');
+      return new Date(+p[0], +p[1]-1, +p[2]).toLocaleDateString('en-US',
+        {month:'short', day:'numeric', year:'numeric'}); };
+
+    $('#rs-h').textContent  = S.title || 'Where you stand on reviews';
+    $('#rs-n').textContent  = C.hasProfile === false
+      ? 'no public profile found'
+      : num(C.reviewCount) + ' reviews at ' + one(C.rating);
+    $('#rs-sd').textContent = S.intro || '';
+    if (S.banner) { $('#rs-banner').textContent = S.banner; $('#rs-banner').hidden = false; }
+
+    const tiles = [
+      [num(C.reviewCount),           'your reviews'],
+      [one(C.rating),                'your rating'],
+      [num(Q.medianReviewCount),     'median in this set'],
+      [one(Q.medianRating),          'median rating in this set'],
+      [num(Q.reviewsBehindMedian),   'reviews between you and the median'],
+      [num(Q.highestReviewCount),    'most reviews in this set']
+    ];
+    const tl = L.tiles || [];
+    $('#rs-stats').innerHTML = tiles.map((t,i) =>
+      '<div class="lstat"><b>'+esc(t[0])+'</b><span>'+esc(tl[i]||t[1])+'</span></div>').join('');
+
+    $('#rs-table-label').textContent = L.tableLabel || 'The field, by review count';
+    $('#rs-c1').textContent = L.colName   || 'Business';
+    $('#rs-c2').textContent = L.colRating || 'Rating';
+    $('#rs-c3').textContent = L.colCount  || 'Reviews';
+
+    const you = {name: C.name, city: C.city || '', rating: C.rating,
+                 reviewCount: C.reviewCount, _you: true};
+    const rows = (S.competitors || []).concat([you])
+      .sort((a,b) => (b.reviewCount||0) - (a.reviewCount||0));
+    $('#rs-rows').innerHTML = rows.map(r =>
+      '<div class="rs-row'+(r._you ? ' is-you' : '')+'">'+
+      '<div class="rs-nm">'+esc(r.name||'')+
+        (r.city ? '<i>'+esc(r.city)+'</i>' : '')+'</div>'+
+      '<div class="rs-rt">'+esc(one(r.rating))+'</div>'+
+      '<div class="rs-ct">'+esc(num(r.reviewCount))+'</div></div>').join('');
+
+    const dropped = S.dropped || [];
+    if (dropped.length) {
+      $('#rs-dropped').textContent = (L.droppedLabel || 'Left out of this set:') + ' ' +
+        dropped.map(d => d.name + ' (' + d.why + ')').join(' ');
+      $('#rs-dropped').hidden = false;
+    }
+
+    let src = S.sourceLine || '';
+    if (S.pulledOn) src += (src ? ' ' : '') + 'Read ' + day(S.pulledOn) + '.';
+    if (S.honesty)  src += (src ? ' ' : '') + S.honesty;
+    $('#rs-src').textContent = src;
+    if (S.note) { $('#rs-note').textContent = S.note; $('#rs-note').hidden = false; }
   })();
 
   /* -- storm history --------------------------------------------

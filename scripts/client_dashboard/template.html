@@ -1845,30 +1845,6 @@ const DATA = __DATA__;
 <div id="wing-helper" title="Nimbus, from Wing Digital"
   style="position:fixed;right:16px;z-index:60;opacity:0;pointer-events:none;transition:opacity .8s;
          bottom:calc(14px + env(safe-area-inset-bottom,0px))"></div>
-<script>
-/* On phones the browser URL bar collapses as you scroll, which changes the
-   VISUAL viewport but not the layout viewport -- so a position:fixed corner
-   element drifts instead of staying put. Desktop never shows this, which is why
-   it looks fine in a normal browser. Pinning to visualViewport keeps Nimbus in
-   the corner on a real device; browsers without the API keep the CSS default. */
-(function () {
-  var vv = window.visualViewport;
-  var el = document.getElementById('wing-helper');
-  if (!vv || !el) return;
-  var raf = null;
-  function pin() {
-    raf = null;
-    var gapBottom = (window.innerHeight - vv.height - vv.offsetTop);
-    el.style.bottom = 'calc(14px + env(safe-area-inset-bottom,0px) + ' +
-                      Math.max(0, Math.round(gapBottom)) + 'px)';
-  }
-  function schedule() { if (raf === null) raf = requestAnimationFrame(pin); }
-  vv.addEventListener('resize', schedule);
-  vv.addEventListener('scroll', schedule);
-  addEventListener('orientationchange', schedule);
-  schedule();
-})();
-</script>
 <script src="/mascot/wing-mascot.js?v=13"></script>
 <script>
 (function(){

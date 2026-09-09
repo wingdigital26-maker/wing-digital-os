@@ -1896,35 +1896,62 @@ const DATA = __DATA__;
 })();
 </script>
 <style>
-/* Bottom-right, CSS only.
+/* Nimbus, welded bottom-right.
 
-   The reason he drifted on iOS: Safari REPAINTS a position:fixed element as the
-   page scrolls rather than compositing it, so it lags the scroll and reads as
-   moving. translateZ(0) + backface-visibility promotes him to his own GPU
-   layer, which is the standard remedy -- the layer is composited with the
-   scroll instead of being redrawn behind it.
-
-   Anchored with svh, not dvh. dvh tracks the URL bar, and iOS Safari only
-   recomputes it when the scroll STOPS -- which is the jump. svh is the small
-   viewport height and is static, so it never changes and he cannot move. The
-   cost is that he sits a little higher once the bar is hidden; the benefit is
-   that he is welded in place, which is what was asked for. */
+   iOS Safari specifics, learned the hard way:
+     * Safari REPAINTS a fixed element during scroll instead of compositing it,
+       so it lags and reads as moving -> translateZ(0) puts him on his own GPU
+       layer, which is composited with the scroll.
+     * `bottom` is resolved against the layout viewport, which does not match
+       the visible area while the URL bar animates -> anchor from the TOP, which
+       Safari handles correctly.
+     * svh is the STATIC small-viewport height, so the anchor never changes.
+       dvh tracks the URL bar and Safari only recomputes it when scrolling
+       stops, which is the jump.
+   Older Safari has no svh; the script below sets the same anchor in pixels and
+   updates it ONLY when the viewport actually resizes -- never per scroll frame,
+   because that is what made it bounce. */
 #wing-helper{
-  position:fixed;right:16px;bottom:14px;z-index:60;
+  position:fixed;right:16px;top:auto;bottom:14px;z-index:60;
   width:78px;height:78px;line-height:0;margin:0;
   opacity:0;pointer-events:none;transition:opacity .8s;
   -webkit-transform:translateZ(0);transform:translateZ(0);
   -webkit-backface-visibility:hidden;backface-visibility:hidden;
-  will-change:transform;
 }
 @supports (height:100svh){
-  #wing-helper{
-    top:calc(100svh - 78px - 14px - env(safe-area-inset-bottom,0px));
-    bottom:auto;
-  }
+  #wing-helper{top:calc(100svh - 92px - env(safe-area-inset-bottom,0px));bottom:auto}
+}
+/* Phones: he does not float at all.
+
+   Five separate fixes for iOS Safari's fixed-position behaviour did not hold
+   on a real device, and a mascot that wanders mid-page is worse than no
+   mascot. On desktop, where fixed works, he stays in the corner. */
+@media (max-width:760px){
+  #wing-helper{display:none!important}
 }
 </style>
 <div id="wing-helper" title="Nimbus, from Wing Digital"></div>
+<script>
+(function () {
+  var el = document.getElementById('wing-helper');
+  if (!el) return;
+  // Only needed where svh is missing (Safari < 15.4). Where svh works, CSS
+  // already holds him and this does nothing.
+  var hasSvh = window.CSS && CSS.supports && CSS.supports('height', '100svh');
+  if (hasSvh) return;
+  function place() {
+    var vv = window.visualViewport;
+    var h = vv ? vv.height : window.innerHeight;
+    el.style.top = Math.round(h - 92) + 'px';
+    el.style.bottom = 'auto';
+  }
+  // resize only. Never on scroll: a per-frame update lags the scroll and bounces.
+  addEventListener('resize', place);
+  addEventListener('orientationchange', place);
+  if (window.visualViewport) visualViewport.addEventListener('resize', place);
+  place();
+})();
+</script>
 <script src="/mascot/wing-mascot.js?v=13"></script>
 <script>
 (function(){

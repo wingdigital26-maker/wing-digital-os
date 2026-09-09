@@ -1843,55 +1843,12 @@ const DATA = __DATA__;
 })();
 </script>
 <style>
-/* Nimbus is positioned by script, not by position:fixed. On some phones fixed
-   was behaving like absolute -- he rose as the page scrolled down and returned
-   to the corner at the top, which is the exact signature of a broken fixed
-   containing block. Rather than keep hunting for what breaks it, the corner is
-   computed from the current scroll position every frame, so it holds whether
-   fixed works or not. */
-/* explicit size: the orb mounts as an inline-block child, so without this the
-   host measures 0 tall and the corner maths lands ~78px off. */
-#wing-helper{position:absolute;z-index:60;opacity:0;pointer-events:none;
-  transition:opacity .8s;margin:0;width:78px;height:78px;line-height:0}
+/* Pinned bottom-right in CSS only. No JavaScript positioning: every
+   scroll-driven approach repositions a frame behind the scroll, which
+   reads as bouncing. */
+#wing-helper{position:fixed;right:16px;bottom:14px;z-index:60;width:78px;height:78px;line-height:0;opacity:0;pointer-events:none;transition:opacity .8s}
 </style>
 <div id="wing-helper" title="Nimbus, from Wing Digital"></div>
-<script>
-(function () {
-  var el = document.getElementById('wing-helper');
-  if (!el) return;
-  var PAD_R = 16, PAD_B = 14, raf = null;
-
-  function place() {
-    raf = null;
-    var vv = window.visualViewport;
-    // bottom-right of what the reader can actually see, in document coordinates
-    var viewW = vv ? vv.width  : document.documentElement.clientWidth;
-    var viewH = vv ? vv.height : document.documentElement.clientHeight;
-    var offX  = (vv ? vv.offsetLeft : 0) + (window.scrollX || window.pageXOffset || 0);
-    var offY  = (vv ? vv.offsetTop  : 0) + (window.scrollY || window.pageYOffset || 0);
-    var r = el.getBoundingClientRect();
-    var w = r.width || el.offsetWidth || 78,
-        hgt = r.height || el.offsetHeight || 78;
-    var safe = 0;
-    try { safe = parseFloat(getComputedStyle(document.documentElement)
-      .getPropertyValue('--sab')) || 0; } catch (e) {}
-    el.style.left = Math.round(offX + viewW - w - PAD_R) + 'px';
-    el.style.top  = Math.round(offY + viewH - hgt - PAD_B - safe) + 'px';
-  }
-  function schedule() { if (raf === null) raf = requestAnimationFrame(place); }
-
-  addEventListener('scroll', schedule, { passive: true });
-  addEventListener('resize', schedule);
-  addEventListener('orientationchange', schedule);
-  if (window.visualViewport) {
-    visualViewport.addEventListener('scroll', schedule);
-    visualViewport.addEventListener('resize', schedule);
-  }
-  // the orb mounts after this runs, so settle once it has a real size
-  setTimeout(schedule, 300); setTimeout(schedule, 1200);
-  schedule();
-})();
-</script>
 <script src="/mascot/wing-mascot.js?v=13"></script>
 <script>
 (function(){

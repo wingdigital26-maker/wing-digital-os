@@ -528,6 +528,16 @@ section{padding:34px 0 0}
     <button class="more" id="more" hidden></button>
   </section>
 
+  <!-- Social sits directly under the content work and reads the same way: it is
+       the same job, published somewhere else. Renders only when the client has
+       posts on file. -->
+  <section id="soc-sec" hidden>
+    <div class="sh"><h2 id="soc-h"></h2><span class="n" id="soc-n"></span></div>
+    <div class="sd" id="soc-sd"></div>
+    <div id="soc-list"></div>
+    <button class="more" id="soc-more" hidden></button>
+  </section>
+
 <section id="pages-sec">
     <div class="sh"><h2>Other pages we maintain</h2><span class="n" id="pagen"></span></div>
     <div class="sd">Pages on your site beyond the list above.</div>
@@ -1254,6 +1264,49 @@ const DATA = __DATA__;
         if (frame) frame.style.height = Math.min(Math.max(px + 8, 600), 6000) + 'px';
       });
     }
+  })();
+
+
+  /* Social posts. Same row shape as the published-work list above, so the two
+     sections read as one body of work rather than two systems. */
+  (function () {
+    const S = DATA.social;
+    if (!S || !S.items || !S.items.length) return;
+    const MON = ['Jan','Feb','Mar','Apr','May','Jun',
+                 'Jul','Aug','Sep','Oct','Nov','Dec'];
+    const day = function (d) {
+      if (!d) return '';
+      const p = String(d).split('-');
+      if (p.length < 3) return d;
+      return MON[(+p[1] || 1) - 1] + ' ' + (+p[2]) + ', ' + p[0];
+    };
+    $('#soc-h').textContent = S.title;
+    $('#soc-n').textContent = S.count + (S.count === 1 ? ' post' : ' posts');
+    $('#soc-sd').innerHTML = esc(S.intro || '') + (S.handle ?
+      ' <a href="' + esc(S.handleUrl || '#') + '" target="_blank" rel="noopener">' +
+      esc(S.handle) + '</a>' : '');
+
+    let shown = 0;
+    const STEP = 8;
+    function render() {
+      const slice = S.items.slice(0, shown + STEP);
+      shown = slice.length;
+      $('#soc-list').innerHTML = slice.map(function (it) {
+        return '<a class="row" href="' + esc(it.url) + '" target="_blank" rel="noopener">' +
+          '<span class="row-dot" style="background:var(--accent)"></span>' +
+          '<span class="row-t">' + esc(it.title) + '</span>' +
+          '<span class="row-m">' + esc(it.platform || 'Social') + '</span>' +
+          '<span class="row-d">' + day(it.date) + '</span></a>';
+      }).join('');
+      const more = $('#soc-more');
+      if (shown < S.items.length) {
+        more.hidden = false;
+        more.textContent = 'Show ' + Math.min(STEP, S.items.length - shown) + ' more';
+      } else { more.hidden = true; }
+    }
+    $('#soc-more').addEventListener('click', render);
+    render();
+    $('#soc-sec').hidden = false;
   })();
 
 

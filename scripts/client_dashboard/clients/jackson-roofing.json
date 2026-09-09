@@ -213,5 +213,13 @@
   "mapNote": "Search a ZIP or city, pick a storm from the timeline, then zoom in to see individual homes and the hail each one took.",
   "_mapUrl_comment": "Must end in /map/. /storm-map/jackson/ is the published copy of THIS dashboard; pointing the iframe there makes the page embed itself. Verify the URL renders a map before shipping.",
   "_source_line_comment": "Jack 2026-09-09: do not name our data sources on client-facing pages. State the coverage and the window, not where it came from. Map-tile attribution inside the embedded map is a licence condition and must stay."
+ },
+ "social": {
+  "data": "history/jackson-roofing-legacy.json",
+  "key": "social_posts",
+  "title": "What we posted on your social",
+  "intro": "Posts published to your Instagram. Click any one to open it.",
+  "handle": "@jackson_roofing1",
+  "handleUrl": "https://www.instagram.com/jackson_roofing1/"
  }
 }

@@ -363,6 +363,40 @@ def collect_storm_history(cfg):
     }
 
 
+# ── social posts (read from the client's own account) ───────────────────────
+def collect_social(cfg):
+    """Posts published to the client's own social account.
+
+    Same shape as the content section on purpose: social is content work and
+    should read like it. Returns None when the client has no social posts on
+    file, and the template then renders nothing at all.
+    """
+    sc = cfg.get("social")
+    if not sc:
+        return None
+    path = sc["data"]
+    if not os.path.isabs(path):
+        path = os.path.join(HERE, path)
+    if not os.path.exists(path):
+        print("    ! social data missing: %s" % path)
+        return None
+    note_mtime(path)
+    with open(path, encoding="utf-8") as fh:
+        src = json.load(fh)
+    items = src.get(sc.get("key", "social_posts"), [])
+    items = sorted(items, key=lambda x: x.get("date", ""), reverse=True)
+    if not items:
+        return None
+    return {
+        "title": sc.get("title", "What we posted on social"),
+        "intro": sc.get("intro", ""),
+        "handle": sc.get("handle", ""),
+        "handleUrl": sc.get("handleUrl", ""),
+        "items": items,
+        "count": len(items),
+    }
+
+
 # ── review standing (a live read of public review listings) ──────────────────
 def collect_review_standing(cfg):
     """Summarise a review-standing data file for the dashboard.
@@ -643,6 +677,7 @@ def build(slug):
         # arithmetic (median, range, gap) on those same figures. No projection.
         "reviewStanding": collect_review_standing(cfg),
         # Optional, generic: per-section copy overrides (see template).
+        "social": collect_social(cfg),
         "notes": cfg.get("notes", {}),
         # Optional REAL numbers only (e.g. {"emailsSent30d": 120, "asOf": "2026-09-06"}).
         # Nimbus's arrival reaction reads these; leaving it absent is always

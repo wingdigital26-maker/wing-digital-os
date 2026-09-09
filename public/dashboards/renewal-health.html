@@ -367,6 +367,16 @@ section{padding:34px 0 0}
   min-width:3.4em}
 .sv-wh{font-size:.9rem;font-weight:600;color:var(--t1);overflow-wrap:break-word}
 .sv-mt{font-size:.78rem;color:var(--t3);overflow-wrap:break-word}
+.sv-map{margin:18px 0 6px}
+.sv-mapnote{color:var(--muted);font-size:13px;margin:0 0 12px;max-width:70ch}
+.sv-mapframe{width:100%;height:1180px;border:1px solid var(--line);
+  border-radius:12px;background:var(--card);display:block;overflow:hidden;
+  transition:height .25s ease}
+.sv-mapopen{display:inline-block;margin-top:10px;color:var(--accent);
+  font-size:13px;font-weight:600;text-decoration:none}
+.sv-mapopen:hover{text-decoration:underline}
+@media(max-width:760px){.sv-mapframe{height:1420px}}
+@media(prefers-reduced-motion:reduce){.sv-mapframe{transition:none}}
 .sv-src{margin-top:14px;font-size:.79rem;color:var(--t3);line-height:1.55;
   overflow-wrap:break-word}
 .sv-src a{color:var(--accent);text-decoration:none;overflow-wrap:anywhere}
@@ -485,6 +495,55 @@ section{padding:34px 0 0}
   <!-- Referral partners. Generic and config-driven: this whole section exists
        only when the payload carries `referralPartners`, and every visible word
        is injected by the referralPartners() script below. -->
+  <!-- SEO and content work leads the page: it is what Wing does for the
+       client week to week. Outreach, reviews and hail follow. -->
+<section id="health-sec" hidden>
+    <div class="sh"><h2>Your site, checked just now</h2><span class="n" id="healthn"></span></div>
+    <div class="sd">We opened every page on your site as this loaded and checked the things Google
+      looks at. These are live readings.</div>
+    <div id="health"></div>
+  </section>
+
+<section id="chart-sec">
+    <div class="sh"><h2>Published by month</h2></div>
+    <div class="sd" id="chart-sd"></div>
+    <div class="card">
+      <div class="chart" id="chart"></div>
+      <div class="cnote" id="cnote"></div>
+    </div>
+  </section>
+
+<section>
+    <div class="sh"><h2>What we published</h2><span class="n" id="pubn"></span></div>
+    <div class="sd" id="pub-sd">Colours match the chart above. Click any title to open it on your site.</div>
+    <div class="card" style="margin-bottom:14px">
+      <div class="mix" id="mix"></div>
+      <div class="keys" id="keys"></div>
+    </div>
+    <div class="search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input id="q" type="search" placeholder="Search by title" autocomplete="off" aria-label="Search published work by title">
+    </div>
+    <div id="list"></div>
+    <button class="more" id="more" hidden></button>
+  </section>
+
+  <!-- Social sits directly under the content work and reads the same way: it is
+       the same job, published somewhere else. Renders only when the client has
+       posts on file. -->
+  <section id="soc-sec" hidden>
+    <div class="sh"><h2 id="soc-h"></h2><span class="n" id="soc-n"></span></div>
+    <div class="sd" id="soc-sd"></div>
+    <div id="soc-list"></div>
+    <button class="more" id="soc-more" hidden></button>
+  </section>
+
+<section id="pages-sec">
+    <div class="sh"><h2>Other pages we maintain</h2><span class="n" id="pagen"></span></div>
+    <div class="sd">Pages on your site beyond the list above.</div>
+    <div id="pages"></div>
+  </section>
+
   <section id="rp-sec" hidden>
     <div class="sh"><h2 id="rp-h"></h2><span class="n" id="rp-n"></span></div>
     <div class="sd" id="rp-sd"></div>
@@ -532,15 +591,23 @@ section{padding:34px 0 0}
     <div class="sd" id="sv-sd"></div>
     <div class="pl-banner" id="sv-banner" hidden></div>
     <div class="lstats" id="sv-stats"></div>
-    <div class="mgroup"><div class="mlabel" id="sv-county-label"></div></div>
-    <div class="rp-bars" id="sv-counties"></div>
-    <div class="mgroup"><div class="mlabel" id="sv-month-label"></div></div>
-    <div class="rp-bars" id="sv-months"></div>
-    <div class="mgroup"><div class="mlabel" id="sv-city-label"></div></div>
-    <div class="lpills" id="sv-cities"></div>
-    <div class="ctbl-cap" id="sv-city-note" hidden></div>
-    <div class="mgroup"><div class="mlabel" id="sv-ev-label"></div></div>
-    <div id="sv-events"></div>
+
+    <!-- The map carries the same breakdowns interactively (ranked areas, storm
+         timeline, per-storm detail), so when a client has one the static
+         versions below are suppressed rather than printed twice. -->
+    <div class="sv-map" id="sv-map" hidden></div>
+
+    <div id="sv-breakdowns">
+      <div class="mgroup"><div class="mlabel" id="sv-county-label"></div></div>
+      <div class="rp-bars" id="sv-counties"></div>
+      <div class="mgroup"><div class="mlabel" id="sv-month-label"></div></div>
+      <div class="rp-bars" id="sv-months"></div>
+      <div class="mgroup"><div class="mlabel" id="sv-city-label"></div></div>
+      <div class="lpills" id="sv-cities"></div>
+      <div class="ctbl-cap" id="sv-city-note" hidden></div>
+      <div class="mgroup"><div class="mlabel" id="sv-ev-label"></div></div>
+      <div id="sv-events"></div>
+    </div>
     <div class="sv-src" id="sv-src"></div>
     <div class="pl-note" id="sv-note" hidden></div>
   </section>
@@ -581,38 +648,7 @@ section{padding:34px 0 0}
     </div>
   </section>
 
-  <section id="health-sec" hidden>
-    <div class="sh"><h2>Your site, checked just now</h2><span class="n" id="healthn"></span></div>
-    <div class="sd">We opened every page on your site as this loaded and checked the things Google
-      looks at. These are live readings.</div>
-    <div id="health"></div>
-  </section>
-
-  <section id="chart-sec">
-    <div class="sh"><h2>Published by month</h2></div>
-    <div class="sd" id="chart-sd"></div>
-    <div class="card">
-      <div class="chart" id="chart"></div>
-      <div class="cnote" id="cnote"></div>
-    </div>
-  </section>
-
-  <section>
-    <div class="sh"><h2>What we published</h2><span class="n" id="pubn"></span></div>
-    <div class="sd" id="pub-sd">Colours match the chart above. Click any title to open it on your site.</div>
-    <div class="card" style="margin-bottom:14px">
-      <div class="mix" id="mix"></div>
-      <div class="keys" id="keys"></div>
-    </div>
-    <div class="search">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
-      <input id="q" type="search" placeholder="Search by title" autocomplete="off" aria-label="Search published work by title">
-    </div>
-    <div id="list"></div>
-    <button class="more" id="more" hidden></button>
-  </section>
-
-  <section id="out-sec">
+        <section id="out-sec">
     <div class="sh"><h2>Outreach and social</h2><span class="n" id="outn"></span></div>
     <div class="sd" id="out-sd"></div>
     <div class="chans" id="chans"></div>
@@ -671,20 +707,14 @@ section{padding:34px 0 0}
     <button class="more" id="leadmore" hidden></button>
   </section>
 
-  <section id="pages-sec">
-    <div class="sh"><h2>Other pages we maintain</h2><span class="n" id="pagen"></span></div>
-    <div class="sd">Pages on your site beyond the list above.</div>
-    <div id="pages"></div>
-  </section>
-
-  <div class="foot">
+    <div class="foot">
     Prepared by <span id="agency">Wing Digital</span>
     &middot; <span id="stamp"></span>
   </div>
 </main>
 
 <script>
-const DATA = {"slug":"renewal-health","generated":"2026-09-08","dataThrough":"2026-09-08","generatedAt":"2026-09-08T17:59:47","brand":{"name":"Renewal Health","initials":"RH","site":"https://renewalhealth.life","kicker":"Marketing dashboard","headline":"Everything Wing Digital is building for Renewal Health","subhead":"A live record of the pages and posts running on renewalhealth.life. Click anything to open it on the real site."},"engines":[{"name":"Blog engine","detail":"2 posts a week, published Mondays","icon":"pen"},{"name":"Service pages","detail":"Detox, gut health, hormones, inflammation, weight, neurodivergent care, emotional overwhelm","icon":"map"},{"name":"On-page SEO","detail":"Titles, schema, internal links","icon":"search"},{"name":"Internal linking","detail":"New posts wired to service pages and old posts","icon":"link"}],"types":{"blog":{"label":"Blog post","color":"#8fae85"},"service":{"label":"Service page","color":"#b79cc9"},"core":{"label":"Core page","color":"#c9a24b"},"other":{"label":"Other","color":"#8a7f93"}},"showChart":true,"outreach":{"intro":"What runs automatically for Renewal Health each week.","channels":[{"name":"Weekly content engine","icon":"pen","types":["blog"],"state":"live","note":"Live and scheduled: two new blog posts every Monday morning (7:40am), each image-checked and reviewed against health-claim rules before it publishes."}]},"outreachPreview":null,"plan":null,"referralPartners":null,"stormHistory":null,"reviewStanding":null,"notes":{},"metrics":{},"items":[{"date":"2026-09-08","type":"blog","title":"The Master Thread: Healing Patterns You Did Not Start","status":"published","url":"https://renewalhealth.life/blog/master-thread-inherited-patterns.html"},{"date":"2026-09-08","type":"blog","title":"Nothing Missing, Nothing Broken: What Shalom Means for Your Body","status":"published","url":"https://renewalhealth.life/blog/what-shalom-means-for-your-body.html"},{"date":"2026-09-07","type":"blog","title":"Your Body Is the Most Honest Witness You Have","status":"published","url":"https://renewalhealth.life/blog/body-is-an-honest-witness.html"},{"date":"2026-09-07","type":"blog","title":"Glimmers: Training Your Body to Notice Safety Again","status":"published","url":"https://renewalhealth.life/blog/glimmers-nervous-system.html"},{"date":"2026-09-06","type":"service","title":"Nothing Missing, Nothing Broken","status":"published","url":"https://renewalhealth.life/book.html"},{"date":"2026-09-06","type":"service","title":"5 Signs Your Body Is Asking for a Different Kind of Support","status":"published","url":"https://renewalhealth.life/guide.html"},{"date":"2026-09-06","type":"service","title":"Thank You for Walking This Road with Me","status":"published","url":"https://renewalhealth.life/leave-a-review.html"},{"date":"2026-08-31","type":"blog","title":"Cortisol, Safety, and the Belly That Will Not Let Go","status":"published","url":"https://renewalhealth.life/blog/cortisol-and-belly-weight.html"},{"date":"2026-08-31","type":"blog","title":"Open the Exit Ramps: How Your Body's Drainage Pathways Work","status":"published","url":"https://renewalhealth.life/blog/drainage-pathways.html"},{"date":"2026-08-31","type":"blog","title":"Wired but Tired: When Your Body Is Stuck in a Quiet Emergency","status":"published","url":"https://renewalhealth.life/blog/wired-but-tired.html"},{"date":"2026-08-24","type":"blog","title":"Chasing Symptoms vs Finding the Root: What Root-Cause Really Means","status":"published","url":"https://renewalhealth.life/blog/chasing-symptoms-vs-finding-the-root.html"},{"date":"2026-08-24","type":"blog","title":"Rest and Digest: Why You Cannot Heal Your Gut While Bracing","status":"published","url":"https://renewalhealth.life/blog/rest-and-digest-cannot-heal-gut-while-bracing.html"},{"date":"2026-08-24","type":"blog","title":"What Is Homeopathy, Really? A Plain-English Primer","status":"published","url":"https://renewalhealth.life/blog/what-is-homeopathy-plain-english-primer.html"},{"date":"2026-08-18","type":"blog","title":"Nervous System Support for Neurodivergent Adults","status":"published","url":"https://renewalhealth.life/blog/neurodivergent-nervous-system-support.html"},{"date":"2026-08-18","type":"blog","title":"Why Weight Will Not Budge When the Body Feels Unsafe","status":"published","url":"https://renewalhealth.life/blog/why-weight-will-not-budge.html"},{"date":"2026-08-10","type":"blog","title":"Chronic Inflammation: The Quiet Fire in the Body","status":"published","url":"https://renewalhealth.life/blog/chronic-inflammation-natural-support.html"},{"date":"2026-08-10","type":"blog","title":"Signs Your Hormones May Be Out of Balance","status":"published","url":"https://renewalhealth.life/blog/signs-of-hormone-imbalance.html"},{"date":"2026-08-05","type":"blog","title":"Gentle Detox: Why Your Body Cleanses Best Under Safety","status":"published","url":"https://renewalhealth.life/blog/gentle-detox.html"},{"date":"2026-08-05","type":"blog","title":"The Gut-Brain Connection: Anxiety Starts in the Belly","status":"published","url":"https://renewalhealth.life/blog/gut-brain-connection.html"},{"date":"2026-08-03","type":"service","title":"Detox","status":"published","url":"https://renewalhealth.life/detox.html"},{"date":"2026-07-27","type":"blog","title":"It Is Not Mine to Carry: How to Surrender Your Burdens","status":"published","url":"https://renewalhealth.life/blog/how-to-surrender-your-burdens-to-god.html"},{"date":"2026-07-27","type":"blog","title":"Renewal Health: Why Your Body Needs a Master Builder, a Blueprint, and a Bridge","status":"published","url":"https://renewalhealth.life/blog/root-cause-healing-naturopathy-homeopathy.html"},{"date":"2026-07-27","type":"blog","title":"When Defeat Becomes a Doorway: Growth Through Hardship","status":"published","url":"https://renewalhealth.life/blog/spiritual-growth-through-hardship.html"},{"date":"2026-07-27","type":"blog","title":"Vagal Tone Exercises: Partner With Your Hidden Engine","status":"published","url":"https://renewalhealth.life/blog/vagal-tone-exercises.html"},{"date":"2026-07-27","type":"service","title":"Emotional Overwhelm Support & Nervous System Regulation for Calm, Clarity, and Balance","status":"published","url":"https://renewalhealth.life/emotional-overwhelm-nervous-system.html"},{"date":"2026-07-27","type":"service","title":"Gut Health Support for Digestion, Energy, and Whole-Body Balance","status":"published","url":"https://renewalhealth.life/gut-health-support.html"},{"date":"2026-07-27","type":"service","title":"Hormone Balance Support for Energy, Mood, and Whole-Body Health","status":"published","url":"https://renewalhealth.life/hormone-balance-support.html"},{"date":"2026-07-27","type":"service","title":"Inflammation Support to Reduce Pain, Fatigue, and Whole-Body Imbalance","status":"published","url":"https://renewalhealth.life/inflammation-support.html"},{"date":"2026-07-27","type":"service","title":"Detox","status":"published","url":"https://renewalhealth.life/naturopathic-detox.html"},{"date":"2026-07-27","type":"service","title":"Naturopathy and Homeopathy","status":"published","url":"https://renewalhealth.life/naturopathy-homeopathy-holistic-healing.html"},{"date":"2026-07-27","type":"service","title":"Neurodivergent Support for Focus, Regulation, and Whole-Body Balance","status":"published","url":"https://renewalhealth.life/neurodivergent-support.html"},{"date":"2026-07-27","type":"service","title":"Weight Balance & Metabolic Health Support Through Root-Cause Care","status":"published","url":"https://renewalhealth.life/weight-metabolic-health.html"},{"date":"2026-07-27","type":"service","title":"The Dragonfly","status":"published","url":"https://renewalhealth.life/why-a-dragonfly-renewal-health.html"}],"pages":[{"group":"Blog posts live on your site","icon":"pen","links":[{"title":"Your Body Is the Most Honest Witness You Have","url":"https://renewalhealth.life/blog/body-is-an-honest-witness.html"},{"title":"Chasing Symptoms vs Finding the Root: What Root-Cause Really Means","url":"https://renewalhealth.life/blog/chasing-symptoms-vs-finding-the-root.html"},{"title":"Chronic Inflammation: The Quiet Fire in the Body","url":"https://renewalhealth.life/blog/chronic-inflammation-natural-support.html"},{"title":"Cortisol, Safety, and the Belly That Will Not Let Go","url":"https://renewalhealth.life/blog/cortisol-and-belly-weight.html"},{"title":"Open the Exit Ramps: How Your Body's Drainage Pathways Work","url":"https://renewalhealth.life/blog/drainage-pathways.html"},{"title":"Gentle Detox: Why Your Body Cleanses Best Under Safety","url":"https://renewalhealth.life/blog/gentle-detox.html"},{"title":"Glimmers: Training Your Body to Notice Safety Again","url":"https://renewalhealth.life/blog/glimmers-nervous-system.html"},{"title":"The Gut-Brain Connection: Anxiety Starts in the Belly","url":"https://renewalhealth.life/blog/gut-brain-connection.html"},{"title":"It Is Not Mine to Carry: How to Surrender Your Burdens","url":"https://renewalhealth.life/blog/how-to-surrender-your-burdens-to-god.html"},{"title":"The Master Thread: Healing Patterns You Did Not Start","url":"https://renewalhealth.life/blog/master-thread-inherited-patterns.html"},{"title":"Nervous System Support for Neurodivergent Adults","url":"https://renewalhealth.life/blog/neurodivergent-nervous-system-support.html"},{"title":"Rest and Digest: Why You Cannot Heal Your Gut While Bracing","url":"https://renewalhealth.life/blog/rest-and-digest-cannot-heal-gut-while-bracing.html"},{"title":"Renewal Health: Why Your Body Needs a Master Builder, a Blueprint, and a Bridge","url":"https://renewalhealth.life/blog/root-cause-healing-naturopathy-homeopathy.html"},{"title":"Signs Your Hormones May Be Out of Balance","url":"https://renewalhealth.life/blog/signs-of-hormone-imbalance.html"},{"title":"When Defeat Becomes a Doorway: Growth Through Hardship","url":"https://renewalhealth.life/blog/spiritual-growth-through-hardship.html"},{"title":"Vagal Tone Exercises: Partner With Your Hidden Engine","url":"https://renewalhealth.life/blog/vagal-tone-exercises.html"},{"title":"What Is Homeopathy, Really? A Plain-English Primer","url":"https://renewalhealth.life/blog/what-is-homeopathy-plain-english-primer.html"},{"title":"Nothing Missing, Nothing Broken: What Shalom Means for Your Body","url":"https://renewalhealth.life/blog/what-shalom-means-for-your-body.html"},{"title":"Why Weight Will Not Budge When the Body Feels Unsafe","url":"https://renewalhealth.life/blog/why-weight-will-not-budge.html"},{"title":"Wired but Tired: When Your Body Is Stuck in a Quiet Emergency","url":"https://renewalhealth.life/blog/wired-but-tired.html"}]},{"group":"Service and core pages","icon":"globe","links":[{"title":"My Personal Journey to Root-Cause Healing and Whole-Body Health","url":"https://renewalhealth.life/about-lynette-wing-renewal-health.html"},{"title":"My Personal Journey to Root-Cause Healing and Whole-Body Health","url":"https://renewalhealth.life/about.html"},{"title":"The Renewal Health Blog","url":"https://renewalhealth.life/blog.html"},{"title":"Nothing Missing, Nothing Broken","url":"https://renewalhealth.life/book.html"},{"title":"Reach Lynette Wing","url":"https://renewalhealth.life/contact-renewal-health.html"},{"title":"Detox","url":"https://renewalhealth.life/detox.html"},{"title":"Emotional Overwhelm Support & Nervous System Regulation for Calm, Clarity, and Balance","url":"https://renewalhealth.life/emotional-overwhelm-nervous-system.html"},{"title":"5 Signs Your Body Is Asking for a Different Kind of Support","url":"https://renewalhealth.life/guide.html"},{"title":"Gut Health Support for Digestion, Energy, and Whole-Body Balance","url":"https://renewalhealth.life/gut-health-support.html"},{"title":"Hormone Balance Support for Energy, Mood, and Whole-Body Health","url":"https://renewalhealth.life/hormone-balance-support.html"},{"title":"Emerge. Align. Live Fully.","url":"https://renewalhealth.life/index.html"},{"title":"Inflammation Support to Reduce Pain, Fatigue, and Whole-Body Imbalance","url":"https://renewalhealth.life/inflammation-support.html"},{"title":"Thank You for Walking This Road with Me","url":"https://renewalhealth.life/leave-a-review.html"},{"title":"Detox","url":"https://renewalhealth.life/naturopathic-detox.html"},{"title":"Naturopathy and Homeopathy","url":"https://renewalhealth.life/naturopathy-homeopathy-holistic-healing.html"},{"title":"Neurodivergent Support for Focus, Regulation, and Whole-Body Balance","url":"https://renewalhealth.life/neurodivergent-support.html"},{"title":"Programs & Packages for Personalized, Root-Cause Health Transformation","url":"https://renewalhealth.life/programs-packages.html"},{"title":"Renewal Health: Why Your Body Needs a Master Builder, a Blueprint, and a Bridge","url":"https://renewalhealth.life/resources.html"},{"title":"Services","url":"https://renewalhealth.life/services.html"},{"title":"Patient Stories & Testimonials","url":"https://renewalhealth.life/testimonials.html"},{"title":"Weight Balance & Metabolic Health Support Through Root-Cause Care","url":"https://renewalhealth.life/weight-metabolic-health.html"},{"title":"The Dragonfly","url":"https://renewalhealth.life/why-a-dragonfly-renewal-health.html"}]}]};
+const DATA = {"slug":"renewal-health","generated":"2026-09-09","dataThrough":"2026-09-09","generatedAt":"2026-09-09T13:58:55","brand":{"name":"Renewal Health","initials":"RH","site":"https://renewalhealth.life","kicker":"Marketing dashboard","headline":"Everything Wing Digital is building for Renewal Health","subhead":"A live record of the pages and posts running on renewalhealth.life. Click anything to open it on the real site."},"engines":[{"name":"Blog engine","detail":"2 posts a week, published Mondays","icon":"pen"},{"name":"Service pages","detail":"Detox, gut health, hormones, inflammation, weight, neurodivergent care, emotional overwhelm","icon":"map"},{"name":"On-page SEO","detail":"Titles, schema, internal links","icon":"search"},{"name":"Internal linking","detail":"New posts wired to service pages and old posts","icon":"link"}],"types":{"blog":{"label":"Blog post","color":"#8fae85"},"service":{"label":"Service page","color":"#b79cc9"},"core":{"label":"Core page","color":"#c9a24b"},"other":{"label":"Other","color":"#8a7f93"}},"showChart":true,"outreach":{"intro":"What runs automatically for Renewal Health each week.","channels":[{"name":"Weekly content engine","icon":"pen","types":["blog"],"state":"live","note":"Live and scheduled: two new blog posts every Monday morning (7:40am), each image-checked and reviewed against health-claim rules before it publishes."}]},"outreachPreview":null,"plan":null,"referralPartners":null,"stormHistory":null,"reviewStanding":null,"social":null,"notes":{},"metrics":{},"items":[{"date":"2026-09-09","type":"blog","title":"Body, Soul, Spirit: Why the Healing Order Matters","status":"published","url":"https://renewalhealth.life/blog/body-soul-spirit-healing-order.html"},{"date":"2026-09-09","type":"blog","title":"How to Stop Taking Things Personally, and Why It Helps","status":"published","url":"https://renewalhealth.life/blog/not-taking-things-personally.html"},{"date":"2026-09-08","type":"blog","title":"The Master Thread: Healing Patterns You Did Not Start","status":"published","url":"https://renewalhealth.life/blog/master-thread-inherited-patterns.html"},{"date":"2026-09-08","type":"blog","title":"Nothing Missing, Nothing Broken: What Shalom Means for Your Body","status":"published","url":"https://renewalhealth.life/blog/what-shalom-means-for-your-body.html"},{"date":"2026-09-07","type":"blog","title":"Your Body Is the Most Honest Witness You Have","status":"published","url":"https://renewalhealth.life/blog/body-is-an-honest-witness.html"},{"date":"2026-09-07","type":"blog","title":"Glimmers: Training Your Body to Notice Safety Again","status":"published","url":"https://renewalhealth.life/blog/glimmers-nervous-system.html"},{"date":"2026-09-06","type":"service","title":"Nothing Missing, Nothing Broken","status":"published","url":"https://renewalhealth.life/book.html"},{"date":"2026-09-06","type":"service","title":"5 Signs Your Body Is Asking for a Different Kind of Support","status":"published","url":"https://renewalhealth.life/guide.html"},{"date":"2026-09-06","type":"service","title":"Thank You for Walking This Road with Me","status":"published","url":"https://renewalhealth.life/leave-a-review.html"},{"date":"2026-08-31","type":"blog","title":"Cortisol, Safety, and the Belly That Will Not Let Go","status":"published","url":"https://renewalhealth.life/blog/cortisol-and-belly-weight.html"},{"date":"2026-08-31","type":"blog","title":"Open the Exit Ramps: How Your Body's Drainage Pathways Work","status":"published","url":"https://renewalhealth.life/blog/drainage-pathways.html"},{"date":"2026-08-31","type":"blog","title":"Wired but Tired: When Your Body Is Stuck in a Quiet Emergency","status":"published","url":"https://renewalhealth.life/blog/wired-but-tired.html"},{"date":"2026-08-24","type":"blog","title":"Chasing Symptoms vs Finding the Root: What Root-Cause Really Means","status":"published","url":"https://renewalhealth.life/blog/chasing-symptoms-vs-finding-the-root.html"},{"date":"2026-08-24","type":"blog","title":"Rest and Digest: Why You Cannot Heal Your Gut While Bracing","status":"published","url":"https://renewalhealth.life/blog/rest-and-digest-cannot-heal-gut-while-bracing.html"},{"date":"2026-08-24","type":"blog","title":"What Is Homeopathy, Really? A Plain-English Primer","status":"published","url":"https://renewalhealth.life/blog/what-is-homeopathy-plain-english-primer.html"},{"date":"2026-08-18","type":"blog","title":"Nervous System Support for Neurodivergent Adults","status":"published","url":"https://renewalhealth.life/blog/neurodivergent-nervous-system-support.html"},{"date":"2026-08-18","type":"blog","title":"Why Weight Will Not Budge When the Body Feels Unsafe","status":"published","url":"https://renewalhealth.life/blog/why-weight-will-not-budge.html"},{"date":"2026-08-10","type":"blog","title":"Chronic Inflammation: The Quiet Fire in the Body","status":"published","url":"https://renewalhealth.life/blog/chronic-inflammation-natural-support.html"},{"date":"2026-08-10","type":"blog","title":"Signs Your Hormones May Be Out of Balance","status":"published","url":"https://renewalhealth.life/blog/signs-of-hormone-imbalance.html"},{"date":"2026-08-05","type":"blog","title":"Gentle Detox: Why Your Body Cleanses Best Under Safety","status":"published","url":"https://renewalhealth.life/blog/gentle-detox.html"},{"date":"2026-08-05","type":"blog","title":"The Gut-Brain Connection: Anxiety Starts in the Belly","status":"published","url":"https://renewalhealth.life/blog/gut-brain-connection.html"},{"date":"2026-08-03","type":"service","title":"Detox","status":"published","url":"https://renewalhealth.life/detox.html"},{"date":"2026-07-27","type":"blog","title":"It Is Not Mine to Carry: How to Surrender Your Burdens","status":"published","url":"https://renewalhealth.life/blog/how-to-surrender-your-burdens-to-god.html"},{"date":"2026-07-27","type":"blog","title":"Renewal Health: Why Your Body Needs a Master Builder, a Blueprint, and a Bridge","status":"published","url":"https://renewalhealth.life/blog/root-cause-healing-naturopathy-homeopathy.html"},{"date":"2026-07-27","type":"blog","title":"When Defeat Becomes a Doorway: Growth Through Hardship","status":"published","url":"https://renewalhealth.life/blog/spiritual-growth-through-hardship.html"},{"date":"2026-07-27","type":"blog","title":"Vagal Tone Exercises: Partner With Your Hidden Engine","status":"published","url":"https://renewalhealth.life/blog/vagal-tone-exercises.html"},{"date":"2026-07-27","type":"service","title":"Emotional Overwhelm Support & Nervous System Regulation for Calm, Clarity, and Balance","status":"published","url":"https://renewalhealth.life/emotional-overwhelm-nervous-system.html"},{"date":"2026-07-27","type":"service","title":"Gut Health Support for Digestion, Energy, and Whole-Body Balance","status":"published","url":"https://renewalhealth.life/gut-health-support.html"},{"date":"2026-07-27","type":"service","title":"Hormone Balance Support for Energy, Mood, and Whole-Body Health","status":"published","url":"https://renewalhealth.life/hormone-balance-support.html"},{"date":"2026-07-27","type":"service","title":"Inflammation Support to Reduce Pain, Fatigue, and Whole-Body Imbalance","status":"published","url":"https://renewalhealth.life/inflammation-support.html"},{"date":"2026-07-27","type":"service","title":"Detox","status":"published","url":"https://renewalhealth.life/naturopathic-detox.html"},{"date":"2026-07-27","type":"service","title":"Naturopathy and Homeopathy","status":"published","url":"https://renewalhealth.life/naturopathy-homeopathy-holistic-healing.html"},{"date":"2026-07-27","type":"service","title":"Neurodivergent Support for Focus, Regulation, and Whole-Body Balance","status":"published","url":"https://renewalhealth.life/neurodivergent-support.html"},{"date":"2026-07-27","type":"service","title":"Weight Balance & Metabolic Health Support Through Root-Cause Care","status":"published","url":"https://renewalhealth.life/weight-metabolic-health.html"},{"date":"2026-07-27","type":"service","title":"The Dragonfly","status":"published","url":"https://renewalhealth.life/why-a-dragonfly-renewal-health.html"}],"pages":[{"group":"Blog posts live on your site","icon":"pen","links":[{"title":"Your Body Is the Most Honest Witness You Have","url":"https://renewalhealth.life/blog/body-is-an-honest-witness.html"},{"title":"Body, Soul, Spirit: Why the Healing Order Matters","url":"https://renewalhealth.life/blog/body-soul-spirit-healing-order.html"},{"title":"Chasing Symptoms vs Finding the Root: What Root-Cause Really Means","url":"https://renewalhealth.life/blog/chasing-symptoms-vs-finding-the-root.html"},{"title":"Chronic Inflammation: The Quiet Fire in the Body","url":"https://renewalhealth.life/blog/chronic-inflammation-natural-support.html"},{"title":"Cortisol, Safety, and the Belly That Will Not Let Go","url":"https://renewalhealth.life/blog/cortisol-and-belly-weight.html"},{"title":"Open the Exit Ramps: How Your Body's Drainage Pathways Work","url":"https://renewalhealth.life/blog/drainage-pathways.html"},{"title":"Gentle Detox: Why Your Body Cleanses Best Under Safety","url":"https://renewalhealth.life/blog/gentle-detox.html"},{"title":"Glimmers: Training Your Body to Notice Safety Again","url":"https://renewalhealth.life/blog/glimmers-nervous-system.html"},{"title":"The Gut-Brain Connection: Anxiety Starts in the Belly","url":"https://renewalhealth.life/blog/gut-brain-connection.html"},{"title":"It Is Not Mine to Carry: How to Surrender Your Burdens","url":"https://renewalhealth.life/blog/how-to-surrender-your-burdens-to-god.html"},{"title":"The Master Thread: Healing Patterns You Did Not Start","url":"https://renewalhealth.life/blog/master-thread-inherited-patterns.html"},{"title":"Nervous System Support for Neurodivergent Adults","url":"https://renewalhealth.life/blog/neurodivergent-nervous-system-support.html"},{"title":"How to Stop Taking Things Personally, and Why It Helps","url":"https://renewalhealth.life/blog/not-taking-things-personally.html"},{"title":"Rest and Digest: Why You Cannot Heal Your Gut While Bracing","url":"https://renewalhealth.life/blog/rest-and-digest-cannot-heal-gut-while-bracing.html"},{"title":"Renewal Health: Why Your Body Needs a Master Builder, a Blueprint, and a Bridge","url":"https://renewalhealth.life/blog/root-cause-healing-naturopathy-homeopathy.html"},{"title":"Signs Your Hormones May Be Out of Balance","url":"https://renewalhealth.life/blog/signs-of-hormone-imbalance.html"},{"title":"When Defeat Becomes a Doorway: Growth Through Hardship","url":"https://renewalhealth.life/blog/spiritual-growth-through-hardship.html"},{"title":"Vagal Tone Exercises: Partner With Your Hidden Engine","url":"https://renewalhealth.life/blog/vagal-tone-exercises.html"},{"title":"What Is Homeopathy, Really? A Plain-English Primer","url":"https://renewalhealth.life/blog/what-is-homeopathy-plain-english-primer.html"},{"title":"Nothing Missing, Nothing Broken: What Shalom Means for Your Body","url":"https://renewalhealth.life/blog/what-shalom-means-for-your-body.html"},{"title":"Why Weight Will Not Budge When the Body Feels Unsafe","url":"https://renewalhealth.life/blog/why-weight-will-not-budge.html"},{"title":"Wired but Tired: When Your Body Is Stuck in a Quiet Emergency","url":"https://renewalhealth.life/blog/wired-but-tired.html"}]},{"group":"Service and core pages","icon":"globe","links":[{"title":"My Personal Journey to Root-Cause Healing and Whole-Body Health","url":"https://renewalhealth.life/about-lynette-wing-renewal-health.html"},{"title":"My Personal Journey to Root-Cause Healing and Whole-Body Health","url":"https://renewalhealth.life/about.html"},{"title":"The Renewal Health Blog","url":"https://renewalhealth.life/blog.html"},{"title":"Nothing Missing, Nothing Broken","url":"https://renewalhealth.life/book.html"},{"title":"Reach Lynette Wing","url":"https://renewalhealth.life/contact-renewal-health.html"},{"title":"Detox","url":"https://renewalhealth.life/detox.html"},{"title":"Emotional Overwhelm Support & Nervous System Regulation for Calm, Clarity, and Balance","url":"https://renewalhealth.life/emotional-overwhelm-nervous-system.html"},{"title":"5 Signs Your Body Is Asking for a Different Kind of Support","url":"https://renewalhealth.life/guide.html"},{"title":"Gut Health Support for Digestion, Energy, and Whole-Body Balance","url":"https://renewalhealth.life/gut-health-support.html"},{"title":"Hormone Balance Support for Energy, Mood, and Whole-Body Health","url":"https://renewalhealth.life/hormone-balance-support.html"},{"title":"Emerge. Align. Live Fully.","url":"https://renewalhealth.life/index.html"},{"title":"Inflammation Support to Reduce Pain, Fatigue, and Whole-Body Imbalance","url":"https://renewalhealth.life/inflammation-support.html"},{"title":"Thank You for Walking This Road with Me","url":"https://renewalhealth.life/leave-a-review.html"},{"title":"Detox","url":"https://renewalhealth.life/naturopathic-detox.html"},{"title":"Naturopathy and Homeopathy","url":"https://renewalhealth.life/naturopathy-homeopathy-holistic-healing.html"},{"title":"Neurodivergent Support for Focus, Regulation, and Whole-Body Balance","url":"https://renewalhealth.life/neurodivergent-support.html"},{"title":"Programs & Packages for Personalized, Root-Cause Health Transformation","url":"https://renewalhealth.life/programs-packages.html"},{"title":"Renewal Health: Why Your Body Needs a Master Builder, a Blueprint, and a Bridge","url":"https://renewalhealth.life/resources.html"},{"title":"Services","url":"https://renewalhealth.life/services.html"},{"title":"Patient Stories & Testimonials","url":"https://renewalhealth.life/testimonials.html"},{"title":"Weight Balance & Metabolic Health Support Through Root-Cause Care","url":"https://renewalhealth.life/weight-metabolic-health.html"},{"title":"The Dragonfly","url":"https://renewalhealth.life/why-a-dragonfly-renewal-health.html"}]}]};
 
 (function(){
   'use strict';
@@ -1143,9 +1173,13 @@ const DATA = {"slug":"renewal-health","generated":"2026-09-08","dataThrough":"20
     const tiles = [
       [num(q.hailEvents),                'hail reports on record'],
       [num(q.hailEventsOneInchOrLarger), 'at 1 inch or larger'],
-      [num(q.distinctStormDays),         'separate storm days'],
+      /* A client whose summary carries the map-derived figures gets those;
+         anyone still on the older shape keeps the original two tiles. */
+      [q.homesUnderHail ? num(q.homesUnderHail) : num(q.distinctStormDays),
+                                         'homes under measured hail'],
       [inch(q.largestHailInches||0),     'largest hail recorded'],
-      [num((S.byCounty||[]).length),     'counties covered'],
+      [q.zipsCovered ? num(q.zipsCovered) : num((S.byCounty||[]).length),
+                                         'ZIP codes covered'],
       [num((S.window||{}).months||0),    'months of record']
     ];
     const tl = L.tiles || [];
@@ -1200,6 +1234,79 @@ const DATA = {"slug":"renewal-health","generated":"2026-09-08","dataThrough":"20
     $('#sv-src').innerHTML = esc(src) + (S.sourceUrl ?
       ' <a href="'+esc(S.sourceUrl)+'" target="_blank" rel="noopener">'+esc(S.sourceUrl)+'</a>' : '');
     if (S.note) { $('#sv-note').textContent = S.note; $('#sv-note').hidden = false; }
+
+    /* Interactive map link. Rendered only when the config supplies a URL, so a
+       client without a published map sees nothing rather than a dead button. */
+    if (S.mapUrl) {
+      const m = $('#sv-map');
+      const sep = S.mapUrl.indexOf('?') >= 0 ? '&' : '?';
+      m.innerHTML =
+        (S.mapNote ? '<p class="sv-mapnote">' + esc(S.mapNote) + '</p>' : '') +
+        '<iframe class="sv-mapframe" src="' + esc(S.mapUrl) + sep + 'embed=1"' +
+        ' title="' + esc(S.mapLabel || 'Interactive hail map') + '"' +
+        ' loading="lazy" referrerpolicy="no-referrer"></iframe>' +
+        '<a class="sv-mapopen" href="' + esc(S.mapUrl) + '" target="_blank"' +
+        ' rel="noopener">Open the map full screen</a>';
+      m.hidden = false;
+      /* The map supersedes the static county / month / city / event
+         breakdowns, so they are removed rather than repeated underneath it. */
+      const bd = $('#sv-breakdowns');
+      if (bd) bd.hidden = true;
+
+      /* The embedded map reports its own height, so the frame grows to fit
+         instead of making the reader scroll inside a scroll. Only messages
+         carrying our specific key are honoured, and the height is clamped so a
+         bad value cannot blow up the page. */
+      addEventListener('message', function (ev) {
+        const px = ev && ev.data && ev.data.wingStormMapHeight;
+        if (!px || typeof px !== 'number') return;
+        const frame = $('.sv-mapframe');
+        if (frame) frame.style.height = Math.min(Math.max(px + 8, 600), 6000) + 'px';
+      });
+    }
+  })();
+
+
+  /* Social posts. Same row shape as the published-work list above, so the two
+     sections read as one body of work rather than two systems. */
+  (function () {
+    const S = DATA.social;
+    if (!S || !S.items || !S.items.length) return;
+    const MON = ['Jan','Feb','Mar','Apr','May','Jun',
+                 'Jul','Aug','Sep','Oct','Nov','Dec'];
+    const day = function (d) {
+      if (!d) return '';
+      const p = String(d).split('-');
+      if (p.length < 3) return d;
+      return MON[(+p[1] || 1) - 1] + ' ' + (+p[2]) + ', ' + p[0];
+    };
+    $('#soc-h').textContent = S.title;
+    $('#soc-n').textContent = S.count + (S.count === 1 ? ' post' : ' posts');
+    $('#soc-sd').innerHTML = esc(S.intro || '') + (S.handle ?
+      ' <a href="' + esc(S.handleUrl || '#') + '" target="_blank" rel="noopener">' +
+      esc(S.handle) + '</a>' : '');
+
+    let shown = 0;
+    const STEP = 8;
+    function render() {
+      const slice = S.items.slice(0, shown + STEP);
+      shown = slice.length;
+      $('#soc-list').innerHTML = slice.map(function (it) {
+        return '<a class="row" href="' + esc(it.url) + '" target="_blank" rel="noopener">' +
+          '<span class="row-dot" style="background:var(--accent)"></span>' +
+          '<span class="row-t">' + esc(it.title) + '</span>' +
+          '<span class="row-m">' + esc(it.platform || 'Social') + '</span>' +
+          '<span class="row-d">' + day(it.date) + '</span></a>';
+      }).join('');
+      const more = $('#soc-more');
+      if (shown < S.items.length) {
+        more.hidden = false;
+        more.textContent = 'Show ' + Math.min(STEP, S.items.length - shown) + ' more';
+      } else { more.hidden = true; }
+    }
+    $('#soc-more').addEventListener('click', render);
+    render();
+    $('#soc-sec').hidden = false;
   })();
 
 
@@ -1788,8 +1895,84 @@ const DATA = {"slug":"renewal-health","generated":"2026-09-08","dataThrough":"20
   })();
 })();
 </script>
-<div id="wing-helper" title="Nimbus, from Wing Digital"
-  style="position:fixed;right:16px;bottom:14px;z-index:60;opacity:0;pointer-events:none;transition:opacity .8s"></div>
+<style>
+/* Nimbus, welded bottom-right.
+
+   Root cause of the iOS drift, finally: the element was TOP-anchored with
+   `top:calc(100svh - 92px)`. A fixed element resolves its offsets against the
+   LAYOUT viewport, and on iOS the layout viewport is the LARGE one (the height
+   with the URL bar collapsed, lvh). svh is the SMALL height (bar expanded). So
+   the anchor sat a fixed svh-92px below the layout top while the visible bottom
+   moved between svh and lvh as the bar collapsed. Scrolled to the top, bar
+   expanded, visible height == svh: he landed in the corner. Scrolled down, bar
+   collapsed, visible height == lvh: he stayed put while the bottom edge dropped
+   away by (lvh - svh) -- the URL bar's height, roughly a sixth of the screen.
+   That is exactly the reported symptom, and it is why it never reproduced in
+   devtools: emulators have no collapsing URL bar, so lvh == svh and the bug
+   has nothing to express itself with.
+
+   The fix is to stop computing the anchor at all. `bottom` is the one offset
+   iOS pins to the visible bottom edge for a fixed element, through the whole
+   bar animation, with no JS. No svh, no dvh, no visualViewport math, no
+   per-frame repositioning.
+
+   Add ?nimbusdebug=1 to the URL for the live on-device readout. */
+#wing-helper{
+  position:fixed;right:16px;top:auto;
+  bottom:calc(14px + env(safe-area-inset-bottom,0px));
+  z-index:60;
+  width:78px;height:78px;line-height:0;margin:0;
+  opacity:0;pointer-events:none;transition:opacity .8s;
+}
+@media (max-width:760px){
+  #wing-helper{width:62px;height:62px;right:12px}
+}
+#nimbus-debug{
+  position:fixed;left:8px;top:8px;z-index:9999;
+  font:11px/1.45 ui-monospace,Menlo,Consolas,monospace;
+  background:rgba(0,0,0,.82);color:#7CFFB2;padding:8px 10px;border-radius:8px;
+  white-space:pre;pointer-events:none;max-width:70vw;
+}
+</style>
+<div id="wing-helper" title="Nimbus, from Wing Digital"></div>
+<script>
+/* Temporary on-device diagnostic. Off unless ?nimbusdebug=1 is in the URL, so
+   it costs nothing in production. Prints the six numbers that identify any
+   future drift, live, while you scroll on the real phone. */
+(function () {
+  if (!/[?&]nimbusdebug=1/.test(location.search)) return;
+  var el = document.getElementById('wing-helper');
+  if (!el) return;
+  var box = document.createElement('div');
+  box.id = 'nimbus-debug';
+  document.body.appendChild(box);
+  var pending = false;
+  function paint() {
+    pending = false;
+    var r = el.getBoundingClientRect();
+    var vv = window.visualViewport;
+    var lines = [
+      'rect.top      ' + Math.round(r.top),
+      'rect.bottom   ' + Math.round(r.bottom),
+      'innerHeight   ' + window.innerHeight,
+      'vv.height     ' + (vv ? Math.round(vv.height) : 'n/a'),
+      'vv.offsetTop  ' + (vv ? Math.round(vv.offsetTop) : 'n/a'),
+      'scrollY       ' + Math.round(window.scrollY),
+      'position      ' + getComputedStyle(el).position,
+      'gap-to-bottom ' + Math.round((vv ? vv.height : window.innerHeight) - r.bottom)
+    ];
+    box.textContent = lines.join('\n');
+  }
+  function tick() { if (!pending) { pending = true; requestAnimationFrame(paint); } }
+  addEventListener('scroll', tick, { passive: true });
+  addEventListener('resize', tick);
+  if (window.visualViewport) {
+    visualViewport.addEventListener('resize', tick);
+    visualViewport.addEventListener('scroll', tick);
+  }
+  paint();
+})();
+</script>
 <script src="/mascot/wing-mascot.js?v=13"></script>
 <script>
 (function(){

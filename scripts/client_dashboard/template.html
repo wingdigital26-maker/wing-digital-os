@@ -1898,58 +1898,79 @@ const DATA = __DATA__;
 <style>
 /* Nimbus, welded bottom-right.
 
-   iOS Safari specifics, learned the hard way:
-     * Safari REPAINTS a fixed element during scroll instead of compositing it,
-       so it lags and reads as moving -> translateZ(0) puts him on his own GPU
-       layer, which is composited with the scroll.
-     * `bottom` is resolved against the layout viewport, which does not match
-       the visible area while the URL bar animates -> anchor from the TOP, which
-       Safari handles correctly.
-     * svh is the STATIC small-viewport height, so the anchor never changes.
-       dvh tracks the URL bar and Safari only recomputes it when scrolling
-       stops, which is the jump.
-   Older Safari has no svh; the script below sets the same anchor in pixels and
-   updates it ONLY when the viewport actually resizes -- never per scroll frame,
-   because that is what made it bounce. */
+   Root cause of the iOS drift, finally: the element was TOP-anchored with
+   `top:calc(100svh - 92px)`. A fixed element resolves its offsets against the
+   LAYOUT viewport, and on iOS the layout viewport is the LARGE one (the height
+   with the URL bar collapsed, lvh). svh is the SMALL height (bar expanded). So
+   the anchor sat a fixed svh-92px below the layout top while the visible bottom
+   moved between svh and lvh as the bar collapsed. Scrolled to the top, bar
+   expanded, visible height == svh: he landed in the corner. Scrolled down, bar
+   collapsed, visible height == lvh: he stayed put while the bottom edge dropped
+   away by (lvh - svh) -- the URL bar's height, roughly a sixth of the screen.
+   That is exactly the reported symptom, and it is why it never reproduced in
+   devtools: emulators have no collapsing URL bar, so lvh == svh and the bug
+   has nothing to express itself with.
+
+   The fix is to stop computing the anchor at all. `bottom` is the one offset
+   iOS pins to the visible bottom edge for a fixed element, through the whole
+   bar animation, with no JS. No svh, no dvh, no visualViewport math, no
+   per-frame repositioning.
+
+   Add ?nimbusdebug=1 to the URL for the live on-device readout. */
 #wing-helper{
-  position:fixed;right:16px;top:auto;bottom:14px;z-index:60;
+  position:fixed;right:16px;top:auto;
+  bottom:calc(14px + env(safe-area-inset-bottom,0px));
+  z-index:60;
   width:78px;height:78px;line-height:0;margin:0;
   opacity:0;pointer-events:none;transition:opacity .8s;
-  -webkit-transform:translateZ(0);transform:translateZ(0);
-  -webkit-backface-visibility:hidden;backface-visibility:hidden;
 }
-@supports (height:100svh){
-  #wing-helper{top:calc(100svh - 92px - env(safe-area-inset-bottom,0px));bottom:auto}
-}
-/* Phones: he does not float at all.
-
-   Five separate fixes for iOS Safari's fixed-position behaviour did not hold
-   on a real device, and a mascot that wanders mid-page is worse than no
-   mascot. On desktop, where fixed works, he stays in the corner. */
 @media (max-width:760px){
-  #wing-helper{display:none!important}
+  #wing-helper{width:62px;height:62px;right:12px}
+}
+#nimbus-debug{
+  position:fixed;left:8px;top:8px;z-index:9999;
+  font:11px/1.45 ui-monospace,Menlo,Consolas,monospace;
+  background:rgba(0,0,0,.82);color:#7CFFB2;padding:8px 10px;border-radius:8px;
+  white-space:pre;pointer-events:none;max-width:70vw;
 }
 </style>
 <div id="wing-helper" title="Nimbus, from Wing Digital"></div>
 <script>
+/* Temporary on-device diagnostic. Off unless ?nimbusdebug=1 is in the URL, so
+   it costs nothing in production. Prints the six numbers that identify any
+   future drift, live, while you scroll on the real phone. */
 (function () {
+  if (!/[?&]nimbusdebug=1/.test(location.search)) return;
   var el = document.getElementById('wing-helper');
   if (!el) return;
-  // Only needed where svh is missing (Safari < 15.4). Where svh works, CSS
-  // already holds him and this does nothing.
-  var hasSvh = window.CSS && CSS.supports && CSS.supports('height', '100svh');
-  if (hasSvh) return;
-  function place() {
+  var box = document.createElement('div');
+  box.id = 'nimbus-debug';
+  document.body.appendChild(box);
+  var pending = false;
+  function paint() {
+    pending = false;
+    var r = el.getBoundingClientRect();
     var vv = window.visualViewport;
-    var h = vv ? vv.height : window.innerHeight;
-    el.style.top = Math.round(h - 92) + 'px';
-    el.style.bottom = 'auto';
+    var lines = [
+      'rect.top      ' + Math.round(r.top),
+      'rect.bottom   ' + Math.round(r.bottom),
+      'innerHeight   ' + window.innerHeight,
+      'vv.height     ' + (vv ? Math.round(vv.height) : 'n/a'),
+      'vv.offsetTop  ' + (vv ? Math.round(vv.offsetTop) : 'n/a'),
+      'scrollY       ' + Math.round(window.scrollY),
+      'position      ' + getComputedStyle(el).position,
+      'gap-to-bottom ' + Math.round((vv ? vv.height : window.innerHeight) - r.bottom)
+    ];
+    box.textContent = lines.join('\n');
   }
-  // resize only. Never on scroll: a per-frame update lags the scroll and bounces.
-  addEventListener('resize', place);
-  addEventListener('orientationchange', place);
-  if (window.visualViewport) visualViewport.addEventListener('resize', place);
-  place();
+  function tick() { if (!pending) { pending = true; requestAnimationFrame(paint); } }
+  addEventListener('scroll', tick, { passive: true });
+  addEventListener('resize', tick);
+  if (window.visualViewport) {
+    visualViewport.addEventListener('resize', tick);
+    visualViewport.addEventListener('scroll', tick);
+  }
+  paint();
 })();
 </script>
 <script src="/mascot/wing-mascot.js?v=13"></script>

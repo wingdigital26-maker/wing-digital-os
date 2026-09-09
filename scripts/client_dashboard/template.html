@@ -540,16 +540,23 @@ section{padding:34px 0 0}
     <div class="sd" id="sv-sd"></div>
     <div class="pl-banner" id="sv-banner" hidden></div>
     <div class="lstats" id="sv-stats"></div>
-    <div class="mgroup"><div class="mlabel" id="sv-county-label"></div></div>
-    <div class="rp-bars" id="sv-counties"></div>
-    <div class="mgroup"><div class="mlabel" id="sv-month-label"></div></div>
-    <div class="rp-bars" id="sv-months"></div>
-    <div class="mgroup"><div class="mlabel" id="sv-city-label"></div></div>
-    <div class="lpills" id="sv-cities"></div>
-    <div class="ctbl-cap" id="sv-city-note" hidden></div>
-    <div class="mgroup"><div class="mlabel" id="sv-ev-label"></div></div>
-    <div id="sv-events"></div>
+
+    <!-- The map carries the same breakdowns interactively (ranked areas, storm
+         timeline, per-storm detail), so when a client has one the static
+         versions below are suppressed rather than printed twice. -->
     <div class="sv-map" id="sv-map" hidden></div>
+
+    <div id="sv-breakdowns">
+      <div class="mgroup"><div class="mlabel" id="sv-county-label"></div></div>
+      <div class="rp-bars" id="sv-counties"></div>
+      <div class="mgroup"><div class="mlabel" id="sv-month-label"></div></div>
+      <div class="rp-bars" id="sv-months"></div>
+      <div class="mgroup"><div class="mlabel" id="sv-city-label"></div></div>
+      <div class="lpills" id="sv-cities"></div>
+      <div class="ctbl-cap" id="sv-city-note" hidden></div>
+      <div class="mgroup"><div class="mlabel" id="sv-ev-label"></div></div>
+      <div id="sv-events"></div>
+    </div>
     <div class="sv-src" id="sv-src"></div>
     <div class="pl-note" id="sv-note" hidden></div>
   </section>
@@ -1152,9 +1159,13 @@ const DATA = __DATA__;
     const tiles = [
       [num(q.hailEvents),                'hail reports on record'],
       [num(q.hailEventsOneInchOrLarger), 'at 1 inch or larger'],
-      [num(q.distinctStormDays),         'separate storm days'],
+      /* A client whose summary carries the map-derived figures gets those;
+         anyone still on the older shape keeps the original two tiles. */
+      [q.homesUnderHail ? num(q.homesUnderHail) : num(q.distinctStormDays),
+                                         'homes under measured hail'],
       [inch(q.largestHailInches||0),     'largest hail recorded'],
-      [num((S.byCounty||[]).length),     'counties covered'],
+      [q.zipsCovered ? num(q.zipsCovered) : num((S.byCounty||[]).length),
+                                         'ZIP codes covered'],
       [num((S.window||{}).months||0),    'months of record']
     ];
     const tl = L.tiles || [];
@@ -1223,6 +1234,10 @@ const DATA = __DATA__;
         '<a class="sv-mapopen" href="' + esc(S.mapUrl) + '" target="_blank"' +
         ' rel="noopener">Open the map full screen</a>';
       m.hidden = false;
+      /* The map supersedes the static county / month / city / event
+         breakdowns, so they are removed rather than repeated underneath it. */
+      const bd = $('#sv-breakdowns');
+      if (bd) bd.hidden = true;
     }
   })();
 

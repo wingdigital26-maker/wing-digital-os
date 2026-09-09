@@ -232,15 +232,15 @@
   "data": "history/jackson-storm-events.json",
   "topEvents": 10,
   "title": "Hail history in your service area",
-  "intro": "Every hail event on record across Collin, Denton, Dallas, Rockwall and Kaufman counties over the 24 months from June 2024 through May 2026. These are recorded events, not estimates.",
+  "intro": "Every hail day measured across your service area, from March 2021 through August 2026. These are recorded events, not estimates. The map below is the same record, street by street.",
   "banner": "Hail is the demand signal for residential roof replacement in North Texas. This is the record for your counties.",
   "labels": {
    "tiles": [
-    "hail reports on record",
+    "hail days on record",
     "at 1 inch or larger",
-    "separate storm days",
+    "homes under measured hail",
     "largest hail recorded",
-    "counties covered",
+    "ZIP codes covered",
     "months of record"
    ],
    "countyLabel": "Hail reports by county",
@@ -248,11 +248,11 @@
    "cityLabel": "Your cities named on the record",
    "eventLabel": "The largest hail on record"
   },
-  "source_line": "Recorded hail events for Texas, counties Collin, Denton, Dallas, Rockwall and Kaufman, June 2024 through May 2026.",
+  "source_line": "Measured hail across Collin, Denton, Dallas and Rockwall counties, March 2021 through August 2026.",
   "note": "1 inch is the size that typically damages asphalt shingles, which is why it is counted separately. We have not contacted anyone off this data or run any campaign from it. It is the targeting layer we would build on, and it is here so you can check it yourself.",
   "mapUrl": "https://wingdigital26-maker.github.io/storm-map/jackson/",
   "mapLabel": "Jackson Roofing hail map",
-  "mapNote": "Radar-measured hail over 421,903 mapped homes across 46 ZIP codes. Search a ZIP or city, pick a storm from the timeline, then zoom in to see individual houses.",
+  "mapNote": "Search a ZIP or city, pick a storm from the timeline, then zoom in to see individual homes and the hail each one took.",
   "_mapUrl_comment": "Built from the same NOAA MRMS MESH radar grids as the figures above, joined to Collin/Denton/Dallas/Rockwall appraisal parcels. Branded copy of the Wing storm map; shares one dataset.",
   "_source_line_comment": "Jack 2026-09-09: do not name our data sources on client-facing pages. State the coverage and the window, not where it came from. Map-tile attribution inside the embedded map is a licence condition and must stay."
  }

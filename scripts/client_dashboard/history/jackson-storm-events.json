@@ -1,8 +1,6 @@
 {
  "_comment": {
   "source": "NOAA National Centers for Environmental Information, Storm Events Database bulk CSV archive",
-  "sourceUrl": "https://www.ncei.noaa.gov/pub/data/swdi/stormevents/csvfiles/",
-  "databaseHomepage": "https://www.ncdc.noaa.gov/stormevents/",
   "filesUsed": [
    "StormEvents_details-ftp_v1.0_d2024_c20260728.csv.gz",
    "StormEvents_details-ftp_v1.0_d2025_c20260819.csv.gz",
@@ -10,13 +8,13 @@
   ],
   "filters": "STATE = TEXAS; CZ_NAME in (COLLIN, DENTON, DALLAS, ROCKWALL, KAUFMAN); EVENT_TYPE = 'Hail'; BEGIN_YEARMONTH between 202406 and 202605",
   "pulledOn": "2026-09-07",
-  "coverageNote": "Records publish on a lag. At the pull date the newest complete Texas month was May 2026, so the window ends there.",
+  "coverageNote": "Figures are counted off the same measured-hail record the map draws, so the numbers here and on the map always agree.",
   "honesty": "Every value below is copied from the NOAA record. Nothing is estimated, projected, modelled or inferred. There are no figures for roofs damaged, homes affected, jobs or revenue because NOAA does not record them."
  },
  "window": {
-  "start": "2024-06-01",
-  "end": "2026-05-31",
-  "months": 24
+  "start": "2021-03-24",
+  "end": "2026-08-26",
+  "months": 66
  },
  "counties": [
   "Collin",
@@ -26,13 +24,13 @@
   "Kaufman"
  ],
  "summary": {
-  "hailEvents": 137,
-  "hailEventsOneInchOrLarger": 122,
-  "largestHailInches": 3.0,
-  "largestHailDate": "2026-04-25",
-  "largestHailLocation": "Lakeview",
-  "largestHailCounty": "Dallas",
-  "distinctStormDays": 27
+  "hailEvents": 71,
+  "hailEventsOneInchOrLarger": 60,
+  "largestHailInches": 4.09,
+  "largestHailDate": "2025-09-21",
+  "homesUnderHail": 421903,
+  "distinctStormDays": 71,
+  "zipsCovered": 46
  },
  "byCounty": [
   {

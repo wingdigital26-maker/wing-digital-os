@@ -1896,16 +1896,32 @@ const DATA = __DATA__;
 })();
 </script>
 <style>
-/* Bottom-right, CSS only. On mobile `bottom` was resolving against a box taller
-   than the visible screen, which parked Nimbus mid-right. dvh is the dynamic
-   viewport height -- it tracks the URL bar -- so anchoring from the top with it
-   puts him on the real bottom edge. Browsers without dvh keep plain `bottom`. */
-#wing-helper{position:fixed;right:16px;bottom:14px;z-index:60;
-  width:78px;height:78px;line-height:0;opacity:0;pointer-events:none;
-  transition:opacity .8s;margin:0}
-@supports (height:100dvh){
-  #wing-helper{top:calc(100dvh - 78px - 14px - env(safe-area-inset-bottom,0px));
-               bottom:auto}
+/* Bottom-right, CSS only.
+
+   The reason he drifted on iOS: Safari REPAINTS a position:fixed element as the
+   page scrolls rather than compositing it, so it lags the scroll and reads as
+   moving. translateZ(0) + backface-visibility promotes him to his own GPU
+   layer, which is the standard remedy -- the layer is composited with the
+   scroll instead of being redrawn behind it.
+
+   Anchored with svh, not dvh. dvh tracks the URL bar, and iOS Safari only
+   recomputes it when the scroll STOPS -- which is the jump. svh is the small
+   viewport height and is static, so it never changes and he cannot move. The
+   cost is that he sits a little higher once the bar is hidden; the benefit is
+   that he is welded in place, which is what was asked for. */
+#wing-helper{
+  position:fixed;right:16px;bottom:14px;z-index:60;
+  width:78px;height:78px;line-height:0;margin:0;
+  opacity:0;pointer-events:none;transition:opacity .8s;
+  -webkit-transform:translateZ(0);transform:translateZ(0);
+  -webkit-backface-visibility:hidden;backface-visibility:hidden;
+  will-change:transform;
+}
+@supports (height:100svh){
+  #wing-helper{
+    top:calc(100svh - 78px - 14px - env(safe-area-inset-bottom,0px));
+    bottom:auto;
+  }
 }
 </style>
 <div id="wing-helper" title="Nimbus, from Wing Digital"></div>

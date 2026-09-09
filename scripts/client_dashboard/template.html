@@ -370,11 +370,13 @@ section{padding:34px 0 0}
 .sv-map{margin:18px 0 6px}
 .sv-mapnote{color:var(--muted);font-size:13px;margin:0 0 12px;max-width:70ch}
 .sv-mapframe{width:100%;height:1180px;border:1px solid var(--line);
-  border-radius:12px;background:var(--card);display:block}
+  border-radius:12px;background:var(--card);display:block;overflow:hidden;
+  transition:height .25s ease}
 .sv-mapopen{display:inline-block;margin-top:10px;color:var(--accent);
   font-size:13px;font-weight:600;text-decoration:none}
 .sv-mapopen:hover{text-decoration:underline}
 @media(max-width:760px){.sv-mapframe{height:1420px}}
+@media(prefers-reduced-motion:reduce){.sv-mapframe{transition:none}}
 .sv-src{margin-top:14px;font-size:.79rem;color:var(--t3);line-height:1.55;
   overflow-wrap:break-word}
 .sv-src a{color:var(--accent);text-decoration:none;overflow-wrap:anywhere}
@@ -1238,6 +1240,17 @@ const DATA = __DATA__;
          breakdowns, so they are removed rather than repeated underneath it. */
       const bd = $('#sv-breakdowns');
       if (bd) bd.hidden = true;
+
+      /* The embedded map reports its own height, so the frame grows to fit
+         instead of making the reader scroll inside a scroll. Only messages
+         carrying our specific key are honoured, and the height is clamped so a
+         bad value cannot blow up the page. */
+      addEventListener('message', function (ev) {
+        const px = ev && ev.data && ev.data.wingStormMapHeight;
+        if (!px || typeof px !== 'number') return;
+        const frame = $('.sv-mapframe');
+        if (frame) frame.style.height = Math.min(Math.max(px + 8, 600), 6000) + 'px';
+      });
     }
   })();
 

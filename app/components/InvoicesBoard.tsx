@@ -407,7 +407,7 @@ export default function InvoicesBoard() {
     return (
       <div style={card}>
         <p style={{ margin: 0, color: "var(--text-secondary)", fontSize: 13 }}>
-          Invoices are not configured — SONAR_SUPABASE_URL / SONAR_SUPABASE_SERVICE_KEY are missing.
+          Invoices are not configured: SONAR_SUPABASE_URL / SONAR_SUPABASE_SERVICE_KEY are missing.
         </p>
       </div>
     );
@@ -525,13 +525,13 @@ export default function InvoicesBoard() {
                       aria-expanded={isOpen}
                       aria-label={
                         has
-                          ? `${shortDate(c.date)} — ${money(sum)} across ${c.pays.length} payment${c.pays.length === 1 ? "" : "s"}`
-                          : `${shortDate(c.date)} — no payments, add one`
+                          ? `${shortDate(c.date)}: ${money(sum)} across ${c.pays.length} payment${c.pays.length === 1 ? "" : "s"}`
+                          : `${shortDate(c.date)}: no payments, add one`
                       }
                       onClick={() => toggleDay(c.date)}
                       title={
                         has
-                          ? c.pays.map((p) => `${p.client} — ${money(p.amount_cents, p.currency)}`).join("\n")
+                          ? c.pays.map((p) => `${p.client}: ${money(p.amount_cents, p.currency)}`).join("\n")
                           : undefined
                       }
                       style={{

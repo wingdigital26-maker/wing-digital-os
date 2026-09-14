@@ -228,7 +228,7 @@ function ReplyBox({ thread, configured, pipeNote, onSent }: {
       if (!res.ok || !j.ok) {
         setResult({ ok: false, msg: j.error || `Send failed (HTTP ${res.status}).` });
       } else {
-        setResult({ ok: true, msg: `Sent — Twilio accepted it as "${j.status ?? "queued"}". Delivery status updates on this thread.` });
+        setResult({ ok: true, msg: `Sent. Twilio accepted it as "${j.status ?? "queued"}". Delivery status updates on this thread.` });
         setText("");
         onSent();
       }
@@ -278,7 +278,7 @@ function ReplyBox({ thread, configured, pipeNote, onSent }: {
 
 // ── Twilio status panel ─────────────────────────────────────────────────────
 const SETUP_STEPS = [
-  "Create a Twilio account (twilio.com) — free to start.",
+  "Create a Twilio account (twilio.com), free to start.",
   "Register A2P 10DLC (a brand + campaign under Messaging > Regulatory compliance). Carriers require this for business texting to US numbers; approval can take days and texts sent before it are filtered.",
   "Buy an SMS-capable phone number in the Twilio console.",
   "Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_FROM_NUMBER on Vercel (Project > Settings > Environment Variables), then redeploy.",
@@ -335,10 +335,10 @@ function TwilioPanel() {
         border: "1px solid var(--border)", borderRadius: 12, background: "var(--bg-card)",
         padding: "12px 14px", display: "grid", gap: 10,
       }}>
-        <span style={label}>Environment variables (names only — values never leave the server)</span>
+        <span style={label}>Environment variables (names only, values never leave the server)</span>
         {Object.entries(h.env).map(([name, set]) =>
           row(set, name, set
-            ? (name === "TWILIO_FROM_NUMBER" && h.fromNumber ? `Set — sending from ${h.fromNumber}.` : "Set on this deployment.")
+            ? (name === "TWILIO_FROM_NUMBER" && h.fromNumber ? `Set, sending from ${h.fromNumber}.` : "Set on this deployment.")
             : "Not set on this deployment.")
         )}
       </div>
@@ -441,7 +441,7 @@ export default function MessageLedger({ channel: lockedChannel }: { channel?: "s
     return <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Reading the message ledger…</div>;
   }
   if (err && !data) {
-    return <Note tone="var(--red)" text={`The message ledger could not be read: ${err}. Nothing below is available — this is a failure, not an empty board.`} />;
+    return <Note tone="var(--red)" text={`The message ledger could not be read: ${err}. Nothing below is available. This is a failure, not an empty board.`} />;
   }
   if (!data) return null;
 
@@ -566,7 +566,7 @@ export default function MessageLedger({ channel: lockedChannel }: { channel?: "s
             )}
             {!data.clientCountsExact && data.clientSlugs.length > 0 && (
               <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                (counts hidden — the ledger outgrew the counting page, so a number here could be wrong)
+                (counts hidden: the ledger outgrew the counting page, so a number here could be wrong)
               </span>
             )}
           </div>
@@ -585,7 +585,7 @@ export default function MessageLedger({ channel: lockedChannel }: { channel?: "s
           {!data.emptyNote && search.trim() &&
             visibleThreads.length === 0 && (
             <div style={{ fontSize: 12.5, color: "var(--text-muted)" }}>
-              Nothing matches “{search.trim()}”. The rows are still in the ledger — clear the search to see them.
+              Nothing matches “{search.trim()}”. The rows are still in the ledger, so clear the search to see them.
             </div>
           )}
 

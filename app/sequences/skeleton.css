@@ -1,0 +1,16 @@
+/* Loading skeletons for the Sequences surfaces. Theme-token colors only so the
+   shimmer reads in both light and dark. Kept local to /sequences. */
+@keyframes wingSkelPulse {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.wing-skel-bar {
+  background: var(--border);
+  border-radius: 6px;
+  animation: wingSkelPulse 1.4s ease-in-out infinite;
+}

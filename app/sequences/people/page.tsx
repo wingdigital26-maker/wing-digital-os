@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import { PeopleListSkeleton } from "../_ui";
 
 // /sequences/people — everyone enrolled on any sequence: which email they are
 // waiting on, when it goes out, one-click Pause / Resume / Remove. Plus the
@@ -164,11 +165,15 @@ function PeopleInner() {
           Could not load people: {error}
         </div>
       )}
-      {rows === null && !error && <div style={{ color: "var(--text-muted)", fontSize: 13 }}>Loading...</div>}
+      {rows === null && !error && <PeopleListSkeleton />}
 
       {rows?.length === 0 && (
-        <div style={{ ...card, textAlign: "center", padding: 40, color: "var(--text-secondary)", fontSize: 14 }}>
-          Nobody is on {filterName ? "this sequence" : "any sequence"} yet. Add someone above.
+        <div style={{ ...card, textAlign: "center", padding: 40, color: "var(--text-secondary)", fontSize: 14, lineHeight: 1.6 }}>
+          <div style={{ fontWeight: 700, color: "var(--text-primary)", marginBottom: 6 }}>
+            Nobody is on {filterName ? "this sequence" : "any sequence"} yet
+          </div>
+          Use <strong>Add a person</strong> above to enroll someone. Enrollment is manual for now, so this list stays
+          empty until you add the first person.
         </div>
       )}
 
@@ -206,7 +211,7 @@ function PeopleInner() {
 
 export default function PeoplePage() {
   return (
-    <Suspense fallback={<div style={{ color: "var(--text-muted)", fontSize: 13 }}>Loading...</div>}>
+    <Suspense fallback={<PeopleListSkeleton />}>
       <PeopleInner />
     </Suspense>
   );

@@ -57,7 +57,7 @@ export default function NewIntelBanner() {
           {items.length} new video{items.length === 1 ? "" : "s"} from your watched creators
         </div>
         <div style={{ fontSize: 11.5, color: "var(--text-secondary)", marginTop: 2 }}>
-          {creators.join(", ")} — latest: “{items[0]?.title}”
+          {creators.join(", ")} · latest: “{items[0]?.title}”
         </div>
       </div>
       <button

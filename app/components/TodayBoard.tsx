@@ -533,7 +533,7 @@ export default function TodayBoard() {
           ) : socialNeedsAction === null ? (
             <SourceDown
               name="Social queue (/api/social)"
-              reason={social.state === "ok" ? (social.data.reason ?? "table missing — run migration 0028") : social.state === "error" ? social.reason : "unavailable"}
+              reason={social.state === "ok" ? (social.data.reason ?? "table missing, run migration 0028") : social.state === "error" ? social.reason : "unavailable"}
             />
           ) : (
             <button style={rowBtn} onClick={() => goView("social")}>

@@ -26,7 +26,38 @@ type Lead = {
   next_action_at: string | null;
   claimed_by_email: string | null;
   overdue?: boolean;
+  tier?: string | null;
 };
+
+// Buy-likelihood category. The value arrives as "A"/"b"/"tier-c"/"not callable";
+// normalise to a single callable letter or null. Mirrors the /calls/list map so
+// the dialer and the full list read the same category the same way.
+const TIER_TONE: Record<string, { label: string; tone: string }> = {
+  A: { label: "A · hot", tone: "var(--green)" },
+  B: { label: "B · warm", tone: "var(--accent)" },
+  C: { label: "C · cool", tone: "var(--text-muted)" },
+};
+function tierLetter(t: string | null | undefined): "A" | "B" | "C" | null {
+  const c = (t ?? "").trim().toUpperCase().replace(/^TIER[-\s]?/, "").charAt(0);
+  return c === "A" || c === "B" || c === "C" ? c : null;
+}
+function TierBadge({ tier }: { tier: string | null | undefined }) {
+  const c = tierLetter(tier);
+  if (!c) return null;
+  const m = TIER_TONE[c];
+  return (
+    <span
+      style={{
+        display: "inline-flex", alignItems: "center", gap: 4,
+        padding: "2px 8px", borderRadius: 999, fontSize: 11, fontWeight: 700,
+        border: `1px solid ${m.tone}`, color: m.tone, letterSpacing: 0.2,
+      }}
+      title="Buy-likelihood category"
+    >
+      {m.label}
+    </span>
+  );
+}
 
 type Activity = {
   id: number;
@@ -299,7 +330,10 @@ export default function TodayDashboard() {
                   {l.score ?? 0}
                 </div>
                 <div style={{ flex: "1 1 260px", minWidth: 0 }}>
-                  <span style={{ fontSize: 15, fontWeight: 700 }}>{l.company}</span>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 15, fontWeight: 700 }}>{l.company}</span>
+                    <TierBadge tier={l.tier} />
+                  </span>
                   <ContactLine contact_name={l.contact_name} title={l.title} extra={[l.city, l.vertical]} />
                   {isResearchDump(l.title) && <ResearchNotes notes={l.title} />}
                   {displaySignals(l.signals) && (

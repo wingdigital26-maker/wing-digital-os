@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import "./activity.css";
 
@@ -174,6 +175,7 @@ export default function ActivityBoard() {
     <div className="act-wrap">
       <div className="act-head">
         <button className="act-refresh" onClick={load} disabled={loading}>{loading ? "Loading…" : "Refresh"}</button>
+        <Link href="/" className="act-home">← Wing Digital OS</Link>
         <h1>Messaging Activity</h1>
         <p>
           Everything Wing is sending — or would send — in one place: what has actually gone out, what is queued next

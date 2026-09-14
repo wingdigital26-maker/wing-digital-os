@@ -60,6 +60,7 @@ export default function DashboardsIndexPage() {
   return (
     <div className="dash-index page-scroll">
       <div className="dash-index-inner">
+        <Link href="/" className="dash-home">← Wing Digital OS</Link>
         <header className="dash-head">
           <h1>Client dashboards</h1>
           <p>

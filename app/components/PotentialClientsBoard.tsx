@@ -128,7 +128,7 @@ export default function PotentialClientsBoard() {
   useEffect(() => {
     if (!researching) { setElapsed(0); return; }
     const started = Date.now();
-    const t = setInterval(() => setElapsed(Math.floor((Date.now() - started) / 1000)), 250);
+    const t = setInterval(() => setElapsed(Math.floor((Date.now() - started) / 1000)), 1000);
     return () => clearInterval(t);
   }, [researching]);
 

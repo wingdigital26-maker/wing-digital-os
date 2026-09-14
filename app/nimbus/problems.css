@@ -219,6 +219,18 @@
   cursor: copy;
   word-break: break-all;
 }
+.np-cmd:hover {
+  border-color: rgba(61, 107, 240, 0.5);
+}
+.np-cmd:focus-visible {
+  outline: 2px solid rgba(61, 107, 240, 0.75);
+  outline-offset: 2px;
+}
+.np-cmd[data-copied="1"] {
+  color: #8ff0b8;
+  border-color: rgba(64, 200, 128, 0.5);
+  background: rgba(64, 200, 128, 0.12);
+}
 
 .np-actions {
   display: flex;

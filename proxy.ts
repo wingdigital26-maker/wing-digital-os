@@ -115,7 +115,6 @@ function isPublicPath(pathname: string): boolean {
 
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  console.log("JAPERFHIT", pathname);
 
   // Static demo sites in public/ have no directory-index resolution in Next;
   // send the bare folder URL to its index.html.

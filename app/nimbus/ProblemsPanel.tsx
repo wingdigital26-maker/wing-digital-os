@@ -64,6 +64,21 @@ export default function ProblemsPanel({ onClose }: { onClose: () => void }) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
+
+  const copyCommand = useCallback((cmd: string) => {
+    navigator.clipboard?.writeText(cmd).then(
+      () => {
+        setCopied(cmd);
+        window.setTimeout(() => setCopied((c) => (c === cmd ? null : c)), 1600);
+      },
+      () => {
+        // Clipboard blocked (permission/insecure context): say so rather than
+        // showing a silent "copied" that never happened.
+        setCopied(null);
+      }
+    );
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -204,8 +219,22 @@ export default function ProblemsPanel({ onClose }: { onClose: () => void }) {
                       {t.proposedCommand ? (
                         <code
                           className="np-cmd"
-                          title="Click to copy"
-                          onClick={() => navigator.clipboard?.writeText(t.proposedCommand as string)}
+                          role="button"
+                          tabIndex={0}
+                          aria-label={
+                            copied === t.proposedCommand
+                              ? "Command copied to clipboard"
+                              : `Copy command to clipboard: ${t.proposedCommand}`
+                          }
+                          data-copied={copied === t.proposedCommand ? "1" : undefined}
+                          title={copied === t.proposedCommand ? "Copied" : "Click to copy"}
+                          onClick={() => copyCommand(t.proposedCommand as string)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              copyCommand(t.proposedCommand as string);
+                            }
+                          }}
                         >
                           {t.proposedCommand}
                         </code>

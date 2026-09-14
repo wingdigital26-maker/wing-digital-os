@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 // ───────────────────────────────────────────────────────────────────────────
-// /book — the PUBLIC self-serve booking page (GHL calendar replacement).
+// /book: the PUBLIC self-serve booking page (GHL calendar replacement).
 //
 // No login. A prospect opens the link, picks a day, picks a 30-minute slot,
 // types name/email, and confirms. The row lands in public.bookings via

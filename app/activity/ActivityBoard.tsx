@@ -4,15 +4,15 @@ import { useCallback, useEffect, useState } from "react";
 import "./activity.css";
 
 // ───────────────────────────────────────────────────────────────────────────
-// Messaging Activity — one place to see what email/text is going out.
+// Messaging Activity: one place to see what email/text is going out.
 //
 // This is a read-only VIEW. It fetches three existing read-only endpoints from
 // the browser (same-origin, session cookie carried automatically) and never
 // touches a send endpoint:
-//   * /api/messaging   — the automated cold-email QA board (queue + sent +
+//   * /api/messaging   the automated cold-email QA board (queue + sent +
 //                        lane paused/delivery state + the "no SMS lane" truth)
-//   * /api/messages    — the unified sent-message ledger (email + sms rows)
-//   * /api/sms/health  — live Twilio status (read-only)
+//   * /api/messages    the unified sent-message ledger (email + sms rows)
+//   * /api/sms/health  live Twilio status (read-only)
 //
 // HONESTY: Wing's automated send lanes are effectively dead right now
 // (daily_outreach.py lost its delivery step in the GHL retirement; there is NO
@@ -126,7 +126,7 @@ export default function ActivityBoard() {
   useEffect(() => { load(); }, [load]);
 
   // ── Lane status logic ──────────────────────────────────────────────
-  // Automated cold email: DEAD regardless of the paused flag — the delivery
+  // Automated cold email: DEAD regardless of the paused flag. The delivery
   // step was removed in the GHL retirement (see /api/messaging deliveryWarning).
   const coldEmail: { kind: LaneKind; state: string; detail: string } = (() => {
     if (!msg) return { kind: "unknown", state: "unknown", detail: "Could not read /api/messaging, so the automated cold-email lane state is unknown." };
@@ -251,7 +251,7 @@ export default function ActivityBoard() {
               </div>
             )}
 
-            {/* Cold-engine sent rows (emailed_at) — separate honest source */}
+            {/* Cold-engine sent rows (emailed_at): separate honest source */}
             {msg?.sent.available && (msg.sent.items.length > 0) && (
               <>
                 <p className="sub" style={{ marginTop: 16 }}>Cold-engine rows stamped as emailed (from prospects.emailed_at):</p>

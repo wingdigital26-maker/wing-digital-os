@@ -7,6 +7,7 @@
   --bg-secondary: #eef1f7;
   --bg-card: #ffffff;
   --bg-hover: #e7ecf5;
+  --skel-sheen: rgba(255, 255, 255, 0.65);
   --border: #d8dEE9;
   --accent: #1E44B8;
   --accent-2: #6d4aff;
@@ -40,6 +41,7 @@
   --bg-secondary: #0b0d17;
   --bg-card: #10131f;
   --bg-hover: #171b2c;
+  --skel-sheen: rgba(255, 255, 255, 0.06);
   --border: #1f2437;
   --accent: #3D6BF0;
   --accent-2: #a78bfa;
@@ -201,10 +203,15 @@ main, section {
 /* ── Skeleton shimmer for loading states ─────────────────────────── */
 .skel {
   border-radius: 10px;
-  background: linear-gradient(90deg,
-    rgba(255, 255, 255, 0.035) 25%,
-    rgba(34, 211, 238, 0.07) 50%,
-    rgba(255, 255, 255, 0.035) 75%);
+  /* Solid token base so the box is visible on the shipped LIGHT theme (the app
+     never sets data-theme, so light is the real default); sheen sweeps over it.
+     Previous fill was tuned only for the dark ground and read as near-invisible
+     ghost boxes on light. 2026-09-14. */
+  background-color: var(--bg-hover);
+  background-image: linear-gradient(90deg,
+    transparent 25%,
+    var(--skel-sheen) 50%,
+    transparent 75%);
   background-size: 200% 100%;
   animation: skelShimmer 1.4s ease-in-out infinite;
 }

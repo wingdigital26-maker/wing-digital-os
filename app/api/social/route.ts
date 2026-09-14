@@ -212,7 +212,8 @@ export async function PATCH(req: Request) {
     patch.scheduled_for = d;
   }
   if (body.notes !== undefined) {
-    patch.notes = nullableText(body.notes);
+    const n = nullableText(body.notes);
+    patch.notes = n ? n.slice(0, 2000) : null;
   }
 
   if (!Object.keys(patch).length) return badRequest("Nothing to update.");

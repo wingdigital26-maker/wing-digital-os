@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import CallSkeleton from "../_skeleton";
 
 // Team Schedule — one shared week calendar for Jack, Grant, and Maddox.
 // Everyone in the call room can see it and add to it; booked sales calls are
@@ -311,7 +312,17 @@ export default function TeamSchedule() {
 
       {/* Week grid — columns on desktop, stacked days on phones */}
       {loading ? (
-        <div style={{ color: "var(--text-muted)", fontSize: 13 }}>Loading the week…</div>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+            gap: 8,
+          }}
+        >
+          {Array.from({ length: 7 }).map((_, i) => (
+            <div key={i} className="skel" style={{ height: 150, borderRadius: 12 }} aria-busy="true" />
+          ))}
+        </div>
       ) : (
         <div
           style={{

@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { displayName } from "../names";
+import CallSkeleton from "../_skeleton";
 
 // The follow-up queue. Every lead sitting at status='callback', soonest first,
 // bucketed by how urgent it is. A caller can work the queue right here: same
@@ -245,6 +246,12 @@ export default function Callbacks() {
       {error && (
         <div style={{ ...banner, background: "rgba(239,68,68,0.12)", borderColor: "rgba(239,68,68,0.4)", color: "#f87171" }}>
           {error}
+        </div>
+      )}
+
+      {loading && (
+        <div style={{ marginTop: 20 }}>
+          <CallSkeleton rows={4} height={84} />
         </div>
       )}
 

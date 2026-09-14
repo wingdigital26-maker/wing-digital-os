@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import SignalLinks from "./SignalLinks";
+import CallSkeleton from "./_skeleton";
 
 // The Today screen: the first thing anyone sees when they open Outbound. Its
 // only job is to answer "what do I do right now" with real numbers. Every
@@ -224,7 +225,17 @@ export default function TodayDashboard() {
     return () => clearInterval(t);
   }, [load]);
 
-  if (loading) return <p style={muted}>Loading today…</p>;
+  if (loading)
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 22 }} aria-busy="true">
+        <div>
+          <div className="skel" style={{ height: 26, width: 260, borderRadius: 8 }} />
+          <div className="skel" style={{ height: 14, width: 320, borderRadius: 6, marginTop: 8 }} />
+        </div>
+        <CallSkeleton rows={2} height={64} />
+        <CallSkeleton rows={3} height={72} />
+      </div>
+    );
 
   if (error) {
     return (

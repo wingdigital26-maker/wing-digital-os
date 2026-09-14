@@ -304,7 +304,13 @@ function TwilioPanel() {
   }, []);
   useEffect(() => { void load(); }, [load]);
 
-  if (loading && !h) return <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Checking the Twilio pipe…</div>;
+  if (loading && !h) return (
+    <div style={{ display: "grid", gap: 12 }} aria-busy="true" aria-label="Checking the texting line">
+      <div className="skel" style={{ height: 24, width: 260, borderRadius: 8 }} />
+      <div className="skel" style={{ height: 120, borderRadius: 12 }} />
+      <div className="skel" style={{ height: 88, borderRadius: 12 }} />
+    </div>
+  );
   if (err && !h) return <Note tone="var(--red)" text={`The Twilio status check itself failed: ${err}. That means the answer is unknown, not that Twilio is fine.`} />;
   if (!h) return null;
 
@@ -438,7 +444,20 @@ export default function MessageLedger({ channel: lockedChannel }: { channel?: "s
   }, []);
 
   if (loading && !data) {
-    return <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Reading the message ledger…</div>;
+    return (
+      <div style={{ display: "grid", gap: 14 }} aria-busy="true" aria-label="Loading the message ledger">
+        <div style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
+          <div className="skel" style={{ height: 22, width: 120, borderRadius: 8 }} />
+          <div className="skel" style={{ height: 16, width: 220, borderRadius: 8 }} />
+        </div>
+        <div className="skel" style={{ height: 40, borderRadius: 10 }} />
+        <div style={{ display: "grid", gap: 8 }}>
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="skel" style={{ height: 64, borderRadius: 12 }} />
+          ))}
+        </div>
+      </div>
+    );
   }
   if (err && !data) {
     return <Note tone="var(--red)" text={`The message ledger could not be read: ${err}. Nothing below is available. This is a failure, not an empty board.`} />;

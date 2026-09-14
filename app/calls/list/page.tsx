@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import SignalLinks from "../SignalLinks";
 import { displayName } from "../names";
+import CallSkeleton from "../_skeleton";
 
 type Lead = {
   id: string;
@@ -553,7 +554,7 @@ export default function CallRoom() {
 
         {/* list */}
         <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 10 }}>
-          {loading && <p style={{ color: "var(--text-muted)", fontSize: 13 }}>Loading leads…</p>}
+          {loading && <CallSkeleton rows={5} height={96} />}
           {!loading && !error && shown.length === 0 && (
             <div style={{ ...card, textAlign: "center", padding: 40, color: "var(--text-muted)" }}>
               <p style={{ fontSize: 15, fontWeight: 600 }}>Nothing here</p>

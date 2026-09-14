@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import CallSkeleton from "../_skeleton";
 
 // Where the leads came from, and why some of them are not being called.
 //
@@ -138,7 +139,14 @@ export default function SourcesPage() {
   }
 
   if (loading) {
-    return <p style={{ color: "var(--text-muted)", fontSize: 13 }}>Loading lead sources…</p>;
+    return (
+      <div>
+        <div className="skel" style={{ height: 24, width: 280, borderRadius: 8 }} />
+        <div style={{ marginTop: 18 }}>
+          <CallSkeleton rows={4} height={80} />
+        </div>
+      </div>
+    );
   }
   if (error || !data) {
     return (

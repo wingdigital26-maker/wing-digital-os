@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import CallSkeleton from "../_skeleton";
 
 type Caller = {
   id: string;
@@ -182,7 +183,7 @@ export default function Team() {
 
         {/* list */}
         <div style={{ marginTop: 20, display: "flex", flexDirection: "column", gap: 10 }}>
-          {loading && <p style={{ fontSize: 13, color: "var(--text-muted)" }}>Loading…</p>}
+          {loading && <CallSkeleton rows={3} height={64} />}
           {!loading && rows.length === 0 && (
             <div style={{ ...card, textAlign: "center", padding: 30, color: "var(--text-muted)", fontSize: 13 }}>
               Nobody has call-room access yet.

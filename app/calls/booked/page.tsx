@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { displayName } from "../names";
+import CallSkeleton from "../_skeleton";
 
 // The wins board. Every lead at status='booked', most recent booking first,
 // with the notes from the call that booked it.
@@ -105,6 +106,12 @@ export default function Booked() {
           background: "rgba(239,68,68,0.12)", borderColor: "rgba(239,68,68,0.4)", color: "#f87171",
         }}>
           {error}
+        </div>
+      )}
+
+      {loading && (
+        <div style={{ marginTop: 18 }}>
+          <CallSkeleton rows={3} height={92} />
         </div>
       )}
 

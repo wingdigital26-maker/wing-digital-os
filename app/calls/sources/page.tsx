@@ -327,7 +327,7 @@ export default function SourcesPage() {
           background: "rgba(56,189,248,0.07)", border: "1px solid rgba(56,189,248,0.22)",
         }}
       >
-        <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: "#7dd3fc", fontWeight: 700 }}>
+        <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: "var(--accent)", fontWeight: 700 }}>
           How new leads get here
         </p>
         <p style={{ fontSize: 13, marginTop: 6, lineHeight: 1.6 }}>

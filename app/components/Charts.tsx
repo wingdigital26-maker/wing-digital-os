@@ -56,7 +56,7 @@ export function Delta({ value, label }: { value: number | null; label?: string }
   if (value === null || !Number.isFinite(value)) return null;
   const up = value > 0;
   const flat = value === 0;
-  const c = flat ? "#6b7280" : up ? "var(--green)" : "var(--red)";
+  const c = flat ? "var(--text-muted)" : up ? "var(--green)" : "var(--red)";
   return (
     <span style={{
       display: "inline-flex", alignItems: "center", gap: 4,
@@ -145,7 +145,7 @@ export function BarChart({
               width: "100%", maxWidth: 26, height: Math.max(h, 3), borderRadius: "5px 5px 2px 2px",
               background: d.value > 0
                 ? `linear-gradient(180deg, ${color}, ${color}55)`
-                : "rgba(255,255,255,0.05)",
+                : "var(--bg-hover)",
               boxShadow: isPeak ? `0 0 12px ${color}55` : "none",
               transition: "height 0.4s ease",
             }} />
@@ -220,7 +220,7 @@ export function DonutChart({
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap" }}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ flexShrink: 0 }} aria-hidden="true">
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth={thickness} />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--bg-hover)" strokeWidth={thickness} />
         {visible.map(s => {
           const frac = s.value / total;
           const dash = `${Math.max(frac * C - 2, 0.5)} ${C}`;

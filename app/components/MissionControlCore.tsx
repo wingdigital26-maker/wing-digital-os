@@ -971,7 +971,7 @@ function RecheckFindings({ result, ranAt }: { result: RecheckResult; ranAt: numb
           <button type="button" style={toggleBtn} onClick={() => setShowPc((v) => !v)}>
             {showPc ? "▾" : "▸"} {cnc.length} check{cnc.length === 1 ? "" : "s"} can only run on the PC{result.summary?.pcLastResult ? ` · last PC result: ${result.summary.pcLastResult}` : ""}
           </button>
-          {showPc && cnc.map((f) => <FindingRow key={f.id} f={f} color="#93a4b8" muted />)}
+          {showPc && cnc.map((f) => <FindingRow key={f.id} f={f} color="var(--text-muted)" muted />)}
         </div>
       )}
 
@@ -1003,12 +1003,12 @@ const RECHECK_TARGETS: { id: string; label: string }[] = [
 ];
 
 const statusColor = (s: string): string =>
-  s === "resolved" || s === "ok" ? "var(--green)" : s === "problem" ? "var(--red)" : "#93a4b8";
+  s === "resolved" || s === "ok" ? "var(--green)" : s === "problem" ? "var(--red)" : "var(--text-muted)";
 
 function StatusMark({ status }: { status: string }) {
   if (status === "resolved" || status === "ok") return <span style={{ color: "var(--green)" }} aria-hidden>&#10003;</span>;
   if (status === "problem") return <span style={{ color: "var(--red)" }} aria-hidden>&#10007;</span>;
-  return <Pill text="needs PC" color="#93a4b8" />;
+  return <Pill text="needs PC" color="var(--text-muted)" />;
 }
 
 export function RecheckButton({ onRechecked, compact }: { onRechecked?: () => void; compact?: boolean }) {

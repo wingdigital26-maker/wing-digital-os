@@ -692,7 +692,7 @@ export default function CallRoom() {
                   </details>
                 )}
                 {displaySignals(l.signals) && (
-                  <p style={{ fontSize: 12, color: "#7dd3fc", marginTop: 5, lineHeight: 1.45 }}>
+                  <p style={{ fontSize: 12, color: "var(--accent)", marginTop: 5, lineHeight: 1.45 }}>
                     <SignalLinks signals={displaySignals(l.signals)!} company={l.company} city={l.city} website={l.website} />
                   </p>
                 )}
@@ -899,7 +899,7 @@ export default function CallRoom() {
                 marginTop: 14, padding: 12, borderRadius: 10,
                 background: "rgba(56,189,248,0.08)", border: "1px solid rgba(56,189,248,0.25)",
               }}>
-                <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: "#7dd3fc", fontWeight: 700 }}>
+                <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: "var(--accent)", fontWeight: 700 }}>
                   Why they are worth calling
                 </p>
                 <p style={{ fontSize: 13, marginTop: 5, lineHeight: 1.5 }}>

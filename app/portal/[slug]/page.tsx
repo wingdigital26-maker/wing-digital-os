@@ -171,15 +171,23 @@ export default async function PortalPage({ params }: { params: Promise<{ slug: s
                 </div>
                 <div style={{ flex: 1, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 12 }}>
                   {PILLARS.map((p) => {
-                    const v = health[p.key] as number | undefined;
+                    const raw = health[p.key];
+                    const measured = typeof raw === "number" && Number.isFinite(raw);
+                    const v = measured ? (raw as number) : undefined;
                     return (
                       <div key={p.label}>
-                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4, gap: 8 }}>
                           <span style={{ fontSize: 11.5, color: "var(--text-secondary)" }}>{p.label}</span>
-                          <span style={{ fontSize: 11.5, fontWeight: 700, color: scoreColor(v) }}>{v ?? "—"}</span>
+                          {measured ? (
+                            <span style={{ fontSize: 11.5, fontWeight: 700, color: scoreColor(v) }}>{v}</span>
+                          ) : (
+                            <span style={{ fontSize: 10.5, color: "var(--text-muted)" }}>Not measured yet</span>
+                          )}
                         </div>
                         <div style={{ height: 6, background: "var(--bg-hover)", borderRadius: 999, overflow: "hidden" }}>
-                          <div style={{ width: `${Math.min(Number(v) || 0, 100)}%`, height: "100%", background: scoreColor(v), borderRadius: 999 }} />
+                          {measured && (
+                            <div style={{ width: `${Math.min(v as number, 100)}%`, height: "100%", background: scoreColor(v), borderRadius: 999 }} />
+                          )}
                         </div>
                       </div>
                     );

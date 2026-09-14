@@ -416,7 +416,7 @@ export default function Callbacks() {
                 marginTop: 14, padding: 12, borderRadius: 10,
                 background: "rgba(56,189,248,0.08)", border: "1px solid rgba(56,189,248,0.25)",
               }}>
-                <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: "#7dd3fc", fontWeight: 700 }}>
+                <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: "var(--accent)", fontWeight: 700 }}>
                   Why they are worth calling
                 </p>
                 <p style={{ fontSize: 13, marginTop: 5, lineHeight: 1.5 }}>{active.signals}</p>

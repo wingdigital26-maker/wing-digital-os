@@ -70,3 +70,14 @@
 | safety | clean — presentational/perf only, test file read-only | — |
 | regression | gate tests 93/93 · tsc 0 · clean build | build exit 0 |
 **Process note:** never give two parallel agents the same file. This round gave perf+visual both SocialBoard.tsx; they did not collide but it was luck. Logged in journal.
+
+## 2026-09-14 — jaswarm Round 8 (Hero's social: caption quality / anti-slop)
+| Lane | Change | Proof |
+|---|---|---|
+| content | All 11 pillar prompts rewritten for specificity (DFW suburbs, concrete items, forbid cliche openers/hashtag-stuffing) + 3 new brand_rules + sharper examples | JSON ok · gate 95/95 · 0 $/em-dash/phone |
+| system | NEW quality.py anti-slop advisory (cliche openers, emoji/hashtag stuffing, ALL-CAPS, generic) wired into engine as non-blocking quality_notes | advisory-only (always exit 0) · never blocks export |
+| visual | no changes needed (board dialed after round 7) | — |
+| practicality | no changes needed (no UI/nav change) | board reachable ✓ |
+| safety | clean — quality.py pure string analysis, gate path untouched, no secrets | — |
+| regression | gate tests 95/95 · engine draft/export smoke ok · OS worktree unchanged (round-7 build stands) | 95/95 ✓ |
+**Committed (code):** ghl-cli/heros_social (not a repo) · changelog only to ja/loop

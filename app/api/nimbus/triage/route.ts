@@ -41,7 +41,10 @@ export async function POST(req: NextRequest) {
   }
   let body: { problemId?: unknown };
   try {
-    body = await req.json();
+    // A body of literal `null` parses without throwing, so the catch below does
+    // not cover it; reading .problemId off it then 500'd.
+    const parsed = await req.json();
+    body = (parsed && typeof parsed === "object" ? parsed : {}) as { problemId?: unknown };
   } catch {
     return NextResponse.json({ ok: false, error: "expected a JSON body with problemId" }, { status: 400, headers: noStore });
   }

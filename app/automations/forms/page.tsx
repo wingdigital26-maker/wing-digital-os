@@ -15,6 +15,7 @@ import {
   input,
   jsonInit,
   label,
+  LoadingRows,
   muted,
   Notice,
   pickList,
@@ -200,7 +201,7 @@ export default function FormsPage() {
 
       {notice && <Notice kind={notice.kind}>{notice.text}</Notice>}
       {error && <ErrorBox what="forms" error={error} />}
-      {forms === null && !error && <div style={muted}>Loading...</div>}
+      {forms === null && !error && <LoadingRows />}
       {forms?.length === 0 && <EmptyState>No forms yet. Create one above, then paste its embed code into the client&apos;s site.</EmptyState>}
 
       <div style={{ display: "grid", gap: 10 }}>
@@ -254,7 +255,7 @@ export default function FormsPage() {
                       <button onClick={() => loadSubs(f.id)} style={btnSmall}>Refresh</button>
                     </div>
                     {!s || (s.rows === null && !s.error) ? (
-                      <div style={muted}>Loading...</div>
+                      <LoadingRows rows={2} height={40} />
                     ) : s.error ? (
                       <div style={{ ...card, borderColor: "var(--red)", fontSize: 13 }}>Could not load submissions: {s.error}</div>
                     ) : s.rows && s.rows.length === 0 ? (

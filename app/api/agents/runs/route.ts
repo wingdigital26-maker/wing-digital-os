@@ -21,7 +21,11 @@ export async function GET() {
   try {
     queue = JSON.parse(await readFile(QUEUE_FILE, "utf-8"));
   } catch { /* no queue yet */ }
-  return NextResponse.json({ runs, queue: queue.filter((q: any) => q.status === "open") });
+  // needs_jack.json is written by external agents; if it ever holds an object
+  // instead of an array, .filter() throws and the whole board 500s. POST
+  // already guards this shape -- GET has to as well.
+  const open = Array.isArray(queue) ? queue.filter((q: any) => q?.status === "open") : [];
+  return NextResponse.json({ runs, queue: open });
 }
 
 // The only two resolutions this endpoint may write. Anything else used to be

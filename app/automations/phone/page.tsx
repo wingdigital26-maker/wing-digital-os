@@ -14,6 +14,7 @@ import {
   input,
   jsonInit,
   label,
+  LoadingRows,
   muted,
   Notice,
   pickList,
@@ -223,7 +224,7 @@ export default function PhonePage() {
 
       {notice && <Notice kind={notice.kind}>{notice.text}</Notice>}
       {error && <ErrorBox what="phone numbers" error={error} />}
-      {numbers === null && !error && <div style={muted}>Loading...</div>}
+      {numbers === null && !error && <LoadingRows />}
       {numbers?.length === 0 && <EmptyState>No numbers are tracked yet. Add one above and connect it in Twilio.</EmptyState>}
 
       <div style={{ display: "grid", gap: 8, marginBottom: 26 }}>

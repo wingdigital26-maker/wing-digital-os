@@ -32,6 +32,7 @@ import {
   input,
   jsonInit,
   label,
+  LoadingRows,
   muted,
   Notice,
   RunLog,
@@ -196,7 +197,7 @@ export default function AutomationEditorPage() {
   };
 
   if (error) return <ErrorBox what="this automation" error={error} />;
-  if (!wf) return <div style={muted}>Loading...</div>;
+  if (!wf) return <LoadingRows rows={4} height={72} />;
 
   const filterKeys = TRIGGER_FILTER_KEYS[trigger] ?? [];
   const dirty =

@@ -9,6 +9,12 @@ export const runtime = "nodejs";
 const execFileAsync = promisify(execFile);
 const GHL_CLI = "C:\\Users\\wjack\\ghl-cli";
 
+// Kept in sync with VALID in ghl-cli/call_log.py.
+const VALID_STATUS = new Set([
+  "no-answer", "voicemail", "not-interested", "callback", "booked",
+  "emailed", "closed", "new", "called",
+]);
+
 export async function GET() {
   if (isCloud()) {
     // Local-only: reads prospects.db via python on Jack's PC. In the cloud we
@@ -63,14 +69,48 @@ export async function POST(req: Request) {
     if (!id || !status) {
       return NextResponse.json({ error: "id and status required" }, { status: 400 });
     }
-    // Stringified at the boundary: these become argv for a child process, and
-    // execFile rejects a non-string arg with a TypeError that surfaced as a 500.
-    const args = ["call_log.py", String(id), String(status)];
-    if (notes) args.push(String(notes));
+    // `id` lands in argv[1] of call_log.py, which dispatches on that slot: the
+    // literals "list", "today", "note" and "callbacks" are subcommands, not ids.
+    // A non-numeric id therefore picked a subcommand instead of a prospect --
+    // "note" in particular reaches add_note() and writes arbitrary text onto a
+    // row while skipping the status whitelist below. Pinning id to a positive
+    // integer makes every subcommand name unreachable from here.
+    const pid = typeof id === "number" ? id : Number(String(id).trim());
+    if (!Number.isInteger(pid) || pid <= 0) {
+      return NextResponse.json({ error: "id must be a positive integer" }, { status: 400 });
+    }
+    // Mirrors VALID in call_log.py. The script prints its own rejection and
+    // still exits 0, so without this check a rejected write came back as
+    // 200 {"ok":true} and the board optimistically repainted a row for a call
+    // that was never logged.
+    if (typeof status !== "string" || !VALID_STATUS.has(status)) {
+      return NextResponse.json(
+        { error: `status must be one of: ${[...VALID_STATUS].sort().join(", ")}` },
+        { status: 400 }
+      );
+    }
+    if (notes !== undefined && notes !== null && typeof notes !== "string") {
+      return NextResponse.json({ error: "notes must be a string" }, { status: 400 });
+    }
+    const args = ["call_log.py", String(pid), status];
+    if (notes) args.push(notes);
     const { stdout } = await execFileAsync("python", args, { cwd: GHL_CLI });
+    const message = stdout.trim();
+    // call_log.py exits 0 even when it wrote nothing (log_call returns early
+    // and prints "No prospect with id N"). A successful write is the only path
+    // that prints "#<id> <name> -> <status>", so key off that rather than
+    // trusting the exit code. Without this the board repainted the row and
+    // toasted success for a call that was never logged.
+    if (!message.startsWith(`#${pid} `)) {
+      return NextResponse.json({ ok: false, error: message || "the call was not logged" }, { status: 404 });
+    }
     await execFileAsync("python", ["generate_call_sheet.py"], { cwd: GHL_CLI });
-    return NextResponse.json({ ok: true, message: stdout.trim() });
+    return NextResponse.json({ ok: true, message });
   } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
+    // e.message here is the child process failure, which carries the full
+    // Python traceback including absolute paths under C:\Users. Log it, do not
+    // ship it to the client.
+    console.error("[api/prospects] call_log failed:", e?.message ?? e);
+    return NextResponse.json({ error: "could not log the call" }, { status: 500 });
   }
 }

@@ -38,8 +38,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false }, { status: 401 });
   };
 
-  const body = await req.json().catch(() => ({}));
-  const { password, email } = body as { password?: string; email?: string };
+  // The .catch guards the parse, not the parsed value: a body of literal `null`
+  // parses fine and then threw on destructuring, giving an unauthenticated 500
+  // on the OS front door (/api/login is on the proxy public allowlist).
+  const parsed = await req.json().catch(() => null);
+  const body = (parsed && typeof parsed === "object" ? parsed : {}) as {
+    password?: string;
+    email?: string;
+  };
+  const { password, email } = body;
 
   // --- NEW: Supabase email + password path (additive) ---
   // Only engages when an email is supplied AND Supabase env is configured.

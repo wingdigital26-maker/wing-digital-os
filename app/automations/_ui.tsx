@@ -178,6 +178,19 @@ export function Notice({ kind, children }: { kind: "ok" | "warn" | "error"; chil
   );
 }
 
+// The house shimmer skeleton, shaped like the card rows that will replace it,
+// so a loading list reads as the same object arriving rather than a bare
+// "Loading..." line. Matches the .skel language used across the rest of the OS.
+export function LoadingRows({ rows = 3, height = 68 }: { rows?: number; height?: number }) {
+  return (
+    <div style={{ display: "grid", gap: 10 }} aria-label="Loading" aria-busy="true">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="skel" style={{ height, borderRadius: 12 }} />
+      ))}
+    </div>
+  );
+}
+
 export function EmptyState({ children }: { children: React.ReactNode }) {
   return (
     <div style={{ ...card, textAlign: "center", padding: 34, color: "var(--text-secondary)", fontSize: 14 }}>

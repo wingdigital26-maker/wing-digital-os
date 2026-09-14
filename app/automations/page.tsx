@@ -15,6 +15,7 @@ import {
   h1,
   input,
   jsonInit,
+  LoadingRows,
   muted,
   Notice,
   StatusPill,
@@ -152,7 +153,7 @@ export default function AutomationsPage() {
       {notice && <Notice kind={notice.kind}>{notice.text}</Notice>}
       {error && <ErrorBox what="automations" error={error} />}
 
-      {items === null && !error && <div style={muted}>Loading...</div>}
+      {items === null && !error && <LoadingRows height={84} />}
 
       {items?.length === 0 && (
         <EmptyState>

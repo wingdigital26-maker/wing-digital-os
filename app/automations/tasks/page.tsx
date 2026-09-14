@@ -15,6 +15,7 @@ import {
   input,
   jsonInit,
   label,
+  LoadingRows,
   muted,
   Notice,
   pickList,
@@ -159,7 +160,7 @@ export default function TasksPage() {
 
       {notice && <Notice kind={notice.kind}>{notice.text}</Notice>}
       {error && <ErrorBox what="tasks" error={error} />}
-      {tasks === null && !error && <div style={muted}>Loading...</div>}
+      {tasks === null && !error && <LoadingRows />}
       {tasks?.length === 0 && <EmptyState>Nothing is waiting on you. Open tasks will show up here as automations create them.</EmptyState>}
 
       {ORDER.map((g) => {

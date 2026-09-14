@@ -11,6 +11,7 @@ import {
   errText,
   fmtWhen,
   h1,
+  LoadingRows,
   muted,
   pickList,
   RunLog,
@@ -94,7 +95,7 @@ export default function RunsPage() {
       </div>
 
       {error && <ErrorBox what="activity" error={error} />}
-      {runs === null && !error && <div style={muted}>Loading...</div>}
+      {runs === null && !error && <LoadingRows height={92} />}
       {runs?.length === 0 && <EmptyState>No automation has run yet. Activate one and it will show up here the first time its trigger happens.</EmptyState>}
 
       <div style={{ display: "grid", gap: 8 }}>

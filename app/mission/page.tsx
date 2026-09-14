@@ -66,7 +66,10 @@ export default function MissionControl() {
     setTimedOut(false); setError(null); setAttempt((a) => a + 1); load();
   }, [load]);
 
-  const overallColor = STATUS_COLOR[data?.overall ?? "green"];
+  // Until real data arrives (loading, error, or PC-off timeout) we don't know
+  // the fleet's health, so show a neutral, non-pulsing dot instead of a green
+  // "all good" pulse that would misrepresent unknown state as healthy.
+  const overallColor = data ? (STATUS_COLOR[data.overall] ?? "var(--text-muted)") : "var(--text-muted)";
   const scheduled = useMemo(() => data?.agents.filter((a) => a.kind === "scheduled") ?? [], [data]);
   const crew = useMemo(() => data?.agents.filter((a) => a.kind === "crew") ?? [], [data]);
 
@@ -89,7 +92,7 @@ export default function MissionControl() {
       {/* Header */}
       <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18, flexWrap: "wrap", gap: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <Dot color={overallColor} pulse />
+          <Dot color={overallColor} pulse={!!data} />
           <h1 style={{ fontSize: 22, letterSpacing: "0.14em", fontWeight: 700 }}>
             WING OS <span style={{ color: "var(--accent)" }}>MISSION CONTROL</span>
           </h1>

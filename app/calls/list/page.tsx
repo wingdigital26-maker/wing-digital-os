@@ -831,7 +831,7 @@ export default function CallRoom() {
                 background: "linear-gradient(135deg,rgba(61,107,240,0.16),rgba(30,68,184,0.10))",
                 border: "1px solid rgba(61,107,240,0.45)",
               }}>
-                <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: "#93b4ff", fontWeight: 700 }}>
+                <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: "var(--accent)", fontWeight: 700 }}>
                   Say this
                 </p>
                 <p style={{ fontSize: 15.5, lineHeight: 1.5, marginTop: 6, fontWeight: 600 }}>

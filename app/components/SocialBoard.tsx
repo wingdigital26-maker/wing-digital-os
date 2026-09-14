@@ -483,6 +483,12 @@ export default function SocialBoard() {
                   <span style={{ fontSize: 12.5, color: "var(--text-muted)" }}>{items.length}</span>
                 </div>
                 <p style={{ margin: 0, fontSize: 11.5, color: "var(--text-muted)" }}>{col.blurb}</p>
+                {col.key === "scheduled" && (
+                  <p className="sb-col-help">
+                    The auto-poster publishes these once their date is due. The board itself never
+                    posts: that is a separate agent.
+                  </p>
+                )}
                 {items.length === 0 ? (
                   <p style={{ fontSize: 12.5, color: "var(--text-muted)", padding: "16px 0", textAlign: "center", border: "1px dashed var(--border)", borderRadius: 12 }}>
                     {platformFilter !== "all"
@@ -566,6 +572,21 @@ function PostCard({ post: p, busy, err, onSave, onRemove }: {
             <span className="sb-note-text">{p.notes}</span>
           </div>
         </div>
+      )}
+
+      {/* Readiness line — only for cards the auto-poster will actually pick up
+          (status "scheduled"). Instagram cannot publish without an image, so a
+          scheduled Instagram post with no image_url is honestly flagged as
+          blocked. Everything else that has what it needs reads a quiet
+          "Ready to post". Text only, no status dot (hard rule). */}
+      {p.status === "scheduled" && (
+        p.platform === "instagram" && !p.image_url ? (
+          <p className="sb-ready sb-ready-warn">
+            Needs a photo before it can post to Instagram
+          </p>
+        ) : (
+          <p className="sb-ready">Ready to post</p>
+        )
       )}
 
       {err && <p style={{ margin: 0, fontSize: 12, color: "var(--red)" }}>{err}</p>}

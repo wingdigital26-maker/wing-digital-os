@@ -951,7 +951,7 @@ function RecheckFindings({ result, ranAt }: { result: RecheckResult; ranAt: numb
   return (
     <div style={{
       border: `1px solid ${color}55`, borderRadius: 10, padding: "9px 11px",
-      background: "rgba(255,255,255,0.02)", display: "flex", flexDirection: "column", gap: 7,
+      background: "var(--bg-hover)", display: "flex", flexDirection: "column", gap: 7,
     }} onClick={(e) => e.stopPropagation()}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color, fontFamily: mono }}>
         <StatusMark status={problems.length ? "problem" : "ok"} />
@@ -1094,7 +1094,7 @@ export function RecheckButton({ onRechecked, compact }: { onRechecked?: () => vo
                 color: "var(--text-secondary, #9ca3af)", fontSize: 11, fontFamily: mono, padding: "6px 8px",
                 borderRadius: 6, cursor: "pointer",
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.05)")}
+              onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-hover)")}
               onMouseLeave={(e) => (e.currentTarget.style.background = "none")}>
               {t.label}
             </button>
@@ -2052,7 +2052,7 @@ function StatPanel({ statKey, onClose, onSelect }: {
           <div style={{
             display: "flex", alignItems: "center", gap: 8, marginBottom: 8, padding: "6px 10px", borderRadius: 8,
             border: `1px solid ${detail.stale ? "rgba(251,146,60,0.4)" : "var(--border, rgba(255,255,255,0.08))"}`,
-            background: detail.stale ? "rgba(251,146,60,0.06)" : "rgba(255,255,255,0.02)",
+            background: detail.stale ? "rgba(251,146,60,0.06)" : "var(--bg-hover)",
           }}>
             <FreshnessMark source={detail.source ?? "snapshot"} updated={detail.updated} stale={detail.stale} />
             <span style={{ fontSize: 11, color: detail.stale ? "var(--orange)" : "var(--text-secondary, #9ca3af)", fontFamily: "'JetBrains Mono', monospace" }}>

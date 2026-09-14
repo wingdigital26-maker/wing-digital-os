@@ -81,3 +81,14 @@
 | safety | clean — quality.py pure string analysis, gate path untouched, no secrets | — |
 | regression | gate tests 95/95 · engine draft/export smoke ok · OS worktree unchanged (round-7 build stands) | 95/95 ✓ |
 **Committed (code):** ghl-cli/heros_social (not a repo) · changelog only to ja/loop
+
+## 2026-09-14 — jaswarm Round 9 (Hero's social: consistency + doc accuracy + micro-polish)
+| Lane | Change | Proof |
+|---|---|---|
+| content | strategy.md fix: Week 4 calendar scheduled a FB/Google-only pillar (how-it-works) on Nextdoor; swapped to neighborhood-proof (Nextdoor-eligible) | 0 em-dash/$/phone; calendar refs now match post_bank |
+| docs | SKILL.md updated to the full command surface (check/push/run_weekly/quality/poster) + fail-closed safety model | frontmatter intact, every command grep-verified in source |
+| visual | eyebrow label consistency: .sb-note-title letter-spacing 0.04->0.06em to match week strip | tsc 0 · build ✓ |
+| practicality | no changes needed | board reachable ✓ |
+| safety | clean — cosmetic CSS + docs only, no secrets, frontmatter intact | — |
+| regression | tsc 0 · clean build · gate 95/95 (unchanged) | build exit 0 |
+**Committed (worktree):** SocialBoard.css + changelog · docs/strategy in ghl-cli + .claude/skills (not a repo)

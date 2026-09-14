@@ -18,3 +18,13 @@
 | practicality | generator->board handoff now closable (`push --live`) + Round 1 info-panel hint | Social reachable via nav ✓ |
 | safety | clean — token env-only never printed, no SSRF, TLS intact, no XSS | — |
 | regression | Round 1 gate fixes still hold (5 FAIL / 2 legit PASS); full build ✓ | build exit 0 |
+
+## 2026-09-14 — jaswarm Round 3 (Hero's social system: polish + defense-in-depth)
+| Lane | Change | Proof |
+|---|---|---|
+| visual | Composer: platform-aware character counter (--orange near cap, --red over, guidance-only, aria-live) | tsc 0 err · 375px no collide · build ✓ |
+| system | engine.py re-lints at export/push time (closes stored-gate tamper gap) + read-only `check --week` auditor | tamper caption SKIPPED by check/export/push; --week traversal rejected |
+| content | strategy.md: 5-shot photo/video capture SOP + copy-paste hashtag & local-tag bank | 0 em dashes/prices/phones |
+| practicality | `check` gives a per-post lint audit before anything is pushed | read-only, reachable via CLI + skill |
+| safety | clean — counter is presentational, re-lint warning leaks no caption/token, check read-only | — |
+| regression | Round 1 gate rules hold (phone/price FAIL); full clean build | build exit 0 |

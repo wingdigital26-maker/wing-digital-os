@@ -44,6 +44,21 @@ function platformAccent(p: string): string {
   return PLATFORM_ACCENT[p] || "var(--text-muted)";
 }
 
+// Practical caption caps per platform. These are guidance, not a hard block:
+// the composer never stops you from saving a longer caption, it just flags
+// when you are near or over the network's usual limit so you can trim before
+// you post it by hand. Numbers are the commonly cited practical maximums.
+const PLATFORM_LIMIT: Record<string, number> = {
+  facebook: 2200,
+  instagram: 2200,
+  google: 1500,
+  nextdoor: 1000,
+  other: 2200,
+};
+function platformLimit(p: string): number {
+  return PLATFORM_LIMIT[p] || 2200;
+}
+
 function PlatformChip({ platform }: { platform: string }) {
   const known = platform in PLATFORM_ACCENT && platform !== "other";
   return (
@@ -102,6 +117,18 @@ export default function SocialBoard() {
 
   const [busyId, setBusyId] = useState<number | null>(null);
   const [rowErr, setRowErr] = useState<Record<number, string>>({});
+
+  // Live character counter, derived from the real caption length and the real
+  // selected platform's practical cap. Warns as you near the cap and flags
+  // over-limit, but never blocks saving (guidance only).
+  const counter = useMemo(() => {
+    const count = caption.length;
+    const limit = platformLimit(platform);
+    const over = count > limit;
+    const near = !over && count >= limit * 0.9;
+    const color = over ? "var(--red)" : near ? "var(--orange)" : "var(--text-muted)";
+    return { count, limit, over, near, color };
+  }, [caption, platform]);
 
   // Filter the board by platform. "all" shows everything. Only platforms that
   // actually have posts get a chip, so the control never fabricates options.
@@ -271,7 +298,25 @@ export default function SocialBoard() {
           placeholder="Write the caption..."
           rows={3}
           style={{ ...input, resize: "vertical", width: "100%", boxSizing: "border-box" }}
+          aria-describedby="sb-charcount"
         />
+        <div
+          id="sb-charcount"
+          className="sb-charcount"
+          style={{ color: counter.color }}
+          aria-live="polite"
+        >
+          <span className="sb-charcount-num">{counter.count.toLocaleString()}</span>
+          <span className="sb-charcount-sep"> / </span>
+          <span>{counter.limit.toLocaleString()}</span>
+          <span className="sb-charcount-label">
+            {counter.over
+              ? ` over the ${PLATFORM_LABEL[platform] || platform} limit`
+              : counter.near
+              ? ` near the ${PLATFORM_LABEL[platform] || platform} limit`
+              : ` ${PLATFORM_LABEL[platform] || platform} characters`}
+          </span>
+        </div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
           <input
             value={imageUrl}

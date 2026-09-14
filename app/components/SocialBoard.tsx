@@ -76,7 +76,7 @@ function PlatformChip({ platform }: { platform: string }) {
 // The board columns, in the order a post travels through them.
 const COLUMNS: { key: string; label: string; color: string; blurb: string }[] = [
   { key: "draft", label: "Draft", color: "var(--text-muted)", blurb: "Written, no date yet." },
-  { key: "scheduled", label: "Scheduled", color: "var(--orange)", blurb: "Has a target date. Someone still posts it by hand." },
+  { key: "scheduled", label: "Scheduled", color: "var(--orange)", blurb: "Has a target date. This is the queue the posting agent draws from." },
   { key: "posted", label: "Posted", color: "var(--green)", blurb: "A person marked this as posted." },
 ];
 
@@ -485,8 +485,9 @@ export default function SocialBoard() {
                 <p style={{ margin: 0, fontSize: 11.5, color: "var(--text-muted)" }}>{col.blurb}</p>
                 {col.key === "scheduled" && (
                   <p className="sb-col-help">
-                    The auto-poster publishes these once their date is due. The board itself never
-                    posts: that is a separate agent.
+                    Scheduled posts are the queue for the posting agent, a separate tool. Until it is
+                    connected and turned on, post these by hand and mark them Posted. This board never
+                    posts anything itself.
                   </p>
                 )}
                 {items.length === 0 ? (

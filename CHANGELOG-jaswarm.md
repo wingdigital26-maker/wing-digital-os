@@ -49,3 +49,13 @@
 | practicality | weekly cycle can now be scheduled (draft-only) and the week is visible at a glance on the board | reachable via Marketing>Social |
 | safety | clean — run_weekly uses safe argv (no shell), self-computed week, no network, no secret | — |
 | regression | gate rules + tamper re-lint hold post-edit; full clean build | build exit 0 |
+
+## 2026-09-14 — jaswarm Round 6 (Hero's social system: the posting agent)
+| Lane | Change | Proof |
+|---|---|---|
+| poster | NEW poster.py: fail-closed Meta Graph publisher. Posts NOTHING unless --live AND HEROS_SOCIAL_POST_ENABLED=1 AND tokens all present; reads only due scheduled posts from /api/social, re-lints, skips IG w/o image, ledger logs, marks posted | status + post dry-run send nothing; verifier: AND-gate holds; safety clean |
+| content | NEW META_SETUP.md: how to get IG Business + FB Page tokens, .env var names only, no-password/ToS note, image + go-live requirements | 0 em dashes, 0 token values |
+| visual | Scheduled cards show honest readiness ("Ready to post" / IG "Needs a photo"); column helper reconciled to say posting agent is separate + off until connected (no board auto-post) | tsc 0 err · build ✓ |
+| practicality | owner can glance at Scheduled column and see what will/won't go out | reachable via Marketing>Social |
+| safety | clean — no hardcoded secrets, tokens only in headers/body never URL, graph host hardcoded, TLS on, fail-closed | — |
+| regression | honesty fix: removed present-tense "auto-poster publishes these" that contradicted the by-hand blurb; full clean build | build exit 0 |

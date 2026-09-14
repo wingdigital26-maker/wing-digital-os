@@ -19,9 +19,10 @@ export async function POST(req: NextRequest) {
 
   const abs = path.resolve(VAULT, filePath);
 
-  // Security: must stay inside vault (exact match or a real subpath, so a
-  // sibling dir like "<vault>-other" cannot pass a bare prefix check).
-  if (abs !== VAULT && !abs.startsWith(VAULT + path.sep)) {
+  // Security: must be a real file INSIDE the vault - a strict subpath. The
+  // vault root itself is rejected (writing to it is EISDIR), and a sibling dir
+  // like "<vault>-other" cannot pass a bare prefix check.
+  if (abs === VAULT || !abs.startsWith(VAULT + path.sep)) {
     return NextResponse.json({ error: "Path outside vault" }, { status: 403 });
   }
 

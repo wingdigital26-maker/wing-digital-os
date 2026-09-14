@@ -198,7 +198,7 @@ export default function MissionControl() {
               }}
             >
               <h2 style={{ fontSize: 11, letterSpacing: "0.14em", color: "var(--text-muted)", marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>
-                <Dot color="var(--green)" pulse /> ACTIVITY
+                <Dot color="var(--text-muted)" /> ACTIVITY
                 <span style={{ marginLeft: "auto", marginRight: 14, fontFamily: "'JetBrains Mono', monospace", fontSize: 10 }}>
                   refresh 30s
                 </span>

@@ -185,6 +185,7 @@ export default function BookPage() {
                       <button
                         key={d.date}
                         type="button"
+                        aria-pressed={active}
                         onClick={() => {
                           setPickedDay(d.date);
                           setPickedSlot(null);
@@ -230,6 +231,7 @@ export default function BookPage() {
                       <button
                         key={s.starts_at}
                         type="button"
+                        aria-pressed={active}
                         disabled={!s.available}
                         onClick={() => setPickedSlot(s)}
                         style={{

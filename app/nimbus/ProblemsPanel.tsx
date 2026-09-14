@@ -12,7 +12,7 @@ import "./problems.css";
 // into it": he investigates on the PC, fixes what is safe to fix, and comes
 // back with what he found and what is left for Jack.
 //
-// HONESTY: everything here comes from /api/nimbus/problems, which is the
+// HONESTY: everything here comes from /api/nimbus/watch, which is the
 // watch's own output. Nothing is summarised into a number, no problem is hidden
 // because it is inconvenient, and a check that could not run is shown as such
 // rather than counted as healthy.

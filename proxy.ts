@@ -42,7 +42,7 @@ function isPublicPath(pathname: string): boolean {
     // carries its own fail-closed key check (LEADS_DASHBOARD_KEY) because this
     // is enriched B2B contact data, not the client's published content. It is
     // listed here only so the OS login gate does not shadow that check -- a
-    // client has no OS account, so without this the middleware 401s every
+    // client has no OS account, so without this the proxy 401s every
     // request and the route never runs.
     pathname.startsWith("/api/leads/") ||
     // Machine endpoints: heartbeat ingest (PC posts with x-heartbeat-key), the
@@ -108,7 +108,7 @@ function isPublicPath(pathname: string): boolean {
   );
 }
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // Static demo sites in public/ have no directory-index resolution in Next;

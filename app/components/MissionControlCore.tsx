@@ -1383,7 +1383,7 @@ export function FreshnessMark({ source, updated, stale }: { source: MetricSource
   const age = fmtAge(updated);
   const color = stale ? "var(--orange)" : "var(--text-muted, #6b7280)";
   return (
-    <span title={stale ? "From a snapshot and past its freshness window — may be stale, needs PC or state-sync" : `From snapshot${age ? `, ${age}` : ""}`}
+    <span title={stale ? "From a snapshot and past its freshness window, may be stale, needs PC or state-sync" : `From snapshot${age ? `, ${age}` : ""}`}
       style={{ fontSize: 9, color, fontFamily: mono }}>
       {stale ? "stale " : ""}{age ? (source === "snapshot" ? `as of ${age}` : age) : "snapshot"}
     </span>
@@ -1394,9 +1394,9 @@ export function FreshnessMark({ source, updated, stale }: { source: MetricSource
 export function FreshnessLegend() {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", fontSize: 10, color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace" }}>
-      <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Dot color="var(--green)" /> live — queried from the source just now</span>
-      <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Dot color="#6b7280" /> snapshot — shows its real age</span>
-      <span style={{ display: "inline-flex", alignItems: "center", gap: 5, color: "var(--orange)" }}><Dot color="var(--orange)" /> stale — past its freshness window, needs PC</span>
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Dot color="var(--green)" /> live: queried from the source just now</span>
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Dot color="#6b7280" /> snapshot: shows its real age</span>
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 5, color: "var(--orange)" }}><Dot color="var(--orange)" /> stale: past its freshness window, needs PC</span>
     </div>
   );
 }
@@ -2250,7 +2250,7 @@ export function SchedulerCalendar({ agents, content = [], onSelect }: {
       ? () => openAgent(it.e)
       : () => { sfx.play("blip-artifact"); setPickedContent({ c: it.c, date }); };
     return (
-      <div className="mo-click mo-cal-chip" onClick={onClick} title={`${name} — ${it.when}${ran ? " (ran)" : ""}`}
+      <div className="mo-click mo-cal-chip" onClick={onClick} title={`${name} · ${it.when}${ran ? " (ran)" : ""}`}
         style={{
           display: "flex", alignItems: "center", gap: 7, fontSize: big ? 11.5 : 10.5, marginBottom: 4,
           padding: big ? "3px 8px" : "3px 7px", borderRadius: 6, minWidth: 0,

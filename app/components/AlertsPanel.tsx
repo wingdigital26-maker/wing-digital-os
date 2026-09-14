@@ -47,7 +47,7 @@ export default function AlertsPanel() {
   return (
     <section style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 12, padding: 14, marginBottom: 16 }}>
       <h2 style={{ fontSize: 11, letterSpacing: "0.14em", color: "var(--text-muted)", marginBottom: 10 }}>
-        NOTIFICATIONS — WHY
+        NOTIFICATIONS · WHY
       </h2>
       {open.map((a) => (
         <div key={a.key} style={{ marginBottom: 10, paddingLeft: 10, borderLeft: "3px solid var(--red)" }}>
@@ -60,7 +60,7 @@ export default function AlertsPanel() {
       ))}
       {recent.map((a) => (
         <div key={a.key} style={{ marginBottom: 8, paddingLeft: 10, borderLeft: "3px solid var(--green)", opacity: 0.75 }}>
-          <div style={{ fontSize: 12 }}>✅ {a.title} <span style={{ color: "var(--text-muted)" }}>— recovered {ago(a.resolved_at)}</span></div>
+          <div style={{ fontSize: 12 }}>✅ {a.title} <span style={{ color: "var(--text-muted)" }}>· recovered {ago(a.resolved_at)}</span></div>
           {a.body && <div style={{ fontSize: 11, color: "var(--text-muted)", lineHeight: 1.4 }}>{a.body}</div>}
         </div>
       ))}

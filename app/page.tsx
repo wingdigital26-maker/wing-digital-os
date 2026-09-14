@@ -1089,7 +1089,7 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
                 ))}
               </div>
               <p style={{ fontSize: 10.5, color: "var(--text-muted)", marginTop: 10 }}>
-                Best windows 7:00-8:30am · 4:30-6:00pm — log every dial so Dispatch can order tomorrow's list
+                Best windows 7:00-8:30am · 4:30-6:00pm. Log every dial so Dispatch can order tomorrow's list
               </p>
             </div>
           )}
@@ -1147,7 +1147,7 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
             </div>
             {onBattery && (
               <p style={{ fontSize: 10.5, color: "var(--orange)", marginTop: 12 }}>
-                ⚠ Some agents are blocked from running on battery — they will queue until plugged in.
+                ⚠ Some agents are blocked from running on battery. They will queue until plugged in.
               </p>
             )}
           </motion.div>

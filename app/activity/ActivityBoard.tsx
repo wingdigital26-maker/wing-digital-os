@@ -144,7 +144,7 @@ export default function ActivityBoard() {
   const smtpLane: { kind: LaneKind; state: string; detail: string } = {
     kind: "draft",
     state: "manual only",
-    detail: "1:1 SMTP send (/api/email/send) exists but nothing calls it automatically — it only fires when a person sends from the Email page. Returns 503 if SMTP env is unset.",
+    detail: "1:1 SMTP send (/api/email/send) exists but nothing calls it automatically. It only fires when a person sends from the Email page. Returns 503 if SMTP env is unset.",
   };
   const campaignLane: { kind: LaneKind; state: string; detail: string } = {
     kind: "draft",
@@ -166,7 +166,7 @@ export default function ActivityBoard() {
     // Twilio configured = manual 1:1 texting possible, but still no automation.
     const acct = sms.account?.detail ?? "";
     return { kind: "draft", state: "manual only",
-      detail: `Twilio is configured (manual 1:1 texting via /api/sms/send only — no automated SMS lane exists). ${acct}` };
+      detail: `Twilio is configured (manual 1:1 texting via /api/sms/send only; no automated SMS lane exists). ${acct}` };
   })();
 
   const emailSent = (ledger?.items ?? []).filter((m) => m.channel === "email" && m.direction === "outbound");
@@ -178,7 +178,7 @@ export default function ActivityBoard() {
         <Link href="/" className="act-home">← Wing Digital OS</Link>
         <h1>Messaging Activity</h1>
         <p>
-          Everything Wing is sending — or would send — in one place: what has actually gone out, what is queued next
+          Everything Wing is sending (or would send) in one place: what has actually gone out, what is queued next
           with a word-for-word preview, and which lanes are live versus dead. This view sends nothing and only reads.
         </p>
       </div>
@@ -206,7 +206,7 @@ export default function ActivityBoard() {
           {/* Sent */}
           <section className="act-section">
             <h2>Sent</h2>
-            <p className="sub">Email that has actually left the building, newest first — from the unified message ledger and the cold-engine sent rows.</p>
+            <p className="sub">Email that has actually left the building, newest first, from the unified message ledger and the cold-engine sent rows.</p>
 
             {msg?.lane.deliveryWarning && (
               <div className="act-note dead">
@@ -246,7 +246,7 @@ export default function ActivityBoard() {
             )}
             {ledger?.available && emailSent.length === 0 && !ledger.tableMissing && (
               <div className="act-note dead">
-                Nothing is sending. The ledger holds no outbound email — with the automated cold lane not wired (delivery step removed in the GHL retirement), this is empty because no pipe is running, not because it is a quiet day.
+                Nothing is sending. The ledger holds no outbound email. With the automated cold lane not wired (delivery step removed in the GHL retirement), this is empty because no pipe is running, not because it is a quiet day.
                 {ledger.emptyNote ? ` ${ledger.emptyNote}` : ""}
               </div>
             )}
@@ -288,7 +288,7 @@ export default function ActivityBoard() {
 
             {msg && (
               <div className="act-note warn" style={{ marginBottom: 14 }}>
-                {msg.lane.deliveryWarning} Treat this as a pre-flight QA queue, not an outbox — nothing below is actually going out today.
+                {msg.lane.deliveryWarning} Treat this as a pre-flight QA queue, not an outbox. Nothing below is actually going out today.
               </div>
             )}
 
@@ -306,7 +306,7 @@ export default function ActivityBoard() {
             {msg?.queue.droppedNote && <div className="act-note warn" style={{ marginBottom: 12 }}>{msg.queue.droppedNote}</div>}
 
             {msg?.queue.available && msg.queue.items.length === 0 && (
-              <div className="act-note">The eligible queue is empty right now — no rows match the sender&apos;s filter.</div>
+              <div className="act-note">The eligible queue is empty right now. No rows match the sender&apos;s filter.</div>
             )}
 
             {(msg?.queue.items ?? []).map((q) => (
@@ -318,18 +318,18 @@ export default function ActivityBoard() {
                 </div>
                 {q.statusNote && <span className="lane-detail" style={{ display: "block" }}>{q.statusNote}</span>}
                 {q.flags.map((f) => (
-                  <span className="act-flag" key={f.code}>⚠ {f.label} — {f.detail}</span>
+                  <span className="act-flag" key={f.code}>⚠ {f.label}: {f.detail}</span>
                 ))}
                 {q.message.bodies ? (
                   <details className="act-preview">
                     <summary>Preview the 3 emails this row would receive</summary>
                     {q.message.subjects && (
                       <>
-                        <div className="subj">Day 1 — {q.message.subjects[0]}</div>
+                        <div className="subj">Day 1: {q.message.subjects[0]}</div>
                         <pre>{q.message.bodies.d1}</pre>
-                        <div className="subj">Day 3 — {q.message.subjects[1]}</div>
+                        <div className="subj">Day 3: {q.message.subjects[1]}</div>
                         <pre>{q.message.bodies.d3}</pre>
-                        <div className="subj">Day 7 — {q.message.subjects[2]}</div>
+                        <div className="subj">Day 7: {q.message.subjects[2]}</div>
                         <pre>{q.message.bodies.d7}</pre>
                       </>
                     )}
@@ -374,8 +374,8 @@ export default function ActivityBoard() {
 
           {/* Live Twilio pipe status (manual 1:1 only) */}
           <h2 style={{ marginTop: 22 }}>Twilio pipe (manual 1:1 only)</h2>
-          <p className="sub">Whether the manual send/receive pipe is even configured — this is NOT an automated lane. Live from /api/sms/health.</p>
-          {!sms && <div className="act-note warn">/api/sms/health did not return — Twilio status unknown.</div>}
+          <p className="sub">Whether the manual send/receive pipe is even configured. This is NOT an automated lane. Live from /api/sms/health.</p>
+          {!sms && <div className="act-note warn">/api/sms/health did not return, so Twilio status is unknown.</div>}
           {sms && !sms.configured && <div className="act-note dead">{sms.note}</div>}
           {sms && sms.configured && (
             <>
@@ -419,12 +419,12 @@ function SmsLedger() {
     })();
   }, []);
 
-  if (failed) return <div className="act-note warn">Could not read the SMS ledger — status unknown.</div>;
+  if (failed) return <div className="act-note warn">Could not read the SMS ledger, so status is unknown.</div>;
   if (!state) return <div className="act-loading">Loading…</div>;
   if (state.tableMissing) return <div className="act-note dead">{state.reason}</div>;
   if (!state.available) return <div className="act-note warn">SMS ledger unavailable: {state.reason ?? "unknown reason"}.</div>;
   if (!rows || rows.length === 0) {
-    return <div className="act-note dead">No text has ever been logged. With no automated SMS lane and manual texting only, an empty list here means nothing has been sent or received — not a quiet inbox.</div>;
+    return <div className="act-note dead">No text has ever been logged. With no automated SMS lane and manual texting only, an empty list here means nothing has been sent or received, not a quiet inbox.</div>;
   }
   return (
     <div className="act-tablewrap">

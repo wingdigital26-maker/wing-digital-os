@@ -164,7 +164,7 @@ export default function SendQueueBoard() {
     return <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Reading the automated send queue…</div>;
   }
   if (err && !data) {
-    return <Note tone="var(--red)" text={`The automated messaging lane could not be read: ${err}. Nothing below is available — this is a failure, not an empty queue.`} />;
+    return <Note tone="var(--red)" text={`The automated messaging lane could not be read: ${err}. Nothing below is available. This is a failure, not an empty queue.`} />;
   }
   if (!data) return null;
 

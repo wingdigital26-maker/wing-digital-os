@@ -573,7 +573,7 @@ export default function VaultGraph({ onSelectNode, onToggleTree }: { onSelectNod
               : "This browser has WebGL disabled or blocked. Enable hardware acceleration to see the graph."}
           </p>
           <p style={{ color: "rgba(148,163,184,0.6)", fontSize: 11 }}>
-            {stats.nodes} notes · {stats.links} threads are still indexed — use the contents list to browse them.
+            {stats.nodes} notes · {stats.links} threads are still indexed. Use the contents list to browse them.
           </p>
         </div>
       )}

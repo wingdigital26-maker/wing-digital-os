@@ -483,7 +483,11 @@ export default function StormBoard() {
       </div>
 
       {loading && !data ? (
-        <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Loading storm events...</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }} aria-label="Loading storm events">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="skel" style={{ height: 132, borderRadius: 12 }} />
+          ))}
+        </div>
       ) : null}
 
       {error ? <Note text={error} tone="var(--red)" /> : null}

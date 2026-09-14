@@ -110,3 +110,12 @@
 | safety | clean — token header-only, redaction solid, tamper re-lint intact, test file offline/read-only | — |
 | regression | gate 95/95 · poster 50/50 · engine smoke ok · OS worktree unchanged (round-9 build stands) | 145/145 ✓ |
 **Open:** router occasionally emits unicode look-alike punctuation (U+2011 non-breaking hyphen, curly quotes) that the gate passes; not a rule violation but a display/quality nit for a future normalization round. **Committed (worktree):** changelog only; code in ghl-cli (not a repo).
+
+## 2026-09-14 — jaswarm Round 12 (Hero's social: unicode punctuation hygiene)
+| Lane | Change | Proof |
+|---|---|---|
+| gate | gate.py rejects 6 more dash/ellipsis look-alikes (U+2010/2011/2012/2015/2212/2026); ASCII hyphen still allowed; +8 test cases | gate 103/103 (was 95) |
+| system | engine.py normalize_punctuation(): curly quotes/nbsp/unicode dashes/ellipsis -> ASCII, applied before gate+quality+staging | queue captions now 0 unicode look-alikes |
+| safety | clean — regexes backtrack-safe, normalize can't synthesize a banned pattern or reintroduce an em dash, fail-closed intact | — |
+| regression | gate 103/103 · poster 50/50 · engine AST ok · OS worktree unchanged | 153/153 ✓ |
+**Committed (worktree):** changelog only; code in ghl-cli (not a repo).

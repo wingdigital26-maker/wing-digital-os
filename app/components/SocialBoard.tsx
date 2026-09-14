@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import "./SocialBoard.css";
 
 // SOCIAL POSTS -- draft and schedule social posts per client, then mark them
 // posted once a human has actually put them up.
@@ -28,6 +29,34 @@ const PLATFORMS: [string, string][] = [
   ["nextdoor", "Nextdoor"], ["other", "Other"],
 ];
 const PLATFORM_LABEL: Record<string, string> = Object.fromEntries(PLATFORMS);
+
+// One low-saturation accent per platform. These are deliberate semantic brand
+// hints (not theme tokens): kept muted so the chip and card rail read the same
+// in light and dark. "other" falls back to the neutral muted token.
+const PLATFORM_ACCENT: Record<string, string> = {
+  facebook: "#4a7dc4",
+  instagram: "#c65b9b",
+  google: "#d59a3c",
+  nextdoor: "#4fa07a",
+  other: "var(--text-muted)",
+};
+function platformAccent(p: string): string {
+  return PLATFORM_ACCENT[p] || "var(--text-muted)";
+}
+
+function PlatformChip({ platform }: { platform: string }) {
+  const known = platform in PLATFORM_ACCENT && platform !== "other";
+  return (
+    <span
+      className="sb-chip"
+      data-platform={known ? platform : undefined}
+      style={{ ["--sb-accent" as string]: platformAccent(platform) }}
+    >
+      <span className="sb-dot" aria-hidden />
+      {PLATFORM_LABEL[platform] || platform}
+    </span>
+  );
+}
 
 // The board columns, in the order a post travels through them.
 const COLUMNS: { key: string; label: string; color: string; blurb: string }[] = [
@@ -176,7 +205,8 @@ export default function SocialBoard() {
         <span aria-hidden style={{ fontSize: 15, lineHeight: 1.4 }}>&#9432;</span>
         <p style={{ margin: 0, fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.5 }}>
           This board never posts anything for you. It holds your drafts and your plan. When you have posted
-          one yourself on the real platform, mark it Posted so the board stays honest.
+          one yourself on the real platform, mark it Posted so the board stays honest. Drafts arrive two ways:
+          write them here, or let the post engine stage a batch for you to review before anything goes out.
         </p>
       </div>
 
@@ -223,7 +253,7 @@ export default function SocialBoard() {
             autoComplete="off"
             style={{ ...input, flex: "1 1 260px" }}
           />
-          <button type="submit" disabled={saving || !caption.trim()} style={{ ...primary, padding: "10px 18px", opacity: saving || !caption.trim() ? 0.6 : 1 }}>
+          <button type="submit" className="sb-primary" disabled={saving || !caption.trim()} style={{ ...primary, padding: "10px 18px", opacity: saving || !caption.trim() ? 0.6 : 1 }}>
             {saving ? "Saving..." : scheduledFor ? "Schedule draft" : "Save draft"}
           </button>
         </div>
@@ -238,7 +268,7 @@ export default function SocialBoard() {
         <div style={{ border: "1px solid var(--border)", borderRadius: 14, padding: 16, background: "var(--bg-card)", display: "grid", gap: 8, maxWidth: 560 }}>
           <div style={{ fontSize: 14, fontWeight: 600 }}>Social posts could not be loaded</div>
           <div style={{ fontSize: 13, color: "var(--red)", lineHeight: 1.5 }}>{loadErr}</div>
-          <div><button type="button" onClick={load} style={btn}>Retry</button></div>
+          <div><button type="button" className="sb-btn" onClick={load} style={btn}>Retry</button></div>
         </div>
       )}
 
@@ -248,7 +278,7 @@ export default function SocialBoard() {
           <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5 }}>
             Apply migration <code>0028_social_posts.sql</code>, then reload. Your drafts will appear here.
           </div>
-          <div><button type="button" onClick={load} style={btn}>Reload</button></div>
+          <div><button type="button" className="sb-btn" onClick={load} style={btn}>Reload</button></div>
         </div>
       )}
 
@@ -305,17 +335,24 @@ function PostCard({ post: p, busy, err, onSave, onRemove }: {
   onSave: (id: number, patch: Record<string, unknown>) => void;
   onRemove: (id: number) => void;
 }) {
-  const sub = [p.client_slug, PLATFORM_LABEL[p.platform] || p.platform].filter(Boolean).join(" · ");
-
   return (
-    <div style={{
-      background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 14,
-      padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10, minWidth: 0,
-    }}>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "baseline" }}>
-        <span style={{ fontSize: 11.5, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {sub || "No client"}
-        </span>
+    <div
+      className="sb-card"
+      style={{
+        background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 14,
+        padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10, minWidth: 0,
+        ["--sb-accent" as string]: platformAccent(p.platform),
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+          <PlatformChip platform={p.platform} />
+          {p.client_slug && (
+            <span style={{ fontSize: 11.5, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {p.client_slug}
+            </span>
+          )}
+        </div>
         {p.status === "posted" && p.posted_at ? (
           <span style={{ fontSize: 11, color: "var(--green)" }}>Posted {fmtDate(p.posted_at)}</span>
         ) : p.scheduled_for ? (
@@ -341,21 +378,21 @@ function PostCard({ post: p, busy, err, onSave, onRemove }: {
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", paddingTop: 6, borderTop: "1px solid var(--border)" }}>
         {p.status !== "scheduled" && p.status !== "posted" && (
-          <button type="button" disabled={busy} onClick={() => onSave(p.id, { status: "scheduled" })} style={{ ...btn, opacity: busy ? 0.6 : 1 }}>
+          <button type="button" className="sb-btn" disabled={busy} onClick={() => onSave(p.id, { status: "scheduled" })} style={{ ...btn, opacity: busy ? 0.6 : 1 }}>
             Move to scheduled
           </button>
         )}
         {p.status !== "posted" && (
-          <button type="button" disabled={busy} onClick={() => onSave(p.id, { status: "posted" })} style={{ ...primary, opacity: busy ? 0.6 : 1 }}>
+          <button type="button" className="sb-primary" disabled={busy} onClick={() => onSave(p.id, { status: "posted" })} style={{ ...primary, opacity: busy ? 0.6 : 1 }}>
             Mark posted
           </button>
         )}
         {p.status === "posted" && (
-          <button type="button" disabled={busy} onClick={() => onSave(p.id, { status: p.scheduled_for ? "scheduled" : "draft" })} style={{ ...btn, opacity: busy ? 0.6 : 1 }}>
+          <button type="button" className="sb-btn" disabled={busy} onClick={() => onSave(p.id, { status: p.scheduled_for ? "scheduled" : "draft" })} style={{ ...btn, opacity: busy ? 0.6 : 1 }}>
             Un-post
           </button>
         )}
-        <button type="button" disabled={busy} onClick={() => onRemove(p.id)} style={{ ...btn, marginLeft: "auto", color: "var(--red)", borderColor: "transparent" }}>
+        <button type="button" className="sb-btn sb-danger" disabled={busy} onClick={() => onRemove(p.id)} style={{ ...btn, marginLeft: "auto", color: "var(--red)", borderColor: "transparent" }}>
           Delete
         </button>
       </div>

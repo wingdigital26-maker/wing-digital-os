@@ -1,0 +1,68 @@
+/* SocialBoard — per-platform visual language + interaction states.
+   Inline styles cannot express :hover / :focus-visible, so the interactive
+   bits live here. Platform accents are semantic brand hints (not theme
+   tokens on purpose) kept low-saturation so they read in light and dark. */
+
+.sb-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 4px 9px 4px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.sb-chip .sb-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  flex: none;
+  background: var(--sb-accent, var(--text-muted));
+}
+/* Each platform borrows a faint tint of its own accent so the chip and the
+   card rail read as one family without shouting. */
+.sb-chip[data-platform] {
+  border-color: color-mix(in srgb, var(--sb-accent) 40%, var(--border));
+  background: color-mix(in srgb, var(--sb-accent) 12%, var(--bg-secondary));
+  color: var(--text-primary);
+}
+
+/* Card gets a thin left rail in its platform accent — the house accent-rail
+   tile look, applied per platform. */
+.sb-card {
+  border-left: 3px solid var(--sb-accent, var(--border));
+  transition: border-color 120ms ease, transform 120ms ease;
+}
+
+/* Interaction states for the action buttons + retry/reload. */
+.sb-btn {
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+.sb-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: var(--text-muted);
+}
+.sb-btn:focus-visible,
+.sb-primary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.sb-primary {
+  transition: filter 120ms ease, transform 120ms ease;
+}
+.sb-primary:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+.sb-primary:active:not(:disabled),
+.sb-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.sb-danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--red) 12%, transparent);
+  color: var(--red);
+}

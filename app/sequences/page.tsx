@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { SequenceListSkeleton } from "./_ui";
 
 // /sequences — the list. Plain English everywhere: a sequence is "a series of
 // emails sent on a schedule". One click to Activate or Pause; clicking a row
@@ -174,11 +175,13 @@ export default function SequencesPage() {
         </div>
       )}
 
-      {items === null && !error && <div style={{ color: "var(--text-muted)", fontSize: 13 }}>Loading...</div>}
+      {items === null && !error && <SequenceListSkeleton />}
 
       {items?.length === 0 && (
-        <div style={{ ...card, textAlign: "center", padding: 40, color: "var(--text-secondary)", fontSize: 14 }}>
-          No sequences yet. Create one, or click Import current cadence to bring in the cold email cadence you already run.
+        <div style={{ ...card, textAlign: "center", padding: 40, color: "var(--text-secondary)", fontSize: 14, lineHeight: 1.6 }}>
+          <div style={{ fontWeight: 700, color: "var(--text-primary)", marginBottom: 6 }}>No sequences yet</div>
+          Nothing has been created here. Name one above, or click <strong>Import current cadence</strong> to bring in the
+          cold email cadence you already run as an editable draft.
         </div>
       )}
 

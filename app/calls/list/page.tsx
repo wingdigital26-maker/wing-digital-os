@@ -147,6 +147,26 @@ const displaySignals = (signals: string | null): string | null => {
   return parts.length ? parts.join(", ") : null;
 };
 
+// "4.6★ (12)" from google_rating + google_reviews. Both are nullable and land
+// independently, so show whatever is real and never invent the other half.
+const ratingLabel = (rating: unknown, reviews: unknown): string | null => {
+  const r = typeof rating === "number" ? rating : null;
+  const n = typeof reviews === "number" ? reviews : null;
+  if (r && r > 0) return `${r.toFixed(1)}★${n !== null ? ` (${n})` : ""}`;
+  if (n !== null && n > 0) return `${n} review${n === 1 ? "" : "s"}`;
+  return null;
+};
+
+// "8pg · blog · 3 svc" — a one-glance read of the site the caller is about to
+// pitch against. Each part appears only when its field is real.
+const websiteLabel = (l: Lead): string | null => {
+  const parts: string[] = [];
+  if (typeof l.site_pages === "number" && l.site_pages > 0) parts.push(`${l.site_pages}pg`);
+  if (l.has_blog === true) parts.push("blog");
+  if (typeof l.service_pages === "number" && l.service_pages > 0) parts.push(`${l.service_pages} svc`);
+  return parts.length ? parts.join(" · ") : null;
+};
+
 type Activity = {
   id: number;
   user_email: string | null;
@@ -366,6 +386,19 @@ export default function CallRoom() {
     return m;
   }, [leads, tierField]);
 
+  // Distinct verticals present on the loaded page, offered as a category row so
+  // the caller can line up all the roofers (or all the plumbers) at once. The
+  // chips drive the existing server-side search (which already matches vertical)
+  // rather than a new API param, so counts and pagination stay honest.
+  const verticals = useMemo(() => {
+    const s = new Set<string>();
+    for (const l of leads) {
+      const v = str(l.vertical);
+      if (v) s.add(v);
+    }
+    return Array.from(s).sort((a, b) => a.localeCompare(b));
+  }, [leads]);
+
   const activeIntel = useMemo(() => {
     if (!active) return null;
     return {
@@ -484,6 +517,33 @@ export default function CallRoom() {
           </div>
         )}
 
+        {/* vertical / category row -- appears once more than one vertical is on
+            the page. A chip filters by driving the existing search, so it is a
+            true server-side narrow, not a per-page illusion. Tapping the active
+            one clears it. */}
+        {verticals.length > 1 && (
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10, alignItems: "center" }}>
+            <span style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: "var(--text-muted)", fontWeight: 700 }}>
+              Trade
+            </span>
+            {verticals.map((v) => {
+              const on = q.trim().toLowerCase() === v.toLowerCase();
+              return (
+                <button key={v} onClick={() => setQ(on ? "" : v)} style={{
+                  ...chip,
+                  background: on ? "linear-gradient(135deg,#0ea5a4,#0f766e)" : "var(--bg-card)",
+                  borderColor: on ? "transparent" : "var(--border)",
+                  color: on ? "#fff" : "var(--text-muted)",
+                  fontWeight: on ? 700 : 500,
+                  textTransform: "capitalize",
+                }}>
+                  {v}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {/* list */}
         <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 10 }}>
           {loading && <p style={{ color: "var(--text-muted)", fontSize: 13 }}>Loading leads…</p>}
@@ -497,8 +557,19 @@ export default function CallRoom() {
               </p>
             </div>
           )}
-          {shown.map((l) => (
-            <div key={l.id} style={{ ...card, display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap" }}>
+          {shown.map((l) => {
+            const named = Boolean(l.contact_name);
+            const rating = ratingLabel(l.google_rating, l.google_reviews);
+            const web = websiteLabel(l);
+            const angle = str(l.angle);
+            return (
+            <div key={l.id} style={{
+              ...card, display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap",
+              // Nameless leads (most of the list) are still fully workable but
+              // read as secondary: a muted left rail and a hair less presence.
+              borderLeft: `3px solid ${named ? "var(--accent)" : "var(--border)"}`,
+              opacity: named ? 1 : 0.82,
+            }}>
               <div
                 title="Lead score: higher = more worth calling. Green from 65 up."
                 style={{
@@ -511,6 +582,14 @@ export default function CallRoom() {
               <div style={{ flex: "1 1 260px", minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                   <span style={{ fontSize: 15, fontWeight: 700 }}>{l.company}</span>
+                  {rating && (
+                    <span
+                      title="Google rating and review count"
+                      style={{ ...miniChip, color: "var(--text-secondary)", background: "var(--bg-hover)", borderColor: "var(--border)", fontWeight: 700 }}
+                    >
+                      {rating}
+                    </span>
+                  )}
                   <span style={{ ...pill, borderColor: statusColor(l.status), color: statusColor(l.status) }}>
                     {OUTCOMES.find((o) => o.key === l.status)?.label ?? "Not called yet"}
                   </span>
@@ -567,6 +646,21 @@ export default function CallRoom() {
                   {[isResearchDump(l.title) ? null : l.title, l.city, l.vertical, l.employees ? `${l.employees} emp` : null]
                     .filter(Boolean).join(" · ")}
                 </p>
+                {web && (
+                  <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 3 }}>
+                    <span style={{ fontWeight: 600 }}>Website: </span>{web}
+                  </p>
+                )}
+                {/* The opener hook, one glance. Clamped to two lines here; the
+                    full text sits in the "Say this" box when the panel opens. */}
+                {angle && (
+                  <p style={{
+                    fontSize: 12.5, color: "var(--accent)", marginTop: 5, lineHeight: 1.4,
+                    display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
+                  }}>
+                    <span style={{ fontWeight: 700 }}>Angle: </span>{angle}
+                  </p>
+                )}
                 {(derived.get(l.id)?.chips.length ?? 0) > 0 && (
                   <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginTop: 6 }}>
                     {derived.get(l.id)!.chips.map((c, i) => {
@@ -650,7 +744,8 @@ export default function CallRoom() {
                 </button>
               </div>
             </div>
-          ))}
+            );
+          })}
 
           {!loading && hasMore && (
             <button
@@ -710,6 +805,12 @@ export default function CallRoom() {
                   {[active.contact_title, isResearchDump(active.title) ? null : active.title]
                     .filter(Boolean).join(" · ")}
                 </p>
+                {(ratingLabel(active.google_rating, active.google_reviews) || websiteLabel(active)) && (
+                  <p style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 4, fontWeight: 600 }}>
+                    {[ratingLabel(active.google_rating, active.google_reviews), websiteLabel(active)]
+                      .filter(Boolean).join("  ·  ")}
+                  </p>
+                )}
               </div>
               <button onClick={() => closeLead()} style={btnGhost}>Close</button>
             </div>

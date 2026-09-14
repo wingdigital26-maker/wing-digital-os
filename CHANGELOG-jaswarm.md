@@ -59,3 +59,14 @@
 | practicality | owner can glance at Scheduled column and see what will/won't go out | reachable via Marketing>Social |
 | safety | clean — no hardcoded secrets, tokens only in headers/body never URL, graph host hardcoded, TLS on, fail-closed | — |
 | regression | honesty fix: removed present-tense "auto-poster publishes these" that contradicted the by-hand blurb; full clean build | build exit 0 |
+
+## 2026-09-14 — jaswarm Round 7 (Hero's social: fine-detail + perf + gate tests)
+| Lane | Change | Proof |
+|---|---|---|
+| visual | Level-4 polish: focus rings on all 6 composer fields, prefers-reduced-motion guard, unified card radii to 14px | tsc 0 · verify: fields intact |
+| perf | Memoized PostCard (React.memo) + useCallback save/remove: composer typing now 0 card re-renders (was O(N)) | tsc 0 · verify: no stale card |
+| tests | NEW test_gate.py (in ghl-cli): 93 assertions covering every brand rule + all 25 post_bank examples | 93/93 pass, exit 0 |
+| practicality | no changes needed (polish round, board already reachable) | — |
+| safety | clean — presentational/perf only, test file read-only | — |
+| regression | gate tests 93/93 · tsc 0 · clean build | build exit 0 |
+**Process note:** never give two parallel agents the same file. This round gave perf+visual both SocialBoard.tsx; they did not collide but it was luck. Logged in journal.

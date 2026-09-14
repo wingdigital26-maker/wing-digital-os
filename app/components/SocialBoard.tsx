@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
+import { memo, useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import "./SocialBoard.css";
 
 // SOCIAL POSTS -- draft and schedule social posts per client, then mark them
@@ -184,7 +184,7 @@ export default function SocialBoard() {
     }
   }
 
-  async function save(id: number, patch: Record<string, unknown>) {
+  const save = useCallback(async (id: number, patch: Record<string, unknown>) => {
     setBusyId(id);
     setRowErr((m) => ({ ...m, [id]: "" }));
     try {
@@ -201,9 +201,9 @@ export default function SocialBoard() {
     } finally {
       setBusyId(null);
     }
-  }
+  }, [load]);
 
-  async function remove(id: number) {
+  const remove = useCallback(async (id: number) => {
     if (!window.confirm("Delete this post draft? This cannot be undone.")) return;
     setBusyId(id);
     setRowErr((m) => ({ ...m, [id]: "" }));
@@ -217,7 +217,7 @@ export default function SocialBoard() {
     } finally {
       setBusyId(null);
     }
-  }
+  }, []);
 
   const all = posts || [];
 
@@ -291,7 +291,7 @@ export default function SocialBoard() {
       {/* The one rule that matters here, said plainly and always visible. */}
       <div style={{
         display: "flex", gap: 10, alignItems: "flex-start",
-        background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 12, padding: "10px 14px",
+        background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 14, padding: "10px 14px",
       }}>
         <span aria-hidden style={{ fontSize: 15, lineHeight: 1.4 }}>&#9432;</span>
         <p style={{ margin: 0, fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.5 }}>
@@ -315,9 +315,10 @@ export default function SocialBoard() {
             onChange={(e) => setClientSlug(e.target.value)}
             placeholder="Client (e.g. heros-junk), optional"
             autoComplete="off"
+            className="sb-input"
             style={{ ...input, flex: "1 1 200px" }}
           />
-          <select value={platform} onChange={(e) => setPlatform(e.target.value)} style={{ ...input, flex: "0 1 160px" }} aria-label="Platform">
+          <select value={platform} onChange={(e) => setPlatform(e.target.value)} className="sb-input" style={{ ...input, flex: "0 1 160px" }} aria-label="Platform">
             {PLATFORMS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
           </select>
           <input
@@ -325,6 +326,7 @@ export default function SocialBoard() {
             value={scheduledFor}
             onChange={(e) => setScheduledFor(e.target.value)}
             aria-label="Target date and time (optional)"
+            className="sb-input"
             style={{ ...input, flex: "0 1 220px" }}
           />
         </div>
@@ -333,6 +335,7 @@ export default function SocialBoard() {
           onChange={(e) => setCaption(e.target.value)}
           placeholder="Write the caption..."
           rows={3}
+          className="sb-input"
           style={{ ...input, resize: "vertical", width: "100%", boxSizing: "border-box" }}
           aria-describedby="sb-charcount"
         />
@@ -519,7 +522,7 @@ export default function SocialBoard() {
   );
 }
 
-function PostCard({ post: p, busy, err, onSave, onRemove }: {
+const PostCard = memo(function PostCard({ post: p, busy, err, onSave, onRemove }: {
   post: Post;
   busy: boolean;
   err: string;
@@ -614,4 +617,4 @@ function PostCard({ post: p, busy, err, onSave, onRemove }: {
       </div>
     </div>
   );
-}
+});

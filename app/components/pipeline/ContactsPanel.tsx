@@ -86,7 +86,11 @@ export default function ContactsPanel({
       )}
 
       {!err && loading && (
-        <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Loading contacts</div>
+        <div aria-busy="true" aria-label="Loading contacts" style={{ display: "grid", gap: 8 }}>
+          {[0, 1, 2, 3, 4].map((i) => (
+            <div key={i} className="skel" style={{ height: 74, borderRadius: 10 }} />
+          ))}
+        </div>
       )}
 
       {!err && !loading && contacts && contacts.length === 0 && (
@@ -374,7 +378,14 @@ export function ContactDetail({
         {/* header */}
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
           <div style={{ minWidth: 0 }}>
-            {loading && !c && <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Loading contact</div>}
+            {loading && !c && (
+              <div aria-busy="true" aria-label="Loading contact" style={{ display: "grid", gap: 6 }}>
+                <div className="skel" style={{ height: 20, width: 200, borderRadius: 8 }} />
+                <div className="skel" style={{ height: 13, width: 150, borderRadius: 6 }} />
+                <div className="skel" style={{ height: 13, width: 170, borderRadius: 6 }} />
+                <div className="skel" style={{ height: 13, width: 130, borderRadius: 6 }} />
+              </div>
+            )}
             {c && (
               <>
                 <div style={{ fontSize: 17, fontWeight: 700, overflowWrap: "anywhere" }}>{c.business_name}</div>

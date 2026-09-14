@@ -181,7 +181,16 @@ export default function Timeline({
   }, [load, reloadKey]);
 
   if (loading) {
-    return <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Loading activity</div>;
+    return (
+      <ul aria-busy="true" aria-label="Loading activity" style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 8 }}>
+        {[0, 1, 2].map((i) => (
+          <li key={i} style={{ borderLeft: "2px solid var(--border)", paddingLeft: 10, display: "grid", gap: 6 }}>
+            <div className="skel" style={{ height: 12, width: 160, borderRadius: 6 }} />
+            <div className="skel" style={{ height: 12, width: "80%", borderRadius: 6 }} />
+          </li>
+        ))}
+      </ul>
+    );
   }
   if (err) {
     return (

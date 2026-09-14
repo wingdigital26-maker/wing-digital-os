@@ -270,7 +270,18 @@ function ReplyDetail({ reply, onChanged }: { reply: Reply; onChanged: (r: Reply)
           </div>
         )}
         {addr && thread === null && !threadErr && (
-          <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Loading the history…</div>
+          <div aria-busy="true" aria-label="Loading earlier messages" style={{ display: "grid", gap: 6 }}>
+            {[0, 1].map((i) => (
+              <div
+                key={i}
+                className="skel"
+                style={{
+                  justifySelf: i % 2 === 0 ? "start" : "end",
+                  width: "min(360px, 80%)", height: 48, borderRadius: 10,
+                }}
+              />
+            ))}
+          </div>
         )}
         {threadErr && <Note tone="var(--red)" text={`The history could not be loaded: ${threadErr}`} />}
         {thread && thread.filter((m) => m.id !== reply.message_id).length === 0 && (

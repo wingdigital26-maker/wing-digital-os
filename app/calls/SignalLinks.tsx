@@ -43,7 +43,7 @@ export default function SignalLinks({
           target="_blank"
           rel="noopener noreferrer"
           onClick={e => e.stopPropagation()}
-          style={{ color: "#7dd3fc", textDecoration: "underline", textUnderlineOffset: 2 }}
+          style={{ color: "var(--accent)", textDecoration: "underline", textUnderlineOffset: 2 }}
         >
           {sig}
         </a>

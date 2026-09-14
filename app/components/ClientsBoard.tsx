@@ -135,7 +135,7 @@ export default function ClientsBoard() {
                   <span style={{ fontSize: 10, fontWeight: 600, color: "var(--accent)", background: "rgba(96,165,250,0.1)", padding: "2px 9px", borderRadius: 999 }}>{c.industry}</span>
                 )}
                 {c.location && (
-                  <span style={{ fontSize: 10, fontWeight: 600, color: "var(--text-muted)", background: "rgba(255,255,255,0.05)", padding: "2px 9px", borderRadius: 999 }}>{c.location}</span>
+                  <span style={{ fontSize: 10, fontWeight: 600, color: "var(--text-muted)", background: "var(--bg-hover)", padding: "2px 9px", borderRadius: 999 }}>{c.location}</span>
                 )}
                 <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 9px", borderRadius: 999, color: "var(--green)", background: "rgba(52,211,153,0.1)" }}>active</span>
               </div>

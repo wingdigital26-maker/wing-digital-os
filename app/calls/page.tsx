@@ -240,7 +240,7 @@ export default function TodayDashboard() {
   if (error) {
     return (
       <div style={{ ...card, borderColor: "rgba(239,68,68,0.4)", background: "rgba(239,68,68,0.10)" }}>
-        <p style={{ fontSize: 15, fontWeight: 700, color: "#f87171" }}>Dashboard unavailable</p>
+        <p style={{ fontSize: 15, fontWeight: 700, color: "var(--red)" }}>Dashboard unavailable</p>
         <p style={{ fontSize: 13, marginTop: 6, color: "var(--text-muted)", lineHeight: 1.5 }}>{error}</p>
       </div>
     );
@@ -335,7 +335,7 @@ export default function TodayDashboard() {
                     display: "flex", alignItems: "center", justifyContent: "center",
                     background: "var(--bg-hover)", border: "1px solid var(--border)",
                     fontSize: 14, fontWeight: 800,
-                    color: (l.score ?? 0) >= 65 ? "#4ade80" : "var(--text-muted)",
+                    color: (l.score ?? 0) >= 65 ? "var(--green)" : "var(--text-muted)",
                   }}
                 >
                   {l.score ?? 0}
@@ -348,7 +348,7 @@ export default function TodayDashboard() {
                   <ContactLine contact_name={l.contact_name} title={l.title} extra={[l.city, l.vertical]} />
                   {isResearchDump(l.title) && <ResearchNotes notes={l.title} />}
                   {displaySignals(l.signals) && (
-                    <p style={{ fontSize: 12, color: "#7dd3fc", marginTop: 5, lineHeight: 1.45 }}>
+                    <p style={{ fontSize: 12, color: "var(--accent)", marginTop: 5, lineHeight: 1.45 }}>
                       <SignalLinks
                         signals={displaySignals(l.signals)}
                         company={l.company}
@@ -383,7 +383,7 @@ export default function TodayDashboard() {
             <p style={statLabel}>calls logged today</p>
           </div>
           <div style={card}>
-            <p style={{ ...statNum, color: d.today.booked > 0 ? "#4ade80" : "var(--text-primary)" }}>
+            <p style={{ ...statNum, color: d.today.booked > 0 ? "var(--green)" : "var(--text-primary)" }}>
               {d.today.booked}
             </p>
             <p style={statLabel}>booked today</p>

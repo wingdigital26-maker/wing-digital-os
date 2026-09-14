@@ -162,7 +162,7 @@ export default async function PortalPage({ params }: { params: Promise<{ slug: s
           <p style={sectionTitle}>Health {health?.date ? `· as of ${new Date(health.date).toLocaleDateString()}` : ""}</p>
           {health ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              <div style={{ ...card, display: "flex", alignItems: "center", gap: 20 }}>
+              <div style={{ ...card, display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
                 <div>
                   <p style={{ fontSize: 44, fontWeight: 800, lineHeight: 1, color: scoreColor(health.overall), fontFamily: "'Space Grotesk', sans-serif" }}>
                     {health.overall ?? "—"}
@@ -178,7 +178,7 @@ export default async function PortalPage({ params }: { params: Promise<{ slug: s
                           <span style={{ fontSize: 11.5, color: "var(--text-secondary)" }}>{p.label}</span>
                           <span style={{ fontSize: 11.5, fontWeight: 700, color: scoreColor(v) }}>{v ?? "—"}</span>
                         </div>
-                        <div style={{ height: 6, background: "rgba(255,255,255,0.05)", borderRadius: 999, overflow: "hidden" }}>
+                        <div style={{ height: 6, background: "var(--bg-hover)", borderRadius: 999, overflow: "hidden" }}>
                           <div style={{ width: `${Math.min(Number(v) || 0, 100)}%`, height: "100%", background: scoreColor(v), borderRadius: 999 }} />
                         </div>
                       </div>

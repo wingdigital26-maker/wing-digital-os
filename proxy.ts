@@ -15,6 +15,11 @@ function isPublicPath(pathname: string): boolean {
     pathname === "/icon.svg" ||
     pathname.startsWith("/icon-") ||
     pathname === "/apple-touch-icon.png" ||
+    // The Wing mark on the LOGIN screen (app/login/page.tsx). /login is public,
+    // so an anonymous browser requests this image with no cookie; while it was
+    // gated the proxy answered the <img> request with a 307 to /login and the
+    // logo rendered broken for every logged-out visitor. Static image, no secret.
+    pathname === "/wing-mark.png" ||
     // Interactive client dashboards (scripts/client_dashboard/build.py). Each file
     // is self-contained: the client's own published content, no secrets, no API
     // calls. Public by design so a client can open the link without a login.
@@ -110,6 +115,7 @@ function isPublicPath(pathname: string): boolean {
 
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
+  console.log("JAPERFHIT", pathname);
 
   // Static demo sites in public/ have no directory-index resolution in Next;
   // send the bare folder URL to its index.html.
@@ -246,5 +252,14 @@ export async function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image).*)"],
+  // Static asset files never need the auth gate: they are bytes in public/, no
+  // secrets, and the proxy always ended at NextResponse.next() for them anyway.
+  // Measured on the dev server: every one of them invoked this function, so the
+  // public demo sites and the dashboards paid an edge invocation per image.
+  // Excluding them by extension drops that to one invocation per document.
+  // NOTE .html is deliberately NOT excluded -- /call-sheet.html is gated staff
+  // content and must keep going through isPublicPath.
+  matcher: [
+    "/((?!_next/static|_next/image|.*[.](?:png|jpg|jpeg|gif|webp|avif|svg|ico|css|woff|woff2|ttf|otf|mp4|webm)$).*)",
+  ],
 };

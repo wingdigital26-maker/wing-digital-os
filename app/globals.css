@@ -14,7 +14,11 @@
   --accent-glow: rgba(39, 87, 230, 0.10);
   --text-primary: #10141f;
   --text-secondary: #4a5673;
-  --text-muted: #7b87a3;
+  /* Was #7b87a3 = 3.0-3.6:1 on our grounds, which failed WCAG AA on every
+     micro-label in the app (they run 10-12px). Darkened to clear 4.5:1 on the
+     darkest light ground (--bg-hover #e7ecf5) while staying clearly lighter
+     than --text-secondary. */
+  --text-muted: #5f6a86;
   --green: #0f855c;
   --orange: #b45309;
   --red: #be123c;
@@ -43,7 +47,9 @@
   --accent-glow: rgba(61, 107, 240, 0.14);
   --text-primary: #eef1f8;
   --text-secondary: #9aa3c0;
-  --text-muted: #545d7d;
+  /* Was #545d7d = 2.6-3.1:1 on the night grounds (failed AA, and failed even
+     the large-text 3:1 floor on --bg-hover). Lifted to clear 4.5:1 everywhere. */
+  --text-muted: #7b85a8;
   --green: #34d399;
   --orange: #fbbf24;
   --red: #fb7185;

@@ -431,11 +431,18 @@ export default function CallRoom() {
             Logged: {flash}
           </div>
         )}
-        {error && (
-          <div style={{ ...banner, background: "rgba(239,68,68,0.12)", borderColor: "rgba(239,68,68,0.4)", color: "#f87171" }}>
-            {error}
-          </div>
-        )}
+        {error && (() => {
+          const isAuth = /unauthorized|forbidden|not.?authoriz|401|403/i.test(error);
+          return isAuth ? (
+            <div style={{ ...banner, background: "var(--bg-hover)", borderColor: "var(--border)", color: "var(--text-secondary)" }}>
+              Sign in to load the dial list. Your session may have expired — refresh after signing back in.
+            </div>
+          ) : (
+            <div style={{ ...banner, background: "rgba(239,68,68,0.12)", borderColor: "rgba(239,68,68,0.4)", color: "#f87171" }}>
+              {error}
+            </div>
+          );
+        })()}
 
         {/* filters */}
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 20, alignItems: "center" }}>

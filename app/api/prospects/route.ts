@@ -96,13 +96,15 @@ export async function POST(req: Request) {
     if (notes) args.push(notes);
     const { stdout } = await execFileAsync("python", args, { cwd: GHL_CLI });
     const message = stdout.trim();
-    // call_log.py exits 0 even when it wrote nothing (log_call returns early
-    // and prints "No prospect with id N"). A successful write is the only path
-    // that prints "#<id> <name> -> <status>", so key off that rather than
-    // trusting the exit code. Without this the board repainted the row and
-    // toasted success for a call that was never logged.
-    if (!message.startsWith(`#${pid} `)) {
-      return NextResponse.json({ ok: false, error: message || "the call was not logged" }, { status: 404 });
+    // call_log.py exits 0 even when it wrote nothing: log_call() returns early
+    // and prints "No prospect with id N". The board treated that 200 as a win
+    // and repainted the row for a call that was never logged.
+    // Deliberately matched on the known FAILURE marker rather than on the
+    // success format: this route writes to the live prospect DB, and keying off
+    // success would turn any unanticipated stdout into a 404 on a write that
+    // actually landed. Fail-safe direction -- only the proven miss is rejected.
+    if (message.startsWith(`No prospect with id ${pid}`)) {
+      return NextResponse.json({ ok: false, error: message }, { status: 404 });
     }
     await execFileAsync("python", ["generate_call_sheet.py"], { cwd: GHL_CLI });
     return NextResponse.json({ ok: true, message });

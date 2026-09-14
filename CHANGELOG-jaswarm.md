@@ -92,3 +92,12 @@
 | safety | clean — cosmetic CSS + docs only, no secrets, frontmatter intact | — |
 | regression | tsc 0 · clean build · gate 95/95 (unchanged) | build exit 0 |
 **Committed (worktree):** SocialBoard.css + changelog · docs/strategy in ghl-cli + .claude/skills (not a repo)
+
+## 2026-09-14 — jaswarm Round 10 (Hero's social: poster correctness + folder README)
+| Lane | Change | Proof |
+|---|---|---|
+| system | poster.py: fixed IG to the correct TWO-STEP Graph flow (create container -> poll status_code until FINISHED, bounded -> media_publish), FB /photos vs /feed, added --limit throttle + per-post error handling | AST ok · fail-closed holds · --limit wired (main session finished it after agent stall) |
+| docs | README.md rewritten as the folder index (file map, end-to-end flow, hard rules, go-live conditions) | all 9 files listed exist · 0 em dashes · no secrets |
+| safety | 1 finding FIXED: IG status-poll had the token in the URL query string; moved to Authorization: Bearer header (all other Graph calls already use POST body) | re-verified AST + fail-closed after fix |
+| regression | poster status/post/post --live/post --limit all send nothing; gate 95/95; OS worktree unchanged (round-9 build stands) | fail-closed ✓ |
+**Note:** both build agents stalled on the 600s watchdog at their final verify/journal step; files were complete, main session finished the --limit arg + the safety fix. **Committed (worktree):** changelog only · code in ghl-cli (not a repo).

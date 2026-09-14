@@ -716,6 +716,14 @@ export default function CallRoom() {
                         disabled={busy}
                         style={{
                           ...miniChip,
+                          // Primary one-tap logging control a caller hits from a
+                          // phone every call, so it clears a real touch target
+                          // (the bare miniChip is ~23px tall) rather than the
+                          // hairline chip it used to render as at 375px.
+                          minHeight: 40,
+                          padding: "8px 14px",
+                          display: "inline-flex",
+                          alignItems: "center",
                           cursor: busy ? "not-allowed" : "pointer",
                           fontWeight: 700,
                           color: on ? "#0b1220" : o.tone,

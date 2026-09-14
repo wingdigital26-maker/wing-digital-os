@@ -1400,6 +1400,9 @@ export default function CrmWorkspace({
           .crm-row-main { flex-direction: column; gap: 1px; align-items: stretch; }
           .crm-row-title, .crm-row-ctx { max-width: 100%; flex: none; }
           .crm-row-meta { justify-content: flex-start; flex-wrap: wrap; gap: 6px 10px; }
+          /* On a phone these row pills are the primary touch target, so give
+             them a ~40px tap height (they read ~31px at desktop density). */
+          .crm-pane-pill { min-height: 40px; padding: 9px 16px; display: inline-flex; align-items: center; }
         }
       `}</style>
 

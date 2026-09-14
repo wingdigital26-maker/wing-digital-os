@@ -219,7 +219,7 @@ export default function SourcesPage() {
         {data.sources.map((s) => (
           <div key={s.source} style={card}>
             <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center" }}>
-              <div style={{ flex: "1 1 240px" }}>
+              <div style={{ flex: "1 1 240px", minWidth: 0 }}>
                 <div style={{ fontSize: 14.5, fontWeight: 700 }}>{s.source}</div>
                 <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 3 }}>
                   {s.total} {s.total === 1 ? "lead" : "leads"}

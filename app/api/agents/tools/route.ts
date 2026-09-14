@@ -44,7 +44,14 @@ export const TOOL_DEFINITIONS = [
 ];
 
 export async function POST(req: NextRequest) {
-  const { tool, input } = await req.json();
+  const body = await req.json().catch(() => null);
+  if (!body || typeof body !== "object") {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+  const { tool, input } = body as { tool?: unknown; input?: any };
+  if (typeof tool !== "string" || !tool) {
+    return NextResponse.json({ error: "tool required" }, { status: 400 });
+  }
 
   try {
     switch (tool) {
@@ -71,8 +78,15 @@ export async function POST(req: NextRequest) {
       }
 
       case "write_vault_note": {
-        if (!input.path.startsWith("wiki/")) return NextResponse.json({ ok: false, error: "Can only write to wiki/ directory" });
-        const filePath = path.join(VAULT, input.path.replace(/\//g, "\\"));
+        if (typeof input?.path !== "string" || !input.path.startsWith("wiki/")) return NextResponse.json({ ok: false, error: "Can only write to wiki/ directory" });
+        if (typeof input?.content !== "string") return NextResponse.json({ ok: false, error: "content must be a string" });
+        // Resolve and confirm the target stays inside the vault's wiki/ dir so a
+        // path like "wiki/../secret" cannot escape via the startsWith check.
+        const wikiRoot = path.join(VAULT, "wiki");
+        const filePath = path.resolve(VAULT, input.path);
+        if (filePath !== wikiRoot && !filePath.startsWith(wikiRoot + path.sep)) {
+          return NextResponse.json({ ok: false, error: "Path not allowed" });
+        }
         fs.mkdirSync(path.dirname(filePath), { recursive: true });
         fs.writeFileSync(filePath, input.content, "utf-8");
         return NextResponse.json({ ok: true, result: `Written to ${input.path}` });

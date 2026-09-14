@@ -26,9 +26,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Path outside vault" }, { status: 403 });
   }
 
-  // Never write to raw/
+  // Never write to raw/. Match on the first path segment so a legitimate file
+  // like "rawnote.md" or "raw-data.md" at the vault root is NOT wrongly blocked;
+  // only the actual raw/ directory (and anything under it) is forbidden.
   const rel = path.relative(VAULT, abs);
-  if (FORBIDDEN.some(f => rel.startsWith(f))) {
+  const firstSegment = rel.split(/[\\/]/)[0];
+  if (FORBIDDEN.includes(firstSegment)) {
     return NextResponse.json({ error: "Cannot write to raw/" }, { status: 403 });
   }
 

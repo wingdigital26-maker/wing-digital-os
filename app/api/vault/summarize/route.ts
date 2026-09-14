@@ -8,8 +8,12 @@ export const runtime = "nodejs";
 const HOT_FILE = path.join(VAULT, "wiki", "hot.md");
 
 export async function POST(req: NextRequest) {
-  const { messages, agent } = await req.json();
-  if (!messages?.length) return NextResponse.json({ error: "No messages" }, { status: 400 });
+  const body = await req.json().catch(() => null);
+  if (!body || typeof body !== "object") {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+  const { messages, agent } = body as { messages?: any; agent?: unknown };
+  if (!Array.isArray(messages) || !messages.length) return NextResponse.json({ error: "No messages" }, { status: 400 });
 
   const transcript = messages
     .map((m: any) => `${m.role === "user" ? "Jack" : agent}: ${m.content}`)

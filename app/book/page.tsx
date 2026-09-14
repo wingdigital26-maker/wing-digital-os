@@ -123,6 +123,12 @@ export default function BookPage() {
         padding: "24px 16px 60px",
         display: "flex",
         justifyContent: "center",
+        // Anchor to the top: without this the flex default (align-items: stretch)
+        // stretches the inner grid to the full viewport height, and grid
+        // align-content then inflates every row -- spreading the header text
+        // apart and ballooning the loading/error/empty cards into tall,
+        // near-empty boxes. Top-align lets each card hug its own content.
+        alignItems: "flex-start",
       }}
     >
       <div style={{ width: "100%", maxWidth: 560, display: "grid", gap: 16 }}>

@@ -39,3 +39,13 @@
 | practicality | photo hint now flows generator -> board card, closing the "which photo?" gap | reachable via Marketing>Social |
 | safety | clean — notes parameterized (no SQLi), rendered as escaped text (no XSS), staff-gated | — |
 | regression | gate rules + tamper re-lint hold; full clean build | build exit 0 |
+
+## 2026-09-14 — jaswarm Round 5 (Hero's social system: schedulable + at-a-glance)
+| Lane | Change | Proof |
+|---|---|---|
+| system | run_weekly.py schedulable wrapper: drafts + lint-audits the current ISO week, logs, posts NOTHING (docstring shows the Task Scheduler pattern, no task registered) | draft 8, lint 8/8, sent nothing; idempotent; engine em dashes normalized |
+| visual | SocialBoard "This week" summary strip: honest draft/scheduled/posted counts + next scheduled pill, hidden on load error | tsc 0 err · 375px wraps · build ✓ |
+| content | strategy.md "MEASURING WHAT WORKS (honestly)": ask-how-they-found-you tally, engagement proxy, no fabricated metrics | 0 em dashes/prices/phones |
+| practicality | weekly cycle can now be scheduled (draft-only) and the week is visible at a glance on the board | reachable via Marketing>Social |
+| safety | clean — run_weekly uses safe argv (no shell), self-computed week, no network, no secret | — |
+| regression | gate rules + tamper re-lint hold post-edit; full clean build | build exit 0 |

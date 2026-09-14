@@ -186,6 +186,75 @@
   word-break: break-word;
 }
 
+/* Week-at-a-glance strip: a single subtle row of small stat pills above the
+   kanban, summarizing the current ISO week from real loaded posts. Wraps
+   cleanly at 375px. */
+.sb-week {
+  display: flex;
+  align-items: center;
+  gap: 10px 14px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+}
+.sb-week-title {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  flex: none;
+}
+.sb-week-empty {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+.sb-week-pills {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.sb-week-pill {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  white-space: nowrap;
+}
+.sb-week-pill b {
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--sb-tone, var(--text-primary));
+}
+.sb-week-next {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding: 4px 10px 4px 9px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--sb-accent) 40%, var(--border));
+  background: color-mix(in srgb, var(--sb-accent) 10%, var(--bg-secondary));
+  white-space: nowrap;
+}
+.sb-week-next .sb-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  flex: none;
+  background: var(--sb-accent, var(--text-muted));
+}
+
 /* Interaction states for the action buttons + retry/reload. */
 .sb-btn {
   transition: background 120ms ease, border-color 120ms ease, color 120ms ease;

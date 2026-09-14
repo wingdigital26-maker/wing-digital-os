@@ -246,6 +246,39 @@ export default function SocialBoard() {
   );
   const byStatus = (s: string) => list.filter((p) => p.status === s);
 
+  // Week-at-a-glance summary for the current ISO week (Mon to Sun), derived
+  // only from posts already loaded. Each status is counted on its own natural
+  // date: posted on posted_at, scheduled on scheduled_for, drafts (no date of
+  // their own) on created_at. Honest counts only, never fabricated.
+  const week = useMemo(() => {
+    const now = new Date();
+    const dow = (now.getDay() + 6) % 7; // Mon=0 .. Sun=6
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dow).getTime();
+    const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dow + 7).getTime();
+    const inWeek = (iso: string | null): boolean => {
+      if (!iso) return false;
+      const ms = Date.parse(iso);
+      return Number.isFinite(ms) && ms >= start && ms < end;
+    };
+    let draft = 0, scheduled = 0, posted = 0;
+    let next: Post | null = null;
+    let nextMs = Infinity;
+    for (const p of all) {
+      if (p.status === "posted") {
+        if (inWeek(p.posted_at)) posted++;
+      } else if (p.status === "scheduled") {
+        if (inWeek(p.scheduled_for)) {
+          scheduled++;
+          const ms = Date.parse(p.scheduled_for as string);
+          if (ms < nextMs) { nextMs = ms; next = p; }
+        }
+      } else if (inWeek(p.created_at)) {
+        draft++;
+      }
+    }
+    return { draft, scheduled, posted, next, total: draft + scheduled + posted };
+  }, [all]);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
       <header style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
@@ -348,6 +381,38 @@ export default function SocialBoard() {
         </p>
         {addErr && <p style={{ margin: 0, fontSize: 12.5, color: "var(--red)" }}>{addErr}</p>}
       </form>
+
+      {/* Week-at-a-glance strip. Only once posts have loaded cleanly, so the
+          counts are always derived from real data. */}
+      {!loadErr && !missing && posts !== null && (
+        <div className="sb-week" aria-label="This week summary">
+          <span className="sb-week-title">This week</span>
+          {week.total === 0 ? (
+            <span className="sb-week-empty">Nothing staged for this week yet.</span>
+          ) : (
+            <div className="sb-week-pills">
+              <span className="sb-week-pill">
+                <b>{week.draft}</b> drafted
+              </span>
+              <span className="sb-week-pill" style={{ ["--sb-tone" as string]: "var(--orange)" }}>
+                <b>{week.scheduled}</b> scheduled
+              </span>
+              <span className="sb-week-pill" style={{ ["--sb-tone" as string]: "var(--green)" }}>
+                <b>{week.posted}</b> posted
+              </span>
+              {week.next && (
+                <span
+                  className="sb-week-next"
+                  style={{ ["--sb-accent" as string]: platformAccent(week.next.platform) }}
+                >
+                  <span className="sb-dot" aria-hidden />
+                  Next {fmtDate(week.next.scheduled_for)} on {PLATFORM_LABEL[week.next.platform] || week.next.platform}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* States */}
       {loadErr && (

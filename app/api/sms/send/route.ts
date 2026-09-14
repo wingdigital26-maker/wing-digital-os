@@ -7,6 +7,7 @@ import {
   patchMessages,
   publicUrl,
   webhookKey,
+  isPhoneSuppressed,
   TWILIO_NOT_CONFIGURED,
 } from "@/lib/sms";
 
@@ -65,6 +66,20 @@ export async function POST(req: NextRequest) {
   }
   if (!text) {
     return NextResponse.json({ ok: false, error: "`body` is required." }, { status: 400 });
+  }
+
+  // Suppression gate: never text anyone who has opted out (revoked sms consent)
+  // or is marked do_not_contact. Fails closed (isPhoneSuppressed returns
+  // suppressed=true if the backend is unreachable), so a number whose status we
+  // cannot prove is SKIPPED, not sent. Runs BEFORE logging or sending, so a
+  // refused number touches neither the ledger nor Twilio. Mirrors the
+  // isEmailSuppressed gate in /api/email/send.
+  const supp = await isPhoneSuppressed(to);
+  if (supp.suppressed) {
+    return NextResponse.json(
+      { ok: false, error: `Refused: ${supp.reason ?? "recipient is suppressed"}` },
+      { status: 403 }
+    );
   }
 
   // 1) Log BEFORE sending.

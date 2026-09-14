@@ -1426,7 +1426,12 @@ const DATA = {"slug":"heros-junk","generated":"2026-09-09","dataThrough":"2026-0
   if (DATA.live && DATA.slug) {
     hsec.hidden = false;
     $('#health').innerHTML = '<div class="empty">Opening your pages and checking them…</div>';
-    fetch('/api/dashboard/' + encodeURIComponent(DATA.slug) + '/health', { cache:'no-store' })
+    // Forward the same per-client access key the parent dashboard fetch uses, so
+    // the now-gated /health route authorizes the request. Staff embeds with no
+    // key still pass via their session cookie.
+    var hkey = new URLSearchParams(location.search).get('k');
+    fetch('/api/dashboard/' + encodeURIComponent(DATA.slug) + '/health' +
+          (hkey ? '?k=' + encodeURIComponent(hkey) : ''), { cache:'no-store' })
       .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
       .then(renderHealth)
       .catch(() => {

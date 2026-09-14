@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { CLIENTS, ClientConfig } from "../../clients";
+import { verifyClientKey } from "@/app/lib/clientKeys";
+import { getOsSession, hasLegacyAuth } from "@/lib/osSupabase";
 
 // ── Live site-health endpoint ────────────────────────────────────────────────
 // The main dashboard route reports WHAT we published. This one reports whether
@@ -280,13 +282,35 @@ async function runChecks(cfg: ClientConfig, deadline: number) {
 }
 
 export async function GET(
-  _req: Request,
+  req: Request,
   ctx: { params: Promise<{ slug: string }> } | { params: { slug: string } }
 ) {
   const p = await (ctx.params as Promise<{ slug: string }>);
-  const cfg = CLIENTS[p.slug];
+  const slug = p.slug;
+
+  // ── Access gate (FAILS CLOSED) ─────────────────────────────────────────────
+  // Mirrors the parent /api/dashboard/[slug] route exactly. The slug is a public
+  // URL, not a secret, so a valid ?k=<key> for THIS client is required before any
+  // site-health work runs -- otherwise a guessed slug would serve a client's
+  // full site analysis (and confirm they are an active client) to anyone. Staff
+  // sessions (Supabase-auth or the legacy OS_PASSWORD cookie) bypass the key so
+  // the OS's own UI can embed the page. The deployed client HTML forwards the
+  // same ?k= it already uses for the parent fetch. This block must stay ahead of
+  // every fetch below, and ahead of the cfg lookup so an unknown slug leaks
+  // nothing either.
+  const key = new URL(req.url).searchParams.get("k");
+  const staff = (await getOsSession()) !== null || (await hasLegacyAuth());
+  const keyed = await verifyClientKey(slug, key);
+  if (!staff && !keyed) {
+    return NextResponse.json(
+      { error: "unauthorized", message: "missing or invalid access key" },
+      { status: 401 }
+    );
+  }
+
+  const cfg = CLIENTS[slug];
   if (!cfg) {
-    return NextResponse.json({ error: `unknown client '${p.slug}'` }, { status: 404 });
+    return NextResponse.json({ error: `unknown client '${slug}'` }, { status: 404 });
   }
 
   const deadline = Date.now() + DEADLINE_MS;
@@ -303,6 +327,17 @@ export async function GET(
       // grade is still being measured instead of printing a score of nothing.
       speed,
     },
-    { headers: { "Cache-Control": "public, s-maxage=21600, stale-while-revalidate=43200" } }
+    // Same cache-key trap guard as the parent route: the CDN keys on URL, not
+    // cookie, so a staff request to the BARE url (no ?k=) marked public would
+    // seed a cache entry any anonymous visitor could then read. Only key-bearing
+    // requests (key is part of the cache key) may be publicly cached; session-
+    // authorized ones stay private.
+    {
+      headers: {
+        "Cache-Control": keyed
+          ? "public, s-maxage=21600, stale-while-revalidate=43200"
+          : "private, no-store",
+      },
+    }
   );
 }

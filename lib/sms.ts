@@ -188,6 +188,90 @@ export async function logMessage(
   }
 }
 
+// ── Suppression (opt-out / do_not_contact) for SMS ──────────────────────────
+// Mirror of isEmailSuppressed in lib/email.ts, keyed on the phone number. Two
+// sources of truth, both already defined (migration 0014 + 0004):
+//   * public.consent — a REVOKED sms-consent row (channel='sms', revoked_at
+//     set) for an address is a hard opt-out (the A2P STOP paper trail).
+//   * public.crm_contacts.do_not_contact = true for a row with that phone — a
+//     manual "never contact".
+// This never invents tables; it reads those through the service key.
+// FAIL CLOSED: if Supabase is unreachable or the service key is missing we
+// cannot prove the number is clear, so we treat it as suppressed (skip send).
+//
+// Format note: the send route validates `to` as strict E.164 (+digits) and the
+// A2P STOP that writes a revoked consent row arrives as an E.164 number, so the
+// consent match is exact. crm_contacts.phone may be stored in varied formats,
+// so the do_not_contact check matches BOTH the exact E.164 and its last-10
+// national digits — an over-match there only ever skips a send (fail-safe),
+// never sends to a suppressed number.
+
+export type SmsSuppressionResult = { suppressed: boolean; reason: string | null };
+
+/** True if the number must not be texted: a revoked sms-consent row exists, OR
+ *  a crm_contacts row with that phone has do_not_contact=true. Never throws.
+ *  Fails closed (suppressed=true) when the backend cannot be reached. */
+export async function isPhoneSuppressed(phone: string): Promise<SmsSuppressionResult> {
+  const to = (phone || "").trim();
+  if (!to) return { suppressed: true, reason: "empty number" };
+
+  const url = sbUrl();
+  const key = sbService();
+  if (!url || !key) {
+    return {
+      suppressed: true,
+      reason: "suppression list unreachable (OS_SUPABASE_URL / OS_SUPABASE_SERVICE_KEY not set)",
+    };
+  }
+  const headers = { apikey: key, Authorization: `Bearer ${key}` };
+  const last10 = to.replace(/\D/g, "").slice(-10);
+
+  // 1) Revoked sms-consent row for this number (exact E.164 match).
+  try {
+    const q =
+      `select=id&channel=eq.sms&revoked_at=not.is.null` +
+      `&address=eq.${encodeURIComponent(to)}&limit=1`;
+    const r = await fetch(`${url}/rest/v1/consent?${q}`, { headers, cache: "no-store" });
+    if (!r.ok) {
+      return { suppressed: true, reason: `suppression check failed (consent HTTP ${r.status})` };
+    }
+    const rows = (await r.json()) as unknown[];
+    if (Array.isArray(rows) && rows.length > 0) {
+      return { suppressed: true, reason: "recipient opted out (revoked sms consent)" };
+    }
+  } catch (e) {
+    return {
+      suppressed: true,
+      reason: `suppression check errored: ${e instanceof Error ? e.message : String(e)}`,
+    };
+  }
+
+  // 2) crm_contacts.do_not_contact = true for this phone. Match the exact
+  //    E.164 OR any stored format ending in the same 10 national digits.
+  try {
+    const parts = [`phone.eq.${to}`];
+    if (last10.length === 10) parts.push(`phone.like.*${last10}`);
+    const q =
+      `select=id&do_not_contact=is.true` +
+      `&or=(${encodeURIComponent(parts.join(","))})&limit=1`;
+    const r = await fetch(`${url}/rest/v1/crm_contacts?${q}`, { headers, cache: "no-store" });
+    if (!r.ok) {
+      return { suppressed: true, reason: `suppression check failed (crm_contacts HTTP ${r.status})` };
+    }
+    const rows = (await r.json()) as unknown[];
+    if (Array.isArray(rows) && rows.length > 0) {
+      return { suppressed: true, reason: "recipient is marked do_not_contact" };
+    }
+  } catch (e) {
+    return {
+      suppressed: true,
+      reason: `suppression check errored: ${e instanceof Error ? e.message : String(e)}`,
+    };
+  }
+
+  return { suppressed: false, reason: null };
+}
+
 /** PATCH ledger rows. Never throws; returns an error string or null. */
 export async function patchMessages(
   filter: string,

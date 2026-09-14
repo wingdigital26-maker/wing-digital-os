@@ -86,7 +86,7 @@ export default function Login() {
           </p>
         )}
         <button onClick={submit} disabled={loading || !pw} className="login-btn" style={{
-          padding: "12px 0", borderRadius: 10, border: "none", cursor: "pointer",
+          padding: "12px 0", borderRadius: 10, border: "none",
           background: "linear-gradient(135deg, #3D6BF0, #1E44B8)", color: "#fff",
           fontSize: 14, fontWeight: 700, opacity: loading || !pw ? 0.6 : 1,
         }}>

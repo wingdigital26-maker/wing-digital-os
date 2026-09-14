@@ -276,6 +276,7 @@ main > div:last-child > div > *:nth-child(6) { animation-delay: 0.27s; }
    (lift on hover, press on active, keyboard focus ring) plus an inline
    spinner while a request is in flight. */
 .login-btn {
+  cursor: pointer;
   transition: transform 0.15s ease, box-shadow 0.2s ease, opacity 0.2s ease,
     filter 0.2s ease;
   box-shadow: 0 6px 18px rgba(61, 107, 240, 0.28);

@@ -28,3 +28,14 @@
 | practicality | `check` gives a per-post lint audit before anything is pushed | read-only, reachable via CLI + skill |
 | safety | clean — counter is presentational, re-lint warning leaks no caption/token, check read-only | — |
 | regression | Round 1 gate rules hold (phone/price FAIL); full clean build | build exit 0 |
+
+## 2026-09-14 — jaswarm Round 4 (Hero's social system: photo hint end-to-end)
+| Lane | Change | Proof |
+|---|---|---|
+| system | engine.py maps each post's image_hint into the POST `notes` field so the photo hint rides onto the board | export/push bodies carry notes; tamper guard intact |
+| visual | Composer gains a "Notes for the poster" input; cards show a distinct photo-hint row when notes exist | tsc 0 err · 375px wraps · build ✓ |
+| api | /api/social POST now accepts + stores optional `notes` (staff-gated, nullableText, capped 2000) | build ✓ · safety clean |
+| content | strategy.md OPERATOR RUNBOOK: the exact weekly draft->review->attach->post->mark cycle | 0 em dashes/prices/phones |
+| practicality | photo hint now flows generator -> board card, closing the "which photo?" gap | reachable via Marketing>Social |
+| safety | clean — notes parameterized (no SQLi), rendered as escaped text (no XSS), staff-gated | — |
+| regression | gate rules + tamper re-lint hold; full clean build | build exit 0 |

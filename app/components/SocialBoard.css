@@ -135,6 +135,57 @@
   }
 }
 
+/* Composer text inputs: real hover/focus states (inline styles can't express
+   them). Kept subtle so they match the house form language. */
+.sb-input {
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+.sb-input:hover {
+  border-color: var(--text-muted);
+}
+.sb-input:focus-visible,
+.sb-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+/* Photo / note line on a card: a subtle tinted row so the poster sees what to
+   attach before posting. Honest — only rendered when notes actually exist. */
+.sb-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border));
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-secondary));
+}
+.sb-note-label {
+  font-size: 13px;
+  line-height: 1.3;
+  flex: none;
+}
+.sb-note-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.sb-note-title {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.sb-note-text {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  word-break: break-word;
+}
+
 /* Interaction states for the action buttons + retry/reload. */
 .sb-btn {
   transition: background 120ms ease, border-color 120ms ease, color 120ms ease;

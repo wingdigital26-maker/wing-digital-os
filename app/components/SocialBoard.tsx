@@ -111,6 +111,7 @@ export default function SocialBoard() {
   const [platform, setPlatform] = useState("facebook");
   const [caption, setCaption] = useState("");
   const [imageUrl, setImageUrl] = useState("");
+  const [notes, setNotes] = useState("");
   const [scheduledFor, setScheduledFor] = useState("");
   const [saving, setSaving] = useState(false);
   const [addErr, setAddErr] = useState("");
@@ -164,6 +165,7 @@ export default function SocialBoard() {
           platform,
           caption: cap,
           image_url: imageUrl.trim() || null,
+          notes: notes.trim() || null,
           scheduled_for: scheduledFor ? new Date(scheduledFor).toISOString() : null,
         }),
       });
@@ -172,6 +174,7 @@ export default function SocialBoard() {
       if (!r.ok || !d.post) { setAddErr(d.message || d.error || `HTTP ${r.status}`); return; }
       setCaption("");
       setImageUrl("");
+      setNotes("");
       setScheduledFor("");
       await load();
     } catch (e) {
@@ -317,6 +320,15 @@ export default function SocialBoard() {
               : ` ${PLATFORM_LABEL[platform] || platform} characters`}
           </span>
         </div>
+        <input
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Notes for the poster (e.g. which photo to attach), optional"
+          autoComplete="off"
+          className="sb-input"
+          style={{ ...input, width: "100%", boxSizing: "border-box" }}
+          aria-label="Notes for the poster (e.g. which photo to attach)"
+        />
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
           <input
             value={imageUrl}
@@ -324,6 +336,7 @@ export default function SocialBoard() {
             placeholder="Image URL (optional), e.g. https://..."
             inputMode="url"
             autoComplete="off"
+            className="sb-input"
             style={{ ...input, flex: "1 1 260px" }}
           />
           <button type="submit" className="sb-primary" disabled={saving || !caption.trim()} style={{ ...primary, padding: "10px 18px", opacity: saving || !caption.trim() ? 0.6 : 1 }}>
@@ -479,6 +492,16 @@ function PostCard({ post: p, busy, err, onSave, onRemove }: {
       <p style={{ margin: 0, fontSize: 13, color: "var(--text-primary)", lineHeight: 1.55, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
         {p.caption}
       </p>
+
+      {p.notes && (
+        <div className="sb-note">
+          <span className="sb-note-label" aria-hidden>&#128247;</span>
+          <div className="sb-note-body">
+            <span className="sb-note-title">Photo / note</span>
+            <span className="sb-note-text">{p.notes}</span>
+          </div>
+        </div>
+      )}
 
       {err && <p style={{ margin: 0, fontSize: 12, color: "var(--red)" }}>{err}</p>}
 

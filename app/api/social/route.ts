@@ -142,6 +142,10 @@ export async function POST(req: Request) {
     return badRequest("scheduled_for must be a valid date, or be empty.");
   }
 
+  // Optional note the poster reads before publishing (e.g. which photo to
+  // attach). The generator uses this to carry its image hint onto the board.
+  const notes = nullableText(body.notes);
+
   // A post given a date is scheduled; without one it is a plain draft. The
   // human always moves it to "posted" by hand later; nothing here does that.
   const status = scheduledFor ? "scheduled" : "draft";
@@ -153,6 +157,7 @@ export async function POST(req: Request) {
       caption: caption.slice(0, 5000),
       image_url: imageUrl ?? null,
       scheduled_for: scheduledFor ?? null,
+      notes: notes ? notes.slice(0, 2000) : null,
       status,
     });
     return NextResponse.json({ ok: true, post: created }, { status: 201 });

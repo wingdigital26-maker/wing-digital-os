@@ -138,8 +138,13 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { messages } = await req.json();
-  const userMessages = (messages ?? []).filter((m: any) => m.role === "user");
+  let messages: any;
+  try {
+    ({ messages } = await req.json());
+  } catch {
+    return NextResponse.json({ error: "invalid JSON body", cost: 0, toolCalls: [] }, { status: 400 });
+  }
+  const userMessages = (Array.isArray(messages) ? messages : []).filter((m: any) => m && m.role === "user");
   const last = userMessages[userMessages.length - 1];
   if (!last?.content) {
     return NextResponse.json({ reply: "No message received.", cost: 0, toolCalls: [] });

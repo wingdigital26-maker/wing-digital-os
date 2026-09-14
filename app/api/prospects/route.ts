@@ -45,13 +45,28 @@ export async function POST(req: Request) {
   if (isCloud()) {
     return NextResponse.json(PC_REQUIRED_BODY, { status: 503 });
   }
+  // An empty or malformed body is a bad request, not a server fault. It used
+  // to land in the catch below and come back as a 500 whose body was the raw
+  // parser text ("Unexpected end of JSON input").
+  let body: unknown;
   try {
-    const { id, status, notes } = await req.json();
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "invalid JSON body" }, { status: 400 });
+  }
+  try {
+    const { id, status, notes } = (body ?? {}) as {
+      id?: unknown;
+      status?: unknown;
+      notes?: unknown;
+    };
     if (!id || !status) {
       return NextResponse.json({ error: "id and status required" }, { status: 400 });
     }
-    const args = ["call_log.py", String(id), status];
-    if (notes) args.push(notes);
+    // Stringified at the boundary: these become argv for a child process, and
+    // execFile rejects a non-string arg with a TypeError that surfaced as a 500.
+    const args = ["call_log.py", String(id), String(status)];
+    if (notes) args.push(String(notes));
     const { stdout } = await execFileAsync("python", args, { cwd: GHL_CLI });
     await execFileAsync("python", ["generate_call_sheet.py"], { cwd: GHL_CLI });
     return NextResponse.json({ ok: true, message: stdout.trim() });

@@ -225,7 +225,10 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const { url, key } = creds();
   if (!url || !key) {
-    return NextResponse.json({ ok: false, error: "Sonar Supabase is not configured." }, { status: 500 });
+    // Missing config is "this host cannot do it", not "the server broke":
+    // 503 matches every other unconfigured-backend answer in the OS, and keeps
+    // a plain misconfiguration out of the 500 error budget.
+    return NextResponse.json({ ok: false, error: "Sonar Supabase is not configured." }, { status: 503 });
   }
   const b = await req.json().catch(() => ({}));
   const { id, action } = b as { id?: number; action?: string };

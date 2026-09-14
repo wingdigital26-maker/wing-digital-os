@@ -27,8 +27,14 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { agent, messages } = await req.json();
-  const fp = agent ? filePath(agent) : null;
+  let agent: unknown;
+  let messages: unknown;
+  try {
+    ({ agent, messages } = await req.json());
+  } catch {
+    return NextResponse.json({ error: "invalid JSON body" }, { status: 400 });
+  }
+  const fp = typeof agent === "string" && agent ? filePath(agent) : null;
   if (!fp || !Array.isArray(messages)) {
     return NextResponse.json({ error: "invalid" }, { status: 400 });
   }

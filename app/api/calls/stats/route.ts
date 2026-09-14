@@ -32,6 +32,7 @@ type Lead = {
   call_count: number | null;
   next_action_at: string | null;
   claimed_by_email: string | null;
+  tier: string | null;
 };
 
 type Activity = {
@@ -47,7 +48,7 @@ type Activity = {
 
 const LEAD_COLS =
   "id,company,contact_name,title,phone,city,state,vertical,score,signals,status," +
-  "last_outcome,last_called_at,call_count,next_action_at,claimed_by_email";
+  "last_outcome,last_called_at,call_count,next_action_at,claimed_by_email,tier";
 
 export async function GET() {
   const user = await requireCallUser();

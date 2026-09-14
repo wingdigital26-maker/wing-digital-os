@@ -18,7 +18,11 @@ function isPublicPath(pathname: string): boolean {
     // Interactive client dashboards (scripts/client_dashboard/build.py). Each file
     // is self-contained: the client's own published content, no secrets, no API
     // calls. Public by design so a client can open the link without a login.
-    pathname.startsWith("/dashboards/") ||
+    // Scoped to the static .html file ONLY: the in-OS wrapper route
+    // /dashboards/<slug> (app/dashboards/[slug]) is a STAFF surface and stays
+    // gated. Matching the whole /dashboards/ prefix (the old rule) leaked that
+    // wrapper to anon users. 2026-09-13.
+    (pathname.startsWith("/dashboards/") && pathname.endsWith(".html")) ||
     // The Wing capabilities one-pager sent to signed clients. Static, no secrets;
     // public so a client can open the link without an OS login.
     pathname === "/pitch.html" ||

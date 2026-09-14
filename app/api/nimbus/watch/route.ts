@@ -183,8 +183,20 @@ export async function GET(req: NextRequest) {
   if ("why" in msg) {
     unknowns.push({ id: "messaging:board", label: "Automated messaging QA board", reason: msg.why });
     sources.push({ id: "messaging", label: "Messaging QA board", state: "absent", note: msg.why });
-  } else if (!msg.guardrails) {
-    const reason = msg.lane?.reason || "the messaging board returned no guardrails block";
+  } else if (
+    !msg.guardrails ||
+    // /api/messaging ALWAYS returns a guardrails object; when its Supabase
+    // reads fail it returns 200 with null counts inside and lane.available
+    // false. Coercing those nulls to 0 would report the board healthy with
+    // nothing wrong -- the exact "could not ask, reported as fine" outcome the
+    // header forbids. Treat null counts or an unavailable lane as unreachable.
+    // 2026-09-13.
+    msg.lane?.available === false ||
+    typeof msg.guardrails.qaFailed !== "number" ||
+    typeof msg.guardrails.badEmail !== "number" ||
+    typeof msg.guardrails.claimed !== "number"
+  ) {
+    const reason = msg.lane?.reason || "the messaging board's data could not be read";
     unknowns.push({ id: "messaging:board", label: "Automated messaging QA board", reason });
     sources.push({ id: "messaging", label: "Messaging QA board", state: "absent", note: reason });
   } else {

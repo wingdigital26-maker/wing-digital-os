@@ -206,6 +206,12 @@ export default function ActivityBoard() {
             <h2>Sent</h2>
             <p className="sub">Email that has actually left the building, newest first — from the unified message ledger and the cold-engine sent rows.</p>
 
+            {msg?.lane.deliveryWarning && (
+              <div className="act-note dead">
+                {msg.lane.deliveryWarning} Any "cold-engine sent" count below is historical (rows stamped emailed in the GHL era), not mail going out now.
+              </div>
+            )}
+
             {ledger?.tableMissing && (
               <div className="act-note dead">{ledger.reason}</div>
             )}

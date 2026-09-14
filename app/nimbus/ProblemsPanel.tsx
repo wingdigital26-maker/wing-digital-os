@@ -238,7 +238,7 @@ export default function ProblemsPanel({ onClose }: { onClose: () => void }) {
                       Ask me
                     </button>
                     {p.link ? (
-                      <a className="np-btn" href={p.link.href}>
+                      <a className="np-btn" href={p.link.href} onClick={onClose}>
                         {p.link.label}
                       </a>
                     ) : null}

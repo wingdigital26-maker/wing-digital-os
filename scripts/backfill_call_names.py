@@ -43,6 +43,18 @@ ENV_FILES = [
 
 _SUFFIXES = {"inc", "llc", "ltd", "co", "company", "corp", "corporation", "the", "and"}
 
+# Words that make a capitalized two-token string a place or trade, not a person.
+# Any name containing one of these is rejected by is_real_name.
+_NON_NAME_WORDS = {
+    "north", "south", "east", "west", "northern", "southern", "eastern", "western",
+    "fort", "lake", "metro", "greater", "central", "texas", "tx", "dallas", "worth",
+    "plano", "frisco", "mckinney", "allen", "denton", "collin", "county", "city",
+    "roofing", "construction", "exteriors", "restoration", "contractors", "services",
+    "solutions", "systems", "group", "enterprises", "industries", "supply",
+    "heating", "cooling", "plumbing", "electric", "electrical", "hvac", "pools",
+    "landscaping", "remodeling", "builders", "homes", "properties", "realty",
+}
+
 
 def load_env() -> dict:
     out = {}
@@ -82,6 +94,12 @@ def is_real_name(nm: str | None) -> bool:
             return False
         if not t[0].isupper():
             return False
+    # Belt-and-suspenders: a capitalized two-token string can still be a place
+    # or trade name ("North Texas", "Fort Worth", "Metro Roofing") that would
+    # read as a person to a caller. If ANY token is a known place/trade word,
+    # it is not a person's name. 2026-09-13.
+    if any(t.lower().strip(".-'") in _NON_NAME_WORDS for t in toks):
+        return False
     return True
 
 

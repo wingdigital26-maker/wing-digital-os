@@ -35,14 +35,20 @@ type Problem = {
   fix: string | null;
   link: { label: string; href: string } | null;
   severity: "high" | "normal";
+  // Where this item came from. "watch" items are the core watch's own and can
+  // be handed to the triage agent; anything else is surfaced from another OS
+  // surface (the messaging QA board today) and only links out.
+  source?: string;
   triage: Triage | null;
 };
+type Source = { id: string; label: string; state: "watched" | "absent"; note: string };
 type Payload = {
   ok?: boolean;
   asOf?: string;
   headline?: string;
   problems?: Problem[];
   unknowns?: { id: string; label: string; reason: string }[];
+  sources?: Source[];
   error?: string;
 };
 
@@ -61,7 +67,7 @@ export default function ProblemsPanel({ onClose }: { onClose: () => void }) {
 
   const load = useCallback(async () => {
     try {
-      const r = await fetch("/api/nimbus/problems", { cache: "no-store" });
+      const r = await fetch("/api/nimbus/watch", { cache: "no-store" });
       const j = (await r.json()) as Payload;
       if (!r.ok || !j.ok) throw new Error(j.error || `HTTP ${r.status}`);
       setData(j);
@@ -125,6 +131,7 @@ export default function ProblemsPanel({ onClose }: { onClose: () => void }) {
 
   const problems = data?.problems ?? [];
   const unknowns = data?.unknowns ?? [];
+  const sources = data?.sources ?? [];
 
   // Portalled to the body on purpose: the stage is a fixed, overflow-hidden
   // layer, so a scrim rendered inside it is trapped in that stacking context
@@ -207,14 +214,22 @@ export default function ProblemsPanel({ onClose }: { onClose: () => void }) {
                   ) : null}
 
                   <div className="np-actions">
-                    <button
-                      type="button"
-                      className="np-btn np-btn-primary"
-                      disabled={busy === p.id || t?.status === "investigating"}
-                      onClick={() => lookInto(p.id)}
-                    >
-                      {t?.status === "investigating" ? "Looking..." : t ? "Look again" : "Look into it"}
-                    </button>
+                    {/* The triage agent only investigates the core watch's own
+                        problems, so "Look into it" is offered only for those.
+                        A cross-surface item names where it came from instead of
+                        showing a button that could not run. */}
+                    {p.source && p.source !== "watch" ? (
+                      <span className="np-source-tag">Flagged by {p.source}</span>
+                    ) : (
+                      <button
+                        type="button"
+                        className="np-btn np-btn-primary"
+                        disabled={busy === p.id || t?.status === "investigating"}
+                        onClick={() => lookInto(p.id)}
+                      >
+                        {t?.status === "investigating" ? "Looking..." : t ? "Look again" : "Look into it"}
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="np-btn"
@@ -248,6 +263,25 @@ export default function ProblemsPanel({ onClose }: { onClose: () => void }) {
           <div className="np-empty">
             <b>Nothing is broken in anything I watch.</b>
             <span>Checked just now.</span>
+          </div>
+        ) : null}
+
+        {/* What Nimbus is actually watching, named honestly: a source that
+            could not be read shows as "not reachable" here rather than being
+            silently dropped, so an empty list never reads as full coverage. */}
+        {sources.length ? (
+          <div className="np-sources" aria-label="What Nimbus watches">
+            <span className="np-sources-title">Watching</span>
+            {sources.map((s) => (
+              <span
+                key={s.id}
+                className={"np-source np-source-" + s.state}
+                title={s.note}
+              >
+                {s.label}
+                <span className="np-source-state">{s.state === "watched" ? "on" : "not reachable"}</span>
+              </span>
+            ))}
           </div>
         ) : null}
         </div>

@@ -271,3 +271,60 @@
     animation: none;
   }
 }
+
+/* A cross-surface item names where it was flagged, in place of the triage
+   button it cannot use. Muted, matching the unknown-dot grey. */
+.np-source-tag {
+  font-size: 11px;
+  color: #9aa4bd;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  padding: 4px 9px;
+  text-transform: capitalize;
+  align-self: center;
+}
+
+/* The footer that names every source Nimbus watches and whether it is
+   reachable. Absent sources are shown, not hidden. */
+.np-sources {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 4px 4px;
+  margin-top: 4px;
+  border-top: 1px solid rgba(61, 107, 240, 0.14);
+}
+.np-sources-title {
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #6b7590;
+  margin-right: 2px;
+}
+.np-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #c3ccdf;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 8px;
+  padding: 3px 8px;
+}
+.np-source-state {
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.np-source-watched .np-source-state {
+  color: #7ee0a8;
+}
+.np-source-absent {
+  border-color: rgba(226, 136, 79, 0.3);
+}
+.np-source-absent .np-source-state {
+  color: #f0b487;
+}

@@ -103,6 +103,35 @@ function displayTitle(title: string | null): string | null {
   return isResearchDump(title) ? null : title;
 }
 
+// A contact line for a lead. When we have a real name it leads in stronger
+// text so a caller can scan for "who am I asking for" at a glance; when we
+// don't, "No named contact" is shown muted + italic so a nameless lead is
+// visually, honestly distinct from a named one -- never a fabricated name.
+function ContactLine({
+  contact_name,
+  title,
+  extra = [],
+}: {
+  contact_name: string | null;
+  title: string | null;
+  extra?: (string | null | undefined)[];
+}) {
+  const meta = [displayTitle(title), ...extra].filter(Boolean).join(" · ");
+  if (!contact_name) {
+    return (
+      <p style={{ ...muted, marginTop: 4, fontStyle: "italic", opacity: 0.75 }}>
+        {["No named contact", meta].filter(Boolean).join(" · ")}
+      </p>
+    );
+  }
+  return (
+    <p style={{ ...muted, marginTop: 4 }}>
+      <span style={{ color: "var(--text-primary)", fontWeight: 600 }}>{contact_name}</span>
+      {meta && <span> · {meta}</span>}
+    </p>
+  );
+}
+
 // Signals starting with "src:" are provenance tags for the importer, not
 // evidence a caller can use. They stay in the data but not on screen.
 function displaySignals(signals: string | null): string {
@@ -229,9 +258,7 @@ export default function TodayDashboard() {
                       {l.next_action_at ? due(l.next_action_at) : "due"}
                     </span>
                   </div>
-                  <p style={{ ...muted, marginTop: 4 }}>
-                    {[l.contact_name, displayTitle(l.title), l.city].filter(Boolean).join(" · ") || "No named contact"}
-                  </p>
+                  <ContactLine contact_name={l.contact_name} title={l.title} extra={[l.city]} />
                   {isResearchDump(l.title) && <ResearchNotes notes={l.title} />}
                 </div>
                 {l.phone && (
@@ -273,10 +300,7 @@ export default function TodayDashboard() {
                 </div>
                 <div style={{ flex: "1 1 260px", minWidth: 0 }}>
                   <span style={{ fontSize: 15, fontWeight: 700 }}>{l.company}</span>
-                  <p style={{ ...muted, marginTop: 4 }}>
-                    {[l.contact_name, displayTitle(l.title), l.city, l.vertical].filter(Boolean).join(" · ") ||
-                      "No named contact"}
-                  </p>
+                  <ContactLine contact_name={l.contact_name} title={l.title} extra={[l.city, l.vertical]} />
                   {isResearchDump(l.title) && <ResearchNotes notes={l.title} />}
                   {displaySignals(l.signals) && (
                     <p style={{ fontSize: 12, color: "#7dd3fc", marginTop: 5, lineHeight: 1.45 }}>

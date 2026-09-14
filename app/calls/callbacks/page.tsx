@@ -303,8 +303,17 @@ export default function Callbacks() {
                         )}
                       </div>
 
-                      <p style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 4 }}>
-                        {[l.contact_name, l.title, l.city].filter(Boolean).join(" · ") || "No named contact"}
+                      <p style={{
+                        fontSize: 12.5, color: "var(--text-muted)", marginTop: 4,
+                        fontStyle: l.contact_name ? "normal" : "italic",
+                        opacity: l.contact_name ? 1 : 0.75,
+                      }}>
+                        {l.contact_name && (
+                          <span style={{ color: "var(--text-primary)", fontWeight: 600 }}>{l.contact_name}</span>
+                        )}
+                        {l.contact_name && [l.title, l.city].some(Boolean) ? " · " : ""}
+                        {[l.title, l.city].filter(Boolean).join(" · ")
+                          || (l.contact_name ? "" : "No named contact")}
                       </p>
 
                       <p style={{

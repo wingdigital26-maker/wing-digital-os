@@ -157,6 +157,7 @@ export default function SectionChrome({ title, tabs, isTabActive, extras, childr
           background: var(--bg-hover); color: var(--text-primary);
           font-size: 12.5px; font-weight: 600; text-decoration: none; white-space: nowrap;
         }
+        .sc-btn:hover { border-color: var(--accent); color: var(--accent); }
         .sc-menu-root { position: relative; }
         .sc-menu-btn { cursor: pointer; display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: 12.5px; font-weight: 600; }
         .sc-menu {
@@ -164,7 +165,7 @@ export default function SectionChrome({ title, tabs, isTabActive, extras, childr
           min-width: 230px; max-width: calc(100vw - 24px);
           max-height: min(70vh, 480px); overflow-y: auto;
           background: var(--bg-primary); border: 1px solid var(--border); border-radius: 12px;
-          box-shadow: 0 12px 32px rgba(0,0,0,0.35);
+          box-shadow: var(--shadow-lg);
           padding: 8px;
         }
         .sc-menu-home {
@@ -193,6 +194,7 @@ export default function SectionChrome({ title, tabs, isTabActive, extras, childr
           padding: 12px 16px 13px; font-size: 14px; text-decoration: none; white-space: nowrap;
           color: var(--text-muted); font-weight: 500; border-bottom: 2px solid transparent;
         }
+        .sc-tab:hover { color: var(--text-primary); border-bottom-color: var(--border); }
         .sc-tab[aria-current="page"] { color: var(--text-primary); font-weight: 700; border-bottom-color: var(--accent); }
         .sc-tabs-wrap::after {
           content: ""; position: absolute; top: 0; right: 0; bottom: 0; width: 34px; pointer-events: none;

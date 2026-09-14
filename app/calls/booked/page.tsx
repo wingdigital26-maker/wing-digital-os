@@ -136,9 +136,17 @@ export default function Booked() {
                 <span style={{ ...pill, borderColor: "#22c55e", color: "#4ade80" }}>Booked</span>
               </div>
 
-              <p style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 4 }}>
-                {[lead.contact_name, lead.title, lead.city, lead.vertical].filter(Boolean).join(" · ")
-                  || "No named contact"}
+              <p style={{
+                fontSize: 12.5, color: "var(--text-muted)", marginTop: 4,
+                fontStyle: lead.contact_name ? "normal" : "italic",
+                opacity: lead.contact_name ? 1 : 0.75,
+              }}>
+                {lead.contact_name && (
+                  <span style={{ color: "var(--text-primary)", fontWeight: 600 }}>{lead.contact_name}</span>
+                )}
+                {lead.contact_name && [lead.title, lead.city, lead.vertical].some(Boolean) ? " · " : ""}
+                {[lead.title, lead.city, lead.vertical].filter(Boolean).join(" · ")
+                  || (lead.contact_name ? "" : "No named contact")}
               </p>
 
               <p style={{ fontSize: 12.5, color: "#4ade80", marginTop: 6, fontWeight: 600 }}>

@@ -38,6 +38,9 @@ export const NAV_TREE: NavGroupDef[] = [
     hint: "Your clients, new leads, and storm alerts",
     subs: [
       { id: "clients", label: "Clients" },
+      // Dashboards (2026-09-13): the OS index of every built client dashboard,
+      // opened inside the OS. Routed page (see EXTERNAL_SUB_LINKS).
+      { id: "dashboards", label: "Dashboards", keywords: "reporting client dashboard" },
       // Potential clients (2026-09-04): paste a website, the OS researches it
       // and files it as a prospect to work toward signing.
       { id: "potential", label: "Potential clients", keywords: "prospects" },
@@ -69,6 +72,9 @@ export const NAV_TREE: NavGroupDef[] = [
       // Reply Inbox (2026-09-01): every inbound cold-email reply, hot first,
       // with the thread and an editable draft. Read/draft only; never sends.
       { id: "replies", label: "Reply Inbox", keywords: "inbound" },
+      // Activity (2026-09-13): the "what is going out" board — sent + queued
+      // emails and texts with honest lane status. Routed page.
+      { id: "activity", label: "Activity", keywords: "emails texts sent going out messaging outbound" },
     ],
   },
   {
@@ -157,6 +163,9 @@ export const EXTERNAL_SUB_LINKS: Record<string, string> = {
   // (ActivityLog itself pointed users there). Was aliased to "knowledge",
   // which shares no content with it.
   log: "/automations/runs",
+  // 2026-09-13: two new routed sections reached from their sidebar subs.
+  dashboards: "/dashboards",
+  activity: "/activity",
 };
 
 // ── Routed pages ─────────────────────────────────────────────────────────────
@@ -203,6 +212,10 @@ export const ROUTED_PAGES: RoutedPage[] = [
   // but the complete read-only layout; was only reachable from watchdog
   // finding links before 2026-09-05.
   { href: "/mission", label: "Mission (full page)", keywords: "fleet monitor agents watchdog" },
+  // 2026-09-13 swarm: client dashboards inside the OS, and the messaging
+  // activity board (what emails/texts are going out).
+  { href: "/dashboards", label: "Client Dashboards", keywords: "reporting clients dashboard" },
+  { href: "/activity", label: "Messaging Activity", keywords: "emails texts sent going out outbound queue" },
 ];
 
 /** Routed sections shown in SectionChrome's top switcher strip. */

@@ -1,0 +1,120 @@
+/* Client dashboards index + embed. Uses OS theme tokens only -- no hardcoded hex. */
+
+.dash-index {
+  min-height: 100vh;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+.dash-index-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 40px 28px 64px;
+}
+.dash-head h1 {
+  font-size: 26px;
+  font-weight: 700;
+  margin: 0 0 6px;
+}
+.dash-head p {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin: 0 0 28px;
+}
+.dash-empty {
+  font-size: 14px;
+  color: var(--text-secondary);
+  padding: 24px;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+}
+.dash-empty code {
+  color: var(--text-primary);
+}
+
+.dash-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+.dash-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg-card);
+  text-decoration: none;
+  color: var(--text-primary);
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.dash-card-live:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+.dash-card-pending {
+  opacity: 0.7;
+  cursor: default;
+}
+.dash-card-name {
+  font-size: 16px;
+  font-weight: 650;
+}
+.dash-card-slug {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.dash-card-state {
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.dash-state-open {
+  color: var(--accent);
+}
+.dash-state-pending {
+  color: var(--text-muted);
+}
+
+/* Detail / embed */
+.dash-detail {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+.dash-detail-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+  flex: 0 0 auto;
+}
+.dash-back {
+  font-size: 13px;
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+.dash-back:hover {
+  color: var(--text-primary);
+}
+.dash-detail-name {
+  font-size: 14px;
+  font-weight: 650;
+}
+.dash-fullpage {
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--accent);
+  text-decoration: none;
+}
+.dash-frame {
+  flex: 1 1 auto;
+  width: 100%;
+  border: 0;
+  background: var(--bg-primary);
+}

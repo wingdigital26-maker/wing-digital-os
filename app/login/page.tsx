@@ -85,11 +85,12 @@ export default function Login() {
             That email and password did not match. Check for typos and try again.
           </p>
         )}
-        <button onClick={submit} disabled={loading || !pw} style={{
+        <button onClick={submit} disabled={loading || !pw} className="login-btn" style={{
           padding: "12px 0", borderRadius: 10, border: "none", cursor: "pointer",
           background: "linear-gradient(135deg, #3D6BF0, #1E44B8)", color: "#fff",
           fontSize: 14, fontWeight: 700, opacity: loading || !pw ? 0.6 : 1,
         }}>
+          {loading && <span className="login-spinner" aria-hidden="true" />}
           {loading ? "Checking..." : "Enter"}
         </button>
       </div>

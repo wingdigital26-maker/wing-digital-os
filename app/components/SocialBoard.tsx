@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import "./SocialBoard.css";
 
 // SOCIAL POSTS -- draft and schedule social posts per client, then mark them
@@ -103,6 +103,10 @@ export default function SocialBoard() {
   const [busyId, setBusyId] = useState<number | null>(null);
   const [rowErr, setRowErr] = useState<Record<number, string>>({});
 
+  // Filter the board by platform. "all" shows everything. Only platforms that
+  // actually have posts get a chip, so the control never fabricates options.
+  const [platformFilter, setPlatformFilter] = useState("all");
+
   const load = useCallback(async () => {
     try {
       const r = await fetch("/api/social");
@@ -185,7 +189,31 @@ export default function SocialBoard() {
     }
   }
 
-  const list = posts || [];
+  const all = posts || [];
+
+  // Real per-platform counts, in the canonical PLATFORMS order, from fetched
+  // data only. Platforms with zero posts are dropped so no empty chip shows.
+  const platformCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const p of all) counts[p.platform] = (counts[p.platform] || 0) + 1;
+    const known = PLATFORMS.filter(([k]) => counts[k]).map(([k]) => k);
+    // Any platform value not in our known list (defensive) sorts to the end.
+    const extra = Object.keys(counts).filter((k) => !PLATFORM_LABEL[k]).sort();
+    return { counts, order: [...known, ...extra], total: all.length };
+  }, [all]);
+
+  // If the active filter no longer has any posts (e.g. after a delete), fall
+  // back to All so the board never shows a stuck-empty filtered view.
+  useEffect(() => {
+    if (platformFilter !== "all" && !platformCounts.counts[platformFilter]) {
+      setPlatformFilter("all");
+    }
+  }, [platformFilter, platformCounts]);
+
+  const list = useMemo(
+    () => (platformFilter === "all" ? all : all.filter((p) => p.platform === platformFilter)),
+    [all, platformFilter],
+  );
   const byStatus = (s: string) => list.filter((p) => p.status === s);
 
   return (
@@ -288,6 +316,37 @@ export default function SocialBoard() {
         </div>
       )}
 
+      {/* Filter by platform — only when there is more than one platform to
+          pick between, so it never adds clutter for a single-network board. */}
+      {!loadErr && !missing && posts !== null && platformCounts.order.length > 1 && (
+        <div className="sb-filter" role="group" aria-label="Filter posts by platform">
+          <button
+            type="button"
+            className="sb-filter-btn"
+            aria-pressed={platformFilter === "all"}
+            onClick={() => setPlatformFilter("all")}
+          >
+            All <span className="sb-filter-count">{platformCounts.total}</span>
+          </button>
+          {platformCounts.order.map((k) => {
+            const active = platformFilter === k;
+            return (
+              <button
+                key={k}
+                type="button"
+                className="sb-filter-btn"
+                aria-pressed={active}
+                onClick={() => setPlatformFilter(active ? "all" : k)}
+                style={{ ["--sb-accent" as string]: platformAccent(k) }}
+              >
+                <span className="sb-dot" aria-hidden />
+                {PLATFORM_LABEL[k] || k} <span className="sb-filter-count">{platformCounts.counts[k]}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Board */}
       {!loadErr && !missing && posts !== null && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 14, alignItems: "start" }}>
@@ -303,9 +362,11 @@ export default function SocialBoard() {
                 <p style={{ margin: 0, fontSize: 11.5, color: "var(--text-muted)" }}>{col.blurb}</p>
                 {items.length === 0 ? (
                   <p style={{ fontSize: 12.5, color: "var(--text-muted)", padding: "16px 0", textAlign: "center", border: "1px dashed var(--border)", borderRadius: 12 }}>
-                    {col.key === "draft" ? "No drafts yet. Write one above." :
-                     col.key === "scheduled" ? "Nothing scheduled. Add a date to a draft." :
-                     "Nothing marked posted yet."}
+                    {platformFilter !== "all"
+                      ? `No ${PLATFORM_LABEL[platformFilter] || platformFilter} posts here.`
+                      : col.key === "draft" ? "No drafts yet. Write one above." :
+                        col.key === "scheduled" ? "Nothing scheduled. Add a date to a draft." :
+                        "Nothing marked posted yet."}
                   </p>
                 ) : (
                   items.map((p) => (

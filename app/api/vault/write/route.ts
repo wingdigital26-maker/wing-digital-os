@@ -8,15 +8,20 @@ export const runtime = "nodejs";
 const FORBIDDEN = ["raw"]; // never write to raw/
 
 export async function POST(req: NextRequest) {
-  const { filePath, content } = await req.json();
-  if (!filePath || content === undefined) {
-    return NextResponse.json({ error: "filePath and content required" }, { status: 400 });
+  const body = await req.json().catch(() => null);
+  if (!body || typeof body !== "object") {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+  const { filePath, content } = body as { filePath?: unknown; content?: unknown };
+  if (typeof filePath !== "string" || !filePath || typeof content !== "string") {
+    return NextResponse.json({ error: "filePath and string content required" }, { status: 400 });
   }
 
-  const abs = path.join(VAULT, filePath);
+  const abs = path.resolve(VAULT, filePath);
 
-  // Security: must stay inside vault
-  if (!abs.startsWith(VAULT)) {
+  // Security: must stay inside vault (exact match or a real subpath, so a
+  // sibling dir like "<vault>-other" cannot pass a bare prefix check).
+  if (abs !== VAULT && !abs.startsWith(VAULT + path.sep)) {
     return NextResponse.json({ error: "Path outside vault" }, { status: 403 });
   }
 

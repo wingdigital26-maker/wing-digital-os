@@ -19,7 +19,14 @@ async function executeTool(tool: string, input: any): Promise<string> {
 }
 
 export async function POST(req: NextRequest) {
-  const { messages, vaultContext } = await req.json();
+  const body = await req.json().catch(() => null);
+  if (!body || typeof body !== "object") {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+  const { messages, vaultContext } = body as { messages?: unknown; vaultContext?: string };
+  if (!Array.isArray(messages)) {
+    return NextResponse.json({ error: "messages array required" }, { status: 400 });
+  }
 
   const permanent = await loadPermanentVaultContext();
   const contextParts = [

@@ -101,3 +101,12 @@
 | safety | 1 finding FIXED: IG status-poll had the token in the URL query string; moved to Authorization: Bearer header (all other Graph calls already use POST body) | re-verified AST + fail-closed after fix |
 | regression | poster status/post/post --live/post --limit all send nothing; gate 95/95; OS worktree unchanged (round-9 build stands) | fail-closed ✓ |
 **Note:** both build agents stalled on the 600s watchdog at their final verify/journal step; files were complete, main session finished the --limit arg + the safety fix. **Committed (worktree):** changelog only · code in ghl-cli (not a repo).
+
+## 2026-09-14 — jaswarm Round 11 (Hero's social: lock down the Python side)
+| Lane | Change | Proof |
+|---|---|---|
+| tests | NEW test_poster.py: 50 cases pinning fail-closed AND-logic, selection (due/gate/image), --limit throttle, _redact, no-network smoke | 50/50 pass, exit 0; no poster bug found |
+| system | engine.py push hardened: added _redact + catch-all per-post error handling (one failure no longer aborts the batch); confirmed staff token already header-only not URL | AST ok · push --live no-token refuses · fail-closed intact |
+| safety | clean — token header-only, redaction solid, tamper re-lint intact, test file offline/read-only | — |
+| regression | gate 95/95 · poster 50/50 · engine smoke ok · OS worktree unchanged (round-9 build stands) | 145/145 ✓ |
+**Open:** router occasionally emits unicode look-alike punctuation (U+2011 non-breaking hyphen, curly quotes) that the gate passes; not a rule violation but a display/quality nit for a future normalization round. **Committed (worktree):** changelog only; code in ghl-cli (not a repo).

@@ -435,7 +435,7 @@ export default function CallRoom() {
           const isAuth = /unauthorized|forbidden|not.?authoriz|401|403/i.test(error);
           return isAuth ? (
             <div style={{ ...banner, background: "var(--bg-hover)", borderColor: "var(--border)", color: "var(--text-secondary)" }}>
-              Sign in to load the dial list. Your session may have expired — refresh after signing back in.
+              Sign in to load the dial list. Your session may have expired. Refresh after signing back in.
             </div>
           ) : (
             <div style={{ ...banner, background: "rgba(239,68,68,0.12)", borderColor: "rgba(239,68,68,0.4)", color: "#f87171" }}>
@@ -554,7 +554,7 @@ export default function CallRoom() {
         {/* list */}
         <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 10 }}>
           {loading && <p style={{ color: "var(--text-muted)", fontSize: 13 }}>Loading leads…</p>}
-          {!loading && shown.length === 0 && (
+          {!loading && !error && shown.length === 0 && (
             <div style={{ ...card, textAlign: "center", padding: 40, color: "var(--text-muted)" }}>
               <p style={{ fontSize: 15, fontWeight: 600 }}>Nothing here</p>
               <p style={{ fontSize: 13, marginTop: 6 }}>

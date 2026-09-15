@@ -273,21 +273,30 @@ export default function CallRoom() {
     load();
   }, [load]);
 
-  // Desktop keyboard speed: Escape closes the open call panel, same as tapping
-  // Close, without reaching for the mouse. Skipped while a text field has
-  // focus so it never eats an Escape meant to blur notes/date first.
+  // Desktop keyboard speed while the call panel is open: Escape closes it
+  // (same as tapping Close), and 1-5 log the same five outcomes as the
+  // on-screen QUICK chips (Signed/Booked/Call back/No answer/Not interested)
+  // without reaching for the mouse. Both are skipped while a text field has
+  // focus, so typing "1" into notes or picking a callback date never fires
+  // a shortcut meant for the panel itself.
   useEffect(() => {
     if (!active) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
       const tag = (e.target as HTMLElement | null)?.tagName;
       if (tag === "TEXTAREA" || tag === "INPUT") return;
-      closeLead();
+      if (e.key === "Escape") {
+        closeLead();
+        return;
+      }
+      if (busy) return;
+      const idx = Number(e.key) - 1;
+      if (Number.isInteger(idx) && idx >= 0 && idx < QUICK.length) {
+        disposition(QUICK[idx].key);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active]);
+  }, [active, busy, disposition, closeLead]);
 
   // Refresh while idle so a caller sees what teammates are claiming in near
   // real time. Paused while a lead is open so the list cannot shuffle mid-call.
@@ -1008,24 +1017,40 @@ export default function CallRoom() {
               />
             </div>
 
-            <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: "var(--text-muted)", fontWeight: 700, marginTop: 18 }}>
-              How did it go?
-            </p>
+            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, flexWrap: "wrap", marginTop: 18 }}>
+              <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: "var(--text-muted)", fontWeight: 700 }}>
+                How did it go?
+              </p>
+              <p style={{ fontSize: 11, color: "var(--text-muted)" }}>Press 1-5 for the marked ones</p>
+            </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 8, marginTop: 8 }}>
-              {OUTCOMES.map((o) => (
-                <button
-                  key={o.key}
-                  disabled={busy}
-                  onClick={() => disposition(o.key)}
-                  style={{
-                    padding: "14px 12px", minHeight: 48, borderRadius: 10, cursor: busy ? "wait" : "pointer",
-                    border: `1px solid ${o.tone}55`, background: `${o.tone}18`,
-                    color: o.tone, fontSize: 14, fontWeight: 700, opacity: busy ? 0.6 : 1,
-                  }}
-                >
-                  {o.label}
-                </button>
-              ))}
+              {OUTCOMES.map((o) => {
+                const quickIdx = QUICK.findIndex((q) => q.key === o.key);
+                return (
+                  <button
+                    key={o.key}
+                    disabled={busy}
+                    onClick={() => disposition(o.key)}
+                    style={{
+                      padding: "14px 12px", minHeight: 48, borderRadius: 10, cursor: busy ? "wait" : "pointer",
+                      border: `1px solid ${o.tone}55`, background: `${o.tone}18`,
+                      color: o.tone, fontSize: 14, fontWeight: 700, opacity: busy ? 0.6 : 1,
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
+                    }}
+                  >
+                    {quickIdx >= 0 && (
+                      <span style={{
+                        display: "inline-flex", alignItems: "center", justifyContent: "center",
+                        width: 18, height: 18, borderRadius: 5, fontSize: 11, fontWeight: 800,
+                        background: `${o.tone}2a`, border: `1px solid ${o.tone}55`, flexShrink: 0,
+                      }}>
+                        {quickIdx + 1}
+                      </span>
+                    )}
+                    {o.label}
+                  </button>
+                );
+              })}
             </div>
             <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 12, lineHeight: 1.5 }}>
               This lead is held for you for 20 minutes so nobody double-dials it. Logging any

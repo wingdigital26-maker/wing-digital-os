@@ -1,6 +1,5 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import CallSkeleton from "../_skeleton";
 
 // Team Schedule — one shared week calendar for Jack, Grant, and Maddox.
 // Everyone in the call room can see it and add to it; booked sales calls are
@@ -379,6 +378,7 @@ export default function TeamSchedule() {
                             onClick={() => removeBlock(e)}
                             disabled={busy}
                             title="Delete this block"
+                            aria-label={`Delete "${e.title}"`}
                             style={{
                               border: "none", background: "transparent", color: "var(--text-muted)",
                               cursor: "pointer", fontSize: 14, lineHeight: 1,
@@ -420,6 +420,10 @@ export default function TeamSchedule() {
 
 const btn: React.CSSProperties = {
   padding: "7px 12px",
+  minHeight: 40,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
   borderRadius: 9,
   border: "1px solid var(--border)",
   background: "var(--bg-hover)",

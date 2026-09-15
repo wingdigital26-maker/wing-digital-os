@@ -33,6 +33,7 @@ type Batch = {
 type RejectionGroup = { reason: string; count: number; companies: string[] };
 
 type Payload = {
+  me: { email: string; role: string; isAdmin: boolean };
   totals: {
     leads: number;
     dialable: number;
@@ -80,22 +81,6 @@ export default function SourcesPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState<Record<string, boolean>>({});
-  // null = role not known yet; "caller" gets the short version below because
-  // the batch ledger and rejection tables are analyst material, not call prep.
-  const [role, setRole] = useState<string | null>(null);
-
-  useEffect(() => {
-    let alive = true;
-    fetch("/api/calls/leads?status=all&limit=1", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (alive && d?.me?.role) setRole(String(d.me.role));
-      })
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -120,24 +105,6 @@ export default function SourcesPage() {
     };
   }, []);
 
-  if (role === "caller") {
-    return (
-      <div>
-        <h1 style={h1}>Where the leads come from</h1>
-        <div style={{ ...card, marginTop: 16, maxWidth: 640 }}>
-          <p style={{ fontSize: 14, lineHeight: 1.6 }}>
-            Verified lists Jack imports. Every lead on your dial list already passed a quality
-            audit before it got to you.
-          </p>
-          <p style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 8, lineHeight: 1.55 }}>
-            You do not need anything on this page to dial. Head back to the dial list and keep
-            calling.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   if (loading) {
     return (
       <div>
@@ -154,6 +121,27 @@ export default function SourcesPage() {
         <h1 style={h1}>Where the leads come from</h1>
         <div style={{ ...banner, background: "rgba(239,68,68,0.12)", borderColor: "rgba(239,68,68,0.4)", color: "#f87171" }}>
           {error ?? "No data came back."}
+        </div>
+      </div>
+    );
+  }
+
+  // The batch ledger and rejection tables are analyst material, not call prep,
+  // so a caller gets the short version. Read straight off the payload this
+  // screen already fetched -- no second request just to learn the role.
+  if (data.me.role === "caller") {
+    return (
+      <div>
+        <h1 style={h1}>Where the leads come from</h1>
+        <div style={{ ...card, marginTop: 16, maxWidth: 640 }}>
+          <p style={{ fontSize: 14, lineHeight: 1.6 }}>
+            Verified lists Jack imports. Every lead on your dial list already passed a quality
+            audit before it got to you.
+          </p>
+          <p style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 8, lineHeight: 1.55 }}>
+            You do not need anything on this page to dial. Head back to the dial list and keep
+            calling.
+          </p>
         </div>
       </div>
     );

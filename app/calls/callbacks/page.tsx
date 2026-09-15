@@ -312,6 +312,12 @@ export default function Callbacks() {
 
   async function disposition(outcome: string) {
     if (!active) return;
+    // A callback with no date reminds nobody. Same gentle check as the dial
+    // list, so logging "call back" (tap or the "2" key) never silently drops
+    // the follow-up.
+    if (outcome === "callback" && !callbackAt) {
+      if (!window.confirm("Log without a date? It will not remind anyone.")) return;
+    }
     setBusy(true);
     setError(null);
     const r = await fetch("/api/calls/disposition", {

@@ -41,7 +41,7 @@ const PERSON_LABEL: Record<string, string> = {
   maddox: "Maddox",
   team: "Team",
 };
-const CALL_COLOR = "#f97316"; // loud accent for booked calls
+const CALL_COLOR = "var(--green)"; // booked calls read green everywhere in the Call Room
 
 const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 

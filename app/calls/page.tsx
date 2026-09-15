@@ -283,8 +283,8 @@ export default function TodayDashboard() {
                   gap: 12,
                   alignItems: "center",
                   flexWrap: "wrap",
-                  borderColor: l.overdue ? "rgba(239,68,68,0.55)" : "rgba(234,179,8,0.45)",
-                  background: l.overdue ? "rgba(239,68,68,0.08)" : "var(--bg-card)",
+                  borderColor: l.overdue ? "color-mix(in srgb, var(--red) 55%, transparent)" : "rgba(234,179,8,0.45)",
+                  background: l.overdue ? "color-mix(in srgb, var(--red) 8%, var(--bg-card))" : "var(--bg-card)",
                 }}
               >
                 <div style={{ flex: "1 1 240px", minWidth: 0 }}>
@@ -293,8 +293,8 @@ export default function TodayDashboard() {
                     <span
                       style={{
                         ...pill,
-                        borderColor: l.overdue ? "#ef4444" : "#eab308",
-                        color: l.overdue ? "#f87171" : "#eab308",
+                        borderColor: l.overdue ? "var(--red)" : "#eab308",
+                        color: l.overdue ? "var(--red)" : "#eab308",
                       }}
                     >
                       {l.next_action_at ? due(l.next_action_at) : "due"}

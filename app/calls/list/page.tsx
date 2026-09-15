@@ -621,7 +621,8 @@ export default function CallRoom() {
                   width: 44, height: 44, borderRadius: 11, flexShrink: 0,
                   display: "flex", alignItems: "center", justifyContent: "center",
                   background: "var(--bg-hover)", border: "1px solid var(--border)",
-                  fontSize: 14, fontWeight: 800, color: (l.score ?? 0) >= 65 ? "#4ade80" : "var(--text-muted)",
+                  fontSize: 14, fontWeight: 800, fontVariantNumeric: "tabular-nums",
+                  color: (l.score ?? 0) >= 65 ? "#4ade80" : "var(--text-muted)",
                 }}>{l.score ?? 0}</div>
 
               <div style={{ flex: "1 1 260px", minWidth: 0 }}>

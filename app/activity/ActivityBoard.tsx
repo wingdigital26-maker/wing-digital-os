@@ -74,10 +74,40 @@ type SmsHealth = {
   account: Check | null; webhook: Check | null; webhookAuth: Check; note: string;
 };
 
+// ── Instantly.ai — the one LIVE sending lane ─────────────────────────────
+// Read-only view of GET /api/outreach/instantly (built by a sibling agent).
+// This is real cold email actually leaving the building right now, so it
+// gets prime placement above the dead/draft lane strip.
+type InstantlySeqStep = { step: number; delayDays: number; subject: string; body: string };
+type InstantlySent = { to: string; from: string; at: string; subject: string; body: string };
+type InstantlyLead = { email: string; name: string; company: string; contacted: boolean };
+type InstantlyView = {
+  available: boolean; reason: string | null;
+  campaign: { id: string; name: string; status: number; schedule: string | null } | null;
+  stats: { leads: number; contacted: number; sent: number; opens: number; replies: number; clicks: number; bounced: number; unsubscribed: number } | null;
+  sequence: InstantlySeqStep[];
+  sent: InstantlySent[];
+  leads: InstantlyLead[];
+};
+
 function when(iso: string | null): string {
   if (!iso) return "—";
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? String(iso) : d.toLocaleString();
+}
+
+function relTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const ms = Date.now() - d.getTime();
+  const min = Math.round(ms / 60000);
+  if (min < 1) return "just now";
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.round(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  const day = Math.round(hr / 24);
+  if (day < 30) return `${day}d ago`;
+  return d.toLocaleDateString();
 }
 
 type LaneKind = "dead" | "draft" | "live" | "unknown";
@@ -95,6 +125,8 @@ export default function ActivityBoard() {
   const [msg, setMsg] = useState<Messaging | null>(null);
   const [ledger, setLedger] = useState<Ledger | null>(null);
   const [sms, setSms] = useState<SmsHealth | null>(null);
+  const [instantly, setInstantly] = useState<InstantlyView | null>(null);
+  const [instantlyFailed, setInstantlyFailed] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"email" | "text">("email");
@@ -103,15 +135,18 @@ export default function ActivityBoard() {
     setLoading(true);
     setErr(null);
     try {
-      const [mR, lR, sR] = await Promise.all([
+      const [mR, lR, sR, iR] = await Promise.all([
         fetch("/api/messaging", { cache: "no-store" }),
         fetch("/api/messages?channel=email&limit=200", { cache: "no-store" }),
         fetch("/api/sms/health", { cache: "no-store" }),
+        fetch("/api/outreach/instantly", { cache: "no-store" }),
       ]);
       // Each is best-effort: one failing must not blank the whole board.
       setMsg(mR.ok ? await mR.json() : null);
       setLedger(lR.ok ? await lR.json() : null);
       setSms(sR.ok ? await sR.json() : null);
+      setInstantly(iR.ok ? await iR.json() : null);
+      setInstantlyFailed(!iR.ok);
       if (!mR.ok && !lR.ok && !sR.ok) {
         setErr(`All data sources failed (messaging ${mR.status}, messages ${lR.status}, sms/health ${sR.status}).`);
       }
@@ -182,6 +217,79 @@ export default function ActivityBoard() {
       </div>
 
       {err && <div className="act-error">{err}</div>}
+
+      {/* ── Instantly — live sending ─────────────────────────────────
+          The one lane that is actually sending real email right now.
+          Gets top placement, above the dead/draft lane strip. ────────── */}
+      <section className="act-section act-instantly">
+        <h2>Instantly — live sending</h2>
+        <p className="sub">The cold-email lane that is actually sending, straight from Instantly.ai. Everything below is real, not a preview.</p>
+
+        {loading && !instantly && <div className="act-loading">Loading Instantly…</div>}
+
+        {!loading && instantlyFailed && (
+          <div className="act-note warn">Could not read /api/outreach/instantly, so Instantly status is unknown.</div>
+        )}
+
+        {instantly && !instantly.available && (
+          <div className="act-note dead">Instantly not connected: {instantly.reason ?? "unknown reason"}.</div>
+        )}
+
+        {instantly && instantly.available && (
+          <>
+            <div className="inst-campaign">
+              <div className="inst-campaign-name">{instantly.campaign?.name ?? "(unnamed campaign)"}</div>
+              {instantly.campaign?.schedule && <div className="inst-campaign-schedule">{instantly.campaign.schedule}</div>}
+              {instantly.campaign?.name?.toUpperCase().includes("DRAFT") && (instantly.stats?.sent ?? 0) > 0 && (
+                <span className="inst-caption">name still says draft, but this lane is sending</span>
+              )}
+            </div>
+
+            <div className="act-stats">
+              <div className="act-stat"><div className="n">{num(instantly.stats?.sent)}</div><div className="l">sent</div></div>
+              <div className="act-stat"><div className="n">{num(instantly.stats?.contacted)}</div><div className="l">contacted</div></div>
+              <div className="act-stat"><div className="n">{num(instantly.stats?.leads)}</div><div className="l">leads</div></div>
+              <div className="act-stat"><div className="n">{num(instantly.stats?.opens)}</div><div className="l">{instantly.stats?.opens === 0 ? "0 opens" : "opens"}</div></div>
+              <div className="act-stat"><div className="n">{num(instantly.stats?.replies)}</div><div className="l">{instantly.stats?.replies === 0 ? "0 replies" : "replies"}</div></div>
+              <div className="act-stat"><div className="n">{num(instantly.stats?.bounced)}</div><div className="l">{instantly.stats?.bounced === 0 ? "0 bounced" : "bounced"}</div></div>
+            </div>
+
+            <h3 className="inst-subhead">The actual emails</h3>
+            {instantly.sent.length === 0 ? (
+              <div className="act-note dead">No emails logged yet from Instantly. Nothing has gone out through this lane so far.</div>
+            ) : (
+              <div className="inst-inbox">
+                {instantly.sent.slice(0, 15).map((s, i) => (
+                  <div className="inst-email" key={`${s.to}-${s.at}-${i}`}>
+                    <div className="inst-email-head">
+                      <span className="inst-to">{s.to}</span>
+                      <span className="inst-time">{relTime(s.at)}</span>
+                    </div>
+                    <div className="inst-email-meta">from {s.from}</div>
+                    <div className="inst-email-subject">{s.subject}</div>
+                    <div className="inst-email-body">{s.body}</div>
+                  </div>
+                ))}
+                {instantly.sent.length > 15 && (
+                  <p className="lane-detail">+ {instantly.sent.length - 15} more not shown.</p>
+                )}
+              </div>
+            )}
+
+            {instantly.sequence.length > 0 && (
+              <details className="act-preview inst-sequence">
+                <summary>Sequence template ({instantly.sequence.length} step{instantly.sequence.length === 1 ? "" : "s"})</summary>
+                {instantly.sequence.map((step) => (
+                  <div key={step.step}>
+                    <div className="subj">Step {step.step} · day {step.delayDays}: {step.subject}</div>
+                    <pre>{step.body}</pre>
+                  </div>
+                ))}
+              </details>
+            )}
+          </>
+        )}
+      </section>
 
       {/* ── Lane status strip ─────────────────────────────────────── */}
       <div className="act-lanes">

@@ -48,7 +48,8 @@ const fmtDuration = (s: number | null) => {
 };
 
 // Admin-only screen for creating and revoking call-room logins.
-// Middleware blocks /calls/team for the caller role; the API re-checks.
+// proxy.ts redirects /calls/team to /calls for the caller role at the edge;
+// the /api/calls/callers route re-checks adminOnly on every request.
 export default function Team() {
   const [rows, setRows] = useState<Caller[]>([]);
   const [email, setEmail] = useState("");

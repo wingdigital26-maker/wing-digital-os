@@ -127,6 +127,7 @@ export default function ActivityBoard() {
   const [ledger, setLedger] = useState<Ledger | null>(null);
   const [sms, setSms] = useState<SmsHealth | null>(null);
   const [instantly, setInstantly] = useState<InstantlyView | null>(null);
+  const [instantlyLoading, setInstantlyLoading] = useState(true);
   const [instantlyFailed, setInstantlyFailed] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -136,18 +137,15 @@ export default function ActivityBoard() {
     setLoading(true);
     setErr(null);
     try {
-      const [mR, lR, sR, iR] = await Promise.all([
+      const [mR, lR, sR] = await Promise.all([
         fetch("/api/messaging", { cache: "no-store" }),
         fetch("/api/messages?channel=email&limit=200", { cache: "no-store" }),
         fetch("/api/sms/health", { cache: "no-store" }),
-        fetch("/api/outreach/instantly", { cache: "no-store" }),
       ]);
       // Each is best-effort: one failing must not blank the whole board.
       setMsg(mR.ok ? await mR.json() : null);
       setLedger(lR.ok ? await lR.json() : null);
       setSms(sR.ok ? await sR.json() : null);
-      setInstantly(iR.ok ? await iR.json() : null);
-      setInstantlyFailed(!iR.ok);
       if (!mR.ok && !lR.ok && !sR.ok) {
         setErr(`All data sources failed (messaging ${mR.status}, messages ${lR.status}, sms/health ${sR.status}).`);
       }
@@ -158,7 +156,24 @@ export default function ActivityBoard() {
     }
   }, []);
 
+  // Instantly fires on its own, independent of the three lanes above, so the
+  // one lane that is actually LIVE never waits behind a slow sibling fetch.
+  const loadInstantly = useCallback(async () => {
+    setInstantlyLoading(true);
+    try {
+      const iR = await fetch("/api/outreach/instantly", { cache: "no-store" });
+      setInstantly(iR.ok ? await iR.json() : null);
+      setInstantlyFailed(!iR.ok);
+    } catch {
+      setInstantly(null);
+      setInstantlyFailed(true);
+    } finally {
+      setInstantlyLoading(false);
+    }
+  }, []);
+
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { loadInstantly(); }, [loadInstantly]);
 
   // ── Lane status logic ──────────────────────────────────────────────
   // Automated cold email: DEAD regardless of the paused flag. The delivery
@@ -227,9 +242,9 @@ export default function ActivityBoard() {
         <h2>Instantly — live sending</h2>
         <p className="sub">The cold-email lane that is actually sending, straight from Instantly.ai. Everything below is real, not a preview.</p>
 
-        {loading && !instantly && <div className="act-loading">Loading Instantly…</div>}
+        {instantlyLoading && !instantly && <div className="act-loading">Loading Instantly…</div>}
 
-        {!loading && instantlyFailed && (
+        {!instantlyLoading && instantlyFailed && (
           <div className="act-note warn">Could not read /api/outreach/instantly, so Instantly status is unknown.</div>
         )}
 
@@ -277,6 +292,32 @@ export default function ActivityBoard() {
                 )}
               </div>
             )}
+
+            <h3 className="inst-subhead inst-subhead-sm">Queued next</h3>
+            {(() => {
+              const pending = instantly.leads.filter((l) => !l.contacted);
+              if (instantly.leads.length === 0) {
+                return <p className="lane-detail">No leads loaded yet.</p>;
+              }
+              if (pending.length === 0) {
+                return <p className="lane-detail">All loaded leads have been contacted.</p>;
+              }
+              const cap = 12;
+              return (
+                <div className="inst-queue">
+                  {pending.slice(0, cap).map((l, i) => (
+                    <div className="inst-queue-row" key={`${l.email}-${i}`}>
+                      <span className="inst-queue-name">{l.name || "(no name)"}</span>
+                      {l.company && <span className="inst-queue-company">{l.company}</span>}
+                      <span className="inst-queue-email">{l.email}</span>
+                    </div>
+                  ))}
+                  {pending.length > cap && (
+                    <p className="lane-detail">+ {pending.length - cap} more not shown.</p>
+                  )}
+                </div>
+              );
+            })()}
 
             {instantly.sequence.length > 0 && (
               <details className="act-preview inst-sequence">

@@ -154,7 +154,7 @@ export async function GET() {
       email: l.email ?? "",
       name: [l.first_name, l.last_name].filter(Boolean).join(" ").trim(),
       company: l.company_name ?? "",
-      contacted: l.status === 1,
+      contacted: Boolean(l.timestamp_last_contact),
     }));
   }
 

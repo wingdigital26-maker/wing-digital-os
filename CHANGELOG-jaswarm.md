@@ -249,3 +249,11 @@ Draft-and-copy (no free GBP API); human posts manually. Additive, no existing-su
 | fix | overflow-wrap:anywhere on inst-to/meta/subject/body -> long addresses/URLs cannot break mobile layout | verify finding #1 |
 | safety | clean — no key/secret exposure, no XSS (bodies render as text), no SSRF; route matches existing no-auth baseline (pre-existing product-wide, not new) | safety gate |
 | regression | tsc --noEmit clean whole project | EXIT 0 |
+
+## 2026-09-15 — jaswarm Round 2 · Instantly panel fine pass
+| Lane | Change | Proof |
+|---|---|---|
+| visual | Instantly fetch decoupled into its own useEffect+state so the live lane renders independently, not blocked behind slow sibling lane fetches | code read; renders immediately |
+| visual | New "Queued next" list under the sent emails: the loaded leads not yet emailed (name/company/email), capped 12 with +N more, honest none-pending note | live: 6 pending shown correctly |
+| fix (data) | contacted derived from timestamp_last_contact, NOT status (status is 1 for every loaded lead whether emailed or not) — was reporting 12/12 contacted, now correct 6/6 | curl pending=6 contacted=6 |
+| regression | tsc --noEmit clean whole project | EXIT 0 |

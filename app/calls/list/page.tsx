@@ -288,7 +288,10 @@ export default function CallRoom() {
         closeLead();
         return;
       }
-      if (busy) return;
+      // A held digit key repeats keydown far faster than React can flip busy in
+      // this listener's closure, which could double-log an outcome. Only the
+      // first press counts.
+      if (busy || e.repeat) return;
       const idx = Number(e.key) - 1;
       if (Number.isInteger(idx) && idx >= 0 && idx < QUICK.length) {
         disposition(QUICK[idx].key);
@@ -349,6 +352,11 @@ export default function CallRoom() {
     // Gentle check, not a wall.
     if (outcome === "callback" && !callbackAt) {
       if (!window.confirm("Log without a date? It will not remind anyone.")) return;
+    }
+    // Signed is the highest-stakes outcome and the hardest to walk back, and it
+    // is one tap or the "1" key away. Confirm it, whichever way it was fired.
+    if (outcome === "signed") {
+      if (!window.confirm(`Mark ${active.company} as Signed?`)) return;
     }
     setBusy(true);
     setError(null);
@@ -853,7 +861,14 @@ export default function CallRoom() {
                   </p>
                 )}
               </div>
-              <button onClick={() => closeLead()} style={btnGhost}>Close</button>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5, flexShrink: 0 }}>
+                <button onClick={() => closeLead()} style={btnGhost}>Close</button>
+                {/* Surfaced at the top so a caller sees the keyboard path before
+                    scrolling to the outcome grid at the very bottom. */}
+                <span style={{ fontSize: 10.5, color: "var(--text-muted)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
+                  1-5 log · Esc closes
+                </span>
+              </div>
             </div>
 
             {/* The angle is the first thing on the panel because it is the last
@@ -1024,7 +1039,17 @@ export default function CallRoom() {
               <p style={{ fontSize: 11, color: "var(--text-muted)" }}>Press 1-5 for the marked ones</p>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 8, marginTop: 8 }}>
-              {OUTCOMES.map((o) => {
+              {/* Numbered outcomes first, in 1-5 order, so the badges read as an
+                  unbroken sequence instead of interleaving with the unnumbered
+                  ones as the grid wraps. */}
+              {[...OUTCOMES].sort((a, b) => {
+                const ia = QUICK.findIndex((q) => q.key === a.key);
+                const ib = QUICK.findIndex((q) => q.key === b.key);
+                if (ia === -1 && ib === -1) return 0;
+                if (ia === -1) return 1;
+                if (ib === -1) return -1;
+                return ia - ib;
+              }).map((o) => {
                 const quickIdx = QUICK.findIndex((q) => q.key === o.key);
                 return (
                   <button

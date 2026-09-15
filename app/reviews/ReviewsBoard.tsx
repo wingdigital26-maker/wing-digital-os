@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import "./reviews.css";
+import { smsBody, emailSubject, emailBody } from "./reviewCopy";
 
 // ───────────────────────────────────────────────────────────────────────────
 // Reviews: set each client's Google review link (the write path round 1 never
@@ -39,6 +40,74 @@ function when(iso: string | null): string {
 }
 
 type SaveState = "idle" | "saving" | "saved" | "error";
+type CopyState = "idle" | "copied" | "error";
+
+// The greeting name is generic ("there") because this board has no specific
+// customer in view -- it is a per-client template for staff to paste into
+// their own phone/email and personalize before sending, not a per-contact
+// message. Matches the automated send route's own "there" fallback in
+// app/reviews/reviewCopy.ts::smsBody/emailBody when a contact has no name.
+const GENERIC_FIRST_NAME = "there";
+
+async function copyText(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    // fall through to the legacy path below
+  }
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
+function CopyButton({
+  label,
+  copiedLabel,
+  disabled,
+  disabledHint,
+  onCopy,
+}: {
+  label: string;
+  copiedLabel: string;
+  disabled: boolean;
+  disabledHint?: string;
+  onCopy: () => string;
+}) {
+  const [state, setState] = useState<CopyState>("idle");
+
+  const handleClick = useCallback(async () => {
+    const ok = await copyText(onCopy());
+    setState(ok ? "copied" : "error");
+    setTimeout(() => setState((s) => (s === "idle" ? s : "idle")), 2200);
+  }, [onCopy]);
+
+  return (
+    <button
+      type="button"
+      className="rv-copy"
+      onClick={handleClick}
+      disabled={disabled}
+      aria-label={disabled ? `${label} unavailable: ${disabledHint ?? "no review link on file"}` : label}
+      title={disabled ? disabledHint : undefined}
+    >
+      {state === "copied" ? copiedLabel : state === "error" ? "Copy failed" : label}
+    </button>
+  );
+}
 
 function ClientRowEditor({
   client,
@@ -114,6 +183,33 @@ function ClientRowEditor({
       {!client.google_review_url && !value && (
         <p className="rv-hint">No review link on file yet. Review requests for this client are held until one is set.</p>
       )}
+
+      {/* ── Manual send affordance: automated sending is OFF, so this is how a
+          staff member sends the ask themselves from their own phone/email
+          today. Same exact copy the (currently off) automated pipeline would
+          use, from the shared app/reviews/reviewCopy.ts. ──────────────── */}
+      <div className="rv-copyrow">
+        <CopyButton
+          label="Copy SMS"
+          copiedLabel="Copied SMS"
+          disabled={!client.google_review_url}
+          disabledHint="Set a review link above first."
+          onCopy={() => smsBody(client.name || client.slug, GENERIC_FIRST_NAME, client.google_review_url ?? "")}
+        />
+        <CopyButton
+          label="Copy email"
+          copiedLabel="Copied email"
+          disabled={!client.google_review_url}
+          disabledHint="Set a review link above first."
+          onCopy={() =>
+            `Subject: ${emailSubject(client.name || client.slug)}\n\n` +
+            emailBody(client.name || client.slug, GENERIC_FIRST_NAME, client.google_review_url ?? "")
+          }
+        />
+        {client.google_review_url && (
+          <span className="rv-copyhint">Paste into a text or email to this customer, then add their name.</span>
+        )}
+      </div>
     </div>
   );
 }

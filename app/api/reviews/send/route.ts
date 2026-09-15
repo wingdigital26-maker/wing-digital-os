@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getOsSession, hasLegacyAuth } from "@/lib/osSupabase";
 import { sbGet, sbPatch, esc } from "../../pipeline/_lib";
+import { smsBody, emailSubject, emailBody } from "@/app/reviews/reviewCopy";
 
 // ───────────────────────────────────────────────────────────────────────────
 // POST /api/reviews/send — the "auto-send once armed" delivery step for review
@@ -123,26 +124,10 @@ function firstName(contact: ContactRow): string {
 // loop below skips a row rather than call these when a client has no link on
 // file. No em dashes, no unrendered tokens, no phone-number CTA (the link is
 // the only call to action).
-function smsBody(brand: string, first: string, reviewUrl: string): string {
-  return (
-    `Hi ${first}, this is ${brand}. Thank you for choosing us. ` +
-    `If you have a minute, we would really appreciate a quick review: ${reviewUrl}`
-  );
-}
-
-function emailSubject(brand: string): string {
-  return `Thanks for choosing ${brand}`;
-}
-
-function emailBody(brand: string, first: string, reviewUrl: string): string {
-  return (
-    `Hi ${first},\n\n` +
-    `Thank you for choosing ${brand}. It was a pleasure working with you.\n\n` +
-    `If you have a moment, a short review would mean a lot and helps other ` +
-    `local folks find us: ${reviewUrl}\n\n` +
-    `Thank you so much,\n${brand}`
-  );
-}
+// smsBody/emailSubject/emailBody moved to app/reviews/reviewCopy.ts (2026-09-15)
+// so the reviews board's manual "Copy SMS / Copy email" affordance can share
+// this EXACT text without importing a next/server route module into a client
+// bundle. Imported above.
 
 // Title-case a slug as a last-resort brand name when the client is not in the
 // clients table (never invent anything beyond the words already in the slug).

@@ -140,6 +140,36 @@
 .rv-error { margin: 8px 0 0; font-size: 12px; color: var(--red); }
 .rv-hint { margin: 8px 0 0; font-size: 11.5px; color: var(--text-muted); line-height: 1.5; }
 
+/* ── Copy-to-clipboard row (manual send affordance) ───────────────────── */
+.rv-copyrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.rv-copy {
+  flex: 0 0 auto;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: 12px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.rv-copy:hover:not(:disabled) { border-color: var(--accent); color: var(--text-primary); }
+.rv-copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.rv-copy:disabled { opacity: 0.45; cursor: not-allowed; }
+.rv-copyhint { font-size: 11px; color: var(--text-muted); line-height: 1.4; }
+
+@media (max-width: 480px) {
+  .rv-copy { flex: 1 1 auto; text-align: center; }
+}
+
 .rv-skel-list { margin-top: 4px; }
 
 /* ── Table ─────────────────────────────────────────────────────────── */

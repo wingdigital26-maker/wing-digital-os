@@ -221,3 +221,11 @@ Sending remains DISABLED (REVIEWS_SEND_ENABLED fail-closed). Branch ja/loop, no 
 | verify+safety | CLEAN pass: all verbs gated, no injection (slug regex+esc), no stored-XSS, secrets server-side, UI states handled |
 | regression | npm run build exit 0, /reviews in route manifest; tsc 0 errors |
 Makes Round 1 usable: staff can now set each client google_review_url + see queued requests. Sending still OFF.
+
+## batch2 Round 3 — 2026-09-15 (Copy review request: value with sending off)
+| Lane | Result |
+|---|---|
+| build:review-copy-preview | reviewCopy.ts shared module (single source of truth), Copy SMS/email buttons on reviews board, disabled when no link, clipboard+fallback |
+| verify | CLEAN: message text byte-identical to prior route copy, no server-code leak, clipboard safe, disabled state correct |
+| regression | npm run build exit 0; tsc 0 errors |
+Staff can send review asks manually today; automated sending still OFF.

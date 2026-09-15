@@ -111,6 +111,10 @@ export type InstantlyLead = {
   last_name?: string;
   company_name?: string;
   status?: number;
+  // Set only once Instantly has actually emailed the lead. This is the
+  // reliable "has been contacted" signal: `status` stays 1 (active/verified)
+  // for every loaded lead whether or not it has been emailed yet.
+  timestamp_last_contact?: string | null;
 };
 
 export async function fetchCampaign(campaignId: string) {

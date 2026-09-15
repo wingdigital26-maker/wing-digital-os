@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import SignalLinks from "./SignalLinks";
+import CallSkeleton from "./_skeleton";
 
 // The Today screen: the first thing anyone sees when they open Outbound. Its
 // only job is to answer "what do I do right now" with real numbers. Every
@@ -26,7 +27,38 @@ type Lead = {
   next_action_at: string | null;
   claimed_by_email: string | null;
   overdue?: boolean;
+  tier?: string | null;
 };
+
+// Buy-likelihood category. The value arrives as "A"/"b"/"tier-c"/"not callable";
+// normalise to a single callable letter or null. Mirrors the /calls/list map so
+// the dialer and the full list read the same category the same way.
+const TIER_TONE: Record<string, { label: string; tone: string }> = {
+  A: { label: "A · hot", tone: "var(--green)" },
+  B: { label: "B · warm", tone: "var(--accent)" },
+  C: { label: "C · cool", tone: "var(--text-muted)" },
+};
+function tierLetter(t: string | null | undefined): "A" | "B" | "C" | null {
+  const c = (t ?? "").trim().toUpperCase().replace(/^TIER[-\s]?/, "").charAt(0);
+  return c === "A" || c === "B" || c === "C" ? c : null;
+}
+function TierBadge({ tier }: { tier: string | null | undefined }) {
+  const c = tierLetter(tier);
+  if (!c) return null;
+  const m = TIER_TONE[c];
+  return (
+    <span
+      style={{
+        display: "inline-flex", alignItems: "center", gap: 4,
+        padding: "2px 8px", borderRadius: 999, fontSize: 11, fontWeight: 700,
+        border: `1px solid ${m.tone}`, color: m.tone, letterSpacing: 0.2,
+      }}
+      title="Buy-likelihood category"
+    >
+      {m.label}
+    </span>
+  );
+}
 
 type Activity = {
   id: number;
@@ -158,11 +190,15 @@ function ResearchNotes({ notes }: { notes: string }) {
   );
 }
 
+// Relative due phrasing kept word-for-word in step with the Dial list and
+// Callbacks board ("due in X" / "X late", word units) so a caller reads one
+// language across all three screens.
 function due(iso: string) {
   const ms = Date.parse(iso) - Date.now();
   const m = Math.round(Math.abs(ms) / 60000);
-  const s = m < 60 ? `${m}m` : m < 1440 ? `${Math.round(m / 60)}h` : `${Math.round(m / 1440)}d`;
-  return ms < 0 ? `${s} overdue` : `due in ${s}`;
+  const days = Math.round(m / 1440);
+  const s = m < 60 ? `${m} min` : m < 1440 ? `${Math.round(m / 60)} hr` : `${days} day${days === 1 ? "" : "s"}`;
+  return ms < 0 ? `${s} late` : `due in ${s}`;
 }
 
 export default function TodayDashboard() {
@@ -193,12 +229,22 @@ export default function TodayDashboard() {
     return () => clearInterval(t);
   }, [load]);
 
-  if (loading) return <p style={muted}>Loading today…</p>;
+  if (loading)
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 22 }} aria-busy="true">
+        <div>
+          <div className="skel" style={{ height: 26, width: 260, borderRadius: 8 }} />
+          <div className="skel" style={{ height: 14, width: 320, borderRadius: 6, marginTop: 8 }} />
+        </div>
+        <CallSkeleton rows={2} height={64} />
+        <CallSkeleton rows={3} height={72} />
+      </div>
+    );
 
   if (error) {
     return (
       <div style={{ ...card, borderColor: "rgba(239,68,68,0.4)", background: "rgba(239,68,68,0.10)" }}>
-        <p style={{ fontSize: 15, fontWeight: 700, color: "#f87171" }}>Dashboard unavailable</p>
+        <p style={{ fontSize: 15, fontWeight: 700, color: "var(--red)" }}>Dashboard unavailable</p>
         <p style={{ fontSize: 13, marginTop: 6, color: "var(--text-muted)", lineHeight: 1.5 }}>{error}</p>
       </div>
     );
@@ -241,30 +287,42 @@ export default function TodayDashboard() {
                   gap: 12,
                   alignItems: "center",
                   flexWrap: "wrap",
-                  borderColor: l.overdue ? "rgba(239,68,68,0.55)" : "rgba(234,179,8,0.45)",
-                  background: l.overdue ? "rgba(239,68,68,0.08)" : "var(--bg-card)",
+                  borderColor: l.overdue ? "color-mix(in srgb, var(--red) 55%, transparent)" : "rgba(234,179,8,0.45)",
+                  background: l.overdue ? "color-mix(in srgb, var(--red) 8%, var(--bg-card))" : "var(--bg-card)",
                 }}
               >
                 <div style={{ flex: "1 1 240px", minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                     <span style={{ fontSize: 15, fontWeight: 700 }}>{l.company}</span>
-                    <span
-                      style={{
-                        ...pill,
-                        borderColor: l.overdue ? "#ef4444" : "#eab308",
-                        color: l.overdue ? "#f87171" : "#eab308",
-                      }}
-                    >
-                      {l.next_action_at ? due(l.next_action_at) : "due"}
-                    </span>
+                    {/* Overdue reads exactly as on the Dial list and Callbacks
+                        board: a solid red "Overdue" pill plus a muted relative
+                        time. A merely-upcoming callback keeps the calm outline. */}
+                    {l.overdue ? (
+                      <>
+                        <span style={{ ...pill, borderColor: "var(--red)", color: "#fff", background: "var(--red)" }}>
+                          Overdue
+                        </span>
+                        {l.next_action_at && (
+                          <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
+                            {due(l.next_action_at)}
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <span style={{ ...pill, borderColor: "#eab308", color: "#eab308" }}>
+                        {l.next_action_at ? due(l.next_action_at) : "due"}
+                      </span>
+                    )}
                   </div>
                   <ContactLine contact_name={l.contact_name} title={l.title} extra={[l.city]} />
                   {isResearchDump(l.title) && <ResearchNotes notes={l.title} />}
                 </div>
-                {l.phone && (
+                {l.phone ? (
                   <a href={`tel:${l.phone.replace(/[^+\d]/g, "")}`} style={btnPrimary}>
                     Call {l.phone}
                   </a>
+                ) : (
+                  <span style={{ ...btnGhost, opacity: 0.5 }}>no phone on file</span>
                 )}
               </div>
             ))}
@@ -293,17 +351,21 @@ export default function TodayDashboard() {
                     display: "flex", alignItems: "center", justifyContent: "center",
                     background: "var(--bg-hover)", border: "1px solid var(--border)",
                     fontSize: 14, fontWeight: 800,
-                    color: (l.score ?? 0) >= 65 ? "#4ade80" : "var(--text-muted)",
+                    fontVariantNumeric: "tabular-nums",
+                    color: (l.score ?? 0) >= 65 ? "var(--green)" : "var(--text-muted)",
                   }}
                 >
                   {l.score ?? 0}
                 </div>
                 <div style={{ flex: "1 1 260px", minWidth: 0 }}>
-                  <span style={{ fontSize: 15, fontWeight: 700 }}>{l.company}</span>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 15, fontWeight: 700 }}>{l.company}</span>
+                    <TierBadge tier={l.tier} />
+                  </span>
                   <ContactLine contact_name={l.contact_name} title={l.title} extra={[l.city, l.vertical]} />
                   {isResearchDump(l.title) && <ResearchNotes notes={l.title} />}
                   {displaySignals(l.signals) && (
-                    <p style={{ fontSize: 12, color: "#7dd3fc", marginTop: 5, lineHeight: 1.45 }}>
+                    <p style={{ fontSize: 12, color: "var(--accent)", marginTop: 5, lineHeight: 1.45 }}>
                       <SignalLinks
                         signals={displaySignals(l.signals)}
                         company={l.company}
@@ -338,7 +400,7 @@ export default function TodayDashboard() {
             <p style={statLabel}>calls logged today</p>
           </div>
           <div style={card}>
-            <p style={{ ...statNum, color: d.today.booked > 0 ? "#4ade80" : "var(--text-primary)" }}>
+            <p style={{ ...statNum, color: d.today.booked > 0 ? "var(--green)" : "var(--text-primary)" }}>
               {d.today.booked}
             </p>
             <p style={statLabel}>booked today</p>
@@ -450,6 +512,7 @@ const statNum: React.CSSProperties = {
   fontWeight: 800,
   letterSpacing: -1,
   lineHeight: 1.1,
+  fontVariantNumeric: "tabular-nums",
 };
 const statLabel: React.CSSProperties = {
   fontSize: 12,

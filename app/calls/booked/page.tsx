@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { displayName } from "../names";
+import CallSkeleton from "../_skeleton";
 
 // The wins board. Every lead at status='booked', most recent booking first,
 // with the notes from the call that booked it.
@@ -36,6 +37,13 @@ type Activity = {
 };
 
 type Row = { lead: Lead; booking: Activity | null };
+
+// Some rows carry internal research dumps in the `title` field ("[factcheck
+// 2026-08-22] ..."). The dial list already keeps these off the caller's
+// screen (see app/calls/list -- isResearchDump); this board must too, or a
+// raw research blob renders in the contact line here.
+const isResearchDump = (t: string | null): t is string =>
+  !!t && (t.trim().startsWith("[") || t.length > 80);
 
 export default function Booked() {
   const [rows, setRows] = useState<Row[]>([]);
@@ -108,6 +116,12 @@ export default function Booked() {
         </div>
       )}
 
+      {loading && (
+        <div style={{ marginTop: 18 }}>
+          <CallSkeleton rows={3} height={92} />
+        </div>
+      )}
+
       {!loading && rows.length === 0 && !error && (
         <div style={{ ...card, textAlign: "center", padding: 44, color: "var(--text-muted)", marginTop: 18 }}>
           <p style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)" }}>
@@ -144,12 +158,12 @@ export default function Booked() {
                 {lead.contact_name && (
                   <span style={{ color: "var(--text-primary)", fontWeight: 600 }}>{lead.contact_name}</span>
                 )}
-                {lead.contact_name && [lead.title, lead.city, lead.vertical].some(Boolean) ? " · " : ""}
-                {[lead.title, lead.city, lead.vertical].filter(Boolean).join(" · ")
+                {lead.contact_name && [isResearchDump(lead.title) ? null : lead.title, lead.city, lead.vertical].some(Boolean) ? " · " : ""}
+                {[isResearchDump(lead.title) ? null : lead.title, lead.city, lead.vertical].filter(Boolean).join(" · ")
                   || (lead.contact_name ? "" : "No named contact")}
               </p>
 
-              <p style={{ fontSize: 12.5, color: "#4ade80", marginTop: 6, fontWeight: 600 }}>
+              <p style={{ fontSize: 12.5, color: "#4ade80", marginTop: 6, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
                 {booking
                   ? `Booked by ${displayName(booking.user_email)} · ${new Date(booking.created_at).toLocaleString()}`
                   : lead.last_called_at
@@ -158,7 +172,7 @@ export default function Booked() {
               </p>
 
               {lead.next_action_at && (
-                <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 3 }}>
+                <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 3, fontVariantNumeric: "tabular-nums" }}>
                   Meeting set for {new Date(lead.next_action_at).toLocaleString()}
                 </p>
               )}
@@ -209,7 +223,9 @@ const pill: React.CSSProperties = {
   textTransform: "uppercase", letterSpacing: 0.4,
 };
 const btnGhost: React.CSSProperties = {
-  padding: "8px 14px", borderRadius: 10, border: "1px solid var(--border)",
+  padding: "8px 14px", minHeight: 40,
+  display: "inline-flex", alignItems: "center", justifyContent: "center",
+  borderRadius: 10, border: "1px solid var(--border)",
   background: "var(--bg-hover)", color: "var(--text-primary)",
   fontSize: 12.5, fontWeight: 600, cursor: "pointer", textDecoration: "none",
 };

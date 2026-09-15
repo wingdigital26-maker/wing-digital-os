@@ -1,8 +1,9 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import SignalLinks from "../SignalLinks";
 import { displayName } from "../names";
+import CallSkeleton from "../_skeleton";
 
 type Lead = {
   id: string;
@@ -87,6 +88,18 @@ const readCautions = (v: unknown): string[] =>
 
 // Only accounts the enrichment could confirm reach this column. Anything that
 // was merely name-matched belongs in cautions, so nothing here is hedged.
+// Defense-in-depth: only ever accept an http(s) URL out of enrichment data.
+// A scheme-relative "//host/path" is upgraded to https:; anything else
+// (javascript:, data:, vbscript:, etc.) is dropped so a bad value can never
+// render as a clickable dangerous href. Handle/platform survive either way.
+const safeSocialUrl = (raw: string): string | null => {
+  if (!raw) return null;
+  const s = raw.trim();
+  if (s.startsWith("//")) return `https:${s}`;
+  if (/^https?:\/\//i.test(s)) return s;
+  return null;
+};
+
 const readSocials = (v: unknown): Social[] =>
   asArray(v)
     .map((s) => {
@@ -94,7 +107,7 @@ const readSocials = (v: unknown): Social[] =>
       const o = s as Record<string, unknown>;
       const platform = str(o.platform ?? o.network ?? o.site);
       const handle = str(o.handle ?? o.username);
-      const url = str(o.url ?? o.link);
+      const url = safeSocialUrl(str(o.url ?? o.link));
       if (!platform && !handle && !url) return null;
       return { platform: platform || "Profile", handle: handle || null, url: url || null };
     })
@@ -147,6 +160,26 @@ const displaySignals = (signals: string | null): string | null => {
   return parts.length ? parts.join(", ") : null;
 };
 
+// "4.6★ (12)" from google_rating + google_reviews. Both are nullable and land
+// independently, so show whatever is real and never invent the other half.
+const ratingLabel = (rating: unknown, reviews: unknown): string | null => {
+  const r = typeof rating === "number" ? rating : null;
+  const n = typeof reviews === "number" ? reviews : null;
+  if (r && r > 0) return `${r.toFixed(1)}★${n !== null ? ` (${n})` : ""}`;
+  if (n !== null && n > 0) return `${n} review${n === 1 ? "" : "s"}`;
+  return null;
+};
+
+// "8pg · blog · 3 svc" — a one-glance read of the site the caller is about to
+// pitch against. Each part appears only when its field is real.
+const websiteLabel = (l: Lead): string | null => {
+  const parts: string[] = [];
+  if (typeof l.site_pages === "number" && l.site_pages > 0) parts.push(`${l.site_pages}pg`);
+  if (l.has_blog === true) parts.push("blog");
+  if (typeof l.service_pages === "number" && l.service_pages > 0) parts.push(`${l.service_pages} svc`);
+  return parts.length ? parts.join(" · ") : null;
+};
+
 type Activity = {
   id: number;
   user_email: string | null;
@@ -189,6 +222,21 @@ const FILTERS = [
 const statusColor = (s: string) =>
   OUTCOMES.find((o) => o.key === s)?.tone ?? "#64748b";
 
+// Same "when is this due" phrasing as the Callbacks board, so a caller who
+// bounces between the two screens reads one language, not two.
+const dueText = (iso: string | null, now: Date): string | null => {
+  if (!iso) return null;
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return null;
+  const diff = t - now.getTime();
+  const mins = Math.round(Math.abs(diff) / 60000);
+  const rel =
+    mins < 60 ? `${mins} min` :
+    mins < 1440 ? `${Math.round(mins / 60)} hr` :
+    `${Math.round(mins / 1440)} day${Math.round(mins / 1440) === 1 ? "" : "s"}`;
+  return diff < 0 ? `${rel} late` : `due in ${rel}`;
+};
+
 export default function CallRoom() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
@@ -211,6 +259,10 @@ export default function CallRoom() {
   const [total, setTotal] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [pageSize, setPageSize] = useState(PAGE);
+  // Ticks once a minute so an overdue callback flips loud without a reload.
+  // Minute granularity is plenty for a "how late is this" label and keeps the
+  // derived-data memo below from recomputing on every render.
+  const [now, setNow] = useState(() => new Date());
 
   // Filters and search stay server-driven; changing any of them starts back at
   // the first page.
@@ -251,6 +303,51 @@ export default function CallRoom() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(t);
+  }, []);
+
+  // Desktop keyboard speed while the call panel is open: Escape closes it
+  // (same as tapping Close), and 1-5 log the same five outcomes as the
+  // on-screen QUICK chips (Signed/Booked/Call back/No answer/Not interested)
+  // without reaching for the mouse. Both are skipped while a text field has
+  // focus, so typing "1" into notes or picking a callback date never fires
+  // a shortcut meant for the panel itself.
+  // Desktop keyboard speed while the call panel is open: Escape closes it, and
+  // 1-5 log the same five outcomes as the on-screen QUICK chips. Both skip while
+  // a text field has focus. disposition/closeLead are in the deps so the handler
+  // always sees the latest notes/callbackAt/busy (it resubscribes on change,
+  // which only ever happens while a single panel is open).
+  useEffect(() => {
+    if (!active) return;
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "TEXTAREA" || tag === "INPUT") return;
+      if (e.key === "Escape") {
+        closeLead();
+        return;
+      }
+      // A held digit key repeats keydown faster than React can flip busy, which
+      // could double-log an outcome. Only the first press counts.
+      if (busy || e.repeat) return;
+      const idx = Number(e.key) - 1;
+      if (Number.isInteger(idx) && idx >= 0 && idx < QUICK.length) {
+        disposition(QUICK[idx].key);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [active, busy, disposition, closeLead]);
+
+  // Focus-trap-lite: when the panel opens, move focus into it (the Close
+  // button) so keyboard/screen-reader users land inside the dialog instead of
+  // it silently opening behind their still-focused trigger element.
+  const closeBtnRef = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => {
+    if (active) closeBtnRef.current?.focus();
+  }, [active]);
 
   // Refresh while idle so a caller sees what teammates are claiming in near
   // real time. Paused while a lead is open so the list cannot shuffle mid-call.
@@ -304,6 +401,11 @@ export default function CallRoom() {
     if (outcome === "callback" && !callbackAt) {
       if (!window.confirm("Log without a date? It will not remind anyone.")) return;
     }
+    // Signed is the highest-stakes outcome and the hardest to walk back, and it
+    // is one tap or the "1" key away. Confirm it, whichever way it was fired.
+    if (outcome === "signed") {
+      if (!window.confirm(`Mark ${active.company} as Signed?`)) return;
+    }
     setBusy(true);
     setError(null);
     const r = await fetch("/api/calls/disposition", {
@@ -334,6 +436,12 @@ export default function CallRoom() {
   // Opening the panel to record "no answer" is three taps for the most common
   // result of a cold call, and the sheet Maddox already works needs one.
   async function quickLog(lead: Lead, outcome: string) {
+    // Signed is the highest-stakes, hardest-to-walk-back outcome. The panel path
+    // (disposition) confirms it; the one-tap card path must too, or a single
+    // phone mis-tap marks a company Signed with no undo.
+    if (outcome === "signed") {
+      if (!window.confirm(`Mark ${lead.company} as Signed?`)) return;
+    }
     setBusy(true);
     setError(null);
     const r = await fetch("/api/calls/disposition", {
@@ -355,16 +463,36 @@ export default function CallRoom() {
   // Everything the list card needs from the jsonb columns is derived ONCE per
   // load, keyed by lead id, so scrolling hundreds of rows never re-parses JSON.
   const derived = useMemo(() => {
-    const m = new Map<string, { chips: Chip[]; cautions: number; tier: "A" | "B" | "C" | null }>();
+    const m = new Map<string, {
+      chips: Chip[]; cautions: number; tier: "A" | "B" | "C" | null;
+      overdue: boolean; due: string | null;
+    }>();
     for (const l of leads) {
+      const isCallback = l.status === "callback";
+      const t = isCallback && l.next_action_at ? Date.parse(l.next_action_at) : NaN;
       m.set(l.id, {
         chips: readChips(l.chips).slice(0, 4),
         cautions: readCautions(l.cautions).length,
         tier: tierField ? readTier(l[tierField]) : null,
+        overdue: isCallback && !Number.isNaN(t) && t < now.getTime(),
+        due: isCallback ? dueText(l.next_action_at, now) : null,
       });
     }
     return m;
-  }, [leads, tierField]);
+  }, [leads, tierField, now]);
+
+  // Distinct verticals present on the loaded page, offered as a category row so
+  // the caller can line up all the roofers (or all the plumbers) at once. The
+  // chips drive the existing server-side search (which already matches vertical)
+  // rather than a new API param, so counts and pagination stay honest.
+  const verticals = useMemo(() => {
+    const s = new Set<string>();
+    for (const l of leads) {
+      const v = str(l.vertical);
+      if (v) s.add(v);
+    }
+    return Array.from(s).sort((a, b) => a.localeCompare(b));
+  }, [leads]);
 
   const activeIntel = useMemo(() => {
     if (!active) return null;
@@ -398,11 +526,18 @@ export default function CallRoom() {
             Logged: {flash}
           </div>
         )}
-        {error && (
-          <div style={{ ...banner, background: "rgba(239,68,68,0.12)", borderColor: "rgba(239,68,68,0.4)", color: "#f87171" }}>
-            {error}
-          </div>
-        )}
+        {error && (() => {
+          const isAuth = /unauthorized|forbidden|not.?authoriz|401|403/i.test(error);
+          return isAuth ? (
+            <div style={{ ...banner, background: "var(--bg-hover)", borderColor: "var(--border)", color: "var(--text-secondary)" }}>
+              Sign in to load the dial list. Your session may have expired. Refresh after signing back in.
+            </div>
+          ) : (
+            <div style={{ ...banner, background: "rgba(239,68,68,0.12)", borderColor: "rgba(239,68,68,0.4)", color: "#f87171" }}>
+              {error}
+            </div>
+          );
+        })()}
 
         {/* filters */}
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 20, alignItems: "center" }}>
@@ -484,10 +619,37 @@ export default function CallRoom() {
           </div>
         )}
 
+        {/* vertical / category row -- appears once more than one vertical is on
+            the page. A chip filters by driving the existing search, so it is a
+            true server-side narrow, not a per-page illusion. Tapping the active
+            one clears it. */}
+        {verticals.length > 1 && (
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10, alignItems: "center" }}>
+            <span style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: "var(--text-muted)", fontWeight: 700 }}>
+              Trade
+            </span>
+            {verticals.map((v) => {
+              const on = q.trim().toLowerCase() === v.toLowerCase();
+              return (
+                <button key={v} onClick={() => setQ(on ? "" : v)} style={{
+                  ...chip,
+                  background: on ? "linear-gradient(135deg,#0ea5a4,#0f766e)" : "var(--bg-card)",
+                  borderColor: on ? "transparent" : "var(--border)",
+                  color: on ? "#fff" : "var(--text-muted)",
+                  fontWeight: on ? 700 : 500,
+                  textTransform: "capitalize",
+                }}>
+                  {v}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {/* list */}
         <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 10 }}>
-          {loading && <p style={{ color: "var(--text-muted)", fontSize: 13 }}>Loading leads…</p>}
-          {!loading && shown.length === 0 && (
+          {loading && <CallSkeleton rows={5} height={96} />}
+          {!loading && !error && shown.length === 0 && (
             <div style={{ ...card, textAlign: "center", padding: 40, color: "var(--text-muted)" }}>
               <p style={{ fontSize: 15, fontWeight: 600 }}>Nothing here</p>
               <p style={{ fontSize: 13, marginTop: 6 }}>
@@ -497,23 +659,69 @@ export default function CallRoom() {
               </p>
             </div>
           )}
-          {shown.map((l) => (
-            <div key={l.id} style={{ ...card, display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap" }}>
+          {shown.map((l) => {
+            const named = Boolean(l.contact_name);
+            const rating = ratingLabel(l.google_rating, l.google_reviews);
+            const web = websiteLabel(l);
+            const angle = str(l.angle);
+            const d = derived.get(l.id);
+            const overdue = d?.overdue ?? false;
+            return (
+            <div key={l.id} style={{
+              ...card, display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap",
+              // Nameless leads (most of the list) are still fully workable but
+              // read as secondary: a muted left rail and a hair less presence.
+              // An overdue callback overrides all of that — same red urgency
+              // treatment as the Callbacks board (color-mix border/background),
+              // because a missed follow-up matters more than the name-rail cue.
+              borderLeft: `3px solid ${overdue ? "var(--red)" : named ? "var(--accent)" : "var(--border)"}`,
+              borderColor: overdue ? "color-mix(in srgb, var(--red) 55%, transparent)" : undefined,
+              // Explicit base (not undefined): this key overrides card.background
+              // in the same literal, so a non-overdue card must restate it or it
+              // loses its background entirely.
+              background: overdue ? "color-mix(in srgb, var(--red) 7%, var(--bg-card))" : "var(--bg-card)",
+              opacity: overdue ? 1 : named ? 1 : 0.82,
+            }}>
               <div
                 title="Lead score: higher = more worth calling. Green from 65 up."
                 style={{
                   width: 44, height: 44, borderRadius: 11, flexShrink: 0,
                   display: "flex", alignItems: "center", justifyContent: "center",
                   background: "var(--bg-hover)", border: "1px solid var(--border)",
-                  fontSize: 14, fontWeight: 800, color: (l.score ?? 0) >= 65 ? "#4ade80" : "var(--text-muted)",
+                  fontSize: 14, fontWeight: 800, fontVariantNumeric: "tabular-nums",
+                  color: (l.score ?? 0) >= 65 ? "#4ade80" : "var(--text-muted)",
                 }}>{l.score ?? 0}</div>
 
               <div style={{ flex: "1 1 260px", minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                   <span style={{ fontSize: 15, fontWeight: 700 }}>{l.company}</span>
+                  {rating && (
+                    <span
+                      title="Google rating and review count"
+                      style={{ ...miniChip, color: "var(--text-secondary)", background: "var(--bg-hover)", borderColor: "var(--border)", fontWeight: 700 }}
+                    >
+                      {rating}
+                    </span>
+                  )}
                   <span style={{ ...pill, borderColor: statusColor(l.status), color: statusColor(l.status) }}>
                     {OUTCOMES.find((o) => o.key === l.status)?.label ?? "Not called yet"}
                   </span>
+                  {/* Overdue callbacks get the loudest treatment on the card,
+                      matching the Callbacks board exactly (var(--red) solid
+                      pill). A callback that is merely due later stays subtle
+                      -- a muted tabular-nums label, not a loud pill -- and a
+                      callback with no date recorded shows nothing here at all
+                      (honest: we don't know, so we don't imply urgency). */}
+                  {d?.overdue && (
+                    <span style={{ ...pill, borderColor: "var(--red)", color: "#fff", background: "var(--red)" }}>
+                      Overdue
+                    </span>
+                  )}
+                  {l.status === "callback" && !d?.overdue && d?.due && (
+                    <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
+                      {d.due}
+                    </span>
+                  )}
                   {l.claim === "taken" && (
                     <span style={{ ...pill, borderColor: "#f97316", color: "#f97316" }}>
                       on a call with {l.claimed_by_email ? displayName(l.claimed_by_email) : "someone"}
@@ -567,6 +775,21 @@ export default function CallRoom() {
                   {[isResearchDump(l.title) ? null : l.title, l.city, l.vertical, l.employees ? `${l.employees} emp` : null]
                     .filter(Boolean).join(" · ")}
                 </p>
+                {web && (
+                  <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 3 }}>
+                    <span style={{ fontWeight: 600 }}>Website: </span>{web}
+                  </p>
+                )}
+                {/* The opener hook, one glance. Clamped to two lines here; the
+                    full text sits in the "Say this" box when the panel opens. */}
+                {angle && (
+                  <p style={{
+                    fontSize: 12.5, color: "var(--accent)", marginTop: 5, lineHeight: 1.4,
+                    display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
+                  }}>
+                    <span style={{ fontWeight: 700 }}>Angle: </span>{angle}
+                  </p>
+                )}
                 {(derived.get(l.id)?.chips.length ?? 0) > 0 && (
                   <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginTop: 6 }}>
                     {derived.get(l.id)!.chips.map((c, i) => {
@@ -590,7 +813,7 @@ export default function CallRoom() {
                   </details>
                 )}
                 {displaySignals(l.signals) && (
-                  <p style={{ fontSize: 12, color: "#7dd3fc", marginTop: 5, lineHeight: 1.45 }}>
+                  <p style={{ fontSize: 12, color: "var(--accent)", marginTop: 5, lineHeight: 1.45 }}>
                     <SignalLinks signals={displaySignals(l.signals)!} company={l.company} city={l.city} website={l.website} />
                   </p>
                 )}
@@ -614,6 +837,14 @@ export default function CallRoom() {
                         disabled={busy}
                         style={{
                           ...miniChip,
+                          // Primary one-tap logging control a caller hits from a
+                          // phone every call, so it clears a real touch target
+                          // (the bare miniChip is ~23px tall) rather than the
+                          // hairline chip it used to render as at 375px.
+                          minHeight: 40,
+                          padding: "8px 14px",
+                          display: "inline-flex",
+                          alignItems: "center",
                           cursor: busy ? "not-allowed" : "pointer",
                           fontWeight: 700,
                           color: on ? "#0b1220" : o.tone,
@@ -650,7 +881,8 @@ export default function CallRoom() {
                 </button>
               </div>
             </div>
-          ))}
+            );
+          })}
 
           {!loading && hasMore && (
             <button
@@ -685,15 +917,19 @@ export default function CallRoom() {
             backdropFilter: "blur(3px)",
           }}
         >
-          <div style={{
-            width: "min(680px, 100%)", maxHeight: "92vh", overflowY: "auto",
-            background: "var(--bg-card)", border: "1px solid var(--border)",
-            borderRadius: "20px 20px 0 0", padding: 24,
-            boxShadow: "0 -20px 60px rgba(0,0,0,0.6)",
-          }}>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="call-panel-company"
+            style={{
+              width: "min(680px, 100%)", maxHeight: "92vh", overflowY: "auto",
+              background: "var(--bg-card)", border: "1px solid var(--border)",
+              borderRadius: "20px 20px 0 0", padding: 24,
+              boxShadow: "0 -20px 60px rgba(0,0,0,0.6)",
+            }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
               <div>
-                <h2 style={{ fontSize: 20, fontWeight: 800 }}>{active.company}</h2>
+                <h2 id="call-panel-company" style={{ fontSize: 20, fontWeight: 800 }}>{active.company}</h2>
                 {/* The name he asks for, at a size he can read while the phone
                     is already ringing. */}
                 {active.contact_name ? (
@@ -710,8 +946,21 @@ export default function CallRoom() {
                   {[active.contact_title, isResearchDump(active.title) ? null : active.title]
                     .filter(Boolean).join(" · ")}
                 </p>
+                {(ratingLabel(active.google_rating, active.google_reviews) || websiteLabel(active)) && (
+                  <p style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 4, fontWeight: 600 }}>
+                    {[ratingLabel(active.google_rating, active.google_reviews), websiteLabel(active)]
+                      .filter(Boolean).join("  ·  ")}
+                  </p>
+                )}
               </div>
-              <button onClick={() => closeLead()} style={btnGhost}>Close</button>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5, flexShrink: 0 }}>
+                <button ref={closeBtnRef} onClick={() => closeLead()} style={btnGhost}>Close</button>
+                {/* Surfaced at the top so a caller sees the keyboard path before
+                    scrolling to the outcome grid at the very bottom. */}
+                <span style={{ fontSize: 10.5, color: "var(--text-muted)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
+                  1-5 log · Esc closes
+                </span>
+              </div>
             </div>
 
             {/* The angle is the first thing on the panel because it is the last
@@ -722,7 +971,7 @@ export default function CallRoom() {
                 background: "linear-gradient(135deg,rgba(61,107,240,0.16),rgba(30,68,184,0.10))",
                 border: "1px solid rgba(61,107,240,0.45)",
               }}>
-                <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: "#93b4ff", fontWeight: 700 }}>
+                <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: "var(--accent)", fontWeight: 700 }}>
                   Say this
                 </p>
                 <p style={{ fontSize: 15.5, lineHeight: 1.5, marginTop: 6, fontWeight: 600 }}>
@@ -790,7 +1039,7 @@ export default function CallRoom() {
                 marginTop: 14, padding: 12, borderRadius: 10,
                 background: "rgba(56,189,248,0.08)", border: "1px solid rgba(56,189,248,0.25)",
               }}>
-                <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: "#7dd3fc", fontWeight: 700 }}>
+                <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: "var(--accent)", fontWeight: 700 }}>
                   Why they are worth calling
                 </p>
                 <p style={{ fontSize: 13, marginTop: 5, lineHeight: 1.5 }}>
@@ -875,24 +1124,50 @@ export default function CallRoom() {
               />
             </div>
 
-            <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: "var(--text-muted)", fontWeight: 700, marginTop: 18 }}>
-              How did it go?
-            </p>
+            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, flexWrap: "wrap", marginTop: 18 }}>
+              <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: "var(--text-muted)", fontWeight: 700 }}>
+                How did it go?
+              </p>
+              <p style={{ fontSize: 11, color: "var(--text-muted)" }}>Press 1-5 for the marked ones</p>
+            </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 8, marginTop: 8 }}>
-              {OUTCOMES.map((o) => (
-                <button
-                  key={o.key}
-                  disabled={busy}
-                  onClick={() => disposition(o.key)}
-                  style={{
-                    padding: "14px 12px", minHeight: 48, borderRadius: 10, cursor: busy ? "wait" : "pointer",
-                    border: `1px solid ${o.tone}55`, background: `${o.tone}18`,
-                    color: o.tone, fontSize: 14, fontWeight: 700, opacity: busy ? 0.6 : 1,
-                  }}
-                >
-                  {o.label}
-                </button>
-              ))}
+              {/* Numbered outcomes first, in 1-5 order, so the badges read as an
+                  unbroken sequence instead of interleaving with the unnumbered
+                  ones as the grid wraps. */}
+              {[...OUTCOMES].sort((a, b) => {
+                const ia = QUICK.findIndex((q) => q.key === a.key);
+                const ib = QUICK.findIndex((q) => q.key === b.key);
+                if (ia === -1 && ib === -1) return 0;
+                if (ia === -1) return 1;
+                if (ib === -1) return -1;
+                return ia - ib;
+              }).map((o) => {
+                const quickIdx = QUICK.findIndex((q) => q.key === o.key);
+                return (
+                  <button
+                    key={o.key}
+                    disabled={busy}
+                    onClick={() => disposition(o.key)}
+                    style={{
+                      padding: "14px 12px", minHeight: 48, borderRadius: 10, cursor: busy ? "wait" : "pointer",
+                      border: `1px solid ${o.tone}55`, background: `${o.tone}18`,
+                      color: o.tone, fontSize: 14, fontWeight: 700, opacity: busy ? 0.6 : 1,
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
+                    }}
+                  >
+                    {quickIdx >= 0 && (
+                      <span style={{
+                        display: "inline-flex", alignItems: "center", justifyContent: "center",
+                        width: 18, height: 18, borderRadius: 5, fontSize: 11, fontWeight: 800,
+                        background: `${o.tone}2a`, border: `1px solid ${o.tone}55`, flexShrink: 0,
+                      }}>
+                        {quickIdx + 1}
+                      </span>
+                    )}
+                    {o.label}
+                  </button>
+                );
+              })}
             </div>
             <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 12, lineHeight: 1.5 }}>
               This lead is held for you for 20 minutes so nobody double-dials it. Logging any

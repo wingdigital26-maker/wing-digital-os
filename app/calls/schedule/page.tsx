@@ -41,7 +41,7 @@ const PERSON_LABEL: Record<string, string> = {
   maddox: "Maddox",
   team: "Team",
 };
-const CALL_COLOR = "#f97316"; // loud accent for booked calls
+const CALL_COLOR = "var(--green)"; // booked calls read green everywhere in the Call Room
 
 const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -311,7 +311,17 @@ export default function TeamSchedule() {
 
       {/* Week grid — columns on desktop, stacked days on phones */}
       {loading ? (
-        <div style={{ color: "var(--text-muted)", fontSize: 13 }}>Loading the week…</div>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+            gap: 8,
+          }}
+        >
+          {Array.from({ length: 7 }).map((_, i) => (
+            <div key={i} className="skel" style={{ height: 150, borderRadius: 12 }} aria-busy="true" />
+          ))}
+        </div>
       ) : (
         <div
           style={{
@@ -368,6 +378,7 @@ export default function TeamSchedule() {
                             onClick={() => removeBlock(e)}
                             disabled={busy}
                             title="Delete this block"
+                            aria-label={`Delete "${e.title}"`}
                             style={{
                               border: "none", background: "transparent", color: "var(--text-muted)",
                               cursor: "pointer", fontSize: 14, lineHeight: 1,
@@ -409,6 +420,10 @@ export default function TeamSchedule() {
 
 const btn: React.CSSProperties = {
   padding: "7px 12px",
+  minHeight: 40,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
   borderRadius: 9,
   border: "1px solid var(--border)",
   background: "var(--bg-hover)",

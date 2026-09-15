@@ -196,7 +196,10 @@ export const ROUTED_PAGES: RoutedPage[] = [
   { href: "/calls/schedule", label: "Call Schedule" },
   { href: "/calls/list", label: "Call List" },
   { href: "/calls/sources", label: "Call Sources" },
-  { href: "/calls/team", label: "Call Team" },
+  // Admin-only (proxy.ts redirects non-admins to /calls). Kept out of the
+  // command palette so a caller is never shown a door that only bounces them;
+  // admins reach it from the "Manage callers" button in the Call Room header.
+  { href: "/calls/team", label: "Call Team", inPalette: false },
   { href: "/sequences", label: "Sequences", inStrip: true, inPalette: false },
   { href: "/sequences/people", label: "Sequence People" },
   // /email dropped from the strip 2026-09-05: "Email" appeared twice in one

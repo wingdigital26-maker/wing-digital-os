@@ -1,6 +1,9 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import SignalLinks from "../SignalLinks";
 import { displayName } from "../names";
+import CallSkeleton from "../_skeleton";
 
 // The follow-up queue. Every lead sitting at status='callback', soonest first,
 // bucketed by how urgent it is. A caller can work the queue right here: same
@@ -30,6 +33,105 @@ type Lead = {
   next_action_at: string | null;
   excluded?: boolean | null;
   excluded_reason?: string | null;
+  // Dial-sheet intel, same shape/source as the Dial list (both read
+  // /api/calls/leads). Optional: enrichment backfill lands row by row, so most
+  // callbacks have none of this and the UI must simply say less.
+  angle?: string | null;
+  cautions?: unknown;
+  chips?: unknown;
+  socials?: unknown;
+  [key: string]: unknown;
+};
+
+type Chip = { label: string; tone: string };
+type Social = { platform: string; handle: string | null; url: string | null };
+
+// jsonb comes back parsed, but a column backfilled as text arrives as a JSON
+// string. Accept both, and treat anything else as "nothing to show". (Ported
+// verbatim from list/page.tsx so both screens read the same shape the same way.)
+const asArray = (v: unknown): unknown[] => {
+  if (Array.isArray(v)) return v;
+  if (typeof v === "string" && v.trim().startsWith("[")) {
+    try {
+      const p = JSON.parse(v);
+      return Array.isArray(p) ? p : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+};
+
+const str = (v: unknown): string => (typeof v === "string" ? v.trim() : v == null ? "" : String(v).trim());
+
+const readChips = (v: unknown): Chip[] =>
+  asArray(v)
+    .map((c) => {
+      if (typeof c === "string") return { label: c.trim(), tone: "neutral" };
+      if (c && typeof c === "object") {
+        const o = c as Record<string, unknown>;
+        return { label: str(o.label ?? o.text ?? o.name), tone: str(o.tone) || "neutral" };
+      }
+      return { label: "", tone: "neutral" };
+    })
+    .filter((c) => c.label);
+
+const readCautions = (v: unknown): string[] =>
+  asArray(v)
+    .map((c) => (typeof c === "string" ? c.trim() : str((c as Record<string, unknown>)?.text)))
+    .filter(Boolean);
+
+// Defense-in-depth: only render a URL whose scheme is safe to click.
+// Enrichment data is internal-pipeline, not attacker-reachable, but a bad
+// value should never be able to render as a javascript:/data: href.
+const isSafeUrl = (u: string): boolean => /^(https?:)?\/\//i.test(u);
+
+const readSocials = (v: unknown): Social[] =>
+  asArray(v)
+    .map((s) => {
+      if (!s || typeof s !== "object") return null;
+      const o = s as Record<string, unknown>;
+      const platform = str(o.platform ?? o.network ?? o.site);
+      const handle = str(o.handle ?? o.username);
+      const url = str(o.url ?? o.link);
+      if (!platform && !handle && !url) return null;
+      return { platform: platform || "Profile", handle: handle || null, url: url && isSafeUrl(url) ? url : null };
+    })
+    .filter(Boolean) as Social[];
+
+// Tier values arrive as "A" / "b" / "tier-c" / "not callable". Normalise to a
+// single letter, or null when it is not one of the three callable tiers.
+// Ported verbatim from list/page.tsx so both screens read tier the same way.
+const readTier = (v: unknown): "A" | "B" | "C" | null => {
+  const t = str(v).toUpperCase();
+  const m = t.match(/(?:^|[^A-Z])([ABC])(?:$|[^A-Z])/) ?? t.match(/^([ABC])$/);
+  if (t.includes("NOT")) return null;
+  return (m?.[1] as "A" | "B" | "C") ?? null;
+};
+
+const TIER_META: Record<string, { label: string; tone: string }> = {
+  A: { label: "A", tone: "#4ade80" },
+  B: { label: "B", tone: "#38bdf8" },
+  C: { label: "C", tone: "#94a3b8" },
+};
+
+const chipTone = (tone: string): { fg: string; bg: string; bd: string } => {
+  const t = tone.toLowerCase();
+  if (t === "has" || t === "good" || t === "yes") return { fg: "#4ade80", bg: "rgba(34,197,94,0.10)", bd: "rgba(34,197,94,0.30)" };
+  if (t === "miss" || t === "gap" || t === "no") return { fg: "#fbbf24", bg: "rgba(251,191,36,0.10)", bd: "rgba(251,191,36,0.30)" };
+  return { fg: "var(--text-muted)", bg: "var(--bg-hover)", bd: "var(--border)" };
+};
+
+const isResearchDump = (t: string | null): t is string =>
+  !!t && (t.trim().startsWith("[") || t.length > 80);
+
+const displaySignals = (signals: string | null): string | null => {
+  if (!signals) return null;
+  const parts = signals
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s && !s.toLowerCase().startsWith("src:"));
+  return parts.length ? parts.join(", ") : null;
 };
 
 type Activity = {
@@ -51,6 +153,16 @@ const OUTCOMES: { key: string; label: string; tone: string }[] = [
 ];
 
 const statusColor = (s: string) => OUTCOMES.find((o) => o.key === s)?.tone ?? "#64748b";
+
+// Same one-tap set as the Dial list, so a caller working either screen sees
+// the same shortcuts. "Signed" omitted here on purpose: a callback that closes
+// is rare enough to warrant opening the panel and confirming, same as list.
+const QUICK: { key: string; short: string; tone: string }[] = [
+  { key: "booked", short: "Booked", tone: "#22c55e" },
+  { key: "callback", short: "Call back", tone: "#eab308" },
+  { key: "no_answer", short: "No answer", tone: "#94a3b8" },
+  { key: "not_interested", short: "Not interested", tone: "#f97316" },
+];
 
 type BucketKey = "overdue" | "today" | "week" | "later" | "undated";
 
@@ -104,6 +216,10 @@ export default function Callbacks() {
   // Last note per lead, so a caller has context without opening the row.
   const [context, setContext] = useState<Record<string, Activity | null>>({});
   const [now, setNow] = useState(() => new Date());
+  // Which lead column holds buy-likelihood tier -- client-specific and
+  // reported by the API as `tierField`, same as list/page.tsx.
+  const [tierField, setTierField] = useState<string | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
 
   const load = useCallback(async () => {
     const r = await fetch("/api/calls/leads?status=callback&limit=500", { cache: "no-store" });
@@ -118,6 +234,7 @@ export default function Callbacks() {
     // part of the queue either.
     const rows: Lead[] = (d.leads ?? []).filter((l: Lead) => !l.excluded);
     setLeads(rows);
+    setTierField(d.tierField ?? null);
     setError(null);
     setLoading(false);
 
@@ -181,7 +298,7 @@ export default function Callbacks() {
     setHistory(h.ok ? (await h.json()).activity ?? [] : []);
   }
 
-  async function closeLead(release = true) {
+  const closeLead = useCallback(async (release = true) => {
     if (active && release) {
       await fetch("/api/calls/claim", {
         method: "POST",
@@ -192,10 +309,41 @@ export default function Callbacks() {
     setActive(null);
     setHistory([]);
     load();
-  }
+  }, [active, load]);
+
+  // Desktop keyboard speed to match the dial list's call panel: Escape closes
+  // it, same as tapping Close, and 1-4 log the same QUICK outcomes as the
+  // on-screen chips. Both skip while a text field has focus, so dismissing a
+  // callback date picker with Escape (or typing a digit into notes) doesn't
+  // also fire a panel shortcut. disposition is in the deps so the handler
+  // always sees the latest notes/callbackAt/busy.
+  useEffect(() => {
+    if (!active) return;
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "TEXTAREA" || tag === "INPUT") return;
+      if (e.key === "Escape") {
+        closeLead();
+        return;
+      }
+      if (busy || e.repeat) return;
+      const idx = Number(e.key) - 1;
+      if (Number.isInteger(idx) && idx >= 0 && idx < QUICK.length) {
+        disposition(QUICK[idx].key);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [active, busy, closeLead, disposition]);
 
   async function disposition(outcome: string) {
     if (!active) return;
+    // A callback with no date reminds nobody. Same gentle check as the dial
+    // list, so logging "call back" (tap or the "2" key) never silently drops
+    // the follow-up.
+    if (outcome === "callback" && !callbackAt) {
+      if (!window.confirm("Log without a date? It will not remind anyone.")) return;
+    }
     setBusy(true);
     setError(null);
     const r = await fetch("/api/calls/disposition", {
@@ -221,6 +369,44 @@ export default function Callbacks() {
     setHistory([]);
     load();
   }
+
+  // Log an outcome straight off the card, same one-tap pattern as the dial list.
+  async function quickLog(lead: Lead, outcome: string) {
+    setBusy(true);
+    setError(null);
+    const r = await fetch("/api/calls/disposition", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ leadId: lead.id, outcome }),
+    });
+    setBusy(false);
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok && r.status !== 207) {
+      setError(d.error ?? "Could not save that");
+      return;
+    }
+    setFlash(`${lead.company}: ${OUTCOMES.find((o) => o.key === outcome)?.label ?? outcome}`);
+    setTimeout(() => setFlash(null), 3000);
+    load();
+  }
+
+  const activeIntel = useMemo(() => {
+    if (!active) return null;
+    return {
+      angle: str(active.angle),
+      chips: readChips(active.chips),
+      cautions: readCautions(active.cautions),
+      socials: readSocials(active.socials),
+      tier: tierField ? readTier(active[tierField]) : null,
+      tierReason: tierField ? str(active[`${tierField}_reason`]) : "",
+    };
+  }, [active, tierField]);
+
+  // Move focus into the panel on open, same a11y contract as the dial list:
+  // the Close button is the first focusable and reachable control.
+  useEffect(() => {
+    if (active) panelRef.current?.focus();
+  }, [active]);
 
   const overdue = grouped.overdue.length;
 
@@ -248,6 +434,12 @@ export default function Callbacks() {
         </div>
       )}
 
+      {loading && (
+        <div style={{ marginTop: 20 }}>
+          <CallSkeleton rows={4} height={84} />
+        </div>
+      )}
+
       {!loading && leads.length === 0 && !error && (
         <div style={{ ...card, textAlign: "center", padding: 40, color: "var(--text-muted)", marginTop: 18 }}>
           <p style={{ fontSize: 15, fontWeight: 600 }}>No callbacks scheduled yet</p>
@@ -265,7 +457,7 @@ export default function Callbacks() {
         return (
           <section key={b.key} style={{ marginTop: 24 }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-              <h2 style={{ fontSize: 15, fontWeight: 800, color: loud ? "#f87171" : "var(--text-primary)" }}>
+              <h2 style={{ fontSize: 15, fontWeight: 800, color: loud ? "var(--red)" : "var(--text-primary)" }}>
                 {b.label}
               </h2>
               <span style={{ ...pill, borderColor: b.tone, color: b.tone }}>{rows.length}</span>
@@ -281,8 +473,8 @@ export default function Callbacks() {
                     style={{
                       ...card,
                       display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap",
-                      borderColor: loud ? "rgba(239,68,68,0.55)" : "var(--border)",
-                      background: loud ? "rgba(239,68,68,0.07)" : "var(--bg-card)",
+                      borderColor: loud ? "color-mix(in srgb, var(--red) 55%, transparent)" : "var(--border)",
+                      background: loud ? "color-mix(in srgb, var(--red) 7%, var(--bg-card))" : "var(--bg-card)",
                       borderLeft: `4px solid ${b.tone}`,
                     }}
                   >
@@ -292,7 +484,7 @@ export default function Callbacks() {
                         <span style={{
                           ...pill,
                           borderColor: b.tone, color: loud ? "#fff" : b.tone,
-                          background: loud ? "#ef4444" : "transparent",
+                          background: loud ? "var(--red)" : "transparent",
                         }}>
                           {loud ? "Overdue" : b.label}
                         </span>
@@ -318,7 +510,8 @@ export default function Callbacks() {
 
                       <p style={{
                         fontSize: 12.5, marginTop: 5, fontWeight: 700,
-                        color: loud ? "#f87171" : b.tone,
+                        fontVariantNumeric: "tabular-nums",
+                        color: loud ? "var(--red)" : b.tone,
                       }}>
                         {dueLabel(l.next_action_at, now)}
                       </p>
@@ -345,6 +538,28 @@ export default function Callbacks() {
                           No call history recorded for this lead.
                         </p>
                       )}
+
+                      {/* One tap to record how the call went, same as the dial list. */}
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
+                        {QUICK.map((o) => (
+                          <button
+                            key={o.key}
+                            onClick={(e) => { e.stopPropagation(); quickLog(l, o.key); }}
+                            disabled={busy || l.claim === "taken"}
+                            style={{
+                              ...miniChip,
+                              minHeight: 40, padding: "8px 14px",
+                              display: "inline-flex", alignItems: "center",
+                              cursor: busy || l.claim === "taken" ? "not-allowed" : "pointer",
+                              fontWeight: 700, color: o.tone, background: "transparent",
+                              borderColor: o.tone,
+                              opacity: busy || l.claim === "taken" ? 0.5 : 1,
+                            }}
+                          >
+                            {o.short}
+                          </button>
+                        ))}
+                      </div>
                     </div>
 
                     <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
@@ -375,8 +590,11 @@ export default function Callbacks() {
         );
       })}
 
-      {/* call panel — same loop as the dial list */}
-      {active && (
+      {/* call panel — same loop as the dial list, portalled to <body> for the
+          same reason: the app shell's sticky header sits in a stacking context
+          above this component, so a tall panel (one carrying an angle/chips)
+          would otherwise have its top painted over by the nav. */}
+      {active && createPortal(
         <div
           onClick={(e) => e.target === e.currentTarget && closeLead()}
           style={{
@@ -385,34 +603,144 @@ export default function Callbacks() {
             backdropFilter: "blur(3px)",
           }}
         >
-          <div style={{
-            width: "min(680px, 100%)", maxHeight: "92vh", overflowY: "auto",
-            background: "var(--bg-card)", border: "1px solid var(--border)",
-            borderRadius: "20px 20px 0 0", padding: 24,
-            boxShadow: "0 -20px 60px rgba(0,0,0,0.6)",
-          }}>
+          <div
+            ref={panelRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="callback-panel-company"
+            tabIndex={-1}
+            style={{
+              width: "min(680px, 100%)", maxHeight: "92vh", overflowY: "auto",
+              background: "var(--bg-card)", border: "1px solid var(--border)",
+              borderRadius: "20px 20px 0 0", padding: 24,
+              boxShadow: "0 -20px 60px rgba(0,0,0,0.6)",
+              outline: "none",
+            }}
+          >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
               <div>
-                <h2 style={{ fontSize: 20, fontWeight: 800 }}>{active.company}</h2>
+                <h2 id="callback-panel-company" style={{ fontSize: 20, fontWeight: 800 }}>{active.company}</h2>
                 <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 3 }}>
                   {[active.contact_name, active.title].filter(Boolean).join(" · ") || "No named contact"}
                 </p>
-                <p style={{ fontSize: 12.5, color: "#eab308", marginTop: 4, fontWeight: 700 }}>
+                <p style={{
+                  fontSize: 12.5, marginTop: 4, fontWeight: 700,
+                  fontVariantNumeric: "tabular-nums",
+                  color: bucketOf(active.next_action_at, now) === "overdue" ? "var(--red)" : "var(--orange)",
+                }}>
                   Call back {dueLabel(active.next_action_at, now)}
                 </p>
               </div>
-              <button onClick={() => closeLead()} style={btnGhost}>Close</button>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5, flexShrink: 0 }}>
+                <button onClick={() => closeLead()} style={btnGhost}>Close</button>
+                <span style={{ fontSize: 10.5, color: "var(--text-muted)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
+                  1-{QUICK.length} log · Esc closes
+                </span>
+              </div>
             </div>
+
+            {/* Say-this angle, same placement as the dial list: first thing on
+                the panel because it's the last thing read before the call
+                connects. Only renders when the enrichment actually reached
+                this lead. */}
+            {activeIntel?.angle && (
+              <div style={{
+                marginTop: 14, padding: "13px 15px", borderRadius: 12,
+                background: "linear-gradient(135deg,rgba(61,107,240,0.16),rgba(30,68,184,0.10))",
+                border: "1px solid rgba(61,107,240,0.45)",
+              }}>
+                <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: "var(--accent)", fontWeight: 700 }}>
+                  Say this
+                </p>
+                <p style={{ fontSize: 15.5, lineHeight: 1.5, marginTop: 6, fontWeight: 600 }}>
+                  {activeIntel.angle}
+                </p>
+              </div>
+            )}
+
+            {activeIntel?.tier && (
+              <p style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 12, lineHeight: 1.45 }}>
+                <span style={{ ...pill, borderColor: TIER_META[activeIntel.tier].tone, color: TIER_META[activeIntel.tier].tone, marginRight: 7 }}>
+                  tier {activeIntel.tier}
+                </span>
+                {activeIntel.tierReason || "How likely they are to buy."}
+              </p>
+            )}
+
+            {(activeIntel?.chips.length ?? 0) > 0 && (
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 12 }}>
+                {activeIntel!.chips.map((c, i) => {
+                  const t = chipTone(c.tone);
+                  return (
+                    <span key={i} style={{ ...miniChip, fontSize: 12, padding: "5px 10px", color: t.fg, background: t.bg, borderColor: t.bd }}>
+                      {c.label}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+
+            {(activeIntel?.socials.length ?? 0) > 0 && (
+              <div style={{ marginTop: 14 }}>
+                <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: "var(--text-muted)", fontWeight: 700 }}>
+                  Where they post
+                </p>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 7 }}>
+                  {activeIntel!.socials.map((sc, i) =>
+                    sc.url ? (
+                      <a key={i} href={sc.url} target="_blank" rel="noreferrer" style={btnGhost}>
+                        {sc.platform}{sc.handle ? ` ${sc.handle}` : ""}
+                      </a>
+                    ) : (
+                      <span key={i} style={{ ...btnGhost, cursor: "default" }}>
+                        {sc.platform}{sc.handle ? ` ${sc.handle}` : ""}
+                      </span>
+                    )
+                  )}
+                </div>
+              </div>
+            )}
+
+            {isResearchDump(active.title) && (
+              <details style={{ marginTop: 10 }}>
+                <summary style={{ fontSize: 12.5, color: "var(--text-muted)", cursor: "pointer", fontWeight: 600 }}>
+                  Research notes
+                </summary>
+                <p style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 5, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
+                  {active.title}
+                </p>
+              </details>
+            )}
+
+            {(activeIntel?.cautions.length ?? 0) > 0 && (
+              <div style={{
+                marginTop: 16, padding: "13px 15px", borderRadius: 12,
+                background: "rgba(251,191,36,0.10)", border: "1px solid rgba(251,191,36,0.45)",
+              }}>
+                <p style={{ fontSize: 11.5, textTransform: "uppercase", letterSpacing: 0.6, color: "#fbbf24", fontWeight: 800 }}>
+                  Check before you dial
+                </p>
+                <ul style={{ margin: "7px 0 0", paddingLeft: 18 }}>
+                  {activeIntel!.cautions.map((c, i) => (
+                    <li key={i} style={{ fontSize: 13, lineHeight: 1.5, marginTop: i ? 4 : 0 }}>{c}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {active.signals && (
               <div style={{
                 marginTop: 14, padding: 12, borderRadius: 10,
                 background: "rgba(56,189,248,0.08)", border: "1px solid rgba(56,189,248,0.25)",
               }}>
-                <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: "#7dd3fc", fontWeight: 700 }}>
+                <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: "var(--accent)", fontWeight: 700 }}>
                   Why they are worth calling
                 </p>
-                <p style={{ fontSize: 13, marginTop: 5, lineHeight: 1.5 }}>{active.signals}</p>
+                <p style={{ fontSize: 13, marginTop: 5, lineHeight: 1.5 }}>
+                  {displaySignals(active.signals) ? (
+                    <SignalLinks signals={displaySignals(active.signals)!} company={active.company} city={active.city} website={active.website} />
+                  ) : active.signals}
+                </p>
               </div>
             )}
 
@@ -474,24 +802,49 @@ export default function Callbacks() {
               />
             </div>
 
-            <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: "var(--text-muted)", fontWeight: 700, marginTop: 18 }}>
-              How did it go?
-            </p>
+            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, flexWrap: "wrap", marginTop: 18 }}>
+              <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: "var(--text-muted)", fontWeight: 700 }}>
+                How did it go?
+              </p>
+              <p style={{ fontSize: 11, color: "var(--text-muted)" }}>Press 1-{QUICK.length} for the marked ones</p>
+            </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 8, marginTop: 8 }}>
-              {OUTCOMES.map((o) => (
-                <button
-                  key={o.key}
-                  disabled={busy}
-                  onClick={() => disposition(o.key)}
-                  style={{
-                    padding: "14px 12px", minHeight: 48, borderRadius: 10, cursor: busy ? "wait" : "pointer",
-                    border: `1px solid ${o.tone}55`, background: `${o.tone}18`,
-                    color: o.tone, fontSize: 14, fontWeight: 700, opacity: busy ? 0.6 : 1,
-                  }}
-                >
-                  {o.label}
-                </button>
-              ))}
+              {/* Numbered outcomes first, in 1-N order, matching the on-screen
+                  QUICK badges/keyboard order, same layout rule as the dial list. */}
+              {[...OUTCOMES].sort((a, b) => {
+                const ia = QUICK.findIndex((q) => q.key === a.key);
+                const ib = QUICK.findIndex((q) => q.key === b.key);
+                if (ia === -1 && ib === -1) return 0;
+                if (ia === -1) return 1;
+                if (ib === -1) return -1;
+                return ia - ib;
+              }).map((o) => {
+                const quickIdx = QUICK.findIndex((q) => q.key === o.key);
+                return (
+                  <button
+                    key={o.key}
+                    disabled={busy}
+                    onClick={() => disposition(o.key)}
+                    style={{
+                      padding: "14px 12px", minHeight: 48, borderRadius: 10, cursor: busy ? "wait" : "pointer",
+                      border: `1px solid ${o.tone}55`, background: `${o.tone}18`,
+                      color: o.tone, fontSize: 14, fontWeight: 700, opacity: busy ? 0.6 : 1,
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
+                    }}
+                  >
+                    {quickIdx >= 0 && (
+                      <span style={{
+                        display: "inline-flex", alignItems: "center", justifyContent: "center",
+                        width: 18, height: 18, borderRadius: 5, fontSize: 11, fontWeight: 800,
+                        background: `${o.tone}2a`, border: `1px solid ${o.tone}55`, flexShrink: 0,
+                      }}>
+                        {quickIdx + 1}
+                      </span>
+                    )}
+                    {o.label}
+                  </button>
+                );
+              })}
             </div>
             <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 12, lineHeight: 1.5 }}>
               This lead is held for you for 20 minutes so nobody double-dials it. Logging any
@@ -499,7 +852,8 @@ export default function Callbacks() {
               hold for the rest of the 20 minutes.
             </p>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
@@ -513,6 +867,10 @@ const pill: React.CSSProperties = {
   padding: "2px 8px", borderRadius: 999, border: "1px solid", fontSize: 10.5, fontWeight: 700,
   textTransform: "uppercase", letterSpacing: 0.4,
 };
+const miniChip: React.CSSProperties = {
+  padding: "3px 8px", borderRadius: 7, border: "1px solid",
+  fontSize: 11, fontWeight: 600, lineHeight: 1.35, whiteSpace: "nowrap",
+};
 const btnPrimary: React.CSSProperties = {
   padding: "12px 18px", minHeight: 44,
   display: "inline-flex", alignItems: "center", justifyContent: "center",
@@ -521,7 +879,9 @@ const btnPrimary: React.CSSProperties = {
   fontSize: 13, fontWeight: 700, cursor: "pointer",
 };
 const btnGhost: React.CSSProperties = {
-  padding: "8px 14px", borderRadius: 10, border: "1px solid var(--border)",
+  padding: "8px 14px", minHeight: 40,
+  display: "inline-flex", alignItems: "center", justifyContent: "center",
+  borderRadius: 10, border: "1px solid var(--border)",
   background: "var(--bg-hover)", color: "var(--text-primary)",
   fontSize: 12.5, fontWeight: 600, cursor: "pointer", textDecoration: "none",
 };

@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import CallSkeleton from "../_skeleton";
 
 // Where the leads came from, and why some of them are not being called.
 //
@@ -32,6 +33,7 @@ type Batch = {
 type RejectionGroup = { reason: string; count: number; companies: string[] };
 
 type Payload = {
+  me: { email: string; role: string; isAdmin: boolean };
   totals: {
     leads: number;
     dialable: number;
@@ -79,22 +81,6 @@ export default function SourcesPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState<Record<string, boolean>>({});
-  // null = role not known yet; "caller" gets the short version below because
-  // the batch ledger and rejection tables are analyst material, not call prep.
-  const [role, setRole] = useState<string | null>(null);
-
-  useEffect(() => {
-    let alive = true;
-    fetch("/api/calls/leads?status=all&limit=1", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (alive && d?.me?.role) setRole(String(d.me.role));
-      })
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -119,7 +105,31 @@ export default function SourcesPage() {
     };
   }, []);
 
-  if (role === "caller") {
+  if (loading) {
+    return (
+      <div>
+        <div className="skel" style={{ height: 24, width: 280, borderRadius: 8 }} />
+        <div style={{ marginTop: 18 }}>
+          <CallSkeleton rows={4} height={80} />
+        </div>
+      </div>
+    );
+  }
+  if (error || !data) {
+    return (
+      <div>
+        <h1 style={h1}>Where the leads come from</h1>
+        <div style={{ ...banner, background: "rgba(239,68,68,0.12)", borderColor: "rgba(239,68,68,0.4)", color: "#f87171" }}>
+          {error ?? "No data came back."}
+        </div>
+      </div>
+    );
+  }
+
+  // The batch ledger and rejection tables are analyst material, not call prep,
+  // so a caller gets the short version. Read straight off the payload this
+  // screen already fetched -- no second request just to learn the role.
+  if (data.me.role === "caller") {
     return (
       <div>
         <h1 style={h1}>Where the leads come from</h1>
@@ -132,20 +142,6 @@ export default function SourcesPage() {
             You do not need anything on this page to dial. Head back to the dial list and keep
             calling.
           </p>
-        </div>
-      </div>
-    );
-  }
-
-  if (loading) {
-    return <p style={{ color: "var(--text-muted)", fontSize: 13 }}>Loading lead sources…</p>;
-  }
-  if (error || !data) {
-    return (
-      <div>
-        <h1 style={h1}>Where the leads come from</h1>
-        <div style={{ ...banner, background: "rgba(239,68,68,0.12)", borderColor: "rgba(239,68,68,0.4)", color: "#f87171" }}>
-          {error ?? "No data came back."}
         </div>
       </div>
     );
@@ -211,7 +207,7 @@ export default function SourcesPage() {
         {data.sources.map((s) => (
           <div key={s.source} style={card}>
             <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center" }}>
-              <div style={{ flex: "1 1 240px" }}>
+              <div style={{ flex: "1 1 240px", minWidth: 0 }}>
                 <div style={{ fontSize: 14.5, fontWeight: 700 }}>{s.source}</div>
                 <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 3 }}>
                   {s.total} {s.total === 1 ? "lead" : "leads"}
@@ -319,7 +315,7 @@ export default function SourcesPage() {
           background: "rgba(56,189,248,0.07)", border: "1px solid rgba(56,189,248,0.22)",
         }}
       >
-        <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: "#7dd3fc", fontWeight: 700 }}>
+        <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: "var(--accent)", fontWeight: 700 }}>
           How new leads get here
         </p>
         <p style={{ fontSize: 13, marginTop: 6, lineHeight: 1.6 }}>

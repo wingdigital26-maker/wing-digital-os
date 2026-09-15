@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import CallSkeleton from "../_skeleton";
 
 type Caller = {
   id: string;
@@ -47,7 +48,8 @@ const fmtDuration = (s: number | null) => {
 };
 
 // Admin-only screen for creating and revoking call-room logins.
-// Middleware blocks /calls/team for the caller role; the API re-checks.
+// proxy.ts redirects /calls/team to /calls for the caller role at the edge;
+// the /api/calls/callers route re-checks adminOnly on every request.
 export default function Team() {
   const [rows, setRows] = useState<Caller[]>([]);
   const [email, setEmail] = useState("");
@@ -182,7 +184,7 @@ export default function Team() {
 
         {/* list */}
         <div style={{ marginTop: 20, display: "flex", flexDirection: "column", gap: 10 }}>
-          {loading && <p style={{ fontSize: 13, color: "var(--text-muted)" }}>Loading…</p>}
+          {loading && <CallSkeleton rows={3} height={64} />}
           {!loading && rows.length === 0 && (
             <div style={{ ...card, textAlign: "center", padding: 30, color: "var(--text-muted)", fontSize: 13 }}>
               Nobody has call-room access yet.
@@ -211,7 +213,7 @@ export default function Team() {
                 <span
                   style={{
                     ...btnGhost,
-                    color: "#38bdf8",
+                    color: "var(--accent)",
                     borderColor: "rgba(56,189,248,0.4)",
                     flexShrink: 0,
                   }}

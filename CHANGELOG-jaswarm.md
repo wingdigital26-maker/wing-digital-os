@@ -194,3 +194,10 @@ Committed: 6814898, a5399f5 · Backlog #R6 drained (tier pill deferred)
 | safety | clean — both scheme guards are allowlists, no bypass | — |
 | runtime | /calls/list + /calls/callbacks 200, console clean | ✓ |
 Committed: 662114f · Backlog: 1 left (palette tokenization, low-value/high-risk)
+
+## Round 8 — Call Room (/calls) for Maddox (dialed-check) — 2026-09-15
+| Lane | Change | Proof |
+|---|---|---|
+| audit | Whole-path read-only review: verdict ESSENTIALLY DIALED, one real bug found | — |
+| fix | Confirm before one-tap "Signed" on the list card (quickLog), matching the panel | tsc ✓, /calls/list 200 |
+Committed: f7be1e2 · Verdict: caller path dialed; remaining backlog is low-value/high-risk or minor nits

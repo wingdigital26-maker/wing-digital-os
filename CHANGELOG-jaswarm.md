@@ -154,3 +154,13 @@ Committed: 2463523, 5916945, 39d9688, 01879e6
 | safety | clean | — |
 | practicality | 5 findings: #1/#3/#5 fixed, #2 -> backlog, #4 false alarm | — |
 Committed: 98ac767, 55ef26e
+
+## Round 4 — Call Room (/calls) for Maddox — 2026-09-15
+| Lane | Change | Proof |
+|---|---|---|
+| dial-list | Overdue-callback urgency on the dial list (red border/bg/pill + "due in X"), matches Callbacks/Today; 60s tick | tsc ✓ |
+| signallinks | Audited clean (link safety + tokens already correct) | tsc ✓ |
+| verify | caught duplicate `background` key wiping non-overdue card bg -> fixed | tsc ✓ |
+| safety | clean | — |
+| practicality | Today overdue pill outline/wording mismatch -> harmonized to solid "Overdue" + "X late" | clean console |
+Committed: 0f905bc, d0e6dc8 · Backlog #2 drained

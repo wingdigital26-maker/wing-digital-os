@@ -210,6 +210,21 @@ const FILTERS = [
 const statusColor = (s: string) =>
   OUTCOMES.find((o) => o.key === s)?.tone ?? "#64748b";
 
+// Same "when is this due" phrasing as the Callbacks board, so a caller who
+// bounces between the two screens reads one language, not two.
+const dueText = (iso: string | null, now: Date): string | null => {
+  if (!iso) return null;
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return null;
+  const diff = t - now.getTime();
+  const mins = Math.round(Math.abs(diff) / 60000);
+  const rel =
+    mins < 60 ? `${mins} min` :
+    mins < 1440 ? `${Math.round(mins / 60)} hr` :
+    `${Math.round(mins / 1440)} day${Math.round(mins / 1440) === 1 ? "" : "s"}`;
+  return diff < 0 ? `${rel} late` : `due in ${rel}`;
+};
+
 export default function CallRoom() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
@@ -232,6 +247,10 @@ export default function CallRoom() {
   const [total, setTotal] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [pageSize, setPageSize] = useState(PAGE);
+  // Ticks once a minute so an overdue callback flips loud without a reload.
+  // Minute granularity is plenty for a "how late is this" label and keeps the
+  // derived-data memo below from recomputing on every render.
+  const [now, setNow] = useState(() => new Date());
 
   // Filters and search stay server-driven; changing any of them starts back at
   // the first page.
@@ -272,6 +291,11 @@ export default function CallRoom() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(t);
+  }, []);
 
   // Desktop keyboard speed while the call panel is open: Escape closes it
   // (same as tapping Close), and 1-5 log the same five outcomes as the
@@ -413,16 +437,23 @@ export default function CallRoom() {
   // Everything the list card needs from the jsonb columns is derived ONCE per
   // load, keyed by lead id, so scrolling hundreds of rows never re-parses JSON.
   const derived = useMemo(() => {
-    const m = new Map<string, { chips: Chip[]; cautions: number; tier: "A" | "B" | "C" | null }>();
+    const m = new Map<string, {
+      chips: Chip[]; cautions: number; tier: "A" | "B" | "C" | null;
+      overdue: boolean; due: string | null;
+    }>();
     for (const l of leads) {
+      const isCallback = l.status === "callback";
+      const t = isCallback && l.next_action_at ? Date.parse(l.next_action_at) : NaN;
       m.set(l.id, {
         chips: readChips(l.chips).slice(0, 4),
         cautions: readCautions(l.cautions).length,
         tier: tierField ? readTier(l[tierField]) : null,
+        overdue: isCallback && !Number.isNaN(t) && t < now.getTime(),
+        due: isCallback ? dueText(l.next_action_at, now) : null,
       });
     }
     return m;
-  }, [leads, tierField]);
+  }, [leads, tierField, now]);
 
   // Distinct verticals present on the loaded page, offered as a category row so
   // the caller can line up all the roofers (or all the plumbers) at once. The
@@ -607,13 +638,20 @@ export default function CallRoom() {
             const rating = ratingLabel(l.google_rating, l.google_reviews);
             const web = websiteLabel(l);
             const angle = str(l.angle);
+            const d = derived.get(l.id);
+            const overdue = d?.overdue ?? false;
             return (
             <div key={l.id} style={{
               ...card, display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap",
               // Nameless leads (most of the list) are still fully workable but
               // read as secondary: a muted left rail and a hair less presence.
-              borderLeft: `3px solid ${named ? "var(--accent)" : "var(--border)"}`,
-              opacity: named ? 1 : 0.82,
+              // An overdue callback overrides all of that — same red urgency
+              // treatment as the Callbacks board (color-mix border/background),
+              // because a missed follow-up matters more than the name-rail cue.
+              borderLeft: `3px solid ${overdue ? "var(--red)" : named ? "var(--accent)" : "var(--border)"}`,
+              borderColor: overdue ? "color-mix(in srgb, var(--red) 55%, transparent)" : undefined,
+              background: overdue ? "color-mix(in srgb, var(--red) 7%, var(--bg-card))" : undefined,
+              opacity: overdue ? 1 : named ? 1 : 0.82,
             }}>
               <div
                 title="Lead score: higher = more worth calling. Green from 65 up."
@@ -639,6 +677,22 @@ export default function CallRoom() {
                   <span style={{ ...pill, borderColor: statusColor(l.status), color: statusColor(l.status) }}>
                     {OUTCOMES.find((o) => o.key === l.status)?.label ?? "Not called yet"}
                   </span>
+                  {/* Overdue callbacks get the loudest treatment on the card,
+                      matching the Callbacks board exactly (var(--red) solid
+                      pill). A callback that is merely due later stays subtle
+                      -- a muted tabular-nums label, not a loud pill -- and a
+                      callback with no date recorded shows nothing here at all
+                      (honest: we don't know, so we don't imply urgency). */}
+                  {d?.overdue && (
+                    <span style={{ ...pill, borderColor: "var(--red)", color: "#fff", background: "var(--red)" }}>
+                      Overdue
+                    </span>
+                  )}
+                  {l.status === "callback" && !d?.overdue && d?.due && (
+                    <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
+                      {d.due}
+                    </span>
+                  )}
                   {l.claim === "taken" && (
                     <span style={{ ...pill, borderColor: "#f97316", color: "#f97316" }}>
                       on a call with {l.claimed_by_email ? displayName(l.claimed_by_email) : "someone"}

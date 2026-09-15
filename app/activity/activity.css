@@ -230,6 +230,69 @@ table.act-table {
 .act-loading, .act-error { font-size: 13px; color: var(--text-muted); padding: 20px 0; }
 .act-error { color: var(--red); }
 
+/* ── Instantly — live sending ─────────────────────────────────────── */
+.act-instantly { margin-bottom: 34px; }
+.inst-campaign {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.inst-campaign-name { font-size: 15px; font-weight: 700; color: var(--text-primary); }
+.inst-campaign-schedule { font-size: 12px; color: var(--text-muted); }
+.inst-caption {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.inst-subhead {
+  font-size: 13px;
+  margin: 20px 0 10px;
+  color: var(--text-primary);
+}
+
+.inst-inbox {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.inst-email {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-card);
+  padding: 14px 16px;
+}
+.inst-email-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: baseline;
+}
+.inst-to { font-size: 13.5px; font-weight: 700; color: var(--text-primary); overflow-wrap: anywhere; }
+.inst-time { font-size: 11.5px; color: var(--text-muted); white-space: nowrap; }
+.inst-email-meta { font-size: 11.5px; color: var(--text-muted); margin-top: 2px; overflow-wrap: anywhere; }
+.inst-email-subject { font-size: 13px; font-weight: 600; color: var(--text-primary); margin-top: 8px; overflow-wrap: anywhere; }
+.inst-email-body {
+  margin-top: 6px;
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-width: 60ch;
+}
+
+.inst-sequence { margin-top: 16px; }
+
+@media (max-width: 480px) {
+  .inst-email-head { flex-direction: column; align-items: flex-start; gap: 2px; }
+  .inst-email-body { max-width: 100%; }
+}
+
 .act-refresh {
   float: right;
   background: none;

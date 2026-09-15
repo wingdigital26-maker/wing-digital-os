@@ -238,3 +238,14 @@ Staff can send review asks manually today; automated sending still OFF.
 | verify | CLEAN: captions verbatim+rule-compliant (no pricing/dx/phone/em-dash), clipboard+localStorage safe, reachable, no live-status dots |
 | regression | npm run build exit 0 (/gbp in manifest); tsc 0 errors |
 Draft-and-copy (no free GBP API); human posts manually. Additive, no existing-surface changes.
+
+## 2026-09-15 — jaswarm Round 1 · Instantly live-sending visibility in the OS
+| Lane | Change | Proof |
+|---|---|---|
+| data | New read-only route GET /api/outreach/instantly + lib/instantly.ts proxying Instantly V2 (campaign, analytics, real sent emails, leads); fail-closed, 30s cache | curl 200, available:true, 6 real sent emails in-contract |
+| visual | "Instantly — live sending" section at top of /activity: campaign + schedule, stat tiles (Sent/Contacted/Leads/Opens/Replies/Bounced), "The actual emails" readable cards (to/from/time/subject/body), collapsible sequence | rendered live :4739, 375px overflow=0 |
+| fix | Removed green "sending live" status pill (violates no-status-dots rule) -> muted italic honest note | screenshot |
+| fix | describeSchedule now handles Instantly numeric day keys -> "Mon-Fri 09:00-17:00 America/Chicago" (was dropping weekdays, read as always-on) | curl schedule field |
+| fix | overflow-wrap:anywhere on inst-to/meta/subject/body -> long addresses/URLs cannot break mobile layout | verify finding #1 |
+| safety | clean — no key/secret exposure, no XSS (bodies render as text), no SSRF; route matches existing no-auth baseline (pre-existing product-wide, not new) | safety gate |
+| regression | tsc --noEmit clean whole project | EXIT 0 |

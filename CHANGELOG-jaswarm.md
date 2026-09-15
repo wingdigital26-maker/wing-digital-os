@@ -174,3 +174,13 @@ Committed: 0f905bc, d0e6dc8 · Backlog #2 drained
 | safety | clean | — |
 | practicality | not fully dialed: Callbacks panel lacks dial-list panel parity (1-5 keys, intel, portal, quick-log) -> R6 target | — |
 Committed: aa2770c
+
+## Round 6 — Call Room (/calls) for Maddox — 2026-09-15
+| Lane | Change | Proof |
+|---|---|---|
+| callbacks-parity | Callbacks panel reaches Dial-list parity: createPortal (header-overlap fix), 1-4 outcome keys + badges + hint, per-card quick-log, intel surface (angle/chips/socials/cautions/SignalLinks) | tsc ✓, fresh-tab console ✓ |
+| fix | Callbacks confirms dateless "call back" (matches dial list) | tsc ✓ |
+| verify | no regressions (digit mapping, guards, portal, hoisting, props all traced) | tsc ✓ |
+| safety | clean (flagged socials scheme-guard as defense-in-depth -> backlog) | — |
+| runtime | /calls/callbacks 200; a mid-edit "Expected ','" was stale, absent on fresh mount | ✓ |
+Committed: 6814898, a5399f5 · Backlog #R6 drained (tier pill deferred)

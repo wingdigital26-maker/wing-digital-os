@@ -650,7 +650,10 @@ export default function CallRoom() {
               // because a missed follow-up matters more than the name-rail cue.
               borderLeft: `3px solid ${overdue ? "var(--red)" : named ? "var(--accent)" : "var(--border)"}`,
               borderColor: overdue ? "color-mix(in srgb, var(--red) 55%, transparent)" : undefined,
-              background: overdue ? "color-mix(in srgb, var(--red) 7%, var(--bg-card))" : undefined,
+              // Explicit base (not undefined): this key overrides card.background
+              // in the same literal, so a non-overdue card must restate it or it
+              // loses its background entirely.
+              background: overdue ? "color-mix(in srgb, var(--red) 7%, var(--bg-card))" : "var(--bg-card)",
               opacity: overdue ? 1 : named ? 1 : 0.82,
             }}>
               <div

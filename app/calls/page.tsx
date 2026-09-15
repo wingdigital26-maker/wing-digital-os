@@ -190,11 +190,15 @@ function ResearchNotes({ notes }: { notes: string }) {
   );
 }
 
+// Relative due phrasing kept word-for-word in step with the Dial list and
+// Callbacks board ("due in X" / "X late", word units) so a caller reads one
+// language across all three screens.
 function due(iso: string) {
   const ms = Date.parse(iso) - Date.now();
   const m = Math.round(Math.abs(ms) / 60000);
-  const s = m < 60 ? `${m}m` : m < 1440 ? `${Math.round(m / 60)}h` : `${Math.round(m / 1440)}d`;
-  return ms < 0 ? `${s} overdue` : `due in ${s}`;
+  const days = Math.round(m / 1440);
+  const s = m < 60 ? `${m} min` : m < 1440 ? `${Math.round(m / 60)} hr` : `${days} day${days === 1 ? "" : "s"}`;
+  return ms < 0 ? `${s} late` : `due in ${s}`;
 }
 
 export default function TodayDashboard() {
@@ -290,15 +294,25 @@ export default function TodayDashboard() {
                 <div style={{ flex: "1 1 240px", minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                     <span style={{ fontSize: 15, fontWeight: 700 }}>{l.company}</span>
-                    <span
-                      style={{
-                        ...pill,
-                        borderColor: l.overdue ? "var(--red)" : "#eab308",
-                        color: l.overdue ? "var(--red)" : "#eab308",
-                      }}
-                    >
-                      {l.next_action_at ? due(l.next_action_at) : "due"}
-                    </span>
+                    {/* Overdue reads exactly as on the Dial list and Callbacks
+                        board: a solid red "Overdue" pill plus a muted relative
+                        time. A merely-upcoming callback keeps the calm outline. */}
+                    {l.overdue ? (
+                      <>
+                        <span style={{ ...pill, borderColor: "var(--red)", color: "#fff", background: "var(--red)" }}>
+                          Overdue
+                        </span>
+                        {l.next_action_at && (
+                          <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
+                            {due(l.next_action_at)}
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <span style={{ ...pill, borderColor: "#eab308", color: "#eab308" }}>
+                        {l.next_action_at ? due(l.next_action_at) : "due"}
+                      </span>
+                    )}
                   </div>
                   <ContactLine contact_name={l.contact_name} title={l.title} extra={[l.city]} />
                   {isResearchDump(l.title) && <ResearchNotes notes={l.title} />}

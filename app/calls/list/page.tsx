@@ -273,6 +273,22 @@ export default function CallRoom() {
     load();
   }, [load]);
 
+  // Desktop keyboard speed: Escape closes the open call panel, same as tapping
+  // Close, without reaching for the mouse. Skipped while a text field has
+  // focus so it never eats an Escape meant to blur notes/date first.
+  useEffect(() => {
+    if (!active) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "TEXTAREA" || tag === "INPUT") return;
+      closeLead();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active]);
+
   // Refresh while idle so a caller sees what teammates are claiming in near
   // real time. Paused while a lead is open so the list cannot shuffle mid-call.
   useEffect(() => {

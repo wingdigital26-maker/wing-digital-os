@@ -528,7 +528,9 @@ const btnPrimary: React.CSSProperties = {
   fontSize: 13, fontWeight: 700, cursor: "pointer",
 };
 const btnGhost: React.CSSProperties = {
-  padding: "8px 14px", borderRadius: 10, border: "1px solid var(--border)",
+  padding: "8px 14px", minHeight: 40,
+  display: "inline-flex", alignItems: "center", justifyContent: "center",
+  borderRadius: 10, border: "1px solid var(--border)",
   background: "var(--bg-hover)", color: "var(--text-primary)",
   fontSize: 12.5, fontWeight: 600, cursor: "pointer", textDecoration: "none",
 };

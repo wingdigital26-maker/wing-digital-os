@@ -303,10 +303,12 @@ export default function TodayDashboard() {
                   <ContactLine contact_name={l.contact_name} title={l.title} extra={[l.city]} />
                   {isResearchDump(l.title) && <ResearchNotes notes={l.title} />}
                 </div>
-                {l.phone && (
+                {l.phone ? (
                   <a href={`tel:${l.phone.replace(/[^+\d]/g, "")}`} style={btnPrimary}>
                     Call {l.phone}
                   </a>
+                ) : (
+                  <span style={{ ...btnGhost, opacity: 0.5 }}>no phone on file</span>
                 )}
               </div>
             ))}

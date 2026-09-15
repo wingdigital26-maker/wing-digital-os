@@ -201,3 +201,14 @@ Committed: 662114f · Backlog: 1 left (palette tokenization, low-value/high-risk
 | audit | Whole-path read-only review: verdict ESSENTIALLY DIALED, one real bug found | — |
 | fix | Confirm before one-tap "Signed" on the list card (quickLog), matching the panel | tsc ✓, /calls/list 200 |
 Committed: f7be1e2 · Verdict: caller path dialed; remaining backlog is low-value/high-risk or minor nits
+
+## batch2 Round 1 — 2026-09-15 (SEO->build: review-request SMS plumbing)
+| Lane | Result |
+|---|---|
+| build:review-sms-plumbing | migration 0034 (clients.google_review_url), reviews/send threads real link + skips linkless clients, queue_review_requests.py (dry-run sweep, all gates, sending OFF) |
+| verify | 2 bugs found: unescaped + in PostgREST phone filters; same-run double-queue race |
+| safety | 1 bug: STOP-after-queue consent gap (send-time only checked do_not_contact) |
+| fix | all 3 fixed: urllib.parse.quote on filter values; in-run queued-contact set; isOptedOut() consent check in reviews/send |
+| regression | tsc --noEmit 0 errors; py_compile clean |
+| smoke test | reviews/send loads + gates 401 unauth (send-path behind auth+REVIEWS_SEND_ENABLED, not runtime-armed) |
+Sending remains DISABLED (REVIEWS_SEND_ENABLED fail-closed). Branch ja/loop, no deploy.

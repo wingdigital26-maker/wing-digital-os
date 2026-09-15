@@ -17,7 +17,9 @@ import { sbGet, sbPatch, esc } from "../../pipeline/_lib";
 // reads its answer. A "not armed" answer stops the run and leaves rows queued.
 //
 // It never sends to a do_not_contact contact, never sends when the needed
-// address is missing, and is idempotent: it only ever reads status='queued'
+// address is missing, never sends a client's row when that client has no
+// google_review_url on file (migration 0034 -- a review ask with no link to
+// click is useless), and is idempotent: it only ever reads status='queued'
 // rows, so a request already 'requested' is never re-sent.
 //
 // Auth mirrors /api/notify and /api/sms/send: a staff OS session OR the machine
@@ -62,6 +64,40 @@ type ContactRow = {
   do_not_contact: boolean;
 };
 
+type ConsentRow = {
+  granted_at: string | null;
+  revoked_at: string | null;
+};
+
+// Mirrors gate 3 in scripts/queue_review_requests.py: do_not_contact alone
+// does not catch an inbound STOP (app/api/sms/inbound writes that to
+// public.consent, not to crm_contacts.do_not_contact), so this checks the
+// same consent ledger the STOP handler writes before every send. Looks at
+// the newest consent row per address/channel; opted out when that row is a
+// revoke with no later grant.
+async function isOptedOut(phone: string | null, email: string | null): Promise<boolean> {
+  const checks: Array<{ addr: string; channel: string }> = [];
+  if (phone) checks.push({ addr: phone, channel: "sms" });
+  if (email) checks.push({ addr: email, channel: "email" });
+  for (const { addr, channel } of checks) {
+    let rows: ConsentRow[];
+    try {
+      rows = await sbGet<ConsentRow>(
+        "consent",
+        "granted_at,revoked_at",
+        `address=eq.${esc(addr)}&channel=eq.${esc(channel)}&order=id.desc&limit=1`
+      );
+    } catch {
+      continue;
+    }
+    const latest = rows[0];
+    if (!latest) continue;
+    if (latest.revoked_at && !latest.granted_at) return true;
+    if (latest.revoked_at && latest.granted_at && latest.revoked_at > latest.granted_at) return true;
+  }
+  return false;
+}
+
 // Best-effort E.164 normalisation for a US-style number. Returns null when the
 // value cannot be trusted as a real number, so the caller skips rather than
 // sends somewhere wrong. A value already in +... form with 8-15 digits passes
@@ -82,27 +118,28 @@ function firstName(contact: ContactRow): string {
   return n.split(/\s+/)[0];
 }
 
-// Honest, generic, non-spammy review-request copy. No fabricated links (the
-// clients table has no review URL to offer), no em dashes, no unrendered
-// tokens — the email route's copy guard rejects both.
-function smsBody(brand: string, first: string): string {
+// Honest, non-spammy review-request copy. Requires a REAL google_review_url
+// (migration 0034) -- callers must not invoke these without one; the send
+// loop below skips a row rather than call these when a client has no link on
+// file. No em dashes, no unrendered tokens, no phone-number CTA (the link is
+// the only call to action).
+function smsBody(brand: string, first: string, reviewUrl: string): string {
   return (
     `Hi ${first}, this is ${brand}. Thank you for choosing us. ` +
-    `If you have a minute, a quick review would mean a lot and helps other ` +
-    `local folks find us. Thank you so much.`
+    `If you have a minute, we would really appreciate a quick review: ${reviewUrl}`
   );
 }
 
 function emailSubject(brand: string): string {
-  return `A quick favor from ${brand}`;
+  return `Thanks for choosing ${brand}`;
 }
 
-function emailBody(brand: string, first: string): string {
+function emailBody(brand: string, first: string, reviewUrl: string): string {
   return (
     `Hi ${first},\n\n` +
     `Thank you for choosing ${brand}. It was a pleasure working with you.\n\n` +
-    `If you have a moment, we would be grateful for a short review. A few ` +
-    `honest words go a long way in helping other local folks find us.\n\n` +
+    `If you have a moment, a short review would mean a lot and helps other ` +
+    `local folks find us: ${reviewUrl}\n\n` +
     `Thank you so much,\n${brand}`
   );
 }
@@ -191,23 +228,30 @@ export async function POST(req: NextRequest) {
   let skipped = 0;
   let reason: string | null = null;
 
-  const brandCache = new Map<string, string>();
-  async function brandFor(slug: string): Promise<string> {
+  // Cached per client_slug: { name, reviewUrl }. reviewUrl is null when the
+  // client has none on file yet (migration 0034) -- a row for that client is
+  // skipped below rather than sent with no link to click.
+  const brandCache = new Map<string, { name: string; reviewUrl: string | null }>();
+  async function brandFor(slug: string): Promise<{ name: string; reviewUrl: string | null }> {
     const cached = brandCache.get(slug);
     if (cached) return cached;
     let name = slugToName(slug);
+    let reviewUrl: string | null = null;
     try {
-      const rows = await sbGet<{ slug: string; name: string }>(
+      const rows = await sbGet<{ slug: string; name: string; google_review_url: string | null }>(
         "clients",
-        "slug,name",
+        "slug,name,google_review_url",
         `slug=eq.${esc(slug)}&limit=1`
       );
       if (rows[0]?.name?.trim()) name = rows[0].name.trim();
+      if (rows[0]?.google_review_url?.trim()) reviewUrl = rows[0].google_review_url.trim();
     } catch {
-      // Fall back to the slug-derived name; a lookup miss is not fatal.
+      // Fall back to the slug-derived name with no link; a lookup miss is not
+      // fatal, but it does mean this client's rows get skipped this run.
     }
-    brandCache.set(slug, name);
-    return name;
+    const entry = { name, reviewUrl };
+    brandCache.set(slug, entry);
+    return entry;
   }
 
   for (const r of queued) {
@@ -234,8 +278,21 @@ export async function POST(req: NextRequest) {
       continue;
     }
 
-    const brand = await brandFor(r.client_slug);
+    if (await isOptedOut(toE164(contact.phone), contact.email?.trim().toLowerCase() ?? null)) {
+      skipped++;
+      continue;
+    }
+
+    const { name: brand, reviewUrl } = await brandFor(r.client_slug);
     const first = firstName(contact);
+
+    // No real review link on file for this client: refuse to send a linkless
+    // ask (spec: "a review request with no link to click is close to
+    // useless"). Skip, do not fabricate or fall back to a bare homepage URL.
+    if (!reviewUrl) {
+      skipped++;
+      continue;
+    }
 
     // Build the exact request body for the matching internal send route.
     let path: string;
@@ -250,7 +307,7 @@ export async function POST(req: NextRequest) {
       payload = {
         to,
         subject: emailSubject(brand),
-        body: emailBody(brand, first),
+        body: emailBody(brand, first, reviewUrl),
         client_slug: r.client_slug,
         contact_id: contact.id,
       };
@@ -264,7 +321,7 @@ export async function POST(req: NextRequest) {
       path = "/api/sms/send";
       payload = {
         to,
-        body: smsBody(brand, first),
+        body: smsBody(brand, first, reviewUrl),
         client_slug: r.client_slug,
         contact_id: contact.id,
       };

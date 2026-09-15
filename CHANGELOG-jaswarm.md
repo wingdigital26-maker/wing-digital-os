@@ -142,3 +142,15 @@ Committed: e26812e, a575643
 | practicality | buried hint + interleaved badges -> top cue + contiguous order | clean-tab ✓ |
 | runtime | routes 200, API 401 (gated); "changed size" warning was Fast-Refresh artifact, absent on clean mount | ✓ |
 Committed: 2463523, 5916945, 39d9688, 01879e6
+
+## Round 3 — Call Room (/calls) for Maddox — 2026-09-15
+| Lane | Change | Proof |
+|---|---|---|
+| booked | Guard research-dump blobs off the caller contact line | tsc ✓ |
+| callbacks | Overdue red -> var(--red)/color-mix (AA light mode) + panel urgency color + tabular-nums | tsc ✓, tokens ✓ |
+| today | tabular-nums on stat/funnel/score | tsc ✓ |
+| fix | Unified overdue red + booked green across Today/Schedule; dial-list score tabular-nums | tsc ✓, clean console |
+| verify | no regressions (null due-times, separator/fallback traced) | tsc ✓ |
+| safety | clean | — |
+| practicality | 5 findings: #1/#3/#5 fixed, #2 -> backlog, #4 false alarm | — |
+Committed: 98ac767, 55ef26e

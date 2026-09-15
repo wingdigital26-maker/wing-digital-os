@@ -272,7 +272,7 @@ export default function Callbacks() {
         return (
           <section key={b.key} style={{ marginTop: 24 }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-              <h2 style={{ fontSize: 15, fontWeight: 800, color: loud ? "#f87171" : "var(--text-primary)" }}>
+              <h2 style={{ fontSize: 15, fontWeight: 800, color: loud ? "var(--red)" : "var(--text-primary)" }}>
                 {b.label}
               </h2>
               <span style={{ ...pill, borderColor: b.tone, color: b.tone }}>{rows.length}</span>
@@ -288,8 +288,8 @@ export default function Callbacks() {
                     style={{
                       ...card,
                       display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap",
-                      borderColor: loud ? "rgba(239,68,68,0.55)" : "var(--border)",
-                      background: loud ? "rgba(239,68,68,0.07)" : "var(--bg-card)",
+                      borderColor: loud ? "color-mix(in srgb, var(--red) 55%, transparent)" : "var(--border)",
+                      background: loud ? "color-mix(in srgb, var(--red) 7%, var(--bg-card))" : "var(--bg-card)",
                       borderLeft: `4px solid ${b.tone}`,
                     }}
                   >
@@ -299,7 +299,7 @@ export default function Callbacks() {
                         <span style={{
                           ...pill,
                           borderColor: b.tone, color: loud ? "#fff" : b.tone,
-                          background: loud ? "#ef4444" : "transparent",
+                          background: loud ? "var(--red)" : "transparent",
                         }}>
                           {loud ? "Overdue" : b.label}
                         </span>
@@ -325,7 +325,8 @@ export default function Callbacks() {
 
                       <p style={{
                         fontSize: 12.5, marginTop: 5, fontWeight: 700,
-                        color: loud ? "#f87171" : b.tone,
+                        fontVariantNumeric: "tabular-nums",
+                        color: loud ? "var(--red)" : b.tone,
                       }}>
                         {dueLabel(l.next_action_at, now)}
                       </p>
@@ -404,7 +405,11 @@ export default function Callbacks() {
                 <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 3 }}>
                   {[active.contact_name, active.title].filter(Boolean).join(" · ") || "No named contact"}
                 </p>
-                <p style={{ fontSize: 12.5, color: "#eab308", marginTop: 4, fontWeight: 700 }}>
+                <p style={{
+                  fontSize: 12.5, marginTop: 4, fontWeight: 700,
+                  fontVariantNumeric: "tabular-nums",
+                  color: bucketOf(active.next_action_at, now) === "overdue" ? "var(--red)" : "var(--orange)",
+                }}>
                   Call back {dueLabel(active.next_action_at, now)}
                 </p>
               </div>

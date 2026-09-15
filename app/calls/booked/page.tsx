@@ -38,6 +38,13 @@ type Activity = {
 
 type Row = { lead: Lead; booking: Activity | null };
 
+// Some rows carry internal research dumps in the `title` field ("[factcheck
+// 2026-08-22] ..."). The dial list already keeps these off the caller's
+// screen (see app/calls/list -- isResearchDump); this board must too, or a
+// raw research blob renders in the contact line here.
+const isResearchDump = (t: string | null): t is string =>
+  !!t && (t.trim().startsWith("[") || t.length > 80);
+
 export default function Booked() {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
@@ -151,8 +158,8 @@ export default function Booked() {
                 {lead.contact_name && (
                   <span style={{ color: "var(--text-primary)", fontWeight: 600 }}>{lead.contact_name}</span>
                 )}
-                {lead.contact_name && [lead.title, lead.city, lead.vertical].some(Boolean) ? " · " : ""}
-                {[lead.title, lead.city, lead.vertical].filter(Boolean).join(" · ")
+                {lead.contact_name && [isResearchDump(lead.title) ? null : lead.title, lead.city, lead.vertical].some(Boolean) ? " · " : ""}
+                {[isResearchDump(lead.title) ? null : lead.title, lead.city, lead.vertical].filter(Boolean).join(" · ")
                   || (lead.contact_name ? "" : "No named contact")}
               </p>
 

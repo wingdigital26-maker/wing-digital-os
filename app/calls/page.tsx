@@ -337,6 +337,7 @@ export default function TodayDashboard() {
                     display: "flex", alignItems: "center", justifyContent: "center",
                     background: "var(--bg-hover)", border: "1px solid var(--border)",
                     fontSize: 14, fontWeight: 800,
+                    fontVariantNumeric: "tabular-nums",
                     color: (l.score ?? 0) >= 65 ? "var(--green)" : "var(--text-muted)",
                   }}
                 >
@@ -497,6 +498,7 @@ const statNum: React.CSSProperties = {
   fontWeight: 800,
   letterSpacing: -1,
   lineHeight: 1.1,
+  fontVariantNumeric: "tabular-nums",
 };
 const statLabel: React.CSSProperties = {
   fontSize: 12,

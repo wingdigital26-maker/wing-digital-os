@@ -164,3 +164,13 @@ Committed: 98ac767, 55ef26e
 | safety | clean | — |
 | practicality | Today overdue pill outline/wording mismatch -> harmonized to solid "Overdue" + "X late" | clean console |
 Committed: 0f905bc, d0e6dc8 · Backlog #2 drained
+
+## Round 5 — Call Room (/calls) for Maddox (Level-4 picky) — 2026-09-15
+| Lane | Change | Proof |
+|---|---|---|
+| callbacks | Escape-closes-panel (matches dial list) + closeLead useCallback (stable listener) | tsc ✓ |
+| booked | tabular-nums on the two date lines | tsc ✓ |
+| verify | no regressions (deps, call sites, no double-fire traced) | tsc ✓ |
+| safety | clean | — |
+| practicality | not fully dialed: Callbacks panel lacks dial-list panel parity (1-5 keys, intel, portal, quick-log) -> R6 target | — |
+Committed: aa2770c

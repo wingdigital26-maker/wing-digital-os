@@ -184,3 +184,13 @@ Committed: aa2770c
 | safety | clean (flagged socials scheme-guard as defense-in-depth -> backlog) | — |
 | runtime | /calls/callbacks 200; a mid-edit "Expected ','" was stale, absent on fresh mount | ✓ |
 Committed: 6814898, a5399f5 · Backlog #R6 drained (tier pill deferred)
+
+## Round 7 — Call Room (/calls) for Maddox — 2026-09-15
+| Lane | Change | Proof |
+|---|---|---|
+| list-a11y-harden | Panel role=dialog/aria-modal/aria-labelledby + focus-on-open; socials scheme guard (safeSocialUrl) | tsc ✓ |
+| callbacks-a11y-tier | Same a11y + socials guard (isSafeUrl); tier pill parity with dial list | tsc ✓ |
+| verify | no regressions (focus effect fires only on active-change; guards drop js:/data:; readTier null-safe) | tsc ✓ |
+| safety | clean — both scheme guards are allowlists, no bypass | — |
+| runtime | /calls/list + /calls/callbacks 200, console clean | ✓ |
+Committed: 662114f · Backlog: 1 left (palette tokenization, low-value/high-risk)

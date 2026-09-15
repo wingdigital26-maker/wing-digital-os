@@ -182,7 +182,7 @@ export default function Callbacks() {
     setHistory(h.ok ? (await h.json()).activity ?? [] : []);
   }
 
-  async function closeLead(release = true) {
+  const closeLead = useCallback(async (release = true) => {
     if (active && release) {
       await fetch("/api/calls/claim", {
         method: "POST",
@@ -193,7 +193,21 @@ export default function Callbacks() {
     setActive(null);
     setHistory([]);
     load();
-  }
+  }, [active, load]);
+
+  // Desktop keyboard speed to match the dial list's call panel: Escape closes
+  // it, same as tapping Close. Skipped while a text field has focus so
+  // dismissing a callback date picker with Escape doesn't also close the panel.
+  useEffect(() => {
+    if (!active) return;
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "TEXTAREA" || tag === "INPUT") return;
+      if (e.key === "Escape") closeLead();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [active, closeLead]);
 
   async function disposition(outcome: string) {
     if (!active) return;

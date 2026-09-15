@@ -163,7 +163,7 @@ export default function Booked() {
                   || (lead.contact_name ? "" : "No named contact")}
               </p>
 
-              <p style={{ fontSize: 12.5, color: "#4ade80", marginTop: 6, fontWeight: 600 }}>
+              <p style={{ fontSize: 12.5, color: "#4ade80", marginTop: 6, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
                 {booking
                   ? `Booked by ${displayName(booking.user_email)} · ${new Date(booking.created_at).toLocaleString()}`
                   : lead.last_called_at
@@ -172,7 +172,7 @@ export default function Booked() {
               </p>
 
               {lead.next_action_at && (
-                <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 3 }}>
+                <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 3, fontVariantNumeric: "tabular-nums" }}>
                   Meeting set for {new Date(lead.next_action_at).toLocaleString()}
                 </p>
               )}

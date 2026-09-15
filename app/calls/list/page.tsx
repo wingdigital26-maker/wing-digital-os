@@ -436,6 +436,12 @@ export default function CallRoom() {
   // Opening the panel to record "no answer" is three taps for the most common
   // result of a cold call, and the sheet Maddox already works needs one.
   async function quickLog(lead: Lead, outcome: string) {
+    // Signed is the highest-stakes, hardest-to-walk-back outcome. The panel path
+    // (disposition) confirms it; the one-tap card path must too, or a single
+    // phone mis-tap marks a company Signed with no undo.
+    if (outcome === "signed") {
+      if (!window.confirm(`Mark ${lead.company} as Signed?`)) return;
+    }
     setBusy(true);
     setError(null);
     const r = await fetch("/api/calls/disposition", {

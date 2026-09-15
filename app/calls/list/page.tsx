@@ -668,7 +668,7 @@ export default function CallRoom() {
             const overdue = d?.overdue ?? false;
             return (
             <div key={l.id} style={{
-              ...card, display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap",
+              ...card, display: "flex", gap: 14, alignItems: "flex-start", flexWrap: "wrap",
               // Nameless leads (most of the list) are still fully workable but
               // read as secondary: a muted left rail and a hair less presence.
               // An overdue callback overrides all of that — same red urgency
@@ -783,12 +783,15 @@ export default function CallRoom() {
                 {/* The opener hook, one glance. Clamped to two lines here; the
                     full text sits in the "Say this" box when the panel opens. */}
                 {angle && (
-                  <p style={{
-                    fontSize: 12.5, color: "var(--accent)", marginTop: 5, lineHeight: 1.4,
-                    display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
+                  <div style={{
+                    marginTop: 9, fontSize: 13.5, lineHeight: 1.5, color: "var(--text-primary)",
+                    background: "color-mix(in srgb, var(--accent) 8%, transparent)",
+                    border: "1px solid color-mix(in srgb, var(--accent) 24%, transparent)",
+                    borderRadius: 10, padding: "9px 11px",
                   }}>
-                    <span style={{ fontWeight: 700 }}>Angle: </span>{angle}
-                  </p>
+                    <span style={{ display: "block", fontSize: 10.5, textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 800, color: "var(--accent)", marginBottom: 3 }}>Say this</span>
+                    {angle}
+                  </div>
                 )}
                 {(derived.get(l.id)?.chips.length ?? 0) > 0 && (
                   <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginTop: 6 }}>
@@ -813,9 +816,12 @@ export default function CallRoom() {
                   </details>
                 )}
                 {displaySignals(l.signals) && (
-                  <p style={{ fontSize: 12, color: "var(--accent)", marginTop: 5, lineHeight: 1.45 }}>
-                    <SignalLinks signals={displaySignals(l.signals)!} company={l.company} city={l.city} website={l.website} />
-                  </p>
+                  <div style={{ marginTop: 8 }}>
+                    <span style={{ display: "block", fontSize: 10, textTransform: "uppercase", letterSpacing: 0.7, fontWeight: 700, color: "var(--text-muted)", marginBottom: 3 }}>Why they&rsquo;re worth calling</span>
+                    <p style={{ fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.45, margin: 0 }}>
+                      <SignalLinks signals={displaySignals(l.signals)!} company={l.company} city={l.city} website={l.website} />
+                    </p>
+                  </div>
                 )}
                 {l.call_count > 0 && (
                   <p style={{ fontSize: 11.5, color: "var(--text-muted)", marginTop: 4 }}>
@@ -858,27 +864,39 @@ export default function CallRoom() {
                     );
                   })}
                 </div>
-              </div>
 
-              <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
-                {l.phone ? (
-                  <a href={`tel:${l.phone.replace(/[^+\d]/g, "")}`} style={{ ...btnGhost, fontVariantNumeric: "tabular-nums" }}>
-                    {l.phone}
-                  </a>
-                ) : (
-                  <span style={{ ...btnGhost, opacity: 0.5, cursor: "default" }}>no phone</span>
-                )}
-                <button
-                  onClick={() => openLead(l)}
-                  disabled={busy || l.claim === "taken"}
-                  style={{
-                    ...btnPrimary,
-                    opacity: busy || l.claim === "taken" ? 0.45 : 1,
-                    cursor: l.claim === "taken" ? "not-allowed" : "pointer",
-                  }}
-                >
-                  {l.claim === "taken" ? "In use" : "Call"}
-                </button>
+                {/* Actions row, sheet-style: one prominent green primary to work
+                    the lead (claims it + opens the panel), then the dial number
+                    and whatever contact links we have. */}
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 12 }}>
+                  <button
+                    onClick={() => openLead(l)}
+                    disabled={busy || l.claim === "taken"}
+                    style={{
+                      display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7,
+                      minHeight: 44, padding: "11px 20px", borderRadius: 11, border: "none",
+                      background: l.claim === "taken" ? "var(--bg-hover)" : "var(--green)",
+                      color: l.claim === "taken" ? "var(--text-muted)" : "#fff",
+                      fontSize: 14.5, fontWeight: 700,
+                      cursor: l.claim === "taken" ? "not-allowed" : busy ? "wait" : "pointer",
+                      opacity: busy && l.claim !== "taken" ? 0.6 : 1,
+                    }}
+                  >
+                    {l.claim === "taken"
+                      ? `In use by ${l.claimed_by_email ? displayName(l.claimed_by_email) : "someone"}`
+                      : "Call"}
+                  </button>
+                  {l.phone ? (
+                    <a href={`tel:${l.phone.replace(/[^+\d]/g, "")}`} style={{ ...btnGhost, fontVariantNumeric: "tabular-nums" }}>
+                      {l.phone}
+                    </a>
+                  ) : (
+                    <span style={{ ...btnGhost, opacity: 0.5, cursor: "default" }}>no phone</span>
+                  )}
+                  {l.website && <a href={l.website} target="_blank" rel="noreferrer" style={btnGhost}>Website</a>}
+                  {l.email && <a href={`mailto:${l.email}`} style={btnGhost}>Email</a>}
+                  {l.linkedin && <a href={l.linkedin} target="_blank" rel="noreferrer" style={btnGhost}>LinkedIn</a>}
+                </div>
               </div>
             </div>
             );

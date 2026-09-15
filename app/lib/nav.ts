@@ -166,6 +166,8 @@ export const EXTERNAL_SUB_LINKS: Record<string, string> = {
   // 2026-09-13: two new routed sections reached from their sidebar subs.
   dashboards: "/dashboards",
   activity: "/activity",
+  // 2026-09-15: the Marketing > Reviews sub now reaches the review-link admin.
+  reviews: "/reviews",
 };
 
 // ── Routed pages ─────────────────────────────────────────────────────────────
@@ -191,6 +193,7 @@ export const ROUTED_PAGES: RoutedPage[] = [
   // (view:calls etc.) cover the palette, so listing the page too showed every
   // one twice with identical labels.
   { href: "/calls", label: "Call Room", keywords: "cold calling dialer", inStrip: true, inPalette: false },
+  { href: "/reviews", label: "Reviews", keywords: "google review link requests" },
   { href: "/calls/booked", label: "Booked Calls", keywords: "appointments" },
   { href: "/calls/callbacks", label: "Callbacks" },
   { href: "/calls/schedule", label: "Call Schedule" },

@@ -212,3 +212,12 @@ Committed: f7be1e2 · Verdict: caller path dialed; remaining backlog is low-valu
 | regression | tsc --noEmit 0 errors; py_compile clean |
 | smoke test | reviews/send loads + gates 401 unauth (send-path behind auth+REVIEWS_SEND_ENABLED, not runtime-armed) |
 Sending remains DISABLED (REVIEWS_SEND_ENABLED fail-closed). Branch ja/loop, no deploy.
+
+## batch2 Round 2 — 2026-09-15 (Reviews admin UI: the missing write path)
+| Lane | Result |
+|---|---|
+| build:reviews-admin-ui | app/api/reviews/settings (GET/POST/PATCH gated, slug-validated, https-only), app/reviews page+board+css, matches /activity style |
+| nav (main) | app/lib/nav.ts: /reviews routed + Marketing>Reviews sub now navigates there |
+| verify+safety | CLEAN pass: all verbs gated, no injection (slug regex+esc), no stored-XSS, secrets server-side, UI states handled |
+| regression | npm run build exit 0, /reviews in route manifest; tsc 0 errors |
+Makes Round 1 usable: staff can now set each client google_review_url + see queued requests. Sending still OFF.

@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import SignalLinks from "../SignalLinks";
 import { displayName } from "../names";
@@ -279,27 +279,32 @@ export default function CallRoom() {
   // without reaching for the mouse. Both are skipped while a text field has
   // focus, so typing "1" into notes or picking a callback date never fires
   // a shortcut meant for the panel itself.
+  // The handler needs the freshest disposition/closeLead (they close over notes,
+  // callbackAt, busy), but the listener should mount once per open panel, not
+  // resubscribe on every render. A ref bridges the two: the effect depends only
+  // on `active` (constant-size deps), and always runs the latest logic.
+  const panelKeyRef = useRef<(e: KeyboardEvent) => void>(() => {});
+  panelKeyRef.current = (e: KeyboardEvent) => {
+    const tag = (e.target as HTMLElement | null)?.tagName;
+    if (tag === "TEXTAREA" || tag === "INPUT") return;
+    if (e.key === "Escape") {
+      closeLead();
+      return;
+    }
+    // A held digit key repeats keydown far faster than React can flip busy, which
+    // could double-log an outcome. Only the first press counts.
+    if (busy || e.repeat) return;
+    const idx = Number(e.key) - 1;
+    if (Number.isInteger(idx) && idx >= 0 && idx < QUICK.length) {
+      disposition(QUICK[idx].key);
+    }
+  };
   useEffect(() => {
     if (!active) return;
-    const onKey = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement | null)?.tagName;
-      if (tag === "TEXTAREA" || tag === "INPUT") return;
-      if (e.key === "Escape") {
-        closeLead();
-        return;
-      }
-      // A held digit key repeats keydown far faster than React can flip busy in
-      // this listener's closure, which could double-log an outcome. Only the
-      // first press counts.
-      if (busy || e.repeat) return;
-      const idx = Number(e.key) - 1;
-      if (Number.isInteger(idx) && idx >= 0 && idx < QUICK.length) {
-        disposition(QUICK[idx].key);
-      }
-    };
+    const onKey = (e: KeyboardEvent) => panelKeyRef.current(e);
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [active, busy, disposition, closeLead]);
+  }, [active]);
 
   // Refresh while idle so a caller sees what teammates are claiming in near
   // real time. Paused while a lead is open so the list cannot shuffle mid-call.

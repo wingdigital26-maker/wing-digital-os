@@ -119,3 +119,14 @@
 | safety | clean — regexes backtrack-safe, normalize can't synthesize a banned pattern or reintroduce an em dash, fail-closed intact | — |
 | regression | gate 103/103 · poster 50/50 · engine AST ok · OS worktree unchanged | 153/153 ✓ |
 **Committed (worktree):** changelog only; code in ghl-cli (not a repo).
+
+## Round 1 — Call Room (/calls) for Maddox — 2026-09-15
+| Lane | Change | Proof |
+|---|---|---|
+| dial-list | Escape closes the open call panel (skipped while typing) | tsc ✓ |
+| today | Overdue callback w/ no phone shows "no phone on file" not empty | tsc ✓ |
+| secondary | Callbacks + Booked ghost buttons/links -> 40px touch targets | tsc ✓ |
+| practicality | Hid admin-only "Call Team" from command palette; fixed stale middleware->proxy.ts comment | tsc ✓ |
+| safety | clean | — |
+| verify | no confirmed regressions | tsc ✓ |
+Committed: e26812e, a575643

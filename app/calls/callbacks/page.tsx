@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import SignalLinks from "../SignalLinks";
 import { displayName } from "../names";
@@ -81,6 +81,11 @@ const readCautions = (v: unknown): string[] =>
     .map((c) => (typeof c === "string" ? c.trim() : str((c as Record<string, unknown>)?.text)))
     .filter(Boolean);
 
+// Defense-in-depth: only render a URL whose scheme is safe to click.
+// Enrichment data is internal-pipeline, not attacker-reachable, but a bad
+// value should never be able to render as a javascript:/data: href.
+const isSafeUrl = (u: string): boolean => /^(https?:)?\/\//i.test(u);
+
 const readSocials = (v: unknown): Social[] =>
   asArray(v)
     .map((s) => {
@@ -90,9 +95,25 @@ const readSocials = (v: unknown): Social[] =>
       const handle = str(o.handle ?? o.username);
       const url = str(o.url ?? o.link);
       if (!platform && !handle && !url) return null;
-      return { platform: platform || "Profile", handle: handle || null, url: url || null };
+      return { platform: platform || "Profile", handle: handle || null, url: url && isSafeUrl(url) ? url : null };
     })
     .filter(Boolean) as Social[];
+
+// Tier values arrive as "A" / "b" / "tier-c" / "not callable". Normalise to a
+// single letter, or null when it is not one of the three callable tiers.
+// Ported verbatim from list/page.tsx so both screens read tier the same way.
+const readTier = (v: unknown): "A" | "B" | "C" | null => {
+  const t = str(v).toUpperCase();
+  const m = t.match(/(?:^|[^A-Z])([ABC])(?:$|[^A-Z])/) ?? t.match(/^([ABC])$/);
+  if (t.includes("NOT")) return null;
+  return (m?.[1] as "A" | "B" | "C") ?? null;
+};
+
+const TIER_META: Record<string, { label: string; tone: string }> = {
+  A: { label: "A", tone: "#4ade80" },
+  B: { label: "B", tone: "#38bdf8" },
+  C: { label: "C", tone: "#94a3b8" },
+};
 
 const chipTone = (tone: string): { fg: string; bg: string; bd: string } => {
   const t = tone.toLowerCase();
@@ -195,6 +216,10 @@ export default function Callbacks() {
   // Last note per lead, so a caller has context without opening the row.
   const [context, setContext] = useState<Record<string, Activity | null>>({});
   const [now, setNow] = useState(() => new Date());
+  // Which lead column holds buy-likelihood tier -- client-specific and
+  // reported by the API as `tierField`, same as list/page.tsx.
+  const [tierField, setTierField] = useState<string | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
 
   const load = useCallback(async () => {
     const r = await fetch("/api/calls/leads?status=callback&limit=500", { cache: "no-store" });
@@ -209,6 +234,7 @@ export default function Callbacks() {
     // part of the queue either.
     const rows: Lead[] = (d.leads ?? []).filter((l: Lead) => !l.excluded);
     setLeads(rows);
+    setTierField(d.tierField ?? null);
     setError(null);
     setLoading(false);
 
@@ -371,7 +397,15 @@ export default function Callbacks() {
       chips: readChips(active.chips),
       cautions: readCautions(active.cautions),
       socials: readSocials(active.socials),
+      tier: tierField ? readTier(active[tierField]) : null,
+      tierReason: tierField ? str(active[`${tierField}_reason`]) : "",
     };
+  }, [active, tierField]);
+
+  // Move focus into the panel on open, same a11y contract as the dial list:
+  // the Close button is the first focusable and reachable control.
+  useEffect(() => {
+    if (active) panelRef.current?.focus();
   }, [active]);
 
   const overdue = grouped.overdue.length;
@@ -569,15 +603,23 @@ export default function Callbacks() {
             backdropFilter: "blur(3px)",
           }}
         >
-          <div style={{
-            width: "min(680px, 100%)", maxHeight: "92vh", overflowY: "auto",
-            background: "var(--bg-card)", border: "1px solid var(--border)",
-            borderRadius: "20px 20px 0 0", padding: 24,
-            boxShadow: "0 -20px 60px rgba(0,0,0,0.6)",
-          }}>
+          <div
+            ref={panelRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="callback-panel-company"
+            tabIndex={-1}
+            style={{
+              width: "min(680px, 100%)", maxHeight: "92vh", overflowY: "auto",
+              background: "var(--bg-card)", border: "1px solid var(--border)",
+              borderRadius: "20px 20px 0 0", padding: 24,
+              boxShadow: "0 -20px 60px rgba(0,0,0,0.6)",
+              outline: "none",
+            }}
+          >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
               <div>
-                <h2 style={{ fontSize: 20, fontWeight: 800 }}>{active.company}</h2>
+                <h2 id="callback-panel-company" style={{ fontSize: 20, fontWeight: 800 }}>{active.company}</h2>
                 <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 3 }}>
                   {[active.contact_name, active.title].filter(Boolean).join(" · ") || "No named contact"}
                 </p>
@@ -614,6 +656,15 @@ export default function Callbacks() {
                   {activeIntel.angle}
                 </p>
               </div>
+            )}
+
+            {activeIntel?.tier && (
+              <p style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 12, lineHeight: 1.45 }}>
+                <span style={{ ...pill, borderColor: TIER_META[activeIntel.tier].tone, color: TIER_META[activeIntel.tier].tone, marginRight: 7 }}>
+                  tier {activeIntel.tier}
+                </span>
+                {activeIntel.tierReason || "How likely they are to buy."}
+              </p>
             )}
 
             {(activeIntel?.chips.length ?? 0) > 0 && (

@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import SignalLinks from "../SignalLinks";
 import { displayName } from "../names";
@@ -88,6 +88,18 @@ const readCautions = (v: unknown): string[] =>
 
 // Only accounts the enrichment could confirm reach this column. Anything that
 // was merely name-matched belongs in cautions, so nothing here is hedged.
+// Defense-in-depth: only ever accept an http(s) URL out of enrichment data.
+// A scheme-relative "//host/path" is upgraded to https:; anything else
+// (javascript:, data:, vbscript:, etc.) is dropped so a bad value can never
+// render as a clickable dangerous href. Handle/platform survive either way.
+const safeSocialUrl = (raw: string): string | null => {
+  if (!raw) return null;
+  const s = raw.trim();
+  if (s.startsWith("//")) return `https:${s}`;
+  if (/^https?:\/\//i.test(s)) return s;
+  return null;
+};
+
 const readSocials = (v: unknown): Social[] =>
   asArray(v)
     .map((s) => {
@@ -95,7 +107,7 @@ const readSocials = (v: unknown): Social[] =>
       const o = s as Record<string, unknown>;
       const platform = str(o.platform ?? o.network ?? o.site);
       const handle = str(o.handle ?? o.username);
-      const url = str(o.url ?? o.link);
+      const url = safeSocialUrl(str(o.url ?? o.link));
       if (!platform && !handle && !url) return null;
       return { platform: platform || "Profile", handle: handle || null, url: url || null };
     })
@@ -328,6 +340,14 @@ export default function CallRoom() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [active, busy, disposition, closeLead]);
+
+  // Focus-trap-lite: when the panel opens, move focus into it (the Close
+  // button) so keyboard/screen-reader users land inside the dialog instead of
+  // it silently opening behind their still-focused trigger element.
+  const closeBtnRef = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => {
+    if (active) closeBtnRef.current?.focus();
+  }, [active]);
 
   // Refresh while idle so a caller sees what teammates are claiming in near
   // real time. Paused while a lead is open so the list cannot shuffle mid-call.
@@ -891,15 +911,19 @@ export default function CallRoom() {
             backdropFilter: "blur(3px)",
           }}
         >
-          <div style={{
-            width: "min(680px, 100%)", maxHeight: "92vh", overflowY: "auto",
-            background: "var(--bg-card)", border: "1px solid var(--border)",
-            borderRadius: "20px 20px 0 0", padding: 24,
-            boxShadow: "0 -20px 60px rgba(0,0,0,0.6)",
-          }}>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="call-panel-company"
+            style={{
+              width: "min(680px, 100%)", maxHeight: "92vh", overflowY: "auto",
+              background: "var(--bg-card)", border: "1px solid var(--border)",
+              borderRadius: "20px 20px 0 0", padding: 24,
+              boxShadow: "0 -20px 60px rgba(0,0,0,0.6)",
+            }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
               <div>
-                <h2 style={{ fontSize: 20, fontWeight: 800 }}>{active.company}</h2>
+                <h2 id="call-panel-company" style={{ fontSize: 20, fontWeight: 800 }}>{active.company}</h2>
                 {/* The name he asks for, at a size he can read while the phone
                     is already ringing. */}
                 {active.contact_name ? (
@@ -924,7 +948,7 @@ export default function CallRoom() {
                 )}
               </div>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5, flexShrink: 0 }}>
-                <button onClick={() => closeLead()} style={btnGhost}>Close</button>
+                <button ref={closeBtnRef} onClick={() => closeLead()} style={btnGhost}>Close</button>
                 {/* Surfaced at the top so a caller sees the keyboard path before
                     scrolling to the outcome grid at the very bottom. */}
                 <span style={{ fontSize: 10.5, color: "var(--text-muted)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>

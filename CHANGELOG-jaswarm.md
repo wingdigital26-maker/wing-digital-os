@@ -130,3 +130,15 @@
 | safety | clean | — |
 | verify | no confirmed regressions | tsc ✓ |
 Committed: e26812e, a575643
+
+## Round 2 — Call Room (/calls) for Maddox — 2026-09-15
+| Lane | Change | Proof |
+|---|---|---|
+| dial-list | Number keys 1-5 log quick outcomes; numbered badges + top "1-5 / Esc" cue; numbered outcomes render contiguously | tsc ✓, clean-tab console ✓ |
+| sources | Dropped redundant duplicate fetch (2 req -> 1 per load) | tsc ✓ |
+| schedule | aria-label on delete, 40px touch targets, removed dead import | tsc ✓ |
+| verify | caught held-key double-log -> fixed with e.repeat guard | tsc ✓ |
+| safety | flagged unconfirmed high-stakes "Signed" -> added confirm (key+click) | — |
+| practicality | buried hint + interleaved badges -> top cue + contiguous order | clean-tab ✓ |
+| runtime | routes 200, API 401 (gated); "changed size" warning was Fast-Refresh artifact, absent on clean mount | ✓ |
+Committed: 2463523, 5916945, 39d9688, 01879e6

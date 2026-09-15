@@ -102,6 +102,7 @@ export const NAV_TREE: NavGroupDef[] = [
       // feed, read from the same public sources their dashboards use.
       { id: "seo", label: "SEO", keywords: "blog posts content pages published" },
       { id: "reviews", label: "Reviews" },
+      { id: "gbp", label: "GBP Posts", keywords: "google business profile posts staging" },
       { id: "customers", label: "Customers" },
     ],
   },
@@ -168,6 +169,8 @@ export const EXTERNAL_SUB_LINKS: Record<string, string> = {
   activity: "/activity",
   // 2026-09-15: the Marketing > Reviews sub now reaches the review-link admin.
   reviews: "/reviews",
+  // 2026-09-15: Marketing > GBP Posts reaches the GBP staging board.
+  gbp: "/gbp",
 };
 
 // ── Routed pages ─────────────────────────────────────────────────────────────
@@ -194,6 +197,7 @@ export const ROUTED_PAGES: RoutedPage[] = [
   // one twice with identical labels.
   { href: "/calls", label: "Call Room", keywords: "cold calling dialer", inStrip: true, inPalette: false },
   { href: "/reviews", label: "Reviews", keywords: "google review link requests" },
+  { href: "/gbp", label: "GBP Posts", keywords: "google business profile posts staging captions" },
   { href: "/calls/booked", label: "Booked Calls", keywords: "appointments" },
   { href: "/calls/callbacks", label: "Callbacks" },
   { href: "/calls/schedule", label: "Call Schedule" },

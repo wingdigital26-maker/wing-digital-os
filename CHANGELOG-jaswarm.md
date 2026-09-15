@@ -229,3 +229,12 @@ Makes Round 1 usable: staff can now set each client google_review_url + see queu
 | verify | CLEAN: message text byte-identical to prior route copy, no server-code leak, clipboard safe, disabled state correct |
 | regression | npm run build exit 0; tsc 0 errors |
 Staff can send review asks manually today; automated sending still OFF.
+
+## batch2 Round 4 — 2026-09-15 (GBP post staging board)
+| Lane | Result |
+|---|---|
+| build:gbp-staging | app/gbp standalone page: 12 verbatim GBP drafts (3 clients x 4 wks) from research asset, per-client filter, copy-caption, honest local-only "mark posted" |
+| nav (main) | app/lib/nav.ts: /gbp routed + Marketing>GBP Posts sub |
+| verify | CLEAN: captions verbatim+rule-compliant (no pricing/dx/phone/em-dash), clipboard+localStorage safe, reachable, no live-status dots |
+| regression | npm run build exit 0 (/gbp in manifest); tsc 0 errors |
+Draft-and-copy (no free GBP API); human posts manually. Additive, no existing-surface changes.

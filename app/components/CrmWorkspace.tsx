@@ -1590,7 +1590,11 @@ export default function CrmWorkspace({
       {/* rowActions is a plain JSX helper rather than a nested component, so the
           buttons are not remounted (and their busy state lost) on every render. */}
       {loading && rows.length === 0 ? (
-        <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Loading every CRM record</div>
+        <div style={{ display: "grid", gap: 6 }} aria-label="Loading every CRM record">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="skel" style={{ height: 44, borderRadius: 10 }} />
+          ))}
+        </div>
       ) : pane === null ? null : filtered.length === 0 ? (
         <div style={{
           border: "1px dashed var(--border)", borderRadius: 12, padding: 18,

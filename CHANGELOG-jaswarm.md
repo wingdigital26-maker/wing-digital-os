@@ -18,3 +18,13 @@ Committed: 6a23f50 · Open: SW reload-loop is dev-only (SwRegister controllercha
 | perf:polling | SonarBoard 120s poll + Call Room 20s poll gated on visibility (offsetParent/document.hidden); Storm/Competitor had no recurring polls | tsc 0 |
 | regression | tsc 0 + clean next build 0 | ✓ |
 Committed: (this round) · Deployed to prod
+
+## Round 3 — 2026-09-16 (CRM section deep-dive)
+| Lane | Change | Proof |
+|---|---|---|
+| crm-contacts | Contacts view: plain-text loading -> .skel skeleton blocks | tsc 0 |
+| crm-email | Email (CRM default): added landing intro (eyebrow/title/one-liner) so it orients a first-timer | tsc 0 |
+| crm-replies | Reply Inbox + Text (MessageLedger): plain-text loading -> .skel skeletons (list+panel) | tsc 0 |
+| regression | tsc 0 + clean next build 0 | ✓ |
+| safety | clean (presentational diff only) | — |
+Open: SendQueueBoard/DeliverabilityBoard not yet reviewed (backlog).

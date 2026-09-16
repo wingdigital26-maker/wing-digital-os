@@ -440,6 +440,15 @@ async function checkClientPublishing(): Promise<Check[]> {
       // Sample dashboards are demos, not clients, and must not raise alarms.
       if (/summit-ridge/i.test(f)) continue;
       const html = fs.readFileSync(path.join(dir, f), "utf-8");
+      // live.html is the generic runtime-templated dashboard: it starts with
+      // `var DATA = null` and fetches its data client-side per request via
+      // /api/dashboard/<slug>?... based on a `?c=` query param. It is not a
+      // per-client build artifact and never carries a baked `const DATA = `
+      // literal by design, so it must not be judged here (it would always be
+      // "unreadable" and drown the real could-not-check signal in noise).
+      // A genuine baked dashboard missing its DATA block still falls through
+      // to the unreadable branch below, honestly.
+      if (/var DATA = null/.test(html) && /fetch\(['"]\/api\/dashboard\//.test(html)) continue;
       const at = html.indexOf("const DATA = ");
       if (at < 0) {
         // Not a built client dashboard, or the build changed shape. Either way

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sbUrl, sbService, sbSelect } from "@/lib/osSupabase";
 import { pushToAll } from "@/lib/push";
 import { runNimbusWatch, formatWatchReport, alertBody, type Check } from "@/lib/nimbusWatch";
+import { startTriage } from "@/lib/nimbusTriage";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -103,7 +104,21 @@ export async function GET(req: NextRequest) {
   for (const p of watch.problems) {
     const k = alertKey(p);
     const existing = mine.find((a) => a.key === k);
+    const isNew = !existing;
     const due = !existing || !existing.last_pushed || now - new Date(existing.last_pushed).getTime() > REPUSH_MS;
+    // Ready-but-gated L3->L4 wiring: auto-triage fires only for a problem that
+    // has never had an alert row before (a genuine new problem, never a repeat
+    // or a re-push), and only when explicitly armed. Off by default so current
+    // behavior is unchanged. startTriage() is self-gating (isCloud() PC-only
+    // check, its own MAX_CONCURRENT cap) and never throws, but this is wrapped
+    // anyway so a triage failure can never block the phone push below.
+    if (isNew && process.env.NIMBUS_AUTO_TRIAGE === "1") {
+      try {
+        await startTriage(p);
+      } catch (err) {
+        console.error("[nimbus-report] auto-triage failed, continuing", err);
+      }
+    }
     if (due) {
       await pushToAll({
         title: `${p.severity === "high" ? "🔴" : "🟠"} ${p.label}`,

@@ -48,6 +48,7 @@ a{color:inherit}
 button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
 .wrap{max-width:920px;margin:0 auto;padding:0 24px}
+@media(max-width:480px){.wrap{padding:0 16px}.hero-in{padding-left:16px;padding-right:16px}.hdr-in{padding-left:16px;padding-right:16px}}
 
 /* header */
 .hdr{background:var(--surface);border-bottom:1px solid var(--border)}
@@ -110,8 +111,15 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 .hl b{font-size:.92rem;font-weight:700;font-variant-numeric:tabular-nums;color:var(--t1)}
 .hl span{font-size:.82rem;color:var(--t2)}
 
-/* sections */
-section{padding:34px 0 0}
+/* sections -- rhythm: a section that STARTS a new group of related content
+   gets extra headroom and a divider so the eye can tell "new subject" from
+   "more of the same"; a section that continues the same group sits closer to
+   the one above it. Groups: content published -> site health -> reputation &
+   lists -> outreach -> sample activity -> what's next. This is spacing only,
+   never a text label, so it can never say something the data does not. */
+section{padding:22px 0 0}
+section.grp-start{margin-top:22px;padding-top:40px;border-top:1px solid var(--border)}
+section.grp-mid{padding-top:30px}
 .sh{display:flex;align-items:baseline;gap:11px;flex-wrap:wrap}
 .sh h2{font-family:var(--display);font-size:1.22rem;font-weight:700;letter-spacing:-.015em}
 .sh .n{font-size:.79rem;color:var(--t3);font-variant-numeric:tabular-nums}
@@ -480,31 +488,19 @@ section{padding:34px 0 0}
 
 <main class="wrap">
 
-  <!-- What happens next. Generic and config-driven: hidden AND empty unless the
-       payload carries `plan`, and every visible word is injected from the config
-       by the plan() script below, so a client without one ships none of it. -->
-  <section id="plan-sec" hidden>
-    <div class="sh"><h2 id="plan-h"></h2></div>
-    <div class="sd" id="plan-sd"></div>
-    <div class="pl-banner" id="plan-banner" hidden></div>
-    <div class="pl-grid" id="plan-grid"></div>
-    <div class="pl-note" id="plan-note" hidden></div>
-    <a class="pl-cta" id="plan-cta" target="_blank" rel="noopener" hidden></a>
-  </section>
-
   <!-- Referral partners. Generic and config-driven: this whole section exists
        only when the payload carries `referralPartners`, and every visible word
        is injected by the referralPartners() script below. -->
   <!-- SEO and content work leads the page: it is what Wing does for the
        client week to week. Outreach, reviews and hail follow. -->
-<section id="health-sec" hidden>
+<section id="health-sec" class="grp-start" hidden>
     <div class="sh"><h2>Your site, checked just now</h2><span class="n" id="healthn"></span></div>
     <div class="sd">We opened every page on your site as this loaded and checked the things Google
       looks at. These are live readings.</div>
     <div id="health"></div>
   </section>
 
-<section id="chart-sec">
+<section id="chart-sec" class="grp-start">
     <div class="sh"><h2>Published by month</h2></div>
     <div class="sd" id="chart-sd"></div>
     <div class="card">
@@ -513,7 +509,7 @@ section{padding:34px 0 0}
     </div>
   </section>
 
-<section>
+<section class="grp-mid">
     <div class="sh"><h2>What we published</h2><span class="n" id="pubn"></span></div>
     <div class="sd" id="pub-sd">Colours match the chart above. Click any title to open it on your site.</div>
     <div class="card" style="margin-bottom:14px">
@@ -531,20 +527,20 @@ section{padding:34px 0 0}
   <!-- Social sits directly under the content work and reads the same way: it is
        the same job, published somewhere else. Renders only when the client has
        posts on file. -->
-  <section id="soc-sec" hidden>
+  <section id="soc-sec" class="grp-mid" hidden>
     <div class="sh"><h2 id="soc-h"></h2><span class="n" id="soc-n"></span></div>
     <div class="sd" id="soc-sd"></div>
     <div id="soc-list"></div>
     <button class="more" id="soc-more" hidden></button>
   </section>
 
-<section id="pages-sec">
+<section id="pages-sec" class="grp-mid">
     <div class="sh"><h2>Other pages we maintain</h2><span class="n" id="pagen"></span></div>
     <div class="sd">Pages on your site beyond the list above.</div>
     <div id="pages"></div>
   </section>
 
-  <section id="rp-sec" hidden>
+  <section id="rp-sec" class="grp-start" hidden>
     <div class="sh"><h2 id="rp-h"></h2><span class="n" id="rp-n"></span></div>
     <div class="sd" id="rp-sd"></div>
     <div class="pl-banner" id="rp-banner" hidden></div>
@@ -566,7 +562,7 @@ section{padding:34px 0 0}
        either injected by the reviewStanding() script below or read out of the
        source data file. Public ratings and counts as displayed on the pull
        date, plus arithmetic on them. No forecast of any kind. -->
-  <section id="rs-sec" hidden>
+  <section id="rs-sec" class="grp-mid" hidden>
     <div class="sh"><h2 id="rs-h"></h2><span class="n" id="rs-n"></span></div>
     <div class="sd" id="rs-sd"></div>
     <div class="pl-banner" id="rs-banner" hidden></div>
@@ -586,7 +582,7 @@ section{padding:34px 0 0}
        injected by the stormHistory() script below or read out of the source
        data file. Counts of recorded events only: no estimate, no projection,
        no damage or revenue figure. -->
-  <section id="sv-sec" hidden>
+  <section id="sv-sec" class="grp-mid" hidden>
     <div class="sh"><h2 id="sv-h"></h2><span class="n" id="sv-n"></span></div>
     <div class="sd" id="sv-sd"></div>
     <div class="pl-banner" id="sv-banner" hidden></div>
@@ -617,18 +613,18 @@ section{padding:34px 0 0}
        client they stay hidden AND empty, and every visible label is injected by
        the demoActivity() script below, so a real client's output contains none
        of this text. No lead/review/message number is ever fabricated. -->
-  <section id="demo-projection-sec" hidden>
+  <section id="demo-projection-sec" class="grp-start" hidden>
     <div class="dband" id="demo-projection"></div>
   </section>
 
-  <section id="demo-leads-sec" hidden>
+  <section id="demo-leads-sec" class="grp-mid" hidden>
     <div class="sh"><h2 id="demo-lead-h"></h2><span class="n" id="demo-leadn"></span></div>
     <div class="sd" id="demo-lead-sd"></div>
     <div class="dstats" id="demo-lead-stats"></div>
     <div class="card"><div id="demo-lead-list"></div></div>
   </section>
 
-  <section id="demo-msg-sec" hidden>
+  <section id="demo-msg-sec" class="grp-mid" hidden>
     <div class="sh"><h2 id="demo-msg-h"></h2></div>
     <div class="sd" id="demo-msg-sd"></div>
     <div class="dstats" id="demo-msg-stats"></div>
@@ -638,7 +634,7 @@ section{padding:34px 0 0}
     </div>
   </section>
 
-  <section id="demo-contacts-sec" hidden>
+  <section id="demo-contacts-sec" class="grp-mid" hidden>
     <div class="sh"><h2 id="demo-contacts-h"></h2><span class="n" id="demo-contactsn"></span></div>
     <div class="sd" id="demo-contacts-sd"></div>
     <div class="dstats" id="demo-contacts-stats"></div>
@@ -648,7 +644,7 @@ section{padding:34px 0 0}
     </div>
   </section>
 
-        <section id="out-sec">
+        <section id="out-sec" class="grp-start">
     <div class="sh"><h2>Outreach and social</h2><span class="n" id="outn"></span></div>
     <div class="sd" id="out-sd"></div>
     <div class="chans" id="chans"></div>
@@ -659,7 +655,7 @@ section{padding:34px 0 0}
        Hidden and empty unless the payload carries outreachPreview; every
        visible label is injected by the outreachPreview() script, so other
        clients' output contains none of this text. -->
-  <section id="op-sec" hidden>
+  <section id="op-sec" class="grp-mid" hidden>
     <div class="sh"><h2 id="op-h"></h2><span class="n" id="op-n"></span></div>
     <div class="sd" id="op-sd"></div>
     <div id="op-reach"></div>
@@ -680,7 +676,7 @@ section{padding:34px 0 0}
        rest of this dashboard shows the client's own already-public website
        content, but this section is a few thousand enriched B2B contacts and
        must not sit on a guessable URL. -->
-  <section id="leads-sec" hidden>
+  <section id="leads-sec" class="grp-start" hidden>
     <div class="sh"><h2>Who sends you work</h2><span class="n" id="leadn"></span></div>
     <div class="sd" id="leadsd"></div>
     <div class="lstats" id="lstats"></div>
@@ -705,6 +701,20 @@ section{padding:34px 0 0}
     <div class="lwhy" id="lwhy"></div>
     <div id="leads"></div>
     <button class="more" id="leadmore" hidden></button>
+  </section>
+
+  <!-- What happens next. Generic and config-driven: hidden AND empty unless the
+       payload carries `plan`, and every visible word is injected from the config
+       by the plan() script below, so a client without one ships none of it.
+       Placed last: it is a forward-looking closer, after everything already
+       delivered above. -->
+  <section id="plan-sec" class="grp-start" hidden>
+    <div class="sh"><h2 id="plan-h"></h2></div>
+    <div class="sd" id="plan-sd"></div>
+    <div class="pl-banner" id="plan-banner" hidden></div>
+    <div class="pl-grid" id="plan-grid"></div>
+    <div class="pl-note" id="plan-note" hidden></div>
+    <a class="pl-cta" id="plan-cta" target="_blank" rel="noopener" hidden></a>
   </section>
 
     <div class="foot">

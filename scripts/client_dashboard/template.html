@@ -154,6 +154,12 @@ section.grp-mid{padding-top:30px}
   overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .cnote{margin-top:16px;padding-top:14px;border-top:1px solid var(--border);
   font-size:.78rem;color:var(--t3)}
+/* Chart colour key: the bars are stacked by work type, so what each colour
+   means has to sit right under the chart it explains, not several sections
+   later where the same colours reappear on the mix bar. */
+.chart-key{display:flex;flex-wrap:wrap;gap:7px 16px;margin-top:14px}
+.chart-key .ck{display:flex;align-items:center;gap:7px;font-size:.79rem;color:var(--t2)}
+.chart-key .ck i{width:10px;height:10px;border-radius:3px;flex:0 0 auto}
 /* A dense chart (7+ bars) on a phone: 40px labels under 25px bars collide into
    an unreadable smear. Thin to every other label; the bar titles keep the rest. */
 @media(max-width:560px){
@@ -528,6 +534,7 @@ section.grp-mid{padding-top:30px}
     <div class="sd" id="chart-sd"></div>
     <div class="card">
       <div class="chart" id="chart"></div>
+      <div class="chart-key" id="chart-key"></div>
       <div class="cnote" id="cnote"></div>
     </div>
   </section>
@@ -923,6 +930,7 @@ const DATA = __DATA__;
 
   if (!buckets.length) {
     $('#chart').innerHTML = '<div class="empty">Published work will chart here.</div>';
+    $('#chart-key').innerHTML = '';
     $('#chart-sd').textContent = 'Nothing published yet.';
     $('#cnote').textContent = '';
   } else {
@@ -930,6 +938,18 @@ const DATA = __DATA__;
       unit === 'week' ? 'Published by week' : 'Published by month';
     $('#chart-sd').textContent = 'One bar per ' + unit +
       ', split by what kind of work it was.';
+    // Colour key for the stacked bars, right where the chart is -- never make
+    // the reader scroll to the mix bar below to learn what a colour means.
+    (function(){
+      const totals = {};
+      buckets.forEach(bk => Object.keys(bk.byType).forEach(t => {
+        totals[t] = (totals[t]||0) + bk.byType[t];
+      }));
+      const order = Object.keys(totals).sort((a,c)=>totals[c]-totals[a]);
+      $('#chart-key').innerHTML = order.length > 1 ? order.map(t =>
+        '<div class="ck"><i style="background:'+color(t)+'"></i>'+esc(label(t))+'</div>'
+      ).join('') : '';
+    })();
     if (buckets.length > 6) $('#chart').classList.add('dense');
     $('#chart').innerHTML = buckets.map(bk => {
       if (!bk.total) {
@@ -1761,17 +1781,19 @@ const DATA = __DATA__;
       L.forEach(function(x){ counts[x.category] = (counts[x.category]||0) + 1; });
       var cats = (LD.categories||[]).filter(function(c){ return counts[c.key]; });
       $('#lpills').innerHTML =
-        '<span class="lpill on" data-c="all">Everyone <i>' + L.length + '</i></span>' +
+        '<button type="button" class="lpill on" data-c="all" aria-pressed="true">Everyone <i>' + L.length + '</i></button>' +
         cats.map(function(c){
-          return '<span class="lpill" data-c="' + esc(c.key) + '">' + esc(c.label) +
-                 ' <i>' + counts[c.key] + '</i></span>';
+          return '<button type="button" class="lpill" data-c="' + esc(c.key) + '" aria-pressed="false">' + esc(c.label) +
+                 ' <i>' + counts[c.key] + '</i></button>';
         }).join('');
 
       $('#lpills').addEventListener('click', function(e){
         var p = e.target.closest('.lpill'); if (!p) return;
-        Array.prototype.forEach.call(document.querySelectorAll('.lpill'),
-          function(x){ x.classList.remove('on'); });
-        p.classList.add('on'); LCAT = p.dataset.c; LSHOWN = 100; drawLeads();
+        Array.prototype.forEach.call(document.querySelectorAll('.lpill'), function(x){
+          x.classList.remove('on'); x.setAttribute('aria-pressed','false');
+        });
+        p.classList.add('on'); p.setAttribute('aria-pressed','true');
+        LCAT = p.dataset.c; LSHOWN = 100; drawLeads();
       });
       ['#lq','#lsort','#lhas'].forEach(function(s){
         $(s).addEventListener('input', function(){ LSHOWN = 100; drawLeads(); });

@@ -59,3 +59,9 @@ Open (carry to next round): reviews section prominence, published-list scannabil
 | Lane | Change | Proof |
 |---|---|---|
 | dashboard | lstats/chans grids auto-fit -> auto-fill with capped track widths (tiles/channel cards no longer balloon when few); subtle hover border on lstat/chan.live; reviews+outreach reviewed, already solid | build.py ✓; 10 tokens re-grepped |
+
+## Round (dashboards) 6 — 2026-09-16 (chart legend + a11y)
+| Lane | Change | Proof |
+|---|---|---|
+| dashboard | added chart legend row directly under the published chart (blog/service color key, only when >1 type); referral filter pills span->button + aria-pressed for keyboard/AT | build.py ✓; heros chart shows "Blog post / Service page" legend; 10 tokens re-grepped |
+Deferred: full sitewide --t3 contrast audit (spot-checked fine).

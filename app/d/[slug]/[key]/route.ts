@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import fs from "node:fs";
+import path from "node:path";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,9 +23,22 @@ export async function GET(
   { params }: { params: Promise<{ slug: string; key: string }> }
 ) {
   const { slug, key } = await params;
-  const url = new URL(
-    `/dashboards/live.html?c=${encodeURIComponent(slug)}&k=${encodeURIComponent(key)}`,
-    _req.url
-  );
+  // Prefer the bespoke, better-designed per-client build (/dashboards/<slug>.html)
+  // when it exists -- it is richer AND live, and reads the ?k access key just like
+  // the generic template. Fall back to the generic live template otherwise, so a
+  // client without a bespoke build still gets a working dashboard.
+  const safeSlug = /^[a-z0-9-]+$/i.test(slug) ? slug : "";
+  let hasBespoke = false;
+  try {
+    hasBespoke = !!safeSlug && fs.existsSync(
+      path.join(process.cwd(), "public", "dashboards", `${safeSlug}.html`)
+    );
+  } catch {
+    hasBespoke = false;
+  }
+  const target = hasBespoke
+    ? `/dashboards/${encodeURIComponent(slug)}.html?k=${encodeURIComponent(key)}`
+    : `/dashboards/live.html?c=${encodeURIComponent(slug)}&k=${encodeURIComponent(key)}`;
+  const url = new URL(target, _req.url);
   return NextResponse.redirect(url, 302);
 }

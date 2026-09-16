@@ -467,7 +467,7 @@ export default function Home() {
           {visited.has("clients") && <div className="app-view" style={{ display: active === "clients" ? "block" : "none" }}><ClientsBoard /></div>}
           {visited.has("sonar") && <div className="app-view" style={{ display: active === "sonar" ? "block" : "none" }}><SonarBoard /></div>}
           {visited.has("potential") && <div className="app-view" style={{ display: active === "potential" ? "block" : "none" }}><PotentialClientsBoard /></div>}
-          {visited.has("crm") && <div className="app-view" style={{ display: active === "crm" ? "block" : "none" }}><CrmWorkspace /></div>}
+          {visited.has("contacts") && <div className="app-view" style={{ display: active === "contacts" ? "block" : "none" }}><CrmWorkspace /></div>}
           {visited.has("email") && <div className="app-view" style={{ display: active === "email" ? "block" : "none" }}><EmailHub /></div>}
           {visited.has("text") && <div className="app-view" style={{ display: active === "text" ? "block" : "none" }}><MessageLedger channel="sms" /></div>}
           {visited.has("replies") && <div className="app-view" style={{ display: active === "replies" ? "block" : "none" }}><ReplyInboxBoard /></div>}
@@ -547,10 +547,10 @@ function DesktopMore({ groups, activeId, onPick }: {
   }, [open]);
   if (groups.length === 0) return null;
   return (
-    <div ref={ref} className="desktop-more" style={{ position: "fixed", right: 116, bottom: 30, zIndex: 45 }}>
+    <div ref={ref} className="desktop-more" style={{ position: "fixed", left: 22, bottom: 22, zIndex: 9998 }}>
       {open && (
         <div style={{
-          position: "absolute", bottom: "calc(100% + 12px)", right: 0, width: 268,
+          position: "absolute", bottom: "calc(100% + 12px)", left: 0, width: 268,
           background: "var(--bg-secondary)", border: "1px solid var(--border)",
           borderRadius: 14, padding: 8, boxShadow: "0 18px 50px rgba(0,0,0,0.45)",
           display: "flex", flexDirection: "column", gap: 4,
@@ -615,13 +615,13 @@ function MobileNav({ active, onNavigate, newLeadCount }: {
   // FAB is hidden on phone (globals.css) so there is only ever one trigger.
   const tabs: { id: string; label: string; icon: IconType; group: string; badge?: number }[] = [
     { id: "command", label: "Home", icon: HomeIcon, group: "command", badge: newLeadCount },
-    { id: "crm", label: "CRM", icon: Note, group: "crm" },
+    { id: "email", label: "CRM", icon: Note, group: "crm" },
     { id: "calendar", label: "Calendar", icon: Calendar, group: "calendar" },
   ];
   // In-shell items switch the mounted view; routed ones are plain links.
   const more: { label: string; hint: string; icon: IconType; view?: string; href?: string }[] = [
     { label: "Clients", hint: "Who pays you and how their sites are doing", icon: Users, view: "clients" },
-    { label: "Sonar Leads", hint: "Businesses asking for help online", icon: Radar, view: "sonar" },
+    { label: "Contacts", hint: "Every contact, deal and draft in one place", icon: Users, view: "contacts" },
     { label: "Agents", hint: "What the automated agents are doing", icon: Cpu, view: "agent" },
     { label: "Vault", hint: "Saved notes and knowledge", icon: Bulb, view: "knowledge" },
     { label: "Call Room", hint: "Dial the lead list and log what happened", icon: Call, href: "/calls" },
@@ -783,25 +783,28 @@ function GlobalDaBoss() {
         title={`Da Boss: ${label}`}
         style={{
           position: "fixed", zIndex: 9997,
-          display: "inline-flex", alignItems: "center", gap: 7,
-          padding: "8px 12px", minHeight: 40, borderRadius: 999,
+          display: "inline-flex", alignItems: "center", gap: 5,
+          padding: "6px 10px", minHeight: 32, borderRadius: 999,
           border: `1px solid ${color}`, background: "var(--bg-card)",
           backdropFilter: "blur(10px)", color, cursor: "pointer",
-          fontSize: 12, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace",
+          fontSize: 11, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace",
           boxShadow: `0 4px 18px ${color}33`,
           transition: "none", // color must reflect state instantly (a transition gets stuck under re-render)
         }}
       >
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        {/* Shrunk 2026-09-15 to pair side-by-side with the More pill in the
+            bottom-left corner. The shield already carries the state color, so
+            the separate status dot was dropped (smaller + one less dot). */}
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
         </svg>
-        <span className="daboss-dot" style={{ width: 7, height: 7, borderRadius: "50%", background: color, boxShadow: `0 0 8px ${color}` }} />
         <span>{label}</span>
       </button>
       )}
       <style>{`
-        /* Desktop: bottom-left corner (opposite the bottom-right Jarvis FAB) */
-        .daboss-chip { bottom: 22px; left: 22px; }
+        /* Desktop: bottom-left, sitting flush to the RIGHT of the More pill
+           (More owns left:22 with a stable width; the chip starts past it). */
+        .daboss-chip { bottom: 22px; left: 118px; }
         .daboss-chip.alert { animation: dabossPulse 1.8s ease-in-out infinite; }
         @keyframes dabossPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(248,113,113,0.5); } 50% { box-shadow: 0 0 0 8px rgba(248,113,113,0); } }
         /* Phone: dock at bottom-LEFT, above the tab bar and opposite the
@@ -916,13 +919,6 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
   // Condensed 2026-08-30: only figures with a real source get a tile. Two of the
   // three tiles here were permanently "no data" and were taking the best space on
   // the screen to say nothing. They are now one honest footnote line below.
-  const STATS = [
-    { label: "MRR", value: loading ? "..." : (typeof data?.mrr === "number" ? `$${data.mrr.toLocaleString()}` : "unavailable"), color: "var(--orange)" },
-  ];
-  // Not instrumented yet. Named explicitly so the gap stays visible without
-  // occupying a tile. See the tracking plan; both are blocked on Jack.
-  const NOT_INSTRUMENTED = ["Opened emails", "Appointments booked"];
-
   function showToast(msg: string) {
     setToast(msg);
     setTimeout(() => setToast(""), 3000);
@@ -951,6 +947,28 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
   return (
     <motion.div style={{ display: "flex", flexDirection: "column", gap: 24 }}
       variants={staggerContainer} initial="hidden" animate="show">
+      {/* Basic MRR, first thing on the page (2026-09-15, Jack). Deliberately
+          minimal — just the number and the client count. The expiry/pipeline
+          detail and the standalone MRR tile that used to live lower down were
+          removed; this one line is the whole MRR story now. */}
+      <motion.div variants={riseItem} style={{
+        display: "flex", alignItems: "baseline", gap: 14, flexWrap: "wrap",
+        background: "linear-gradient(180deg, var(--bg-card), var(--bg-card))",
+        border: "1px solid var(--border)", borderRadius: 14, padding: "14px 20px",
+        boxShadow: "0 8px 24px var(--bg-hover)",
+      }}>
+        <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.09em", color: "var(--text-muted)" }}>MRR</span>
+        {typeof data?.mrr === "number" ? (
+          <span style={{ fontSize: 30, fontWeight: 800, color: "var(--green)", lineHeight: 1, fontFamily: "'Space Grotesk', sans-serif" }}>${data.mrr.toLocaleString()}</span>
+        ) : (
+          <span style={{ fontSize: 20, fontWeight: 700, color: "var(--text-muted)" }}>{loading ? "..." : "unavailable"}</span>
+        )}
+        {typeof data?.activeClientCount === "number" && (
+          <span style={{ fontSize: 12.5, color: "var(--text-muted)" }}>
+            {data.activeClientCount} active client{data.activeClientCount === 1 ? "" : "s"}
+          </span>
+        )}
+      </motion.div>
       {/* Start here + Today: the map and the numbers that change what you do
           next, before anything else. Built for someone who is not Jack. */}
       <StartHere />
@@ -1042,32 +1060,8 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
               </div>
               <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>emails sent today</p>
             </div>
-            <div>
-              {typeof data?.mrr === "number" ? (
-                <p style={{ fontSize: 36, fontWeight: 800, color: "var(--green)", lineHeight: 1, textShadow: "0 0 24px rgba(74,222,128,0.35)", fontFamily: "'Space Grotesk', sans-serif" }}><CountUp prefix="$" value={data.mrr} /></p>
-              ) : (
-                <p style={{ fontSize: 22, fontWeight: 700, color: "var(--text-muted)", lineHeight: 1.4, fontFamily: "'Space Grotesk', sans-serif" }}>unavailable</p>
-              )}
-              <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>
-                MRR · {typeof data?.activeClientCount === "number"
-                  ? `${data.activeClientCount} active client${data.activeClientCount === 1 ? "" : "s"}`
-                  : "client count unavailable"}
-              </p>
-              {/* A fixed-term deal reads as durable unless the headline says
-                  otherwise. Warn while there is still time to renew. */}
-              {data?.nextExpiry && (
-                <p style={{ fontSize: 11, color: "var(--orange)", marginTop: 4 }}>
-                  ${data.nextExpiry.amount.toLocaleString()}/mo of this ends {data.nextExpiry.end}
-                  {" "}({data.nextExpiry.monthsRemaining} mo left) unless renewed
-                </p>
-              )}
-              {(data?.pipelineTotal ?? 0) > 0 && (
-                // Pipeline sits beside the earned number, never inside it.
-                <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
-                  + ${data.pipelineTotal.toLocaleString()} pipeline, not earned, not in MRR
-                </p>
-              )}
-            </div>
+            {/* MRR moved to the basic strip at the top of the page (2026-09-15);
+                the verbose version that used to sit here was removed. */}
             <button onClick={() => onSendToAI(`Today's Wing Digital briefing:\n- Emails sent today: ${sentToday ?? camp?.by_day?.[new Date().toLocaleDateString("en-CA")] ?? 0}\n- MRR: ${typeof data?.mrr === "number" ? `$${data.mrr}` : "unavailable"}\n- Replies and appointments: see Reply Inbox and Calendar.\n\nWhat should I prioritize today to grow Wing Digital?`)}
               style={{
                 marginLeft: "auto", fontSize: 12, fontWeight: 600, color: "#fff",
@@ -1118,7 +1112,7 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
           accounting detail is one click away rather than gone. Full Mission
           Control still shows every tile. */}
       {missionStats && missionStats.tiles.length > 0 && (() => {
-        const PRIMARY = ["MRR", "Active Clients", "Pipeline", "Prospects in the pipeline", "Untouched Leads"];
+        const PRIMARY = ["Active Clients", "Pipeline", "Prospects in the pipeline", "Untouched Leads"];
         const primary = missionStats.tiles.filter(t => PRIMARY.includes(t.label));
         const rest = missionStats.tiles.filter(t => !PRIMARY.includes(t.label));
         const shown = showAllStats ? [...primary, ...rest] : primary;
@@ -1259,46 +1253,8 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
         );
       })()}
 
-      {/* Stats */}
-      <motion.div variants={riseItem} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14 }}>
-        {STATS.map((stat: any) => {
-          const inner = (
-            <>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
-                <span className="live-dot" style={{ width: 6, height: 6, borderRadius: "50%", background: stat.color, boxShadow: `0 0 8px ${stat.color}` }} />
-                <p style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>{stat.label}</p>
-              </div>
-              <p style={{
-                fontSize: stat.noSource ? 18 : 30, fontWeight: 700,
-                color: stat.noSource ? "var(--text-muted)" : stat.color,
-                fontFamily: "'Space Grotesk', sans-serif",
-                textShadow: stat.noSource ? "none" : `0 0 20px ${stat.color}44`, lineHeight: 1.2,
-              }}>{stat.value}</p>
-              {stat.noSource && <p style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 8 }}>No data source connected (GHL retired 2026-08-22)</p>}
-            </>
-          );
-          const baseStyle: React.CSSProperties = {
-            position: "relative",
-            background: `radial-gradient(ellipse 90% 70% at 50% -20%, ${stat.color}14, transparent 60%), linear-gradient(180deg, var(--bg-card), var(--bg-card))`,
-            border: "1px solid var(--border)",
-            borderRadius: 16, padding: "18px 20px",
-            boxShadow: "0 8px 24px var(--bg-hover), inset 0 1px 0 rgba(255,255,255,0.04)",
-            cursor: stat.onClick ? "pointer" : "default",
-            textDecoration: "none", display: "block", overflow: "hidden",
-          };
-          const interactive = Boolean(stat.onClick);
-          // Every tile responds; interactive ones respond more.
-          const hover = interactive ? cardHover : cardHoverPassive;
-          const tap = interactive ? cardTap : undefined;
-          return <motion.div key={stat.label} onClick={stat.onClick ? () => { sfx.play("ping"); stat.onClick(); } : undefined} style={baseStyle}
-            whileHover={hover} whileTap={tap} transition={hoverSpring}>{inner}</motion.div>;
-        })}
-      </motion.div>
-
-      {/* The honest gap, in one line instead of two dead tiles. */}
-      <p style={{ fontSize: 10.5, color: "var(--text-muted)", marginTop: -4 }}>
-        Not tracked yet: {NOT_INSTRUMENTED.join(", ").toLowerCase()}. No tracking is installed, so these show no number instead of a zero.
-      </p>
+      {/* The standalone MRR stat tile that used to sit here was removed
+          2026-09-15 (Jack): MRR now shows once, as the basic strip at the top. */}
 
       {/* Removed 2026-08-30: this was a SECOND calendar, permanently empty
           (appointments={[]} hardcoded). The Calendar section is now the one
@@ -1310,7 +1266,7 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
         <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", marginRight: 4 }}>Quick</span>
         {[
-          { icon: Users, label: "Add contact", action: () => window.dispatchEvent(new CustomEvent("os:navigate", { detail: "crm" })), c: "var(--green)" },
+          { icon: Users, label: "Add contact", action: () => window.dispatchEvent(new CustomEvent("os:navigate", { detail: "contacts" })), c: "var(--green)" },
           { icon: Calendar, label: "Calendar", action: goToCalendar, c: "var(--accent)" },
           { icon: Note, label: "New Note", action: () => setShowNewNote(true), c: "var(--accent-2)" },
           { icon: Sparkles, label: "Ask Claude", action: () => onSendToAI("What should I focus on today for Wing Digital?"), c: "#E8692A" },

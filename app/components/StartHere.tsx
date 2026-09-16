@@ -34,7 +34,7 @@ type Tile =
 
 const TILES: Tile[] = [
   { icon: Users, name: "Clients", blurb: "Who pays you and how their sites are doing", view: "clients" },
-  { icon: Note, name: "CRM", blurb: "Every contact, deal, email, text and reply", view: "crm" },
+  { icon: Note, name: "CRM", blurb: "Every contact, deal, email, text and reply", view: "email" },
   { icon: Call, name: "Call Room", blurb: "Dial the lead list and log what happened", href: "/calls" },
   { icon: Route, name: "Automations", blurb: "When something happens, do these things, with nobody at the keyboard", href: "/automations" },
   { icon: Calendar, name: "Calendar", blurb: "Bookings, call-backs, classes and payments", view: "calendar" },
@@ -76,7 +76,7 @@ function ViewLink({ view, children }: { view: string; children: React.ReactNode 
 
 const GUIDE_SECTIONS: { name: string; blurb: string; view?: string; href?: string }[] = [
   { view: "clients", name: "Clients", blurb: "who pays us and how their sites are doing." },
-  { view: "crm", name: "CRM", blurb: "everyone we talk to; emails and texts live here." },
+  { view: "email", name: "CRM", blurb: "everyone we talk to; emails and texts live here." },
   { href: "/automations", name: "Automations", blurb: "the robots; they draft, you approve." },
   { view: "agent", name: "Agents", blurb: "what ran overnight and whether it worked." },
 ];

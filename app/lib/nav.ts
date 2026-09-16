@@ -36,19 +36,15 @@ export const NAV_TREE: NavGroupDef[] = [
   {
     id: "clients", label: "Clients",
     hint: "Your clients, new leads, and storm alerts",
+    // 2026-09-15 (Jack): trimmed to just Clients and Dashboards. Potential
+    // clients, Sonar Leads and Storm Response were dropped from the nav (their
+    // components stay on disk and are still reachable via the command palette /
+    // deep links, just not on the rail).
     subs: [
       { id: "clients", label: "Clients" },
       // Dashboards (2026-09-13): the OS index of every built client dashboard,
       // opened inside the OS. Routed page (see EXTERNAL_SUB_LINKS).
       { id: "dashboards", label: "Dashboards", keywords: "reporting client dashboard" },
-      // Potential clients (2026-09-04): paste a website, the OS researches it
-      // and files it as a prospect to work toward signing.
-      { id: "potential", label: "Potential clients", keywords: "prospects" },
-      { id: "sonar", label: "Sonar Leads", keywords: "leads" },
-      // Storm Response (2026-09-01): SPC hail events near DFW with the drafts
-      // Wing WOULD fire (FB post, ad plan, Nextdoor). Demo build: draft-only,
-      // nothing posts, nothing spends.
-      { id: "storms", label: "Storm Response", keywords: "hail" },
     ],
   },
   {
@@ -61,10 +57,13 @@ export const NAV_TREE: NavGroupDef[] = [
     hint: "Contacts, outreach emails, texts and replies",
     // Exactly four tabs (2026-09-04, Jack): Everything, Email, Text, Reply
     // Inbox. Sequences and Automations moved to their own group below.
+    // 2026-09-15 (Jack): "Everything" dropped as the landing tab. Email is the
+    // default now; the everything view (CrmWorkspace) moved to a "Contacts" tab
+    // on the far right. Order is the tab order left-to-right.
     subs: [
-      { id: "crm", label: "Everything", keywords: "contacts pipeline inbox outbound" },
       // Email: the automated-send queue, the email side of the message
-      // ledger, and email health as internal pills. See EmailHub.tsx.
+      // ledger, and email health as internal pills. See EmailHub.tsx. First =
+      // the CRM group's default landing.
       { id: "email", label: "Email", keywords: "messaging deliverability" },
       // Text: the SMS conversations and the texting-line status, on their
       // own. Same MessageLedger, locked to the sms channel.
@@ -75,6 +74,9 @@ export const NAV_TREE: NavGroupDef[] = [
       // Activity (2026-09-13): the "what is going out" board — sent + queued
       // emails and texts with honest lane status. Routed page.
       { id: "activity", label: "Activity", keywords: "emails texts sent going out messaging outbound" },
+      // Contacts (2026-09-15): the old "Everything" surface (CrmWorkspace) —
+      // every contact, deal and draft in one place — on the far right.
+      { id: "contacts", label: "Contacts", keywords: "everything contacts pipeline inbox outbound deals book" },
     ],
   },
   {
@@ -96,11 +98,12 @@ export const NAV_TREE: NavGroupDef[] = [
     // come back. Both are draft-only, same as the rest of the OS.
     id: "marketing", label: "Marketing",
     hint: "Social posts, reviews, and the SEO content feed",
+    // 2026-09-15 (Jack): SEO and Social flipped so SEO leads.
     subs: [
-      { id: "social", label: "Social", keywords: "posts schedule" },
       // SEO (2026-09-05, Jack): every page/post shipped on client sites, one
       // feed, read from the same public sources their dashboards use.
       { id: "seo", label: "SEO", keywords: "blog posts content pages published" },
+      { id: "social", label: "Social", keywords: "posts schedule" },
       { id: "reviews", label: "Reviews" },
       { id: "customers", label: "Customers" },
     ],
@@ -137,8 +140,11 @@ export const NAV_TREE: NavGroupDef[] = [
 // panel still dispatching the old id land on the merged view instead of a dead
 // screen. Keep these entries; removing one silently breaks a bookmark.
 export const LEGACY_VIEW_ALIAS: Record<string, string> = {
-  inbox: "crm",
-  pipeline: "crm",
+  // 2026-09-15: the "Everything" view (id "crm") became the "Contacts" tab
+  // (id "contacts"). Old links and any panel dispatching the old ids land there.
+  crm: "contacts",
+  inbox: "contacts",
+  pipeline: "contacts",
   money: "calendar",
   invoices: "calendar",
   // 2026-09-01 consolidation: School folded into Calendar, three email tabs

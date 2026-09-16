@@ -193,14 +193,20 @@ main, section {
 }
 
 /* ── Skeleton shimmer for loading states ─────────────────────────── */
+/* Skeleton block. Rebuilt 2026-09-15: the old version layered near-invisible
+   white (0.035 alpha) which vanished on the light OS background. This sits on a
+   neutral slate tint that reads as a real placeholder block on BOTH light and
+   dark, with a clearer moving sheen over it. */
 .skel {
   border-radius: 10px;
-  background: linear-gradient(90deg,
-    rgba(255, 255, 255, 0.035) 25%,
-    rgba(34, 211, 238, 0.07) 50%,
-    rgba(255, 255, 255, 0.035) 75%);
+  background-color: rgba(120, 132, 156, 0.16);
+  background-image: linear-gradient(90deg,
+    rgba(120, 132, 156, 0) 20%,
+    rgba(150, 162, 186, 0.28) 50%,
+    rgba(120, 132, 156, 0) 80%);
   background-size: 200% 100%;
-  animation: skelShimmer 1.4s ease-in-out infinite;
+  background-repeat: no-repeat;
+  animation: skelShimmer 1.25s ease-in-out infinite;
 }
 @keyframes skelShimmer {
   from { background-position: 200% 0; }

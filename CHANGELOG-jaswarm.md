@@ -42,3 +42,9 @@ Next: sharpen the top summary / hero density (still generic above the fold).
 | dashboard | shrank oversized hero (~half height, one-line headline), rebuilt stat strip to uniform aligned auto-fit grid, added reviews-standing tile from real DATA (omitted when no profile); respected house rule vs 30-day metric | build.py ✓; heros 2 tiles (honest), jackson 4 tiles + 4.1 rating |
 | tokens/data | placeholders + __DATA__ contract preserved | grep ✓ |
 Open: jackson rating tile truncates "4.1..." (backlog).
+
+## Round (dashboards) 3 — 2026-09-16 (rating tile fix)
+| Lane | Change | Proof |
+|---|---|---|
+| dashboard | fixed rating tile clip: short "4.1★" value + review count in label; removed ellipsis clip, added .is-long font-step safety net; wrapped reviews table | build.py ✓; jackson shows "4.1★ / 14 reviews on your listing" |
+Open (carry to next round): reviews section prominence, published-list scannability + mobile (R3 agent stalled before these).

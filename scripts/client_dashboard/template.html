@@ -102,7 +102,10 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
   padding:13px 15px;box-shadow:var(--shadow);position:relative;overflow:hidden;min-width:0}
 .stat::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent)}
 .stat-v{font-family:var(--display);font-size:1.5rem;font-weight:700;letter-spacing:-.02em;
-  line-height:1.05;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  line-height:1.15;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;min-width:0}
+/* a tile whose value is a longer compound string (e.g. the rating tile) steps the
+   size down so it still reads as one line on a 148px card instead of wrapping mid-word */
+.stat-v.is-long{font-size:1.15rem}
 .stat-l{margin-top:5px;font-size:.73rem;color:var(--t2);line-height:1.35}
 @media(max-width:480px){.stats{grid-template-columns:repeat(2,1fr)}}
 
@@ -573,10 +576,12 @@ section.grp-mid{padding-top:30px}
     <div class="sd" id="rs-sd"></div>
     <div class="pl-banner" id="rs-banner" hidden></div>
     <div class="lstats" id="rs-stats"></div>
-    <div class="mgroup"><div class="mlabel" id="rs-table-label"></div></div>
-    <div class="card">
-      <div class="rs-head"><span id="rs-c1"></span><span id="rs-c2"></span><span id="rs-c3"></span></div>
-      <div id="rs-rows"></div>
+    <div id="rs-table-wrap">
+      <div class="mgroup"><div class="mlabel" id="rs-table-label"></div></div>
+      <div class="card">
+        <div class="rs-head"><span id="rs-c1"></span><span id="rs-c2"></span><span id="rs-c3"></span></div>
+        <div id="rs-rows"></div>
+      </div>
     </div>
     <div class="ctbl-cap" id="rs-dropped" hidden></div>
     <div class="rs-src" id="rs-src"></div>
@@ -811,8 +816,12 @@ const DATA = __DATA__;
   statList.push({ v: PUB.length,  l: 'Articles published on your site' });
   statList.push({ v: livePages,   l: 'Pages you can open' });
   if (RS && RS.hasProfile !== false && RS.reviewCount != null && RS.rating != null) {
-    statList.push({ v: (Math.round(Number(RS.rating)*10)/10).toFixed(1)+'★ · '+
-      Number(RS.reviewCount).toLocaleString('en-US'), l: 'Rating and reviews on your listing', raw:true });
+    // Short value ("4.1★") always fits the tile at any width; the review count
+    // moves into the label instead of being crammed into the same line, which
+    // is what was clipping to "4.1..." on longer counts.
+    const revN = Number(RS.reviewCount).toLocaleString('en-US');
+    statList.push({ v: (Math.round(Number(RS.rating)*10)/10).toFixed(1)+'★', raw:true,
+      l: revN + (Number(RS.reviewCount) === 1 ? ' review on your listing' : ' reviews on your listing') });
   }
   // Website visits lead when we genuinely have them. DATA.traffic is null while
   // no source is wired, and the page keeps its named pending row instead --
@@ -824,7 +833,10 @@ const DATA = __DATA__;
     const el = document.createElement('div');
     el.className = 'stat';
     const v = s.raw ? esc(s.v) : Number(s.v).toLocaleString();
-    el.innerHTML = '<div class="stat-v">'+v+'</div><div class="stat-l">'+esc(s.l)+'</div>';
+    // Safety net for any value string longer than a plain formatted number: step
+    // the font down rather than let the tile clip or overflow its neighbour.
+    const vCls = String(v).length > 6 ? 'stat-v is-long' : 'stat-v';
+    el.innerHTML = '<div class="'+vCls+'">'+v+'</div><div class="stat-l">'+esc(s.l)+'</div>';
     $('#stats').appendChild(el);
   });
 

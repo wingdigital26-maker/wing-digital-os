@@ -12,8 +12,9 @@ import SectionChrome, { sectionBtn, type SectionTab } from "../components/Sectio
 // just not showing a caller a door that is locked.
 
 const TABS: SectionTab[] = [
-  { href: "/calls", label: "Today", exact: true },
-  { href: "/calls/list", label: "Dial list" },
+  // "Today" and "Dial list" merged into one Call Room screen (2026-09-15), so
+  // the section root IS the working list now — no separate Dial list tab.
+  { href: "/calls", label: "Dial list", exact: true },
   { href: "/calls/callbacks", label: "Callbacks" },
   { href: "/calls/booked", label: "Booked" },
   { href: "/calls/schedule", label: "Schedule" },

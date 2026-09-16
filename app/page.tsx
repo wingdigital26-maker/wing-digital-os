@@ -164,6 +164,13 @@ export default function Home() {
   const nav = NAV
     .map(g => ({ ...g, subs: g.subs.filter(s => !hiddenViews.has(s.id)) }))
     .filter(g => g.subs.length > 0);
+  // Groups Jack pulled off the desktop left rail (2026-09-15) and into the
+  // bottom-right "More" tab. They still exist in the nav tree (palette, section
+  // chrome, deep links all keep working) — they just do not paint on the side
+  // rail; the More popover is their door instead.
+  const MORE_GROUP_IDS = new Set(["automate", "agent", "intel"]);
+  const railNav = nav.filter(g => !MORE_GROUP_IDS.has(g.id));
+  const moreNav = nav.filter(g => MORE_GROUP_IDS.has(g.id));
   // If the active view just became hidden (role resolved to staff while a
   // personal view was open via deep link), land on Command instead.
   useEffect(() => {
@@ -323,7 +330,7 @@ export default function Home() {
         </div>
 
         <nav style={{ flex: 1, padding: "12px 8px", display: "flex", flexDirection: "column", gap: 2 }}>
-          {nav.map(item => {
+          {railNav.map(item => {
             const isActive = groupOf(active).id === item.id;
             const hasBadge = item.id === "command" && newLeadCount > 0;
             return (
@@ -482,6 +489,23 @@ export default function Home() {
         </div>
       </main>
 
+      {/* Bottom-right "More" tab (desktop only): the home for the groups pulled
+          off the left rail — Automations, Agents, Intel. Phone reaches the same
+          places through the bottom bar's own More sheet, so this is hidden
+          there. */}
+      {!isPhone && (
+        <DesktopMore
+          groups={moreNav}
+          activeId={active}
+          onPick={(subId) => {
+            sfx.play("nav");
+            const href = EXTERNAL_SUB_LINKS[subId];
+            if (href) { window.location.href = href; return; }
+            setActive(subId);
+          }}
+        />
+      )}
+
       {/* Mobile bottom tab bar — primary nav on phone, replaces the side rail */}
       <MobileNav active={active} onNavigate={(id) => {
         sfx.play("nav");
@@ -493,6 +517,87 @@ export default function Home() {
       <GlobalDaBoss />
     </div>
     </MotionConfig>
+  );
+}
+
+// Desktop-only "More" tab, bottom-right, just left of the Nimbus orb. Holds the
+// groups Jack pulled off the left rail (Automations, Agents, Intel). A single
+// pill that pops a small upward menu of those groups and their subs; picking one
+// switches the shell view (or navigates, for routed subs like the Call Room).
+function DesktopMore({ groups, activeId, onPick }: {
+  groups: NavGroup[]; activeId: string; onPick: (subId: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  // Highlight the tab when the current view belongs to one of its groups, so a
+  // deep link into Automations still reads as "you are under More".
+  const activeHere = groups.some(g => g.subs.some(s => s.id === activeId));
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    window.addEventListener("mousedown", onDown);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("mousedown", onDown);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+  if (groups.length === 0) return null;
+  return (
+    <div ref={ref} className="desktop-more" style={{ position: "fixed", right: 116, bottom: 30, zIndex: 45 }}>
+      {open && (
+        <div style={{
+          position: "absolute", bottom: "calc(100% + 12px)", right: 0, width: 268,
+          background: "var(--bg-secondary)", border: "1px solid var(--border)",
+          borderRadius: 14, padding: 8, boxShadow: "0 18px 50px rgba(0,0,0,0.45)",
+          display: "flex", flexDirection: "column", gap: 4,
+        }}>
+          {groups.map(g => (
+            <div key={g.id}>
+              <div style={{
+                display: "flex", alignItems: "center", gap: 8, padding: "6px 8px 4px",
+                fontSize: 10.5, textTransform: "uppercase", letterSpacing: 0.6,
+                color: "var(--text-muted)", fontWeight: 800,
+              }}>
+                <g.icon size={13} /> {g.label}
+              </div>
+              {g.subs.map(s => {
+                const on = activeId === s.id;
+                return (
+                  <button key={s.id} onClick={() => { onPick(s.id); setOpen(false); }} style={{
+                    display: "flex", alignItems: "center", width: "100%", textAlign: "left",
+                    padding: "9px 12px", borderRadius: 9, border: "none", cursor: "pointer",
+                    background: on ? "var(--accent-glow)" : "transparent",
+                    color: on ? "var(--text-primary)" : "var(--text-secondary)",
+                    fontSize: 13, fontWeight: on ? 700 : 500,
+                  }}>
+                    {s.label}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      )}
+      <button
+        onClick={() => { sfx.play(open ? "toggle-off" : "toggle-on"); setOpen(o => !o); }}
+        title="Automations, Agents and Intel"
+        aria-expanded={open}
+        style={{
+          display: "inline-flex", alignItems: "center", gap: 8,
+          padding: "11px 16px", borderRadius: 999, cursor: "pointer",
+          border: `1px solid ${activeHere || open ? "var(--accent)" : "var(--border)"}`,
+          background: activeHere || open ? "var(--accent-glow)" : "var(--bg-secondary)",
+          color: activeHere || open ? "var(--accent)" : "var(--text-secondary)",
+          fontSize: 13, fontWeight: 700, boxShadow: "0 8px 24px rgba(0,0,0,0.28)",
+        }}
+      >
+        <More size={16} /> More
+      </button>
+    </div>
   );
 }
 

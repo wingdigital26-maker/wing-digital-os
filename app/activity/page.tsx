@@ -1,4 +1,5 @@
 import ActivityBoard from "./ActivityBoard";
+import BackToOs from "../components/BackToOs";
 
 // /activity — "Messaging Activity": one clear view of what email/text is going
 // out, what is queued next (with word-for-word previews), and which lanes are
@@ -16,5 +17,12 @@ export const metadata = {
 };
 
 export default function ActivityPage() {
-  return <ActivityBoard />;
+  return (
+    <>
+      <div style={{ padding: "16px 22px 0" }}>
+        <BackToOs />
+      </div>
+      <ActivityBoard />
+    </>
+  );
 }

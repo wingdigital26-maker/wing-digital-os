@@ -64,7 +64,8 @@ export default async function DashboardDetailPage({ params }: { params: Promise<
   return (
     <div className="dash-detail">
       <div className="dash-detail-bar">
-        <Link href="/dashboards" className="dash-back">← All dashboards</Link>
+        <Link href="/" className="dash-back" aria-label="Back to the Wing Digital OS home">← Wing OS</Link>
+        <Link href="/dashboards" className="dash-back">All dashboards</Link>
         <span className="dash-detail-name">
           {resolved.name}
           <span className="dash-live-tag">Live · what your client sees</span>

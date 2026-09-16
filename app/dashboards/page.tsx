@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import Link from "next/link";
+import BackToOs from "../components/BackToOs";
 import "./dashboards.css";
 
 export const runtime = "nodejs";
@@ -60,6 +61,7 @@ export default function DashboardsIndexPage() {
   return (
     <div className="dash-index page-scroll">
       <div className="dash-index-inner">
+        <BackToOs style={{ marginBottom: 16 }} />
         <header className="dash-head">
           <h1>Client dashboards</h1>
           <p>

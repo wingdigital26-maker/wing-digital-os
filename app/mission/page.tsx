@@ -13,6 +13,7 @@ import {
   WatchdogBanner, AgentFeed,
 } from "../components/MissionControlCore";
 import SfxMuteButton from "../components/SfxMuteButton";
+import BackToOs from "../components/BackToOs";
 import PushToggle from "../components/PushToggle";
 import AlertsPanel from "../components/AlertsPanel";
 import { AgentUplinkState, UPLINK_TIMEOUT_MS, latestHeartbeat } from "../components/MissionOps";
@@ -89,6 +90,7 @@ export default function MissionControl() {
       {/* Header */}
       <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18, flexWrap: "wrap", gap: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <BackToOs />
           <Dot color={overallColor} pulse />
           <h1 style={{ fontSize: 22, letterSpacing: "0.14em", fontWeight: 700 }}>
             WING OS <span style={{ color: "var(--accent)" }}>MISSION CONTROL</span>

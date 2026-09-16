@@ -70,3 +70,8 @@ Deferred: full sitewide --t3 contrast audit (spot-checked fine).
 | Lane | Change | Proof |
 |---|---|---|
 | dashboard | --t3 muted text token failed WCAG (3.59:1) -> darkened light to #726c63 (4.99:1) + lightened dark to #8c8378 (5.02:1); used by chart labels, stat captions, source lines, footer. Plan section reviewed, already good | measured ratios; 10 tokens re-grepped |
+
+## Round (dashboards) 8 — 2026-09-16 (copy + dialed verdict)
+| Lane | Change | Proof |
+|---|---|---|
+| dashboard | "Other pages we maintain" subhead rewritten from mechanical to owner-value copy; whole page reviewed - everything else already clear/honest. VERDICT: dialed (3 rounds of diminishing finds) | build.py ✓; 10 tokens re-grepped |

@@ -12,9 +12,9 @@
   "honesty": "Every value below is copied from the NOAA record. Nothing is estimated, projected, modelled or inferred. There are no figures for roofs damaged, homes affected, jobs or revenue because NOAA does not record them."
  },
  "window": {
-  "start": "2021-03-24",
-  "end": "2026-08-26",
-  "months": 66
+  "start": "2024-06-02",
+  "end": "2026-05-24",
+  "months": 24
  },
  "counties": [
   "Collin",
@@ -24,12 +24,14 @@
   "Kaufman"
  ],
  "summary": {
-  "hailEvents": 71,
-  "hailEventsOneInchOrLarger": 60,
-  "largestHailInches": 4.09,
-  "largestHailDate": "2025-09-21",
+  "hailEvents": 137,
+  "hailEventsOneInchOrLarger": 122,
+  "largestHailInches": 3.0,
+  "largestHailDate": "2026-04-25",
+  "largestHailLocation": "Lakeview",
+  "largestHailCounty": "Dallas",
   "homesUnderHail": 421903,
-  "distinctStormDays": 71,
+  "distinctStormDays": 27,
   "zipsCovered": 46
  },
  "byCounty": [

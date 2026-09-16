@@ -15,21 +15,27 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const id = url.searchParams.get("id");
 
+  // Scope every read to the caller's user_id when we have a real per-user
+  // session; legacy password access (no user id) sees the shared/staff rows.
+  // Reads run under the service key (RLS bypassed), so this WHERE clause is the
+  // only thing standing between one user and another user's brain chats. Without
+  // it, any signed-in user could read another user's messages by passing their
+  // session id (?id=<uuid>) -- the flagged IDOR.
+  const scope = session?.sub
+    ? `user_id=eq.${session.sub}&`
+    : "";
+
   if (id) {
     const messages = await sbSelect({
       table: "chat_messages",
       select: "id,role,content,model,created_at",
-      query: `session_id=eq.${id}&order=created_at.asc&limit=200`,
+      query: `${scope}session_id=eq.${id}&order=created_at.asc&limit=200`,
       service: true,
     });
     return NextResponse.json({ messages });
   }
 
-  // List sessions. Scope to the caller's user_id when we have a real session;
-  // legacy password access (no user id) sees the shared/staff sessions.
-  const scope = session?.sub
-    ? `user_id=eq.${session.sub}&`
-    : "";
+  // List sessions with the same user scoping.
   const sessions = await sbSelect({
     table: "chat_sessions",
     select: "id,title,created_at",

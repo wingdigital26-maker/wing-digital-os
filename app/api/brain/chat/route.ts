@@ -109,6 +109,13 @@ export async function POST(req: Request) {
   // user_id: real session sub when available; legacy password access has none.
   const userId = session?.sub || null;
 
+  // Scope every session/message read+write to the caller. Reads use the service
+  // key (RLS bypassed), so this user_id filter is the only guard against loading
+  // another user's brain history as context by passing their session id -- the
+  // flagged IDOR. Real per-user sessions filter on their sub; legacy password
+  // access (no user id) stays on the shared/staff rows (user_id null on insert).
+  const scope = userId ? `user_id=eq.${userId}&` : "";
+
   // 1. Retrieve vault context.
   const docs = await retrieveContext(message);
   const contextBlock = buildContextBlock(docs);
@@ -120,7 +127,7 @@ export async function POST(req: Request) {
     priorTurns = await sbSelect<ChatMessage>({
       table: "chat_messages",
       select: "role,content,created_at",
-      query: `session_id=eq.${sessionId}&order=created_at.asc&limit=40`,
+      query: `${scope}session_id=eq.${sessionId}&order=created_at.asc&limit=40`,
       service: true,
     });
   }
@@ -171,6 +178,19 @@ export async function POST(req: Request) {
   // 5. Persist session + messages (service key, stamped with the real user_id).
   // Only when Supabase is configured; if not, still return the answer.
   if (sbUrl() && sbService()) {
+    // If a sessionId was passed, confirm it belongs to the caller before writing
+    // into it. Otherwise a user could append turns to another user's session by
+    // guessing its id. On mismatch (or an unknown id) we drop it and mint a fresh
+    // session below rather than polluting a foreign one.
+    if (sessionId) {
+      const owned = await sbSelect<{ id: string }>({
+        table: "chat_sessions",
+        select: "id",
+        query: `${scope}id=eq.${sessionId}&limit=1`,
+        service: true,
+      });
+      if (owned.length === 0) sessionId = undefined;
+    }
     if (!sessionId) {
       const title = message.split(/\s+/).slice(0, 6).join(" ").slice(0, 80);
       const created = await sbInsert<{ id: string }>("chat_sessions", {

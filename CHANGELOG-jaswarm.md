@@ -54,3 +54,8 @@ Open (carry to next round): reviews section prominence, published-list scannabil
 |---|---|---|
 | dashboard | published-list rows restyled (consistent rhythm, pill type-badges, aligned right-column dates, 480px wrap, pointer on linked rows); reviews section branches on hasProfile -> honest one-line empty state; heading "Reviews and reputation" | build.py ✓; heros list shows pill badges + month headers |
 | tokens/data | all 10 __TOKEN__ + __DATA__ contract preserved (re-grepped) | ✓ |
+
+## Round (dashboards) 5 — 2026-09-16 (component sizing + polish)
+| Lane | Change | Proof |
+|---|---|---|
+| dashboard | lstats/chans grids auto-fit -> auto-fill with capped track widths (tiles/channel cards no longer balloon when few); subtle hover border on lstat/chan.live; reviews+outreach reviewed, already solid | build.py ✓; 10 tokens re-grepped |

@@ -15,7 +15,10 @@
   --bg:#fbfaf8; --surface:#ffffff; --surface-2:#f4f2ee; --surface-3:#ebe8e2;
   --border:rgba(46,40,32,.12); --border-hi:rgba(46,40,32,.3);
   --accent:#c9762a; --accent-bg:rgba(201,118,42,.09); --accent-glow:rgba(201,118,42,.13);
-  --t1:#1c1a17; --t2:#59544c; --t3:#8a837a;
+  /* --t3 sits between --t2 and the border colour, but it is still real reading
+     copy in a dozen places (captions, source lines, footer) -- it must clear
+     4.5:1 on both --bg and --surface, not just look "muted enough". */
+  --t1:#1c1a17; --t2:#59544c; --t3:#726c63;
   --ok:#2f7d55; --ok-bg:rgba(47,125,85,.11);
   --display:"Fraunces",Georgia,serif;
   --font:"Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
@@ -27,7 +30,7 @@
     --bg:#14120f; --surface:#1c1a16; --surface-2:#24211c; --surface-3:#2d2922;
     --border:rgba(214,204,190,.14); --border-hi:rgba(214,204,190,.32);
     --accent:#eba14e; --accent-bg:rgba(235,161,78,.13); --accent-glow:rgba(235,161,78,.20);
-    --t1:#f3efe8; --t2:#a89f92; --t3:#7a7268;
+    --t1:#f3efe8; --t2:#a89f92; --t3:#8c8378;
     --ok:#4ac585; --ok-bg:rgba(74,197,133,.13);
     --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px -18px rgba(0,0,0,.7);
   }
@@ -36,7 +39,7 @@
   --bg:#14120f; --surface:#1c1a16; --surface-2:#24211c; --surface-3:#2d2922;
   --border:rgba(214,204,190,.14); --border-hi:rgba(214,204,190,.32);
   --accent:#eba14e; --accent-bg:rgba(235,161,78,.13); --accent-glow:rgba(235,161,78,.20);
-  --t1:#f3efe8; --t2:#a89f92; --t3:#7a7268;
+  --t1:#f3efe8; --t2:#a89f92; --t3:#8c8378;
   --ok:#4ac585; --ok-bg:rgba(74,197,133,.13);
   --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px -18px rgba(0,0,0,.7);
 }
@@ -48,6 +51,7 @@ a{color:inherit}
 button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
 .wrap{max-width:920px;margin:0 auto;padding:0 24px}
+@media(max-width:480px){.wrap{padding:0 16px}.hero-in{padding-left:16px;padding-right:16px}.hdr-in{padding-left:16px;padding-right:16px}}
 
 /* header */
 .hdr{background:var(--surface);border-bottom:1px solid var(--border)}
@@ -82,22 +86,31 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 .hero::before{content:'';position:absolute;top:-230px;right:-140px;width:560px;height:560px;
   border-radius:50%;background:radial-gradient(circle,var(--accent-glow) 0%,transparent 66%);
   pointer-events:none}
-.hero-in{position:relative;max-width:920px;margin:0 auto;padding:46px 24px 40px}
-.eyebrow{font-size:.7rem;font-weight:700;letter-spacing:.15em;text-transform:uppercase;
-  color:var(--accent);margin-bottom:12px}
-.hero h1{font-family:var(--display);font-size:clamp(1.75rem,4vw,2.35rem);font-weight:700;
-  letter-spacing:-.02em;line-height:1.15;text-wrap:balance;max-width:20ch}
-.hero p{margin-top:11px;font-size:.97rem;color:var(--t2);max-width:56ch}
+.hero-in{position:relative;max-width:920px;margin:0 auto;padding:30px 24px 28px}
+.eyebrow{font-size:.68rem;font-weight:700;letter-spacing:.15em;text-transform:uppercase;
+  color:var(--accent);margin-bottom:8px}
+/* Tightened from a near full-screen display size: the headline still opens the
+   page in the brand's serif, but a business owner should reach the numbers
+   below without scrolling first. */
+.hero h1{font-family:var(--display);font-size:clamp(1.28rem,2.2vw + .8rem,1.62rem);font-weight:700;
+  letter-spacing:-.015em;line-height:1.22;text-wrap:balance;max-width:42ch}
+.hero p{margin-top:7px;font-size:.87rem;color:var(--t2);max-width:60ch}
 
-/* stats */
-.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:30px}
-.stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
-  padding:18px 20px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+/* stats -- the at-a-glance strip. Every tile is one honest number already read
+   out of DATA elsewhere on the page; nothing here is computed just for this
+   row. Uniform card size + a shared baseline grid is what makes five numbers
+   read as one summary instead of a pair of oversized cards. */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:10px;margin-top:20px}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);
+  padding:13px 15px;box-shadow:var(--shadow);position:relative;overflow:hidden;min-width:0}
 .stat::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent)}
-.stat-v{font-family:var(--display);font-size:2.1rem;font-weight:700;letter-spacing:-.03em;
-  line-height:1;font-variant-numeric:tabular-nums}
-.stat-l{margin-top:8px;font-size:.79rem;color:var(--t2);line-height:1.4}
-@media(max-width:620px){.stats{grid-template-columns:1fr}}
+.stat-v{font-family:var(--display);font-size:1.5rem;font-weight:700;letter-spacing:-.02em;
+  line-height:1.15;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;min-width:0}
+/* a tile whose value is a longer compound string (e.g. the rating tile) steps the
+   size down so it still reads as one line on a 148px card instead of wrapping mid-word */
+.stat-v.is-long{font-size:1.15rem}
+.stat-l{margin-top:5px;font-size:.73rem;color:var(--t2);line-height:1.35}
+@media(max-width:480px){.stats{grid-template-columns:repeat(2,1fr)}}
 
 /* highlights -- a quick per-type breakdown of published work. Every number here
    is an honest count of PUBLISHED items of that type, read straight off the same
@@ -110,8 +123,15 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 .hl b{font-size:.92rem;font-weight:700;font-variant-numeric:tabular-nums;color:var(--t1)}
 .hl span{font-size:.82rem;color:var(--t2)}
 
-/* sections */
-section{padding:34px 0 0}
+/* sections -- rhythm: a section that STARTS a new group of related content
+   gets extra headroom and a divider so the eye can tell "new subject" from
+   "more of the same"; a section that continues the same group sits closer to
+   the one above it. Groups: content published -> site health -> reputation &
+   lists -> outreach -> sample activity -> what's next. This is spacing only,
+   never a text label, so it can never say something the data does not. */
+section{padding:22px 0 0}
+section.grp-start{margin-top:22px;padding-top:40px;border-top:1px solid var(--border)}
+section.grp-mid{padding-top:30px}
 .sh{display:flex;align-items:baseline;gap:11px;flex-wrap:wrap}
 .sh h2{font-family:var(--display);font-size:1.22rem;font-weight:700;letter-spacing:-.015em}
 .sh .n{font-size:.79rem;color:var(--t3);font-variant-numeric:tabular-nums}
@@ -137,6 +157,12 @@ section{padding:34px 0 0}
   overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .cnote{margin-top:16px;padding-top:14px;border-top:1px solid var(--border);
   font-size:.78rem;color:var(--t3)}
+/* Chart colour key: the bars are stacked by work type, so what each colour
+   means has to sit right under the chart it explains, not several sections
+   later where the same colours reappear on the mix bar. */
+.chart-key{display:flex;flex-wrap:wrap;gap:7px 16px;margin-top:14px}
+.chart-key .ck{display:flex;align-items:center;gap:7px;font-size:.79rem;color:var(--t2)}
+.chart-key .ck i{width:10px;height:10px;border-radius:3px;flex:0 0 auto}
 /* A dense chart (7+ bars) on a phone: 40px labels under 25px bars collide into
    an unreadable smear. Thin to every other label; the bar titles keep the rest. */
 @media(max-width:560px){
@@ -167,16 +193,28 @@ section{padding:34px 0 0}
 .mgroup{margin-top:26px;padding-bottom:8px;border-bottom:1px solid var(--border)}
 .mlabel{font-size:.72rem;font-weight:700;letter-spacing:.11em;text-transform:uppercase;
   color:var(--t3)}
-.row{display:flex;align-items:baseline;gap:14px;padding:8px 4px;
+.row{display:flex;align-items:center;gap:14px;padding:10px 4px;min-height:46px;
   border-bottom:1px solid var(--border);transition:background .12s}
 .row:hover{background:var(--surface-2)}
-.row-dot{width:9px;height:9px;border-radius:3px;flex:0 0 auto;transform:translateY(4px)}
+.row:has(.row-t a){cursor:pointer}
+.row-dot{width:9px;height:9px;border-radius:3px;flex:0 0 auto}
 .row-m{flex:1;min-width:0}
-.row-t{font-size:.93rem;font-weight:550;line-height:1.4}
-.row-t a{text-decoration:none;border-bottom:1px solid transparent;transition:color .15s,border-color .15s}
+.row-t{font-size:.95rem;font-weight:600;line-height:1.4;color:var(--t1);min-width:0}
+.row-t a{text-decoration:none;color:inherit;border-bottom:1px solid transparent;transition:color .15s,border-color .15s}
 .row-t a:hover{color:var(--accent);border-bottom-color:var(--accent)}
-.row-s{font-size:.77rem;color:var(--t3);margin-top:1px}
-.row-d{font-size:.79rem;color:var(--t3);white-space:nowrap;font-variant-numeric:tabular-nums}
+.row-s{display:inline-block;margin-top:4px;font-size:.66rem;font-weight:700;letter-spacing:.04em;
+  text-transform:uppercase;color:var(--t3);background:var(--surface-2);border:1px solid var(--border);
+  border-radius:999px;padding:2px 8px;line-height:1.4}
+.row-d{flex:0 0 auto;font-size:.79rem;color:var(--t3);white-space:nowrap;
+  font-variant-numeric:tabular-nums;min-width:64px;text-align:right}
+/* Rows stack cleanly on narrow phones instead of squeezing the badge/date
+   against the title: the date drops to its own line, right-aligned, while
+   the dot + title + badge stay together on the line above. */
+@media(max-width:480px){
+  .row{flex-wrap:wrap;row-gap:2px;min-height:0}
+  .row-m{flex-basis:calc(100% - 23px)}
+  .row-d{margin-left:23px}
+}
 .more{margin-top:20px;padding:10px 18px;border-radius:var(--r-sm);border:1px solid var(--border);
   font-size:.84rem;font-weight:600;color:var(--t2);transition:color .15s,border-color .15s}
 .more:hover{color:var(--t1);border-color:var(--border-hi)}
@@ -192,10 +230,11 @@ section{padding:34px 0 0}
 /* referral partners -- the "who sends you work" section. Reuses the page's
    surface/border/text tokens so it reads as part of the dashboard rather than
    a bolted-on table. */
-.lstats{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));
+.lstats{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,168px));
   gap:9px;margin-bottom:18px}
 .lstat{background:var(--surface);border:1px solid var(--border);
-  border-radius:var(--r-sm);padding:11px 13px}
+  border-radius:var(--r-sm);padding:11px 13px;transition:border-color .15s}
+.lstat:hover{border-color:var(--accent)}
 .lstat b{display:block;font-size:1.28rem;letter-spacing:-.02em;
   font-variant-numeric:tabular-nums;color:var(--t1)}
 .lstat span{font-size:.75rem;color:var(--t3)}
@@ -232,9 +271,10 @@ section{padding:34px 0 0}
 @media(max-width:560px){.lrow-t{flex-direction:column}.lrk{text-align:left}}
 
 /* channels */
-.chans{display:grid;grid-template-columns:repeat(auto-fit,minmax(232px,1fr));gap:14px}
+.chans{display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,290px));gap:14px}
 .chan{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
-  padding:17px 19px;box-shadow:var(--shadow)}
+  padding:17px 19px;box-shadow:var(--shadow);transition:border-color .15s}
+.chan.live:hover{border-color:var(--accent)}
 .chan-h{display:flex;align-items:center;gap:10px}
 .chan-i{width:30px;height:30px;border-radius:8px;flex:0 0 auto;display:grid;place-items:center;
   background:var(--surface-2);color:var(--t2)}
@@ -480,40 +520,29 @@ section{padding:34px 0 0}
 
 <main class="wrap">
 
-  <!-- What happens next. Generic and config-driven: hidden AND empty unless the
-       payload carries `plan`, and every visible word is injected from the config
-       by the plan() script below, so a client without one ships none of it. -->
-  <section id="plan-sec" hidden>
-    <div class="sh"><h2 id="plan-h"></h2></div>
-    <div class="sd" id="plan-sd"></div>
-    <div class="pl-banner" id="plan-banner" hidden></div>
-    <div class="pl-grid" id="plan-grid"></div>
-    <div class="pl-note" id="plan-note" hidden></div>
-    <a class="pl-cta" id="plan-cta" target="_blank" rel="noopener" hidden></a>
-  </section>
-
   <!-- Referral partners. Generic and config-driven: this whole section exists
        only when the payload carries `referralPartners`, and every visible word
        is injected by the referralPartners() script below. -->
   <!-- SEO and content work leads the page: it is what Wing does for the
        client week to week. Outreach, reviews and hail follow. -->
-<section id="health-sec" hidden>
+<section id="health-sec" class="grp-start" hidden>
     <div class="sh"><h2>Your site, checked just now</h2><span class="n" id="healthn"></span></div>
     <div class="sd">We opened every page on your site as this loaded and checked the things Google
       looks at. These are live readings.</div>
     <div id="health"></div>
   </section>
 
-<section id="chart-sec">
+<section id="chart-sec" class="grp-start">
     <div class="sh"><h2>Published by month</h2></div>
     <div class="sd" id="chart-sd"></div>
     <div class="card">
       <div class="chart" id="chart"></div>
+      <div class="chart-key" id="chart-key"></div>
       <div class="cnote" id="cnote"></div>
     </div>
   </section>
 
-<section>
+<section class="grp-mid">
     <div class="sh"><h2>What we published</h2><span class="n" id="pubn"></span></div>
     <div class="sd" id="pub-sd">Colours match the chart above. Click any title to open it on your site.</div>
     <div class="card" style="margin-bottom:14px">
@@ -531,20 +560,20 @@ section{padding:34px 0 0}
   <!-- Social sits directly under the content work and reads the same way: it is
        the same job, published somewhere else. Renders only when the client has
        posts on file. -->
-  <section id="soc-sec" hidden>
+  <section id="soc-sec" class="grp-mid" hidden>
     <div class="sh"><h2 id="soc-h"></h2><span class="n" id="soc-n"></span></div>
     <div class="sd" id="soc-sd"></div>
     <div id="soc-list"></div>
     <button class="more" id="soc-more" hidden></button>
   </section>
 
-<section id="pages-sec">
+<section id="pages-sec" class="grp-mid">
     <div class="sh"><h2>Other pages we maintain</h2><span class="n" id="pagen"></span></div>
-    <div class="sd">Pages on your site beyond the list above.</div>
+    <div class="sd">The rest of your site, kept live and working. These aren't new content, but we watch them too.</div>
     <div id="pages"></div>
   </section>
 
-  <section id="rp-sec" hidden>
+  <section id="rp-sec" class="grp-start" hidden>
     <div class="sh"><h2 id="rp-h"></h2><span class="n" id="rp-n"></span></div>
     <div class="sd" id="rp-sd"></div>
     <div class="pl-banner" id="rp-banner" hidden></div>
@@ -566,15 +595,18 @@ section{padding:34px 0 0}
        either injected by the reviewStanding() script below or read out of the
        source data file. Public ratings and counts as displayed on the pull
        date, plus arithmetic on them. No forecast of any kind. -->
-  <section id="rs-sec" hidden>
+  <section id="rs-sec" class="grp-mid" hidden>
     <div class="sh"><h2 id="rs-h"></h2><span class="n" id="rs-n"></span></div>
     <div class="sd" id="rs-sd"></div>
     <div class="pl-banner" id="rs-banner" hidden></div>
+    <div class="empty" id="rs-empty" hidden></div>
     <div class="lstats" id="rs-stats"></div>
-    <div class="mgroup"><div class="mlabel" id="rs-table-label"></div></div>
-    <div class="card">
-      <div class="rs-head"><span id="rs-c1"></span><span id="rs-c2"></span><span id="rs-c3"></span></div>
-      <div id="rs-rows"></div>
+    <div id="rs-table-wrap">
+      <div class="mgroup"><div class="mlabel" id="rs-table-label"></div></div>
+      <div class="card">
+        <div class="rs-head"><span id="rs-c1"></span><span id="rs-c2"></span><span id="rs-c3"></span></div>
+        <div id="rs-rows"></div>
+      </div>
     </div>
     <div class="ctbl-cap" id="rs-dropped" hidden></div>
     <div class="rs-src" id="rs-src"></div>
@@ -586,7 +618,7 @@ section{padding:34px 0 0}
        injected by the stormHistory() script below or read out of the source
        data file. Counts of recorded events only: no estimate, no projection,
        no damage or revenue figure. -->
-  <section id="sv-sec" hidden>
+  <section id="sv-sec" class="grp-mid" hidden>
     <div class="sh"><h2 id="sv-h"></h2><span class="n" id="sv-n"></span></div>
     <div class="sd" id="sv-sd"></div>
     <div class="pl-banner" id="sv-banner" hidden></div>
@@ -617,18 +649,18 @@ section{padding:34px 0 0}
        client they stay hidden AND empty, and every visible label is injected by
        the demoActivity() script below, so a real client's output contains none
        of this text. No lead/review/message number is ever fabricated. -->
-  <section id="demo-projection-sec" hidden>
+  <section id="demo-projection-sec" class="grp-start" hidden>
     <div class="dband" id="demo-projection"></div>
   </section>
 
-  <section id="demo-leads-sec" hidden>
+  <section id="demo-leads-sec" class="grp-mid" hidden>
     <div class="sh"><h2 id="demo-lead-h"></h2><span class="n" id="demo-leadn"></span></div>
     <div class="sd" id="demo-lead-sd"></div>
     <div class="dstats" id="demo-lead-stats"></div>
     <div class="card"><div id="demo-lead-list"></div></div>
   </section>
 
-  <section id="demo-msg-sec" hidden>
+  <section id="demo-msg-sec" class="grp-mid" hidden>
     <div class="sh"><h2 id="demo-msg-h"></h2></div>
     <div class="sd" id="demo-msg-sd"></div>
     <div class="dstats" id="demo-msg-stats"></div>
@@ -638,7 +670,7 @@ section{padding:34px 0 0}
     </div>
   </section>
 
-  <section id="demo-contacts-sec" hidden>
+  <section id="demo-contacts-sec" class="grp-mid" hidden>
     <div class="sh"><h2 id="demo-contacts-h"></h2><span class="n" id="demo-contactsn"></span></div>
     <div class="sd" id="demo-contacts-sd"></div>
     <div class="dstats" id="demo-contacts-stats"></div>
@@ -648,7 +680,7 @@ section{padding:34px 0 0}
     </div>
   </section>
 
-        <section id="out-sec">
+        <section id="out-sec" class="grp-start">
     <div class="sh"><h2>Outreach and social</h2><span class="n" id="outn"></span></div>
     <div class="sd" id="out-sd"></div>
     <div class="chans" id="chans"></div>
@@ -659,7 +691,7 @@ section{padding:34px 0 0}
        Hidden and empty unless the payload carries outreachPreview; every
        visible label is injected by the outreachPreview() script, so other
        clients' output contains none of this text. -->
-  <section id="op-sec" hidden>
+  <section id="op-sec" class="grp-mid" hidden>
     <div class="sh"><h2 id="op-h"></h2><span class="n" id="op-n"></span></div>
     <div class="sd" id="op-sd"></div>
     <div id="op-reach"></div>
@@ -680,7 +712,7 @@ section{padding:34px 0 0}
        rest of this dashboard shows the client's own already-public website
        content, but this section is a few thousand enriched B2B contacts and
        must not sit on a guessable URL. -->
-  <section id="leads-sec" hidden>
+  <section id="leads-sec" class="grp-start" hidden>
     <div class="sh"><h2>Who sends you work</h2><span class="n" id="leadn"></span></div>
     <div class="sd" id="leadsd"></div>
     <div class="lstats" id="lstats"></div>
@@ -707,6 +739,20 @@ section{padding:34px 0 0}
     <button class="more" id="leadmore" hidden></button>
   </section>
 
+  <!-- What happens next. Generic and config-driven: hidden AND empty unless the
+       payload carries `plan`, and every visible word is injected from the config
+       by the plan() script below, so a client without one ships none of it.
+       Placed last: it is a forward-looking closer, after everything already
+       delivered above. -->
+  <section id="plan-sec" class="grp-start" hidden>
+    <div class="sh"><h2 id="plan-h"></h2></div>
+    <div class="sd" id="plan-sd"></div>
+    <div class="pl-banner" id="plan-banner" hidden></div>
+    <div class="pl-grid" id="plan-grid"></div>
+    <div class="pl-note" id="plan-note" hidden></div>
+    <a class="pl-cta" id="plan-cta" target="_blank" rel="noopener" hidden></a>
+  </section>
+
     <div class="foot">
     Prepared by <span id="agency">Wing Digital</span>
     &middot; <span id="stamp"></span>
@@ -714,7 +760,7 @@ section{padding:34px 0 0}
 </main>
 
 <script>
-const DATA = {"slug":"summit-ridge-roofing","generated":"2026-09-09","dataThrough":"2026-09-05","generatedAt":"2026-09-09T13:58:55","brand":{"name":"Summit Ridge Roofing","initials":"SR","site":"https://summitridgeroofing.com","kicker":"Sample dashboard \u00b7 preview","headline":"What your Summit Ridge Roofing dashboard would look like","subhead":"This is a SAMPLE preview built with example content to show the exact dashboard a Summit Ridge account would get. The pages, posts and figures below are illustrative demo data, not work delivered on a live site.","_demo_comment":"These three objects (leadsFeed, activity, projection) drive the demo-only 'Leads coming in', 'Messages and reviews', and typical-client band. They live under brand ON PURPOSE so build.py passes them through unchanged (it copies the brand object whole). They exist ONLY on this SAMPLE preview, real clients have no such keys, so those sections never render for them and no lead/review numbers are ever fabricated. Every value here is illustrative sample data.","leadsFeed":{"thisMonth":31,"allTime":268,"note":"Sample view of leads landing in your account, tagged by where each one came from. In a live account these fill in automatically as calls and form fills arrive.","leads":[{"name":"Marcus T.","source":"Google Search","city":"Frisco","date":"2026-09-04"},{"name":"Dana R.","source":"Google Business Profile","city":"McKinney","date":"2026-09-04"},{"name":"Kevin B.","source":"Website form","city":"Plano","date":"2026-09-03"},{"name":"Sofia M.","source":"Google Search","city":"Allen","date":"2026-09-02"},{"name":"Terrell J.","source":"Facebook","city":"Prosper","date":"2026-09-02"},{"name":"Angela P.","source":"Google Business Profile","city":"Frisco","date":"2026-09-01"},{"name":"Brandon L.","source":"Google Search","city":"Little Elm","date":"2026-08-31"},{"name":"Priya N.","source":"Website form","city":"Celina","date":"2026-08-30"},{"name":"Chris D.","source":"Google Search","city":"Wylie","date":"2026-08-29"},{"name":"Monica S.","source":"Facebook","city":"Melissa","date":"2026-08-28"},{"name":"Derek W.","source":"Google Business Profile","city":"Frisco","date":"2026-08-27"},{"name":"Hannah K.","source":"Website form","city":"McKinney","date":"2026-08-26"},{"name":"Jordan V.","source":"Google Search","city":"Anna","date":"2026-08-25"},{"name":"Lauren C.","source":"Google Business Profile","city":"Plano","date":"2026-08-24"}]},"activity":{"reviewRequests":74,"reviewsCollected":46,"followUpTexts":58,"note":"Sample view of the review and follow-up messaging that runs after each job, review asks, missed-call text-backs, and lead follow-ups, all sent for you.","recent":[{"text":"Review request sent to Marcus T.","date":"2026-09-03"},{"text":"Missed-call text-back sent","date":"2026-09-02"},{"text":"New 5-star review from Dana R.","date":"2026-09-01"},{"text":"Lead follow-up text sent to Kevin B.","date":"2026-08-31"},{"text":"Review request sent to Angela P.","date":"2026-08-30"},{"text":"New 5-star review from Sofia M.","date":"2026-08-29"}]},"projection":{"label":"Typical results \u00b7 illustrative","text":"Clients in your area typically see 20 to 40 new leads a month once the full system is running.","sub":"A typical range for roofers in comparable DFW markets, shown for illustration only. It is not a guarantee, a promise, or a forecast of specific results for Summit Ridge Roofing."},"contacts":{"count":1535,"note":"A sample of the enriched contact database Wing builds and maintains for your account, homeowners and referral partners across your DFW service area, each with verified contact details. In a live account this grows automatically as we find and verify new records.","caption":"Sample data shown for illustration only, names and details are examples, and phone numbers use the reserved 555 range so no real person is implied. Real contacts are built and enriched for your account.","sample":[{"name":"Marcus Delgado","email":"marcus.delgado@gmail.com","phone":"(214) 555-0142","city":"Frisco"},{"name":"Dana Whitfield","email":"dana.whitfield@gmail.com","phone":"(469) 555-0178","city":"McKinney"},{"name":"Kevin Barrera","email":"kevin.barrera@yahoo.com","phone":"(972) 555-0109","city":"Plano"},{"name":"Sofia Marchetti","email":"sofia.marchetti@gmail.com","phone":"(214) 555-0233","city":"Allen"},{"name":"Terrell Jennings","email":"terrell.jennings@outlook.com","phone":"(469) 555-0187","city":"Prosper"},{"name":"Angela Pruitt","email":"angela.pruitt@gmail.com","phone":"(972) 555-0164","city":"Frisco"},{"name":"Brandon Lockhart","email":"brandon.lockhart@gmail.com","phone":"(214) 555-0291","city":"Little Elm"},{"name":"Priya Nair","email":"priya.nair@gmail.com","phone":"(469) 555-0118","city":"Celina"},{"name":"Chris Donovan","email":"chris.donovan@yahoo.com","phone":"(972) 555-0155","city":"Wylie"},{"name":"Monica Salas","email":"monica.salas@gmail.com","phone":"(214) 555-0176","city":"Melissa"},{"name":"Derek Winslow","email":"derek.winslow@gmail.com","phone":"(469) 555-0203","city":"Frisco"},{"name":"Hannah Koenig","email":"hannah.koenig@outlook.com","phone":"(972) 555-0147","city":"McKinney"},{"name":"Jordan Vasquez","email":"jordan.vasquez@gmail.com","phone":"(214) 555-0128","city":"Anna"},{"name":"Lauren Chapman","email":"lauren.chapman@gmail.com","phone":"(469) 555-0192","city":"Plano"},{"name":"Elliot Ramsey","email":"elliot.ramsey@gmail.com","phone":"(972) 555-0136","city":"Frisco"}]}},"engines":[{"name":"Blog engine","detail":"4 to 5 posts a week","icon":"pen"},{"name":"Service pages","detail":"One page per job you do","icon":"map"},{"name":"City pages","detail":"A page for every DFW town you serve","icon":"map"},{"name":"On-page SEO","detail":"Titles, schema, internal links","icon":"search"},{"name":"Internal linking","detail":"New posts wired to old ones","icon":"link"},{"name":"Review engine","detail":"Turns finished jobs into Google reviews","icon":"star"}],"types":{"blog":{"label":"Blog post","color":"#3f6ea5"},"service":{"label":"Service page","color":"#c9762a"},"city":{"label":"City page","color":"#2f8f6f"},"core":{"label":"Core page","color":"#4a5f7a"},"other":{"label":"Other","color":"#7a8ba3"}},"showChart":true,"outreach":{"channels":[]},"outreachPreview":null,"plan":null,"referralPartners":null,"stormHistory":null,"reviewStanding":null,"social":null,"notes":{},"metrics":{},"items":[{"date":"2026-09-04","type":"blog","title":"How to Get the Most From Your Roof Insurance Claim","status":"published","url":"https://summitridgeroofing.com/blog/most-from-roof-insurance-claim"},{"date":"2026-09-04","type":"city","title":"Roof Replacement in Melissa TX","status":"published","url":"https://summitridgeroofing.com/roofing/melissa-tx"},{"date":"2026-09-02","type":"blog","title":"Preparing Your Roof for a Texas Winter","status":"published","url":"https://summitridgeroofing.com/blog/prepare-roof-texas-winter"},{"date":"2026-09-02","type":"service","title":"Roof Ventilation & Attic Airflow","status":"published","url":"https://summitridgeroofing.com/services/roof-ventilation"},{"date":"2026-08-29","type":"blog","title":"Signs of a Bad Roofing Job (and How to Avoid One)","status":"published","url":"https://summitridgeroofing.com/blog/signs-of-a-bad-roofing-job"},{"date":"2026-08-26","type":"blog","title":"Roofing Financing Options for Texas Homeowners","status":"published","url":"https://summitridgeroofing.com/blog/roofing-financing-options-texas"},{"date":"2026-08-26","type":"city","title":"Roof Replacement in Rockwall TX","status":"published","url":"https://summitridgeroofing.com/roofing/rockwall-tx"},{"date":"2026-08-22","type":"blog","title":"How Much Does a Roof Inspection Cost in DFW?","status":"published","url":"https://summitridgeroofing.com/blog/roof-inspection-cost-dfw"},{"date":"2026-08-19","type":"blog","title":"Flat Roof vs. Sloped Roof: Which Is Right for Your Home?","status":"published","url":"https://summitridgeroofing.com/blog/flat-vs-sloped-roof"},{"date":"2026-08-19","type":"city","title":"Roof Replacement in Carrollton TX","status":"published","url":"https://summitridgeroofing.com/roofing/carrollton-tx"},{"date":"2026-08-15","type":"blog","title":"What Causes Roof Leaks (and How We Find Them)","status":"published","url":"https://summitridgeroofing.com/blog/what-causes-roof-leaks"},{"date":"2026-08-12","type":"blog","title":"The DFW Storm Season Roofing Survival Guide","status":"published","url":"https://summitridgeroofing.com/blog/dfw-storm-season-survival-guide"},{"date":"2026-08-12","type":"city","title":"Storm Damage Roof Repair in Richardson TX","status":"published","url":"https://summitridgeroofing.com/roofing/richardson-tx"},{"date":"2026-08-08","type":"blog","title":"How Insurance Adjusters Really Assess Roof Damage","status":"published","url":"https://summitridgeroofing.com/blog/how-adjusters-assess-roof-damage"},{"date":"2026-08-05","type":"blog","title":"Tile Roofing in North Texas: Pros, Cons, and Cost","status":"published","url":"https://summitridgeroofing.com/blog/tile-roofing-north-texas"},{"date":"2026-08-05","type":"city","title":"Roof Replacement in Wylie TX","status":"published","url":"https://summitridgeroofing.com/roofing/wylie-tx"},{"date":"2026-07-29","type":"blog","title":"Should You Repair or Replace a Roof After Hail?","status":"published","url":"https://summitridgeroofing.com/blog/repair-or-replace-roof-after-hail"},{"date":"2026-07-29","type":"city","title":"Roof Replacement in The Colony TX","status":"published","url":"https://summitridgeroofing.com/roofing/the-colony-tx"},{"date":"2026-07-22","type":"blog","title":"Roof Maintenance Checklist for Texas Homeowners","status":"published","url":"https://summitridgeroofing.com/blog/roof-maintenance-checklist-texas"},{"date":"2026-07-22","type":"service","title":"Skylight Installation","status":"published","url":"https://summitridgeroofing.com/services/skylight-installation"},{"date":"2026-07-15","type":"blog","title":"How to Read Your Roofing Estimate Line by Line","status":"published","url":"https://summitridgeroofing.com/blog/read-roofing-estimate"},{"date":"2026-07-15","type":"city","title":"Storm Damage Roof Repair in Denton TX","status":"published","url":"https://summitridgeroofing.com/roofing/denton-tx"},{"date":"2026-07-08","type":"blog","title":"Metal Roofing Cost in DFW: A Homeowner's Breakdown","status":"published","url":"https://summitridgeroofing.com/blog/metal-roofing-cost-dfw"},{"date":"2026-07-08","type":"city","title":"Roof Replacement in Celina TX","status":"published","url":"https://summitridgeroofing.com/roofing/celina-tx"},{"date":"2026-07-01","type":"service","title":"Emergency Roof Tarping","status":"published","url":"https://summitridgeroofing.com/services/emergency-roof-tarping"},{"date":"2026-07-01","type":"blog","title":"What to Do in the First 24 Hours After Roof Storm Damage","status":"published","url":"https://summitridgeroofing.com/blog/first-24-hours-roof-storm-damage"},{"date":"2026-06-24","type":"blog","title":"Impact-Resistant Shingles: Are They Worth It in Texas?","status":"published","url":"https://summitridgeroofing.com/blog/impact-resistant-shingles-texas"},{"date":"2026-06-24","type":"city","title":"Roof Replacement in Little Elm TX","status":"published","url":"https://summitridgeroofing.com/roofing/little-elm-tx"},{"date":"2026-06-17","type":"blog","title":"How to Choose a Roofing Contractor in DFW You Can Trust","status":"published","url":"https://summitridgeroofing.com/blog/choose-roofing-contractor-dfw"},{"date":"2026-06-17","type":"city","title":"Roof Replacement in Prosper TX","status":"published","url":"https://summitridgeroofing.com/roofing/prosper-tx"},{"date":"2026-06-12","type":"service","title":"Gutter Installation & Repair","status":"published","url":"https://summitridgeroofing.com/services/gutter-installation"},{"date":"2026-06-12","type":"blog","title":"Why Ventilation Is the Most Overlooked Part of Your Roof","status":"published","url":"https://summitridgeroofing.com/blog/roof-ventilation-guide"},{"date":"2026-06-10","type":"blog","title":"What Roofing Warranty Actually Covers (and What It Doesn't)","status":"published","url":"https://summitridgeroofing.com/blog/roofing-warranty-explained"},{"date":"2026-06-10","type":"city","title":"Storm Damage Roof Repair in Allen TX","status":"published","url":"https://summitridgeroofing.com/roofing/allen-tx"},{"date":"2026-06-05","type":"city","title":"Roof Replacement in McKinney TX","status":"published","url":"https://summitridgeroofing.com/roofing/mckinney-tx"},{"date":"2026-06-05","type":"blog","title":"The Real Timeline of a Roof Replacement Project","status":"published","url":"https://summitridgeroofing.com/blog/roof-replacement-timeline"},{"date":"2026-06-03","type":"service","title":"Roof Inspections","status":"published","url":"https://summitridgeroofing.com/services/roof-inspections"},{"date":"2026-06-03","type":"blog","title":"Filing a Roof Insurance Claim After a DFW Hail Storm","status":"published","url":"https://summitridgeroofing.com/blog/roof-insurance-claim-dfw-hail"},{"date":"2026-05-29","type":"city","title":"Roof Replacement in Plano TX","status":"published","url":"https://summitridgeroofing.com/roofing/plano-tx"},{"date":"2026-05-29","type":"blog","title":"How Long Does a Roof Last in North Texas?","status":"published","url":"https://summitridgeroofing.com/blog/how-long-roof-lasts-north-texas"},{"date":"2026-05-27","type":"service","title":"Commercial Roofing","status":"published","url":"https://summitridgeroofing.com/services/commercial-roofing"},{"date":"2026-05-27","type":"blog","title":"Do You Really Need a New Roof, or Just a Repair?","status":"published","url":"https://summitridgeroofing.com/blog/new-roof-vs-repair"},{"date":"2026-05-22","type":"blog","title":"5 Signs Your Roof Needs Replacing Before Storm Season","status":"published","url":"https://summitridgeroofing.com/blog/signs-roof-needs-replacing"},{"date":"2026-05-22","type":"city","title":"Roof Replacement in Frisco TX","status":"published","url":"https://summitridgeroofing.com/roofing/frisco-tx"},{"date":"2026-05-20","type":"service","title":"Residential Roof Repair","status":"published","url":"https://summitridgeroofing.com/services/residential-roof-repair"},{"date":"2026-05-20","type":"blog","title":"Asphalt Shingles vs. Metal Roofing in Texas Heat","status":"published","url":"https://summitridgeroofing.com/blog/asphalt-vs-metal-roofing-texas"},{"date":"2026-05-15","type":"service","title":"Storm Damage Roof Repair","status":"published","url":"https://summitridgeroofing.com/services/storm-damage-roof-repair"},{"date":"2026-05-15","type":"blog","title":"What a DFW Roof Replacement Actually Costs in 2026","status":"published","url":"https://summitridgeroofing.com/blog/dfw-roof-replacement-cost-2026"},{"date":"2026-05-13","type":"service","title":"Roof Replacement","status":"published","url":"https://summitridgeroofing.com/services/roof-replacement"},{"date":"2026-05-13","type":"blog","title":"How to Spot Hail Damage on a DFW Roof","status":"published","url":"https://summitridgeroofing.com/blog/spot-hail-damage-dfw-roof"},{"date":"2026-05-11","type":"core","title":"Summit Ridge Roofing | DFW Roofing Contractor","status":"published","url":"https://summitridgeroofing.com/"},{"date":"2026-05-11","type":"core","title":"About Summit Ridge Roofing","status":"published","url":"https://summitridgeroofing.com/about"},{"date":"2026-05-11","type":"core","title":"Contact Us","status":"published","url":"https://summitridgeroofing.com/contact"}],"pages":[{"group":"Blog posts","icon":"pen","links":[{"title":"How to Get the Most From Your Roof Insurance Claim","url":"https://summitridgeroofing.com/blog/most-from-roof-insurance-claim"},{"title":"Preparing Your Roof for a Texas Winter","url":"https://summitridgeroofing.com/blog/prepare-roof-texas-winter"},{"title":"Signs of a Bad Roofing Job (and How to Avoid One)","url":"https://summitridgeroofing.com/blog/signs-of-a-bad-roofing-job"},{"title":"Roofing Financing Options for Texas Homeowners","url":"https://summitridgeroofing.com/blog/roofing-financing-options-texas"},{"title":"How Much Does a Roof Inspection Cost in DFW?","url":"https://summitridgeroofing.com/blog/roof-inspection-cost-dfw"},{"title":"Flat Roof vs. Sloped Roof: Which Is Right for Your Home?","url":"https://summitridgeroofing.com/blog/flat-vs-sloped-roof"},{"title":"What Causes Roof Leaks (and How We Find Them)","url":"https://summitridgeroofing.com/blog/what-causes-roof-leaks"},{"title":"The DFW Storm Season Roofing Survival Guide","url":"https://summitridgeroofing.com/blog/dfw-storm-season-survival-guide"},{"title":"How Insurance Adjusters Really Assess Roof Damage","url":"https://summitridgeroofing.com/blog/how-adjusters-assess-roof-damage"},{"title":"Tile Roofing in North Texas: Pros, Cons, and Cost","url":"https://summitridgeroofing.com/blog/tile-roofing-north-texas"},{"title":"Should You Repair or Replace a Roof After Hail?","url":"https://summitridgeroofing.com/blog/repair-or-replace-roof-after-hail"},{"title":"Roof Maintenance Checklist for Texas Homeowners","url":"https://summitridgeroofing.com/blog/roof-maintenance-checklist-texas"},{"title":"How to Read Your Roofing Estimate Line by Line","url":"https://summitridgeroofing.com/blog/read-roofing-estimate"},{"title":"Metal Roofing Cost in DFW: A Homeowner's Breakdown","url":"https://summitridgeroofing.com/blog/metal-roofing-cost-dfw"},{"title":"What to Do in the First 24 Hours After Roof Storm Damage","url":"https://summitridgeroofing.com/blog/first-24-hours-roof-storm-damage"},{"title":"Impact-Resistant Shingles: Are They Worth It in Texas?","url":"https://summitridgeroofing.com/blog/impact-resistant-shingles-texas"},{"title":"How to Choose a Roofing Contractor in DFW You Can Trust","url":"https://summitridgeroofing.com/blog/choose-roofing-contractor-dfw"},{"title":"Why Ventilation Is the Most Overlooked Part of Your Roof","url":"https://summitridgeroofing.com/blog/roof-ventilation-guide"},{"title":"What Roofing Warranty Actually Covers (and What It Doesn't)","url":"https://summitridgeroofing.com/blog/roofing-warranty-explained"},{"title":"The Real Timeline of a Roof Replacement Project","url":"https://summitridgeroofing.com/blog/roof-replacement-timeline"},{"title":"Filing a Roof Insurance Claim After a DFW Hail Storm","url":"https://summitridgeroofing.com/blog/roof-insurance-claim-dfw-hail"},{"title":"How Long Does a Roof Last in North Texas?","url":"https://summitridgeroofing.com/blog/how-long-roof-lasts-north-texas"},{"title":"Do You Really Need a New Roof, or Just a Repair?","url":"https://summitridgeroofing.com/blog/new-roof-vs-repair"},{"title":"5 Signs Your Roof Needs Replacing Before Storm Season","url":"https://summitridgeroofing.com/blog/signs-roof-needs-replacing"},{"title":"Asphalt Shingles vs. Metal Roofing in Texas Heat","url":"https://summitridgeroofing.com/blog/asphalt-vs-metal-roofing-texas"},{"title":"What a DFW Roof Replacement Actually Costs in 2026","url":"https://summitridgeroofing.com/blog/dfw-roof-replacement-cost-2026"},{"title":"How to Spot Hail Damage on a DFW Roof","url":"https://summitridgeroofing.com/blog/spot-hail-damage-dfw-roof"}]},{"group":"Service pages","icon":"map","links":[{"title":"Roof Ventilation & Attic Airflow","url":"https://summitridgeroofing.com/services/roof-ventilation"},{"title":"Skylight Installation","url":"https://summitridgeroofing.com/services/skylight-installation"},{"title":"Emergency Roof Tarping","url":"https://summitridgeroofing.com/services/emergency-roof-tarping"},{"title":"Gutter Installation & Repair","url":"https://summitridgeroofing.com/services/gutter-installation"},{"title":"Roof Inspections","url":"https://summitridgeroofing.com/services/roof-inspections"},{"title":"Commercial Roofing","url":"https://summitridgeroofing.com/services/commercial-roofing"},{"title":"Residential Roof Repair","url":"https://summitridgeroofing.com/services/residential-roof-repair"},{"title":"Storm Damage Roof Repair","url":"https://summitridgeroofing.com/services/storm-damage-roof-repair"},{"title":"Roof Replacement","url":"https://summitridgeroofing.com/services/roof-replacement"}]},{"group":"City pages","icon":"map","links":[{"title":"Roof Replacement in Melissa TX","url":"https://summitridgeroofing.com/roofing/melissa-tx"},{"title":"Roof Replacement in Rockwall TX","url":"https://summitridgeroofing.com/roofing/rockwall-tx"},{"title":"Roof Replacement in Carrollton TX","url":"https://summitridgeroofing.com/roofing/carrollton-tx"},{"title":"Storm Damage Roof Repair in Richardson TX","url":"https://summitridgeroofing.com/roofing/richardson-tx"},{"title":"Roof Replacement in Wylie TX","url":"https://summitridgeroofing.com/roofing/wylie-tx"},{"title":"Roof Replacement in The Colony TX","url":"https://summitridgeroofing.com/roofing/the-colony-tx"},{"title":"Storm Damage Roof Repair in Denton TX","url":"https://summitridgeroofing.com/roofing/denton-tx"},{"title":"Roof Replacement in Celina TX","url":"https://summitridgeroofing.com/roofing/celina-tx"},{"title":"Roof Replacement in Little Elm TX","url":"https://summitridgeroofing.com/roofing/little-elm-tx"},{"title":"Roof Replacement in Prosper TX","url":"https://summitridgeroofing.com/roofing/prosper-tx"},{"title":"Storm Damage Roof Repair in Allen TX","url":"https://summitridgeroofing.com/roofing/allen-tx"},{"title":"Roof Replacement in McKinney TX","url":"https://summitridgeroofing.com/roofing/mckinney-tx"},{"title":"Roof Replacement in Plano TX","url":"https://summitridgeroofing.com/roofing/plano-tx"},{"title":"Roof Replacement in Frisco TX","url":"https://summitridgeroofing.com/roofing/frisco-tx"}]},{"group":"Core site pages","icon":"globe","links":[{"title":"Summit Ridge Roofing | DFW Roofing Contractor","url":"https://summitridgeroofing.com/"},{"title":"About Summit Ridge Roofing","url":"https://summitridgeroofing.com/about"},{"title":"Contact Us","url":"https://summitridgeroofing.com/contact"}]}]};
+const DATA = {"slug":"summit-ridge-roofing","generated":"2026-09-16","dataThrough":"2026-09-15","generatedAt":"2026-09-16T15:52:34","brand":{"name":"Summit Ridge Roofing","initials":"SR","site":"https://summitridgeroofing.com","kicker":"Sample dashboard \u00b7 preview","headline":"What your Summit Ridge Roofing dashboard would look like","subhead":"This is a SAMPLE preview built with example content to show the exact dashboard a Summit Ridge account would get. The pages, posts and figures below are illustrative demo data, not work delivered on a live site.","_demo_comment":"These three objects (leadsFeed, activity, projection) drive the demo-only 'Leads coming in', 'Messages and reviews', and typical-client band. They live under brand ON PURPOSE so build.py passes them through unchanged (it copies the brand object whole). They exist ONLY on this SAMPLE preview, real clients have no such keys, so those sections never render for them and no lead/review numbers are ever fabricated. Every value here is illustrative sample data.","leadsFeed":{"thisMonth":31,"allTime":268,"note":"Sample view of leads landing in your account, tagged by where each one came from. In a live account these fill in automatically as calls and form fills arrive.","leads":[{"name":"Marcus T.","source":"Google Search","city":"Frisco","date":"2026-09-04"},{"name":"Dana R.","source":"Google Business Profile","city":"McKinney","date":"2026-09-04"},{"name":"Kevin B.","source":"Website form","city":"Plano","date":"2026-09-03"},{"name":"Sofia M.","source":"Google Search","city":"Allen","date":"2026-09-02"},{"name":"Terrell J.","source":"Facebook","city":"Prosper","date":"2026-09-02"},{"name":"Angela P.","source":"Google Business Profile","city":"Frisco","date":"2026-09-01"},{"name":"Brandon L.","source":"Google Search","city":"Little Elm","date":"2026-08-31"},{"name":"Priya N.","source":"Website form","city":"Celina","date":"2026-08-30"},{"name":"Chris D.","source":"Google Search","city":"Wylie","date":"2026-08-29"},{"name":"Monica S.","source":"Facebook","city":"Melissa","date":"2026-08-28"},{"name":"Derek W.","source":"Google Business Profile","city":"Frisco","date":"2026-08-27"},{"name":"Hannah K.","source":"Website form","city":"McKinney","date":"2026-08-26"},{"name":"Jordan V.","source":"Google Search","city":"Anna","date":"2026-08-25"},{"name":"Lauren C.","source":"Google Business Profile","city":"Plano","date":"2026-08-24"}]},"activity":{"reviewRequests":74,"reviewsCollected":46,"followUpTexts":58,"note":"Sample view of the review and follow-up messaging that runs after each job, review asks, missed-call text-backs, and lead follow-ups, all sent for you.","recent":[{"text":"Review request sent to Marcus T.","date":"2026-09-03"},{"text":"Missed-call text-back sent","date":"2026-09-02"},{"text":"New 5-star review from Dana R.","date":"2026-09-01"},{"text":"Lead follow-up text sent to Kevin B.","date":"2026-08-31"},{"text":"Review request sent to Angela P.","date":"2026-08-30"},{"text":"New 5-star review from Sofia M.","date":"2026-08-29"}]},"projection":{"label":"Typical results \u00b7 illustrative","text":"Clients in your area typically see 20 to 40 new leads a month once the full system is running.","sub":"A typical range for roofers in comparable DFW markets, shown for illustration only. It is not a guarantee, a promise, or a forecast of specific results for Summit Ridge Roofing."},"contacts":{"count":1535,"note":"A sample of the enriched contact database Wing builds and maintains for your account, homeowners and referral partners across your DFW service area, each with verified contact details. In a live account this grows automatically as we find and verify new records.","caption":"Sample data shown for illustration only, names and details are examples, and phone numbers use the reserved 555 range so no real person is implied. Real contacts are built and enriched for your account.","sample":[{"name":"Marcus Delgado","email":"marcus.delgado@gmail.com","phone":"(214) 555-0142","city":"Frisco"},{"name":"Dana Whitfield","email":"dana.whitfield@gmail.com","phone":"(469) 555-0178","city":"McKinney"},{"name":"Kevin Barrera","email":"kevin.barrera@yahoo.com","phone":"(972) 555-0109","city":"Plano"},{"name":"Sofia Marchetti","email":"sofia.marchetti@gmail.com","phone":"(214) 555-0233","city":"Allen"},{"name":"Terrell Jennings","email":"terrell.jennings@outlook.com","phone":"(469) 555-0187","city":"Prosper"},{"name":"Angela Pruitt","email":"angela.pruitt@gmail.com","phone":"(972) 555-0164","city":"Frisco"},{"name":"Brandon Lockhart","email":"brandon.lockhart@gmail.com","phone":"(214) 555-0291","city":"Little Elm"},{"name":"Priya Nair","email":"priya.nair@gmail.com","phone":"(469) 555-0118","city":"Celina"},{"name":"Chris Donovan","email":"chris.donovan@yahoo.com","phone":"(972) 555-0155","city":"Wylie"},{"name":"Monica Salas","email":"monica.salas@gmail.com","phone":"(214) 555-0176","city":"Melissa"},{"name":"Derek Winslow","email":"derek.winslow@gmail.com","phone":"(469) 555-0203","city":"Frisco"},{"name":"Hannah Koenig","email":"hannah.koenig@outlook.com","phone":"(972) 555-0147","city":"McKinney"},{"name":"Jordan Vasquez","email":"jordan.vasquez@gmail.com","phone":"(214) 555-0128","city":"Anna"},{"name":"Lauren Chapman","email":"lauren.chapman@gmail.com","phone":"(469) 555-0192","city":"Plano"},{"name":"Elliot Ramsey","email":"elliot.ramsey@gmail.com","phone":"(972) 555-0136","city":"Frisco"}]}},"engines":[{"name":"Blog engine","detail":"4 to 5 posts a week","icon":"pen"},{"name":"Service pages","detail":"One page per job you do","icon":"map"},{"name":"City pages","detail":"A page for every DFW town you serve","icon":"map"},{"name":"On-page SEO","detail":"Titles, schema, internal links","icon":"search"},{"name":"Internal linking","detail":"New posts wired to old ones","icon":"link"},{"name":"Review engine","detail":"Turns finished jobs into Google reviews","icon":"star"}],"types":{"blog":{"label":"Blog post","color":"#3f6ea5"},"service":{"label":"Service page","color":"#c9762a"},"city":{"label":"City page","color":"#2f8f6f"},"core":{"label":"Core page","color":"#4a5f7a"},"other":{"label":"Other","color":"#7a8ba3"}},"showChart":true,"outreach":{"channels":[]},"outreachPreview":null,"plan":null,"referralPartners":null,"stormHistory":null,"reviewStanding":null,"social":null,"notes":{},"metrics":{},"items":[{"date":"2026-09-04","type":"blog","title":"How to Get the Most From Your Roof Insurance Claim","status":"published","url":"https://summitridgeroofing.com/blog/most-from-roof-insurance-claim"},{"date":"2026-09-04","type":"city","title":"Roof Replacement in Melissa TX","status":"published","url":"https://summitridgeroofing.com/roofing/melissa-tx"},{"date":"2026-09-02","type":"blog","title":"Preparing Your Roof for a Texas Winter","status":"published","url":"https://summitridgeroofing.com/blog/prepare-roof-texas-winter"},{"date":"2026-09-02","type":"service","title":"Roof Ventilation & Attic Airflow","status":"published","url":"https://summitridgeroofing.com/services/roof-ventilation"},{"date":"2026-08-29","type":"blog","title":"Signs of a Bad Roofing Job (and How to Avoid One)","status":"published","url":"https://summitridgeroofing.com/blog/signs-of-a-bad-roofing-job"},{"date":"2026-08-26","type":"blog","title":"Roofing Financing Options for Texas Homeowners","status":"published","url":"https://summitridgeroofing.com/blog/roofing-financing-options-texas"},{"date":"2026-08-26","type":"city","title":"Roof Replacement in Rockwall TX","status":"published","url":"https://summitridgeroofing.com/roofing/rockwall-tx"},{"date":"2026-08-22","type":"blog","title":"How Much Does a Roof Inspection Cost in DFW?","status":"published","url":"https://summitridgeroofing.com/blog/roof-inspection-cost-dfw"},{"date":"2026-08-19","type":"blog","title":"Flat Roof vs. Sloped Roof: Which Is Right for Your Home?","status":"published","url":"https://summitridgeroofing.com/blog/flat-vs-sloped-roof"},{"date":"2026-08-19","type":"city","title":"Roof Replacement in Carrollton TX","status":"published","url":"https://summitridgeroofing.com/roofing/carrollton-tx"},{"date":"2026-08-15","type":"blog","title":"What Causes Roof Leaks (and How We Find Them)","status":"published","url":"https://summitridgeroofing.com/blog/what-causes-roof-leaks"},{"date":"2026-08-12","type":"blog","title":"The DFW Storm Season Roofing Survival Guide","status":"published","url":"https://summitridgeroofing.com/blog/dfw-storm-season-survival-guide"},{"date":"2026-08-12","type":"city","title":"Storm Damage Roof Repair in Richardson TX","status":"published","url":"https://summitridgeroofing.com/roofing/richardson-tx"},{"date":"2026-08-08","type":"blog","title":"How Insurance Adjusters Really Assess Roof Damage","status":"published","url":"https://summitridgeroofing.com/blog/how-adjusters-assess-roof-damage"},{"date":"2026-08-05","type":"blog","title":"Tile Roofing in North Texas: Pros, Cons, and Cost","status":"published","url":"https://summitridgeroofing.com/blog/tile-roofing-north-texas"},{"date":"2026-08-05","type":"city","title":"Roof Replacement in Wylie TX","status":"published","url":"https://summitridgeroofing.com/roofing/wylie-tx"},{"date":"2026-07-29","type":"blog","title":"Should You Repair or Replace a Roof After Hail?","status":"published","url":"https://summitridgeroofing.com/blog/repair-or-replace-roof-after-hail"},{"date":"2026-07-29","type":"city","title":"Roof Replacement in The Colony TX","status":"published","url":"https://summitridgeroofing.com/roofing/the-colony-tx"},{"date":"2026-07-22","type":"blog","title":"Roof Maintenance Checklist for Texas Homeowners","status":"published","url":"https://summitridgeroofing.com/blog/roof-maintenance-checklist-texas"},{"date":"2026-07-22","type":"service","title":"Skylight Installation","status":"published","url":"https://summitridgeroofing.com/services/skylight-installation"},{"date":"2026-07-15","type":"blog","title":"How to Read Your Roofing Estimate Line by Line","status":"published","url":"https://summitridgeroofing.com/blog/read-roofing-estimate"},{"date":"2026-07-15","type":"city","title":"Storm Damage Roof Repair in Denton TX","status":"published","url":"https://summitridgeroofing.com/roofing/denton-tx"},{"date":"2026-07-08","type":"blog","title":"Metal Roofing Cost in DFW: A Homeowner's Breakdown","status":"published","url":"https://summitridgeroofing.com/blog/metal-roofing-cost-dfw"},{"date":"2026-07-08","type":"city","title":"Roof Replacement in Celina TX","status":"published","url":"https://summitridgeroofing.com/roofing/celina-tx"},{"date":"2026-07-01","type":"service","title":"Emergency Roof Tarping","status":"published","url":"https://summitridgeroofing.com/services/emergency-roof-tarping"},{"date":"2026-07-01","type":"blog","title":"What to Do in the First 24 Hours After Roof Storm Damage","status":"published","url":"https://summitridgeroofing.com/blog/first-24-hours-roof-storm-damage"},{"date":"2026-06-24","type":"blog","title":"Impact-Resistant Shingles: Are They Worth It in Texas?","status":"published","url":"https://summitridgeroofing.com/blog/impact-resistant-shingles-texas"},{"date":"2026-06-24","type":"city","title":"Roof Replacement in Little Elm TX","status":"published","url":"https://summitridgeroofing.com/roofing/little-elm-tx"},{"date":"2026-06-17","type":"blog","title":"How to Choose a Roofing Contractor in DFW You Can Trust","status":"published","url":"https://summitridgeroofing.com/blog/choose-roofing-contractor-dfw"},{"date":"2026-06-17","type":"city","title":"Roof Replacement in Prosper TX","status":"published","url":"https://summitridgeroofing.com/roofing/prosper-tx"},{"date":"2026-06-12","type":"service","title":"Gutter Installation & Repair","status":"published","url":"https://summitridgeroofing.com/services/gutter-installation"},{"date":"2026-06-12","type":"blog","title":"Why Ventilation Is the Most Overlooked Part of Your Roof","status":"published","url":"https://summitridgeroofing.com/blog/roof-ventilation-guide"},{"date":"2026-06-10","type":"blog","title":"What Roofing Warranty Actually Covers (and What It Doesn't)","status":"published","url":"https://summitridgeroofing.com/blog/roofing-warranty-explained"},{"date":"2026-06-10","type":"city","title":"Storm Damage Roof Repair in Allen TX","status":"published","url":"https://summitridgeroofing.com/roofing/allen-tx"},{"date":"2026-06-05","type":"city","title":"Roof Replacement in McKinney TX","status":"published","url":"https://summitridgeroofing.com/roofing/mckinney-tx"},{"date":"2026-06-05","type":"blog","title":"The Real Timeline of a Roof Replacement Project","status":"published","url":"https://summitridgeroofing.com/blog/roof-replacement-timeline"},{"date":"2026-06-03","type":"service","title":"Roof Inspections","status":"published","url":"https://summitridgeroofing.com/services/roof-inspections"},{"date":"2026-06-03","type":"blog","title":"Filing a Roof Insurance Claim After a DFW Hail Storm","status":"published","url":"https://summitridgeroofing.com/blog/roof-insurance-claim-dfw-hail"},{"date":"2026-05-29","type":"city","title":"Roof Replacement in Plano TX","status":"published","url":"https://summitridgeroofing.com/roofing/plano-tx"},{"date":"2026-05-29","type":"blog","title":"How Long Does a Roof Last in North Texas?","status":"published","url":"https://summitridgeroofing.com/blog/how-long-roof-lasts-north-texas"},{"date":"2026-05-27","type":"service","title":"Commercial Roofing","status":"published","url":"https://summitridgeroofing.com/services/commercial-roofing"},{"date":"2026-05-27","type":"blog","title":"Do You Really Need a New Roof, or Just a Repair?","status":"published","url":"https://summitridgeroofing.com/blog/new-roof-vs-repair"},{"date":"2026-05-22","type":"blog","title":"5 Signs Your Roof Needs Replacing Before Storm Season","status":"published","url":"https://summitridgeroofing.com/blog/signs-roof-needs-replacing"},{"date":"2026-05-22","type":"city","title":"Roof Replacement in Frisco TX","status":"published","url":"https://summitridgeroofing.com/roofing/frisco-tx"},{"date":"2026-05-20","type":"service","title":"Residential Roof Repair","status":"published","url":"https://summitridgeroofing.com/services/residential-roof-repair"},{"date":"2026-05-20","type":"blog","title":"Asphalt Shingles vs. Metal Roofing in Texas Heat","status":"published","url":"https://summitridgeroofing.com/blog/asphalt-vs-metal-roofing-texas"},{"date":"2026-05-15","type":"service","title":"Storm Damage Roof Repair","status":"published","url":"https://summitridgeroofing.com/services/storm-damage-roof-repair"},{"date":"2026-05-15","type":"blog","title":"What a DFW Roof Replacement Actually Costs in 2026","status":"published","url":"https://summitridgeroofing.com/blog/dfw-roof-replacement-cost-2026"},{"date":"2026-05-13","type":"service","title":"Roof Replacement","status":"published","url":"https://summitridgeroofing.com/services/roof-replacement"},{"date":"2026-05-13","type":"blog","title":"How to Spot Hail Damage on a DFW Roof","status":"published","url":"https://summitridgeroofing.com/blog/spot-hail-damage-dfw-roof"},{"date":"2026-05-11","type":"core","title":"Summit Ridge Roofing | DFW Roofing Contractor","status":"published","url":"https://summitridgeroofing.com/"},{"date":"2026-05-11","type":"core","title":"About Summit Ridge Roofing","status":"published","url":"https://summitridgeroofing.com/about"},{"date":"2026-05-11","type":"core","title":"Contact Us","status":"published","url":"https://summitridgeroofing.com/contact"}],"pages":[{"group":"Blog posts","icon":"pen","links":[{"title":"How to Get the Most From Your Roof Insurance Claim","url":"https://summitridgeroofing.com/blog/most-from-roof-insurance-claim"},{"title":"Preparing Your Roof for a Texas Winter","url":"https://summitridgeroofing.com/blog/prepare-roof-texas-winter"},{"title":"Signs of a Bad Roofing Job (and How to Avoid One)","url":"https://summitridgeroofing.com/blog/signs-of-a-bad-roofing-job"},{"title":"Roofing Financing Options for Texas Homeowners","url":"https://summitridgeroofing.com/blog/roofing-financing-options-texas"},{"title":"How Much Does a Roof Inspection Cost in DFW?","url":"https://summitridgeroofing.com/blog/roof-inspection-cost-dfw"},{"title":"Flat Roof vs. Sloped Roof: Which Is Right for Your Home?","url":"https://summitridgeroofing.com/blog/flat-vs-sloped-roof"},{"title":"What Causes Roof Leaks (and How We Find Them)","url":"https://summitridgeroofing.com/blog/what-causes-roof-leaks"},{"title":"The DFW Storm Season Roofing Survival Guide","url":"https://summitridgeroofing.com/blog/dfw-storm-season-survival-guide"},{"title":"How Insurance Adjusters Really Assess Roof Damage","url":"https://summitridgeroofing.com/blog/how-adjusters-assess-roof-damage"},{"title":"Tile Roofing in North Texas: Pros, Cons, and Cost","url":"https://summitridgeroofing.com/blog/tile-roofing-north-texas"},{"title":"Should You Repair or Replace a Roof After Hail?","url":"https://summitridgeroofing.com/blog/repair-or-replace-roof-after-hail"},{"title":"Roof Maintenance Checklist for Texas Homeowners","url":"https://summitridgeroofing.com/blog/roof-maintenance-checklist-texas"},{"title":"How to Read Your Roofing Estimate Line by Line","url":"https://summitridgeroofing.com/blog/read-roofing-estimate"},{"title":"Metal Roofing Cost in DFW: A Homeowner's Breakdown","url":"https://summitridgeroofing.com/blog/metal-roofing-cost-dfw"},{"title":"What to Do in the First 24 Hours After Roof Storm Damage","url":"https://summitridgeroofing.com/blog/first-24-hours-roof-storm-damage"},{"title":"Impact-Resistant Shingles: Are They Worth It in Texas?","url":"https://summitridgeroofing.com/blog/impact-resistant-shingles-texas"},{"title":"How to Choose a Roofing Contractor in DFW You Can Trust","url":"https://summitridgeroofing.com/blog/choose-roofing-contractor-dfw"},{"title":"Why Ventilation Is the Most Overlooked Part of Your Roof","url":"https://summitridgeroofing.com/blog/roof-ventilation-guide"},{"title":"What Roofing Warranty Actually Covers (and What It Doesn't)","url":"https://summitridgeroofing.com/blog/roofing-warranty-explained"},{"title":"The Real Timeline of a Roof Replacement Project","url":"https://summitridgeroofing.com/blog/roof-replacement-timeline"},{"title":"Filing a Roof Insurance Claim After a DFW Hail Storm","url":"https://summitridgeroofing.com/blog/roof-insurance-claim-dfw-hail"},{"title":"How Long Does a Roof Last in North Texas?","url":"https://summitridgeroofing.com/blog/how-long-roof-lasts-north-texas"},{"title":"Do You Really Need a New Roof, or Just a Repair?","url":"https://summitridgeroofing.com/blog/new-roof-vs-repair"},{"title":"5 Signs Your Roof Needs Replacing Before Storm Season","url":"https://summitridgeroofing.com/blog/signs-roof-needs-replacing"},{"title":"Asphalt Shingles vs. Metal Roofing in Texas Heat","url":"https://summitridgeroofing.com/blog/asphalt-vs-metal-roofing-texas"},{"title":"What a DFW Roof Replacement Actually Costs in 2026","url":"https://summitridgeroofing.com/blog/dfw-roof-replacement-cost-2026"},{"title":"How to Spot Hail Damage on a DFW Roof","url":"https://summitridgeroofing.com/blog/spot-hail-damage-dfw-roof"}]},{"group":"Service pages","icon":"map","links":[{"title":"Roof Ventilation & Attic Airflow","url":"https://summitridgeroofing.com/services/roof-ventilation"},{"title":"Skylight Installation","url":"https://summitridgeroofing.com/services/skylight-installation"},{"title":"Emergency Roof Tarping","url":"https://summitridgeroofing.com/services/emergency-roof-tarping"},{"title":"Gutter Installation & Repair","url":"https://summitridgeroofing.com/services/gutter-installation"},{"title":"Roof Inspections","url":"https://summitridgeroofing.com/services/roof-inspections"},{"title":"Commercial Roofing","url":"https://summitridgeroofing.com/services/commercial-roofing"},{"title":"Residential Roof Repair","url":"https://summitridgeroofing.com/services/residential-roof-repair"},{"title":"Storm Damage Roof Repair","url":"https://summitridgeroofing.com/services/storm-damage-roof-repair"},{"title":"Roof Replacement","url":"https://summitridgeroofing.com/services/roof-replacement"}]},{"group":"City pages","icon":"map","links":[{"title":"Roof Replacement in Melissa TX","url":"https://summitridgeroofing.com/roofing/melissa-tx"},{"title":"Roof Replacement in Rockwall TX","url":"https://summitridgeroofing.com/roofing/rockwall-tx"},{"title":"Roof Replacement in Carrollton TX","url":"https://summitridgeroofing.com/roofing/carrollton-tx"},{"title":"Storm Damage Roof Repair in Richardson TX","url":"https://summitridgeroofing.com/roofing/richardson-tx"},{"title":"Roof Replacement in Wylie TX","url":"https://summitridgeroofing.com/roofing/wylie-tx"},{"title":"Roof Replacement in The Colony TX","url":"https://summitridgeroofing.com/roofing/the-colony-tx"},{"title":"Storm Damage Roof Repair in Denton TX","url":"https://summitridgeroofing.com/roofing/denton-tx"},{"title":"Roof Replacement in Celina TX","url":"https://summitridgeroofing.com/roofing/celina-tx"},{"title":"Roof Replacement in Little Elm TX","url":"https://summitridgeroofing.com/roofing/little-elm-tx"},{"title":"Roof Replacement in Prosper TX","url":"https://summitridgeroofing.com/roofing/prosper-tx"},{"title":"Storm Damage Roof Repair in Allen TX","url":"https://summitridgeroofing.com/roofing/allen-tx"},{"title":"Roof Replacement in McKinney TX","url":"https://summitridgeroofing.com/roofing/mckinney-tx"},{"title":"Roof Replacement in Plano TX","url":"https://summitridgeroofing.com/roofing/plano-tx"},{"title":"Roof Replacement in Frisco TX","url":"https://summitridgeroofing.com/roofing/frisco-tx"}]},{"group":"Core site pages","icon":"globe","links":[{"title":"Summit Ridge Roofing | DFW Roofing Contractor","url":"https://summitridgeroofing.com/"},{"title":"About Summit Ridge Roofing","url":"https://summitridgeroofing.com/about"},{"title":"Contact Us","url":"https://summitridgeroofing.com/contact"}]}]};
 
 (function(){
   'use strict';
@@ -786,21 +832,36 @@ const DATA = {"slug":"summit-ridge-roofing","generated":"2026-09-09","dataThroug
      cadence pauses, so it is gone. The referral list, when a client has one, is
      the biggest asset on the page and takes the first slot. */
   const RP = DATA.referralPartners;
+  // Reviews standing, read straight off the same object the reviewStanding()
+  // section renders further down -- a formatted string, not a fabricated
+  // number, and omitted entirely when there is no public profile on file.
+  const RS = DATA.reviewStanding && DATA.reviewStanding.client;
   const statList = [];
   if (RP && RP.total) statList.push({ v: RP.total, l: RP.statLabel || 'Businesses in your outreach list' });
   statList.push({ v: PUB.length,  l: 'Articles published on your site' });
   statList.push({ v: livePages,   l: 'Pages you can open' });
+  if (RS && RS.hasProfile !== false && RS.reviewCount != null && RS.rating != null) {
+    // Short value ("4.1★") always fits the tile at any width; the review count
+    // moves into the label instead of being crammed into the same line, which
+    // is what was clipping to "4.1..." on longer counts.
+    const revN = Number(RS.reviewCount).toLocaleString('en-US');
+    statList.push({ v: (Math.round(Number(RS.rating)*10)/10).toFixed(1)+'★', raw:true,
+      l: revN + (Number(RS.reviewCount) === 1 ? ' review on your listing' : ' reviews on your listing') });
+  }
   // Website visits lead when we genuinely have them. DATA.traffic is null while
   // no source is wired, and the page keeps its named pending row instead --
   // a zero here would tell the client nobody visited, which is a different claim.
   if (DATA.traffic && typeof DATA.traffic.pageviews30d === 'number') {
     statList.unshift({ v: DATA.traffic.pageviews30d, l: 'Website visits, last 30 days' });
-    document.querySelector('.stats').style.gridTemplateColumns = 'repeat(auto-fit,minmax(180px,1fr))';
   }
   statList.forEach(s => {
     const el = document.createElement('div');
     el.className = 'stat';
-    el.innerHTML = '<div class="stat-v">'+s.v.toLocaleString()+'</div><div class="stat-l">'+esc(s.l)+'</div>';
+    const v = s.raw ? esc(s.v) : Number(s.v).toLocaleString();
+    // Safety net for any value string longer than a plain formatted number: step
+    // the font down rather than let the tile clip or overflow its neighbour.
+    const vCls = String(v).length > 6 ? 'stat-v is-long' : 'stat-v';
+    el.innerHTML = '<div class="'+vCls+'">'+v+'</div><div class="stat-l">'+esc(s.l)+'</div>';
     $('#stats').appendChild(el);
   });
 
@@ -872,6 +933,7 @@ const DATA = {"slug":"summit-ridge-roofing","generated":"2026-09-09","dataThroug
 
   if (!buckets.length) {
     $('#chart').innerHTML = '<div class="empty">Published work will chart here.</div>';
+    $('#chart-key').innerHTML = '';
     $('#chart-sd').textContent = 'Nothing published yet.';
     $('#cnote').textContent = '';
   } else {
@@ -879,6 +941,18 @@ const DATA = {"slug":"summit-ridge-roofing","generated":"2026-09-09","dataThroug
       unit === 'week' ? 'Published by week' : 'Published by month';
     $('#chart-sd').textContent = 'One bar per ' + unit +
       ', split by what kind of work it was.';
+    // Colour key for the stacked bars, right where the chart is -- never make
+    // the reader scroll to the mix bar below to learn what a colour means.
+    (function(){
+      const totals = {};
+      buckets.forEach(bk => Object.keys(bk.byType).forEach(t => {
+        totals[t] = (totals[t]||0) + bk.byType[t];
+      }));
+      const order = Object.keys(totals).sort((a,c)=>totals[c]-totals[a]);
+      $('#chart-key').innerHTML = order.length > 1 ? order.map(t =>
+        '<div class="ck"><i style="background:'+color(t)+'"></i>'+esc(label(t))+'</div>'
+      ).join('') : '';
+    })();
     if (buckets.length > 6) $('#chart').classList.add('dense');
     $('#chart').innerHTML = buckets.map(bk => {
       if (!bk.total) {
@@ -1098,12 +1172,30 @@ const DATA = {"slug":"summit-ridge-roofing","generated":"2026-09-09","dataThroug
       return new Date(+p[0], +p[1]-1, +p[2]).toLocaleDateString('en-US',
         {month:'short', day:'numeric', year:'numeric'}); };
 
-    $('#rs-h').textContent  = S.title || 'Where you stand on reviews';
+    $('#rs-h').textContent  = S.title || 'Reviews and reputation';
     $('#rs-n').textContent  = C.hasProfile === false
       ? 'no public profile found'
       : num(C.reviewCount) + ' reviews at ' + one(C.rating);
     $('#rs-sd').textContent = S.intro || '';
     if (S.banner) { $('#rs-banner').textContent = S.banner; $('#rs-banner').hidden = false; }
+
+    /* Honest empty state: a client with no public review profile gets a plain
+       statement of that fact instead of a table of blank ratings and a median
+       computed from a set that doesn't include them. Nothing is invented. */
+    if (C.hasProfile === false) {
+      $('#rs-empty').textContent = S.emptyNote ||
+        'No public review profile found for this business yet. Once one exists, ' +
+        'this section will show the rating, review count and how it compares to ' +
+        'others in the area.';
+      $('#rs-empty').hidden = false;
+      $('#rs-stats').hidden = true;
+      $('#rs-table-wrap').hidden = true;
+      let src = S.sourceLine || '';
+      if (S.pulledOn) src += (src ? ' ' : '') + 'Checked ' + day(S.pulledOn) + '.';
+      $('#rs-src').textContent = src;
+      if (S.note) { $('#rs-note').textContent = S.note; $('#rs-note').hidden = false; }
+      return;
+    }
 
     const tiles = [
       [num(C.reviewCount),           'your reviews'],
@@ -1692,17 +1784,19 @@ const DATA = {"slug":"summit-ridge-roofing","generated":"2026-09-09","dataThroug
       L.forEach(function(x){ counts[x.category] = (counts[x.category]||0) + 1; });
       var cats = (LD.categories||[]).filter(function(c){ return counts[c.key]; });
       $('#lpills').innerHTML =
-        '<span class="lpill on" data-c="all">Everyone <i>' + L.length + '</i></span>' +
+        '<button type="button" class="lpill on" data-c="all" aria-pressed="true">Everyone <i>' + L.length + '</i></button>' +
         cats.map(function(c){
-          return '<span class="lpill" data-c="' + esc(c.key) + '">' + esc(c.label) +
-                 ' <i>' + counts[c.key] + '</i></span>';
+          return '<button type="button" class="lpill" data-c="' + esc(c.key) + '" aria-pressed="false">' + esc(c.label) +
+                 ' <i>' + counts[c.key] + '</i></button>';
         }).join('');
 
       $('#lpills').addEventListener('click', function(e){
         var p = e.target.closest('.lpill'); if (!p) return;
-        Array.prototype.forEach.call(document.querySelectorAll('.lpill'),
-          function(x){ x.classList.remove('on'); });
-        p.classList.add('on'); LCAT = p.dataset.c; LSHOWN = 100; drawLeads();
+        Array.prototype.forEach.call(document.querySelectorAll('.lpill'), function(x){
+          x.classList.remove('on'); x.setAttribute('aria-pressed','false');
+        });
+        p.classList.add('on'); p.setAttribute('aria-pressed','true');
+        LCAT = p.dataset.c; LSHOWN = 100; drawLeads();
       });
       ['#lq','#lsort','#lhas'].forEach(function(s){
         $(s).addEventListener('input', function(){ LSHOWN = 100; drawLeads(); });

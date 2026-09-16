@@ -957,7 +957,7 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
         border: "1px solid var(--border)", borderRadius: 14, padding: "14px 20px",
         boxShadow: "0 8px 24px var(--bg-hover)",
       }}>
-        <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.09em", color: "var(--text-muted)" }}>MRR</span>
+        <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.09em", color: "var(--text-muted)" }}>Making this month</span>
         {typeof data?.mrr === "number" ? (
           <span style={{ fontSize: 30, fontWeight: 800, color: "var(--green)", lineHeight: 1, fontFamily: "'Space Grotesk', sans-serif" }}>${data.mrr.toLocaleString()}</span>
         ) : (
@@ -1113,8 +1113,12 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
           Control still shows every tile. */}
       {missionStats && missionStats.tiles.length > 0 && (() => {
         const PRIMARY = ["Active Clients", "Pipeline", "Prospects in the pipeline", "Untouched Leads"];
-        const primary = missionStats.tiles.filter(t => PRIMARY.includes(t.label));
-        const rest = missionStats.tiles.filter(t => !PRIMARY.includes(t.label));
+        // MRR is shown once now, as the basic strip at the top of the page
+        // (2026-09-15, Jack), so it is dropped from the mission tiles entirely
+        // rather than hiding under "show more".
+        const tiles = missionStats.tiles.filter(t => t.label !== "MRR");
+        const primary = tiles.filter(t => PRIMARY.includes(t.label));
+        const rest = tiles.filter(t => !PRIMARY.includes(t.label));
         const shown = showAllStats ? [...primary, ...rest] : primary;
         return (
           <motion.div variants={riseItem}>

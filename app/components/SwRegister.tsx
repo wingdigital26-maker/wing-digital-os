@@ -8,6 +8,20 @@ export default function SwRegister() {
   useEffect(() => {
     if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
 
+    // Dev guard: Next inlines NODE_ENV at build time, so this branch is
+    // stripped entirely from the production bundle. In dev the bundle
+    // re-hashes on every recompile, which makes a registered SW re-install
+    // over and over, firing controllerchange -> reload -> new SW -> reload
+    // forever. Skip registering in dev, and proactively unregister any SW
+    // a developer already has installed so an existing loop stops too.
+    if (process.env.NODE_ENV !== "production") {
+      navigator.serviceWorker
+        .getRegistrations()
+        .then((regs) => regs.forEach((reg) => reg.unregister()))
+        .catch(() => {});
+      return;
+    }
+
     let reloaded = false;
     navigator.serviceWorker.addEventListener("controllerchange", () => {
       if (reloaded) return;

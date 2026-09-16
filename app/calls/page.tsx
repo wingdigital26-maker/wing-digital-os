@@ -281,6 +281,9 @@ export default function CallRoom() {
   // Minute granularity is plenty for a "how late is this" label and keeps the
   // derived-data memo below from recomputing on every render.
   const [now, setNow] = useState(() => new Date());
+  // Outer element ref, used to skip background polling while this keep-alive
+  // view is hidden (offsetParent is null under a display:none ancestor).
+  const rootRef = useRef<HTMLDivElement | null>(null);
 
   // Filters and search stay server-driven; changing any of them starts back at
   // the first page.
@@ -388,9 +391,19 @@ export default function CallRoom() {
 
   // Refresh while idle so a caller sees what teammates are claiming in near
   // real time. Paused while a lead is open so the list cannot shuffle mid-call.
+  // Also skipped while this view is hidden: in the OS shell the Call Room is a
+  // keep-alive view (display:none when you are on another section), and a 20s
+  // poll firing against a hidden screen is pure waste. rootRef.offsetParent is
+  // null when an ancestor is display:none, so the tick no-ops until it is shown
+  // again. On the standalone /calls route the view is always visible, so this
+  // changes nothing there.
   useEffect(() => {
     if (active) return;
-    const t = setInterval(() => { load(); loadToday(); }, 20000);
+    const t = setInterval(() => {
+      if (!rootRef.current || rootRef.current.offsetParent === null || document.hidden) return;
+      load();
+      loadToday();
+    }, 20000);
     return () => clearInterval(t);
   }, [active, load, loadToday]);
 
@@ -549,7 +562,7 @@ export default function CallRoom() {
 
   return (
     <>
-      <div>
+      <div ref={rootRef}>
         {/* header — sign-out and admin links live in the shared nav above */}
         <div>
           <h1 style={{ fontSize: 26, fontWeight: 800, letterSpacing: -0.5 }}>Call Room</h1>

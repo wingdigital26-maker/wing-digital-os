@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { sfx } from "../lib/sounds";
 import { copyText } from "../lib/copyText";
 
@@ -77,6 +77,7 @@ export default function SonarBoard() {
   // After 12 seconds with nothing back the board says so and offers a retry.
   const [timedOut, setTimedOut] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(() => {
     const qs = new URLSearchParams({ minNeed, limit: "60" });
@@ -97,7 +98,13 @@ export default function SonarBoard() {
   // The engine writes on a schedule, so a slow refresh keeps this honest
   // without hammering Supabase.
   useEffect(() => {
-    const t = setInterval(load, 120000);
+    const t = setInterval(() => {
+      // Skip the tick when this board is hidden behind the shell's
+      // keep-alive display:none (or the tab is backgrounded), so a board
+      // opened once and left in the background does not keep polling.
+      if (!rootRef.current || rootRef.current.offsetParent === null || document.hidden) return;
+      load();
+    }, 120000);
     return () => clearInterval(t);
   }, [load]);
 
@@ -187,7 +194,7 @@ export default function SonarBoard() {
   const t = data.totals;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+    <div ref={rootRef} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
       <header style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
         <h2 style={{ margin: 0, fontSize: 18, letterSpacing: "-0.01em" }}>Sonar</h2>
         <span style={{ fontSize: 12.5, color: "var(--muted,#94a3b8)" }}>

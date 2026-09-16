@@ -65,3 +65,8 @@ Open (carry to next round): reviews section prominence, published-list scannabil
 |---|---|---|
 | dashboard | added chart legend row directly under the published chart (blog/service color key, only when >1 type); referral filter pills span->button + aria-pressed for keyboard/AT | build.py ✓; heros chart shows "Blog post / Service page" legend; 10 tokens re-grepped |
 Deferred: full sitewide --t3 contrast audit (spot-checked fine).
+
+## Round (dashboards) 7 — 2026-09-16 (contrast fix)
+| Lane | Change | Proof |
+|---|---|---|
+| dashboard | --t3 muted text token failed WCAG (3.59:1) -> darkened light to #726c63 (4.99:1) + lightened dark to #8c8378 (5.02:1); used by chart labels, stat captions, source lines, footer. Plan section reviewed, already good | measured ratios; 10 tokens re-grepped |

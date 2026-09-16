@@ -15,7 +15,10 @@
   --bg:#fbfaf8; --surface:#ffffff; --surface-2:#f4f2ee; --surface-3:#ebe8e2;
   --border:rgba(46,40,32,.12); --border-hi:rgba(46,40,32,.3);
   --accent:__ACCENT_L__; --accent-bg:__ACCENT_BG_L__; --accent-glow:__ACCENT_GLOW_L__;
-  --t1:#1c1a17; --t2:#59544c; --t3:#8a837a;
+  /* --t3 sits between --t2 and the border colour, but it is still real reading
+     copy in a dozen places (captions, source lines, footer) -- it must clear
+     4.5:1 on both --bg and --surface, not just look "muted enough". */
+  --t1:#1c1a17; --t2:#59544c; --t3:#726c63;
   --ok:#2f7d55; --ok-bg:rgba(47,125,85,.11);
   --display:"Fraunces",Georgia,serif;
   --font:"Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
@@ -27,7 +30,7 @@
     --bg:#14120f; --surface:#1c1a16; --surface-2:#24211c; --surface-3:#2d2922;
     --border:rgba(214,204,190,.14); --border-hi:rgba(214,204,190,.32);
     --accent:__ACCENT__; --accent-bg:__ACCENT_BG__; --accent-glow:__ACCENT_GLOW__;
-    --t1:#f3efe8; --t2:#a89f92; --t3:#7a7268;
+    --t1:#f3efe8; --t2:#a89f92; --t3:#8c8378;
     --ok:#4ac585; --ok-bg:rgba(74,197,133,.13);
     --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px -18px rgba(0,0,0,.7);
   }
@@ -36,7 +39,7 @@
   --bg:#14120f; --surface:#1c1a16; --surface-2:#24211c; --surface-3:#2d2922;
   --border:rgba(214,204,190,.14); --border-hi:rgba(214,204,190,.32);
   --accent:__ACCENT__; --accent-bg:__ACCENT_BG__; --accent-glow:__ACCENT_GLOW__;
-  --t1:#f3efe8; --t2:#a89f92; --t3:#7a7268;
+  --t1:#f3efe8; --t2:#a89f92; --t3:#8c8378;
   --ok:#4ac585; --ok-bg:rgba(74,197,133,.13);
   --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px -18px rgba(0,0,0,.7);
 }

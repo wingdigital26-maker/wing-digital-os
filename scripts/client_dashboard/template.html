@@ -184,16 +184,28 @@ section.grp-mid{padding-top:30px}
 .mgroup{margin-top:26px;padding-bottom:8px;border-bottom:1px solid var(--border)}
 .mlabel{font-size:.72rem;font-weight:700;letter-spacing:.11em;text-transform:uppercase;
   color:var(--t3)}
-.row{display:flex;align-items:baseline;gap:14px;padding:8px 4px;
+.row{display:flex;align-items:center;gap:14px;padding:10px 4px;min-height:46px;
   border-bottom:1px solid var(--border);transition:background .12s}
 .row:hover{background:var(--surface-2)}
-.row-dot{width:9px;height:9px;border-radius:3px;flex:0 0 auto;transform:translateY(4px)}
+.row:has(.row-t a){cursor:pointer}
+.row-dot{width:9px;height:9px;border-radius:3px;flex:0 0 auto}
 .row-m{flex:1;min-width:0}
-.row-t{font-size:.93rem;font-weight:550;line-height:1.4}
-.row-t a{text-decoration:none;border-bottom:1px solid transparent;transition:color .15s,border-color .15s}
+.row-t{font-size:.95rem;font-weight:600;line-height:1.4;color:var(--t1);min-width:0}
+.row-t a{text-decoration:none;color:inherit;border-bottom:1px solid transparent;transition:color .15s,border-color .15s}
 .row-t a:hover{color:var(--accent);border-bottom-color:var(--accent)}
-.row-s{font-size:.77rem;color:var(--t3);margin-top:1px}
-.row-d{font-size:.79rem;color:var(--t3);white-space:nowrap;font-variant-numeric:tabular-nums}
+.row-s{display:inline-block;margin-top:4px;font-size:.66rem;font-weight:700;letter-spacing:.04em;
+  text-transform:uppercase;color:var(--t3);background:var(--surface-2);border:1px solid var(--border);
+  border-radius:999px;padding:2px 8px;line-height:1.4}
+.row-d{flex:0 0 auto;font-size:.79rem;color:var(--t3);white-space:nowrap;
+  font-variant-numeric:tabular-nums;min-width:64px;text-align:right}
+/* Rows stack cleanly on narrow phones instead of squeezing the badge/date
+   against the title: the date drops to its own line, right-aligned, while
+   the dot + title + badge stay together on the line above. */
+@media(max-width:480px){
+  .row{flex-wrap:wrap;row-gap:2px;min-height:0}
+  .row-m{flex-basis:calc(100% - 23px)}
+  .row-d{margin-left:23px}
+}
 .more{margin-top:20px;padding:10px 18px;border-radius:var(--r-sm);border:1px solid var(--border);
   font-size:.84rem;font-weight:600;color:var(--t2);transition:color .15s,border-color .15s}
 .more:hover{color:var(--t1);border-color:var(--border-hi)}
@@ -575,6 +587,7 @@ section.grp-mid{padding-top:30px}
     <div class="sh"><h2 id="rs-h"></h2><span class="n" id="rs-n"></span></div>
     <div class="sd" id="rs-sd"></div>
     <div class="pl-banner" id="rs-banner" hidden></div>
+    <div class="empty" id="rs-empty" hidden></div>
     <div class="lstats" id="rs-stats"></div>
     <div id="rs-table-wrap">
       <div class="mgroup"><div class="mlabel" id="rs-table-label"></div></div>
@@ -1134,12 +1147,30 @@ const DATA = __DATA__;
       return new Date(+p[0], +p[1]-1, +p[2]).toLocaleDateString('en-US',
         {month:'short', day:'numeric', year:'numeric'}); };
 
-    $('#rs-h').textContent  = S.title || 'Where you stand on reviews';
+    $('#rs-h').textContent  = S.title || 'Reviews and reputation';
     $('#rs-n').textContent  = C.hasProfile === false
       ? 'no public profile found'
       : num(C.reviewCount) + ' reviews at ' + one(C.rating);
     $('#rs-sd').textContent = S.intro || '';
     if (S.banner) { $('#rs-banner').textContent = S.banner; $('#rs-banner').hidden = false; }
+
+    /* Honest empty state: a client with no public review profile gets a plain
+       statement of that fact instead of a table of blank ratings and a median
+       computed from a set that doesn't include them. Nothing is invented. */
+    if (C.hasProfile === false) {
+      $('#rs-empty').textContent = S.emptyNote ||
+        'No public review profile found for this business yet. Once one exists, ' +
+        'this section will show the rating, review count and how it compares to ' +
+        'others in the area.';
+      $('#rs-empty').hidden = false;
+      $('#rs-stats').hidden = true;
+      $('#rs-table-wrap').hidden = true;
+      let src = S.sourceLine || '';
+      if (S.pulledOn) src += (src ? ' ' : '') + 'Checked ' + day(S.pulledOn) + '.';
+      $('#rs-src').textContent = src;
+      if (S.note) { $('#rs-note').textContent = S.note; $('#rs-note').hidden = false; }
+      return;
+    }
 
     const tiles = [
       [num(C.reviewCount),           'your reviews'],

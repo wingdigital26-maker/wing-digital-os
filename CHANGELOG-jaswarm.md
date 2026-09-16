@@ -48,3 +48,9 @@ Open: jackson rating tile truncates "4.1..." (backlog).
 |---|---|---|
 | dashboard | fixed rating tile clip: short "4.1★" value + review count in label; removed ellipsis clip, added .is-long font-step safety net; wrapped reviews table | build.py ✓; jackson shows "4.1★ / 14 reviews on your listing" |
 Open (carry to next round): reviews section prominence, published-list scannability + mobile (R3 agent stalled before these).
+
+## Round (dashboards) 4 — 2026-09-16 (published list + reviews honesty)
+| Lane | Change | Proof |
+|---|---|---|
+| dashboard | published-list rows restyled (consistent rhythm, pill type-badges, aligned right-column dates, 480px wrap, pointer on linked rows); reviews section branches on hasProfile -> honest one-line empty state; heading "Reviews and reputation" | build.py ✓; heros list shows pill badges + month headers |
+| tokens/data | all 10 __TOKEN__ + __DATA__ contract preserved (re-grepped) | ✓ |

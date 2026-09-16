@@ -35,3 +35,10 @@ Open: SendQueueBoard/DeliverabilityBoard not yet reviewed (backlog).
 | dashboard | template.html reorganized into a narrative (content -> site health -> reputation/lists -> outreach -> plan-at-end), group dividers for scannability, tighter 375px margins; rebuilt heros (65 items) + jackson (20) | build.py exit 0, both render, Sept content shows |
 | tokens/data | all __TOKEN__ placeholders + __DATA__ contract preserved | grep verified |
 Next: sharpen the top summary / hero density (still generic above the fold).
+
+## Round (dashboards) 2 — 2026-09-16 (top-of-page density)
+| Lane | Change | Proof |
+|---|---|---|
+| dashboard | shrank oversized hero (~half height, one-line headline), rebuilt stat strip to uniform aligned auto-fit grid, added reviews-standing tile from real DATA (omitted when no profile); respected house rule vs 30-day metric | build.py ✓; heros 2 tiles (honest), jackson 4 tiles + 4.1 rating |
+| tokens/data | placeholders + __DATA__ contract preserved | grep ✓ |
+Open: jackson rating tile truncates "4.1..." (backlog).

@@ -83,22 +83,28 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 .hero::before{content:'';position:absolute;top:-230px;right:-140px;width:560px;height:560px;
   border-radius:50%;background:radial-gradient(circle,var(--accent-glow) 0%,transparent 66%);
   pointer-events:none}
-.hero-in{position:relative;max-width:920px;margin:0 auto;padding:46px 24px 40px}
-.eyebrow{font-size:.7rem;font-weight:700;letter-spacing:.15em;text-transform:uppercase;
-  color:var(--accent);margin-bottom:12px}
-.hero h1{font-family:var(--display);font-size:clamp(1.75rem,4vw,2.35rem);font-weight:700;
-  letter-spacing:-.02em;line-height:1.15;text-wrap:balance;max-width:20ch}
-.hero p{margin-top:11px;font-size:.97rem;color:var(--t2);max-width:56ch}
+.hero-in{position:relative;max-width:920px;margin:0 auto;padding:30px 24px 28px}
+.eyebrow{font-size:.68rem;font-weight:700;letter-spacing:.15em;text-transform:uppercase;
+  color:var(--accent);margin-bottom:8px}
+/* Tightened from a near full-screen display size: the headline still opens the
+   page in the brand's serif, but a business owner should reach the numbers
+   below without scrolling first. */
+.hero h1{font-family:var(--display);font-size:clamp(1.28rem,2.2vw + .8rem,1.62rem);font-weight:700;
+  letter-spacing:-.015em;line-height:1.22;text-wrap:balance;max-width:42ch}
+.hero p{margin-top:7px;font-size:.87rem;color:var(--t2);max-width:60ch}
 
-/* stats */
-.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:30px}
-.stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
-  padding:18px 20px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+/* stats -- the at-a-glance strip. Every tile is one honest number already read
+   out of DATA elsewhere on the page; nothing here is computed just for this
+   row. Uniform card size + a shared baseline grid is what makes five numbers
+   read as one summary instead of a pair of oversized cards. */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:10px;margin-top:20px}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);
+  padding:13px 15px;box-shadow:var(--shadow);position:relative;overflow:hidden;min-width:0}
 .stat::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent)}
-.stat-v{font-family:var(--display);font-size:2.1rem;font-weight:700;letter-spacing:-.03em;
-  line-height:1;font-variant-numeric:tabular-nums}
-.stat-l{margin-top:8px;font-size:.79rem;color:var(--t2);line-height:1.4}
-@media(max-width:620px){.stats{grid-template-columns:1fr}}
+.stat-v{font-family:var(--display);font-size:1.5rem;font-weight:700;letter-spacing:-.02em;
+  line-height:1.05;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stat-l{margin-top:5px;font-size:.73rem;color:var(--t2);line-height:1.35}
+@media(max-width:480px){.stats{grid-template-columns:repeat(2,1fr)}}
 
 /* highlights -- a quick per-type breakdown of published work. Every number here
    is an honest count of PUBLISHED items of that type, read straight off the same
@@ -796,21 +802,29 @@ const DATA = __DATA__;
      cadence pauses, so it is gone. The referral list, when a client has one, is
      the biggest asset on the page and takes the first slot. */
   const RP = DATA.referralPartners;
+  // Reviews standing, read straight off the same object the reviewStanding()
+  // section renders further down -- a formatted string, not a fabricated
+  // number, and omitted entirely when there is no public profile on file.
+  const RS = DATA.reviewStanding && DATA.reviewStanding.client;
   const statList = [];
   if (RP && RP.total) statList.push({ v: RP.total, l: RP.statLabel || 'Businesses in your outreach list' });
   statList.push({ v: PUB.length,  l: 'Articles published on your site' });
   statList.push({ v: livePages,   l: 'Pages you can open' });
+  if (RS && RS.hasProfile !== false && RS.reviewCount != null && RS.rating != null) {
+    statList.push({ v: (Math.round(Number(RS.rating)*10)/10).toFixed(1)+'★ · '+
+      Number(RS.reviewCount).toLocaleString('en-US'), l: 'Rating and reviews on your listing', raw:true });
+  }
   // Website visits lead when we genuinely have them. DATA.traffic is null while
   // no source is wired, and the page keeps its named pending row instead --
   // a zero here would tell the client nobody visited, which is a different claim.
   if (DATA.traffic && typeof DATA.traffic.pageviews30d === 'number') {
     statList.unshift({ v: DATA.traffic.pageviews30d, l: 'Website visits, last 30 days' });
-    document.querySelector('.stats').style.gridTemplateColumns = 'repeat(auto-fit,minmax(180px,1fr))';
   }
   statList.forEach(s => {
     const el = document.createElement('div');
     el.className = 'stat';
-    el.innerHTML = '<div class="stat-v">'+s.v.toLocaleString()+'</div><div class="stat-l">'+esc(s.l)+'</div>';
+    const v = s.raw ? esc(s.v) : Number(s.v).toLocaleString();
+    el.innerHTML = '<div class="stat-v">'+v+'</div><div class="stat-l">'+esc(s.l)+'</div>';
     $('#stats').appendChild(el);
   });
 

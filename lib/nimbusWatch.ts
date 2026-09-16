@@ -403,6 +403,123 @@ async function checkCallRoom(): Promise<Check[]> {
   }
 }
 
+// On Vercel prod, public/dashboards is not in the function's filesystem (see
+// checkClientPublishing below), so the fs-based check cannot run there. This
+// is the cloud-durable substitute: read each active client's own live blog
+// listing page and find the most recent post date printed on the page. It is
+// a weaker signal than the built dashboard (no site-wide/DFW/pipeline detail,
+// just "did a post go up recently"), but it is real and it runs in prod,
+// which the fs check structurally cannot. Only clients with a listing page
+// that prints a day-level date are judged; a client whose page only prints a
+// month ("September 2026", Hero's current format) is left UNKNOWN by name
+// rather than guessed at, because a day-level threshold cannot be honestly
+// evaluated from month-only text.
+const CLOUD_CLIENT_BLOGS: { name: string; url: string }[] = [
+  { name: "Hero's Junk Removal", url: "https://herosjunkremovaltx.com/blog/" },
+  { name: "Renewal Health", url: "https://renewalhealth.life/blog.html" },
+];
+
+const MONTHS = [
+  "january", "february", "march", "april", "may", "june",
+  "july", "august", "september", "october", "november", "december",
+];
+
+/**
+ * Pull every day-level date this page prints ("September 16" or
+ * "2026-09-16") and return the most recent as an ISO date, plus how many
+ * distinct dates were found (so a page with zero real dates, like Hero's
+ * current month-only format, is reported as such instead of silently
+ * returning nothing meaningful). Assumes the current year when the page does
+ * not print one (neither site's format does); a date that would fall in the
+ * future under that assumption is dropped rather than trusted, since that
+ * almost always means the actual year was earlier.
+ */
+function latestDayLevelDate(html: string): { iso: string | null; found: number } {
+  const now = new Date();
+  const candidates: number[] = [];
+  for (const m of html.matchAll(/(\d{4})-(\d{2})-(\d{2})/g)) {
+    const t = Date.parse(`${m[1]}-${m[2]}-${m[3]}T00:00:00Z`);
+    if (Number.isFinite(t) && t <= now.getTime()) candidates.push(t);
+  }
+  const monthPat = new RegExp(`\\b(${MONTHS.join("|")})\\s+(\\d{1,2})\\b(?!\\d)`, "gi");
+  for (const m of html.matchAll(monthPat)) {
+    const monthIdx = MONTHS.indexOf(m[1].toLowerCase());
+    const day = Number(m[2]);
+    if (monthIdx < 0 || day < 1 || day > 31) continue;
+    const t = Date.UTC(now.getUTCFullYear(), monthIdx, day);
+    if (t <= now.getTime()) candidates.push(t);
+  }
+  if (!candidates.length) return { iso: null, found: 0 };
+  const max = Math.max(...candidates);
+  return { iso: new Date(max).toISOString().slice(0, 10), found: candidates.length };
+}
+
+async function checkClientPublishingCloud(): Promise<Check[]> {
+  const CONTENT_FIX =
+    "Run that client's content engine skill (heros-content-engine or renewal-content-engine), then check the site's live blog listing to confirm a new post actually published.";
+  const out: Check[] = [];
+  const quiet: string[] = [];
+  const unreadable: string[] = [];
+  let judged = 0;
+  const results = await Promise.all(
+    CLOUD_CLIENT_BLOGS.map(async (c) => {
+      try {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 8000);
+        const r = await fetch(c.url, { signal: ctrl.signal, cache: "no-store", redirect: "follow" });
+        clearTimeout(t);
+        if (!r.ok) return { c, err: `${r.status} fetching ${c.url}` };
+        const html = await r.text();
+        const { iso, found } = latestDayLevelDate(html);
+        if (!found || !iso) return { c, err: "page has no day-level date to read (month-only or unrecognized format)" };
+        return { c, iso };
+      } catch (e) {
+        return { c, err: errText(e) };
+      }
+    })
+  );
+  for (const res of results) {
+    if (res.err) {
+      unreadable.push(`${res.c.name} (${res.err})`);
+      continue;
+    }
+    judged++;
+    const age = daysSince(res.iso!);
+    if (age !== null && age > 14) quiet.push(`${res.c.name} (${age} days, live site)`);
+  }
+  if (quiet.length) {
+    out.push(
+      problem(
+        "clients:quiet",
+        "Client sites gone quiet",
+        `Nothing has gone live in over 14 days for: ${quiet.join(", ")}.`,
+        VIEW_LINK("clients", "Clients"),
+        CONTENT_FIX,
+        "high"
+      )
+    );
+  }
+  if (unreadable.length) {
+    out.push(
+      unknown(
+        "clients:unreadable",
+        "Client publishing",
+        `${unreadable.length} client site${unreadable.length === 1 ? "" : "s"} could not be judged from their live blog listing: ${unreadable.join(", ")}`
+      )
+    );
+  }
+  if (!quiet.length && judged) {
+    out.push(
+      ok(
+        "clients:quiet",
+        "Client publishing",
+        `${judged} client site${judged === 1 ? "" : "s"} had a dated post inside the last 14 days (read live, cloud path).`
+      )
+    );
+  }
+  return out;
+}
+
 // Client delivery: is anything actually going live for the people who pay.
 async function checkClientPublishing(): Promise<Check[]> {
   // Reading the built dashboards needs the filesystem, which the cloud has a
@@ -415,21 +532,14 @@ async function checkClientPublishing(): Promise<Check[]> {
       // On Vercel this is structural, not incidental: the public/ folder is
       // served from the CDN, not bundled into the serverless function's
       // filesystem, unless next.config.ts lists it under
-      // experimental.outputFileTracingIncludes. Say exactly that instead of
-      // a bare "not found", so the fix is a real next step and not a shrug.
+      // experimental.outputFileTracingIncludes. The dashboard read is out of
+      // reach here either way, so fall back to the cloud-durable live-site
+      // read above instead of returning a bare could-not-check: that gave a
+      // guaranteed-unknown on every single prod run, which is not actually
+      // watching anything.
       const onVercel = !!process.env.VERCEL;
-      const why = onVercel
-        ? "public/dashboards is not present in this serverless function's filesystem. Vercel does not bundle public/ into the function unless next.config.ts traces it in (experimental.outputFileTracingIncludes)."
-        : `${dir} does not exist on this host.`;
-      return [
-        unknown(
-          "clients:quiet",
-          "Client publishing",
-          onVercel
-            ? `${why} Add { experimental: { outputFileTracingIncludes: { "app/api/cron/nimbus-report/route.ts": ["public/dashboards/**"] } } } to next.config.ts so this check can run in prod.`
-            : why
-        ),
-      ];
+      if (onVercel) return checkClientPublishingCloud();
+      return [unknown("clients:quiet", "Client publishing", `${dir} does not exist on this host.`)];
     }
     const out: Check[] = [];
     const quiet: string[] = [];

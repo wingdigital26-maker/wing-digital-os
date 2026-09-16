@@ -24,3 +24,14 @@ Committed this round. Score 56→58 (+2) from triage rung correction. Ready to a
 | regression | no test suite; tsc --noEmit clean | — | tsc 0 |
 | live-run | glance ?k=→200 (unknowns now []); watch ?k=→200, unauth→401 | — | ✓ |
 Committed. Score 58→58 (honest: functionality+observability+gated plumbing, no mechanism/rung change). Ready to arm (Jack): NIMBUS_AUTO_TRIAGE=1 — but note it no-ops in cloud (triage PC-only); real value needs a PC-side triage poller (Jack decision). Backlog: /api/nimbus/problems appears unused by any UI caller; next.config outputFileTracingIncludes for prod client-publishing check.
+
+## Round 3 — 2026-09-16 — NIMBUS — score 58 → 58 (plateau near ceiling; two real fixes shipped)
+| Lane | Change | Rung | Proof |
+|---|---|---|---|
+| functionality | nimbusWatch: checkClientPublishingCloud() — prod check that was a permanent no-op now live-fetches client blogs (rejected sitemap lastmod as fake-healthy); judges Renewal for real, honest unknown for Hero's | L4 (prod no-op → functional) | LIVE: renewalhealth.life/blog.html prints Sep 16/15/14; Hero's no day-date → unknown |
+| chat/safety | jarvisTools run_agent: FAIL-OPEN bug — omitted dryRun defaulted to a LIVE daily_outreach.py send; flipped to dryRun!==false (dry by default) + honest confirm copy | L2 (fail-open→fail-closed) | tsc clean; safety-confirmed strictly safer |
+| audit | 5/6 watch checks confirmed cloud-durable; only checkClientPublishing was fs-based (now fixed) | — | per-check table |
+| safety | clean pass — confirmed fail-open→fail-closed + SSRF-safe (hardcoded URLs) fail-closed | — | — |
+| regression | no test suite; tsc clean; local glance 200 (7 problems, no could-not-check) | — | tsc 0 |
+| live-run | cloud check data source proven live (Renewal dated, Hero's unknown); local watch regression 200 | — | ✓ |
+Committed. Score 58→58 (honest plateau — pieces already at correct rungs; real safety + prod-functionality hardening). Backlog: next.config outputFileTracingIncludes now OPTIONAL (cloud check no longer needs public/ bundled); /api/nimbus/problems unused by UI.

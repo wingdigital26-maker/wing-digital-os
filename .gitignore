@@ -59,3 +59,4 @@ __pycache__/
 # Lead exports are private business data and this repo is PUBLIC.
 # They live in the private wing-os-vault repo (_data/leads/) instead.
 public/data/leads/
+.auto/

@@ -411,7 +411,26 @@ async function checkClientPublishing(): Promise<Check[]> {
     const fs = await import("fs");
     const path = await import("path");
     const dir = path.join(process.cwd(), "public", "dashboards");
-    if (!fs.existsSync(dir)) return [unknown("clients:quiet", "Client publishing", "no built dashboards on this host")];
+    if (!fs.existsSync(dir)) {
+      // On Vercel this is structural, not incidental: the public/ folder is
+      // served from the CDN, not bundled into the serverless function's
+      // filesystem, unless next.config.ts lists it under
+      // experimental.outputFileTracingIncludes. Say exactly that instead of
+      // a bare "not found", so the fix is a real next step and not a shrug.
+      const onVercel = !!process.env.VERCEL;
+      const why = onVercel
+        ? "public/dashboards is not present in this serverless function's filesystem. Vercel does not bundle public/ into the function unless next.config.ts traces it in (experimental.outputFileTracingIncludes)."
+        : `${dir} does not exist on this host.`;
+      return [
+        unknown(
+          "clients:quiet",
+          "Client publishing",
+          onVercel
+            ? `${why} Add { experimental: { outputFileTracingIncludes: { "app/api/cron/nimbus-report/route.ts": ["public/dashboards/**"] } } } to next.config.ts so this check can run in prod.`
+            : why
+        ),
+      ];
+    }
     const out: Check[] = [];
     const quiet: string[] = [];
     const empty: string[] = [];

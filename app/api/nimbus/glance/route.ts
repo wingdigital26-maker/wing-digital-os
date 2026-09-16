@@ -132,7 +132,15 @@ async function attempt<T>(
     const timeout = new Promise<never>((_, reject) => {
       timer = setTimeout(() => reject(new Error(`${label} took longer than ${Math.round(ms / 1000)} seconds, so I skipped it.`)), ms);
     });
-    return { value: await Promise.race([work(), timeout]) };
+    // work() keeps running in the background (it feeds the shared cache slot)
+    // even after the race is decided by the timeout. If it later rejects,
+    // that rejection has no other listener once we've moved on to the `catch`
+    // below, which is an unhandled-rejection crash risk in a long-lived
+    // serverless process. Give it a no-op catch so a late failure is only
+    // ever observed through slot.lastError, never as a bare unhandled promise.
+    const watched = work();
+    watched.catch(() => {});
+    return { value: await Promise.race([watched, timeout]) };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return { why: msg.includes("took longer") ? msg : `${label} could not be read: ${msg}` };

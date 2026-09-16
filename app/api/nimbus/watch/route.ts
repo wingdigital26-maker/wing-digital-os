@@ -1,6 +1,65 @@
 import { NextRequest, NextResponse } from "next/server";
+import fs from "fs";
+import path from "path";
 import { runNimbusWatch } from "@/lib/nimbusWatch";
 import { getTriage } from "@/lib/nimbusTriage";
+import { VAULT_PATH } from "@/lib/vaultSource";
+
+// ───────────────────────────────────────────────────────────────────────────
+// getTriage() only sees triage runs kept in this process's memory (the
+// `store` inside lib/nimbusTriage.ts). That memory does not survive a
+// serverless cold start or a redeploy, so a triage finished minutes ago can
+// go invisible in the panel even though it was faithfully appended to
+// triage-log.jsonl. Nothing read that ledger back until now. FAIL-CLOSED: a
+// missing file, a bad line, or no match for this problem all resolve to
+// null — never an error, never a fake verdict.
+// ───────────────────────────────────────────────────────────────────────────
+const LEDGER = path.join(VAULT_PATH, "wiki", "nimbus", "triage-log.jsonl");
+
+type LedgerTriage = {
+  problemId: string;
+  status: "investigating" | "fixed" | "needs_you" | "failed";
+  summary: string;
+  steps: { at: string; kind: string; text: string }[];
+  nextStep: string | null;
+  proposedCommand: string | null;
+  finishedAt: string | null;
+  startedAt: string;
+};
+
+function readLedgerTriage(problemId: string): LedgerTriage | null {
+  try {
+    if (!fs.existsSync(LEDGER)) return null;
+    const lines = fs.readFileSync(LEDGER, "utf-8").split("\n").filter(Boolean);
+    let latest: LedgerTriage | null = null;
+    for (const line of lines) {
+      let r: LedgerTriage;
+      try {
+        r = JSON.parse(line);
+      } catch {
+        continue;
+      }
+      if (r.problemId !== problemId) continue;
+      const rKey = r.finishedAt ?? r.startedAt;
+      const latestKey = latest ? latest.finishedAt ?? latest.startedAt : "";
+      if (!latest || rKey > latestKey) latest = r;
+    }
+    if (!latest) return null;
+    // A run left "investigating" with no finishedAt means the process doing
+    // it is gone. Nothing here is still looking into it, so say that plainly
+    // instead of showing "Looking into it" forever.
+    if (latest.status === "investigating" && !latest.finishedAt) {
+      return {
+        ...latest,
+        status: "failed",
+        summary: `${latest.summary} (the run that was looking into this did not finish — likely interrupted by a restart)`,
+      };
+    }
+    return latest;
+  } catch {
+    return null;
+  }
+}
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -163,7 +222,7 @@ export async function GET(req: NextRequest) {
     link: p.link ?? null,
     severity: p.severity ?? "normal",
     source: "watch",
-    triage: getTriage(p.id),
+    triage: getTriage(p.id) ?? readLedgerTriage(p.id),
   }));
 
   const unknowns = w.unknowns.map((u) => ({ id: u.id, label: u.label, reason: u.detail }));

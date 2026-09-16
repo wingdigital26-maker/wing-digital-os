@@ -289,11 +289,11 @@ export const JARVIS_TOOLS: ToolDef[] = [
   },
   {
     name: "run_agent",
-    description: "Needs Jack's PC. Trigger one local agent: dispatch, prospector, outreach, chronicler. Requires user confirmation. In the cloud this answers pcRequired.",
+    description: "Needs Jack's PC. Trigger one local agent: dispatch, prospector, outreach, chronicler. For 'outreach' and 'chronicler' this shells out to the local daily_outreach.py/chronicler.py scripts and defaults to --dry-run (no sends) unless dryRun is explicitly set to false. NOTE: real B2B cold-email sending now runs PC-off in the cloud (Supabase + GitHub Actions); this local outreach path is a legacy manual script, not the live sender. Requires user confirmation. In the cloud this answers pcRequired.",
     input_schema: obj(
       {
         agent: { type: "string", enum: ["dispatch", "prospector", "outreach", "chronicler"] },
-        dryRun: { type: "boolean" },
+        dryRun: { type: "boolean", description: "Default true (dry run) for outreach/chronicler. Set false to actually send." },
       },
       ["agent"]
     ),
@@ -1191,7 +1191,11 @@ async function runAgent(a: ToolArgs): Promise<ToolOutcome> {
   const cfg = AGENTS[agent];
   if (!cfg) return { content: json({ error: `unknown agent '${agent}'. Allowed: ${Object.keys(AGENTS).join(", ")}` }) };
   const args = [...cfg.args];
-  if (a.dryRun === true && (agent === "outreach" || agent === "chronicler")) args.push("--dry-run");
+  // Safe-by-default: dry-run unless the caller explicitly opts into a real send
+  // (was previously the other way around -- dryRun===true required, so an
+  // omitted/undefined dryRun silently ran daily_outreach.py live. Matches
+  // run_outreach's default, which is the same script's other entry point).
+  if (a.dryRun !== false && (agent === "outreach" || agent === "chronicler")) args.push("--dry-run");
   const r = await runPython(args, cfg.env);
   return { content: json({ agent, command: `python ${args.join(" ")}`, exitCode: r.code, ok: r.code === 0, stdout: r.stdout.slice(0, 6000), stderr: r.stderr.slice(0, 2000), note: cfg.note }) };
 }
@@ -1276,7 +1280,12 @@ export function describeAction(name: string, rawArgs: unknown): string {
     case "cancel_booking": return `Cancel booking ${s("id").slice(0, 8)}`;
     case "write_vault_file": return `${a.mode === "append" ? "Append to" : "Write"} vault file ${s("path")}`;
     case "run_outreach": return a.dryRun === false ? "Run outreach and SEND real cold emails" : "Dry-run the outreach script (no sends)";
-    case "run_agent": return `Run the ${s("agent")} agent${a.dryRun ? " (dry run)" : ""}`;
+    case "run_agent": {
+      const agentName = s("agent");
+      const sendsRealEmail = agentName === "outreach" || agentName === "chronicler";
+      if (sendsRealEmail && a.dryRun === false) return `Run the ${agentName} agent and SEND real cold emails`;
+      return `Run the ${agentName} agent${sendsRealEmail ? " (dry run, no sends)" : ""}`;
+    }
     default: return describeLocalAction(name, a) ?? `Run ${name}`;
   }
 }

@@ -264,6 +264,12 @@ export default function NimbusStage() {
     heroH: 320,
   });
   const [mascotFailed, setMascotFailed] = useState(false);
+  // Whether the mascot has actually mounted. The mood effect below only runs
+  // when its own deps change; if glance resolves (and sets mood to "alert")
+  // before the async mascot script finishes loading, mascotRef.current was
+  // still null the last time that effect ran and never reruns on its own.
+  // Tracking mount success as state closes that race.
+  const [mascotReady, setMascotReady] = useState(false);
   const [glance, setGlance] = useState<Glance | null>(null);
   const [glanceFailed, setGlanceFailed] = useState(false);
   // Null until the client clock is read: better a blank frame than a greeting
@@ -460,6 +466,7 @@ export default function NimbusStage() {
           mascotRef.current = null;
         }
         if (!mascotRef.current) fail();
+        else if (!cancelled) setMascotReady(true);
       })
       .catch(fail);
     return () => {
@@ -491,7 +498,7 @@ export default function NimbusStage() {
     orb.setState(mood);
     const t = window.setTimeout(() => orb.setState("calm"), MOOD_HOLD_MS);
     return () => clearTimeout(t);
-  }, [mood, glance, mascotFailed]);
+  }, [mood, glance, mascotFailed, mascotReady]);
 
   // Trouble is reported as what broke plus what to do about it. Never a symptom
   // on its own: this window is often the first thing Jack sees in the morning.

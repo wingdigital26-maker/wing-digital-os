@@ -35,3 +35,14 @@ Committed. Score 58→58 (honest: functionality+observability+gated plumbing, no
 | regression | no test suite; tsc clean; local glance 200 (7 problems, no could-not-check) | — | tsc 0 |
 | live-run | cloud check data source proven live (Renewal dated, Hero's unknown); local watch regression 200 | — | ✓ |
 Committed. Score 58→58 (honest plateau — pieces already at correct rungs; real safety + prod-functionality hardening). Backlog: next.config outputFileTracingIncludes now OPTIONAL (cloud check no longer needs public/ bundled); /api/nimbus/problems unused by UI.
+
+## Round 4 — 2026-09-16 — NIMBUS — score 58 → 58 (DIALED at 58/max62; 1 real UI bug fixed)
+| Lane | Change | Rung | Proof |
+|---|---|---|---|
+| functionality (UI) | NimbusStage mount-race: if glance resolved before the mascot script loaded, the alert pulse never fired (orb showed calm despite real problems). Added mascotReady flag to the mood effect deps | L2 | tsc clean; live UI renders |
+| hardening (glance) | no changes needed — traced all edge-case classes, route is solid (isolated failures, asOf/stale markers, guarded arithmetic, fail-closed) | L2 | 307-line trace |
+| audit | VERDICT: essentially DIALED, 58/62 = 94% of ceiling. 8/9 pieces at correct rung. Only lift left: jarvis chat L2→L3 needs a NEW proactive-chat feature (Jack's call). Dead code: /api/nimbus/problems unused + stale comment ProblemsPanel.tsx:15 | — | full-repo grep |
+| safety | clean pass — UI state flag, no security surface | — | — |
+| regression | no test suite; tsc clean | — | tsc 0 |
+| live-run | orb UI rendered live in browser (greeting, orb, chat input); glance 200 | — | screenshot ✓ |
+Committed. Score 58→58. NIMBUS DIALED at 58/max62. Remaining: proactive-chat L3 feature (new scope, +~3pts, Jack greenlight), dead problems route cleanup (cosmetic), next.config tracing (now optional). Recommend Jack point autoswarm at next target OR greenlight proactive-chat.

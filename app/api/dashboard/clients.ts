@@ -151,12 +151,21 @@ export const CLIENTS: Record<string, ClientConfig> = {
       city: { label: "City page", color: "#d9903c" },
       other: { label: "Other", color: "#7a8ba3" },
     },
+    // 2026-09-16 (Jack): the live dashboard was reading jacksonroofingco.com
+    // (the old WordPress site, IP-blocked and NOT where we publish), so it showed
+    // stale data and claimed nothing shipped in September. Our Jackson content
+    // actually lands in the rebuilt static site we own, so read THAT repo -- the
+    // same source pattern as Hero's. First commit that added a file = its publish
+    // date. This is where the September blog posts live.
     sources: [
       {
-        kind: "wp_api",
-        site: "https://jacksonroofingco.com",
-        postType: "blog",
-        pageType: "service",
+        kind: "github_repo",
+        repo: "wingdigital26-maker/jackson-roofing",
+        site: "https://wingdigital26-maker.github.io/jackson-roofing",
+        globs: [
+          { dir: "blog", type: "blog", skip: ["index.html"] },
+          { dir: "services", type: "service", skip: ["index.html"] },
+        ],
       },
     ],
     // No analytics source claimed. Their DNS is not on Wing's Cloudflare

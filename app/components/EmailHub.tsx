@@ -40,6 +40,17 @@ export default function EmailHub() {
 
   return (
     <div>
+      <div style={{ marginBottom: 20, paddingBottom: 16, borderBottom: "1px solid var(--border)" }}>
+        <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--accent)", marginBottom: 6 }}>
+          CRM
+        </div>
+        <h2 style={{ fontSize: 22, fontWeight: 700, color: "var(--text-primary)", margin: "0 0 6px" }}>
+          Email
+        </h2>
+        <p style={{ fontSize: 13.5, color: "var(--text-secondary)", margin: 0, maxWidth: 560, lineHeight: 1.5 }}>
+          Everything going out and coming in by email lives here: the automated send queue, the full message history, and deliverability health. Need texts or replies instead? Use the tabs above.
+        </p>
+      </div>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 18 }}>
         {PILLS.map(p => (
           <button

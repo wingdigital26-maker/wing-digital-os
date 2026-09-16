@@ -439,7 +439,19 @@ export default function ReplyInboxBoard() {
   }, [quickBusy, applyChange]);
 
   if (loading && !data) {
-    return <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Reading the reply inbox…</div>;
+    return (
+      <div style={{ display: "grid", gap: 10 }} aria-label="Loading reply inbox">
+        <div className="skel" style={{ height: 22, width: 180, borderRadius: 8 }} />
+        <div style={{ display: "flex", gap: 14 }}>
+          <div style={{ display: "grid", gap: 8, flex: "1 1 260px" }}>
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="skel" style={{ height: 52, borderRadius: 10 }} />
+            ))}
+          </div>
+          <div className="skel" style={{ flex: "3 1 340px", minHeight: 220, borderRadius: 12 }} />
+        </div>
+      </div>
+    );
   }
   if (err && !data) {
     return (

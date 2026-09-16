@@ -438,7 +438,14 @@ export default function MessageLedger({ channel: lockedChannel }: { channel?: "s
   }, []);
 
   if (loading && !data) {
-    return <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Reading the message ledger…</div>;
+    return (
+      <div style={{ display: "grid", gap: 10 }} aria-label="Loading message ledger">
+        <div className="skel" style={{ height: 22, width: 160, borderRadius: 8 }} />
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className="skel" style={{ height: 64, borderRadius: 12 }} />
+        ))}
+      </div>
+    );
   }
   if (err && !data) {
     return <Note tone="var(--red)" text={`The message ledger could not be read: ${err}. Nothing below is available — this is a failure, not an empty board.`} />;

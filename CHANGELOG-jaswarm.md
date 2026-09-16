@@ -28,3 +28,10 @@ Committed: (this round) · Deployed to prod
 | regression | tsc 0 + clean next build 0 | ✓ |
 | safety | clean (presentational diff only) | — |
 Open: SendQueueBoard/DeliverabilityBoard not yet reviewed (backlog).
+
+## Round (dashboards) — 2026-09-16 (client dashboard template reorg)
+| Lane | Change | Proof |
+|---|---|---|
+| dashboard | template.html reorganized into a narrative (content -> site health -> reputation/lists -> outreach -> plan-at-end), group dividers for scannability, tighter 375px margins; rebuilt heros (65 items) + jackson (20) | build.py exit 0, both render, Sept content shows |
+| tokens/data | all __TOKEN__ placeholders + __DATA__ contract preserved | grep verified |
+Next: sharpen the top summary / hero density (still generic above the fold).

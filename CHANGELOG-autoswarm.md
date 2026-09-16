@@ -46,3 +46,12 @@ Committed. Score 58→58 (honest plateau — pieces already at correct rungs; re
 | regression | no test suite; tsc clean | — | tsc 0 |
 | live-run | orb UI rendered live in browser (greeting, orb, chat input); glance 200 | — | screenshot ✓ |
 Committed. Score 58→58. NIMBUS DIALED at 58/max62. Remaining: proactive-chat L3 feature (new scope, +~3pts, Jack greenlight), dead problems route cleanup (cosmetic), next.config tracing (now optional). Recommend Jack point autoswarm at next target OR greenlight proactive-chat.
+
+## Round 5 — 2026-09-16 — NIMBUS — score 58 → 61 (+3) — jarvis chat L2→L3 (greenlit feature)
+| Lane | Change | Rung | Proof |
+|---|---|---|---|
+| build (proactive-chat) | JarvisButton: on first open of an empty thread, fetch /api/nimbus/watch and inject one assistant briefing (headline count + worst problem by name + offer). Fire-once, fail-closed, no-clobber, read-only | jarvis chat L2→L3 (40→60) | LIVE: panel opened → unprompted "9 things need attention. The one I'd start with is Revenue expiring. $1,250/mo ends 2026-10-18... Want me to look into it?" |
+| verify | fresh adversarial: all 5 mechanism points CONFIRMED (real data, fire-once, fail-closed, no-clobber, read-only) + safety clean | — | file:line trace |
+| regression | no test suite; tsc clean | — | tsc 0 |
+| live-run | proactive briefing rendered live in browser from real watch data (revenue expiring) | — | screenshot ✓ |
+Committed. Score 58→61 (+3, real rung move: chat self-initiates from live state). NIMBUS now 61/max62 = AT CEILING. jarvis chat reached its CEILING@L3. No non-ceiling lifts remain.

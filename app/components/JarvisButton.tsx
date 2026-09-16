@@ -173,20 +173,72 @@ export default function JarvisButton() {
   // What the turn that just ran actually reported. Reset at the top of a turn.
   const turnOutcomeRef = useRef<{ failed: boolean; actionSucceeded: boolean }>({ failed: false, actionSucceeded: false });
 
+  // Proactive opening briefing: fires at most once per tab/session, only into
+  // a genuinely empty thread, only from a real fetched /api/nimbus/watch. Any
+  // failure, timeout, or zero-problems result injects nothing -- current
+  // (reactive-only) behavior exactly. See maybeBrief below.
+  const briefedRef = useRef(false);
+  const maybeBrief = useCallback(async () => {
+    if (briefedRef.current) return;
+    briefedRef.current = true; // gate first: never race a second fetch in
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 6000);
+      let res: Response;
+      try {
+        res = await fetch("/api/nimbus/watch", { signal: ctrl.signal, cache: "no-store" });
+      } finally {
+        clearTimeout(timer);
+      }
+      if (!res.ok) return; // fail closed: no partial/guessed briefing
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const data: any = await res.json();
+      if (!data || data.ok !== true || !Array.isArray(data.problems) || data.problems.length === 0) return;
+      // Real fetched data only: pick the worst-severity item the watch itself
+      // reported, never invent a count or a name.
+      const sorted = [...data.problems].sort(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (a: any, b: any) => (a?.severity === "high" ? -1 : 0) - (b?.severity === "high" ? -1 : 0)
+      );
+      const top = sorted[0];
+      if (!top || typeof top.label !== "string" || !top.label) return;
+      const headline =
+        typeof data.headline === "string" && data.headline
+          ? data.headline
+          : `${data.problems.length} thing${data.problems.length === 1 ? "" : "s"} need${data.problems.length === 1 ? "s" : ""} attention.`;
+      const detail = typeof top.detail === "string" && top.detail ? ` ${top.detail}` : "";
+      const brief: Message = {
+        role: "assistant",
+        content: `${headline} The one I'd start with is "${top.label}."${detail} Want me to look into it?`,
+      };
+      // Only land the briefing if the thread is still empty: a real message
+      // typed while this fetch was in flight must never be clobbered.
+      setMessages((prev) => (prev.length === 0 ? [brief] : prev));
+    } catch {
+      // Fetch failed, aborted (timeout), or the body was not valid JSON:
+      // inject nothing. No cheerful all-clear, no guess.
+    }
+  }, []);
+
   // First open of the panel: restore the last 20 turns for this browser tab,
   // mint a conversation id, and check for the speech API. Done in the open
   // handler (an event) rather than an effect so nothing sets state on mount.
   const openPanel = useCallback(() => {
     setOpen(true);
     if (!hydrated) {
-      setMessages(loadHistory());
+      const restored = loadHistory();
+      setMessages(restored);
       setHydrated(true);
+      // Only a genuinely fresh thread (nothing restored from this tab's
+      // sessionStorage) gets the proactive briefing -- a restored, non-empty
+      // conversation in progress is left untouched.
+      if (restored.length === 0) maybeBrief();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const w = window as any;
       if (!w.SpeechRecognition && !w.webkitSpeechRecognition) setHasSpeechAPI(false);
     }
     setConversationId((id) => id || newConversationId());
-  }, [hydrated]);
+  }, [hydrated, maybeBrief]);
   useEffect(() => {
     if (hydrated && !streaming) saveHistory(messages);
   }, [messages, hydrated, streaming]);

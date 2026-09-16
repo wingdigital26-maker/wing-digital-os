@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import fs from "node:fs";
+import path from "node:path";
 import { listVaultFiles, readVaultFile } from "@/lib/vaultSource";
 import { getRevenueTruth, BASIS_LABEL } from "@/lib/revenue";
 import { CLIENTS as DASHBOARD_CLIENTS } from "../dashboard/clients";
@@ -15,7 +17,19 @@ function dashboardUrlFor(slug: string, name: string): string | null {
   const key = DASHBOARD_CLIENTS[slug]
     ? slug
     : Object.keys(DASHBOARD_CLIENTS).find((k) => norm(DASHBOARD_CLIENTS[k].brand.name) === norm(name) || norm(k) === norm(slug));
-  return key ? `/dashboards/live.html?c=${encodeURIComponent(key)}` : null;
+  if (!key) return null;
+  // Prefer the bespoke, better-designed per-client build when it exists (richer
+  // AND live); fall back to the generic live template. Credential-free link (the
+  // dashboard API bypasses the key for a staff session).
+  let hasBespoke = false;
+  try {
+    hasBespoke = fs.existsSync(path.join(process.cwd(), "public", "dashboards", `${key}.html`));
+  } catch {
+    hasBespoke = false;
+  }
+  return hasBespoke
+    ? `/dashboards/${encodeURIComponent(key)}.html`
+    : `/dashboards/live.html?c=${encodeURIComponent(key)}`;
 }
 
 

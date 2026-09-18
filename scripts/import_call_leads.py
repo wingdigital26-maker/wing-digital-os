@@ -24,6 +24,9 @@ import sys
 import urllib.error
 import urllib.request
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from real_name import clean_name  # noqa: E402
+
 DB = r"C:\Users\wjack\ghl-cli\prospects.db"
 ENV = r"C:\Users\wjack\ghl-cli\.env"
 
@@ -99,7 +102,9 @@ def to_call_lead(r: dict) -> dict:
                 pass
     return {
         "company": r["name"],
-        "contact_name": r.get("owner_name"),
+        # Only a real person's name. Inbox handles ("Orders", "Contactus") are
+        # dropped here so they never reach the dial list as a fake contact.
+        "contact_name": clean_name(r.get("owner_name")),
         "title": title,
         "phone": r.get("phone"),
         "email": r.get("email"),
@@ -197,9 +202,15 @@ def main() -> int:
         return 1
 
     # Chunked so one oversized request cannot fail the whole sync.
+    # Nameless rows go up WITHOUT the contact_name key, in their own chunks
+    # (PostgREST wants uniform keys per request). A null in the payload would
+    # overwrite a name that was farmed straight into the call room.
+    named = [l for l in leads if l["contact_name"]]
+    nameless = [{k: v for k, v in l.items() if k != "contact_name"}
+                for l in leads if not l["contact_name"]]
+    chunks = [g[i:i + 100] for g in (named, nameless) for i in range(0, len(g), 100)]
     sent = 0
-    for i in range(0, len(leads), 100):
-        chunk = leads[i:i + 100]
+    for i, chunk in enumerate(chunks):
         status, err = push(url, key, chunk)
         if status not in (200, 201, 204):
             print(f"\nFAILED on rows {i}-{i + len(chunk)}: HTTP {status} {err}", file=sys.stderr)

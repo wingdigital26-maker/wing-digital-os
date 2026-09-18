@@ -191,8 +191,20 @@ export async function GET(req: Request) {
     }
   }
 
+  // Name gate. A lead with no named contact never reaches the dial list: a
+  // caller must always have a person to ask for. Booked and callback leads are
+  // exempt -- those are promises already made, and hiding one loses it. The
+  // Sources screen (includeExcluded) sees everything, as before.
+  const NAMED = "contact_name=not.is.null";
+  const nameGate = (s: string | null): string[] =>
+    includeExcluded || s === "booked" || s === "callback" ? [] : [NAMED];
+
   const statusPart =
-    status && status !== "all" ? [`status=eq.${encodeURIComponent(status)}`] : [];
+    status && status !== "all"
+      ? [`status=eq.${encodeURIComponent(status)}`, ...nameGate(status)]
+      : includeExcluded
+        ? []
+        : ["or=(contact_name.not.is.null,status.in.(booked,callback))"];
 
   const rowParts = [
     "select=*",
@@ -210,7 +222,7 @@ export async function GET(req: Request) {
     sbGet<Lead>("call_leads", rowParts.join("&")),
     sbCount("call_leads", ["select=id", ...base, ...statusPart].join("&")),
     ...STATUSES.map((s) =>
-      sbCount("call_leads", ["select=id", ...base, `status=eq.${s}`].join("&"))
+      sbCount("call_leads", ["select=id", ...base, `status=eq.${s}`, ...nameGate(s)].join("&"))
     ),
     // Tier counts describe the current status/sheet/search view but ignore the
     // tier filter itself, so the pills never zero each other out.

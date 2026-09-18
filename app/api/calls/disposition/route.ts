@@ -28,12 +28,39 @@ export async function POST(req: Request) {
     notes?: string;
     nextActionAt?: string;
     durationSec?: number;
+    action?: string;
   };
 
   const leadId = String(body.leadId ?? "");
   const outcome = String(body.outcome ?? "");
   if (!/^[0-9a-f-]{36}$/i.test(leadId)) {
     return NextResponse.json({ error: "bad leadId" }, { status: 400 });
+  }
+
+  // { leadId, action: "unbook" } -- take a lead off the booked board. It is a
+  // correction, not a dial: no call_count bump, no automation event. The lead
+  // goes back to "contacted" (someone did talk to them) and the meeting time is
+  // cleared. The history keeps an "unbooked" row so the board's past is honest.
+  if (body.action === "unbook") {
+    const moved = await sbPatch<{ id: string }>(
+      "call_leads",
+      `id=eq.${leadId}&status=eq.booked`,
+      { status: "contacted", last_outcome: "contacted", next_action_at: null }
+    );
+    if (moved === null) {
+      return NextResponse.json({ error: "could not move the lead" }, { status: 502 });
+    }
+    if (moved.length === 0) {
+      return NextResponse.json({ error: "that lead is not booked" }, { status: 409 });
+    }
+    await sbPost("call_activity", {
+      lead_id: leadId,
+      user_id: user.id === "legacy" ? null : user.id,
+      user_email: user.email,
+      outcome: "unbooked",
+      notes: typeof body.notes === "string" ? body.notes.slice(0, 4000) : null,
+    });
+    return NextResponse.json({ ok: true, status: "contacted" });
   }
   if (!(OUTCOMES as readonly string[]).includes(outcome)) {
     return NextResponse.json(

@@ -89,6 +89,29 @@ export default function Booked() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Take a lead off the board. Two taps on purpose: the first arms the button,
+  // the second does it, so a stray tap never un-books a real meeting.
+  const [arming, setArming] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const unbook = async (id: string) => {
+    if (arming !== id) { setArming(id); return; }
+    setBusy(id);
+    const r = await fetch("/api/calls/disposition", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ leadId: id, action: "unbook" }),
+    });
+    setBusy(null);
+    setArming(null);
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      setError(d.error ?? "Could not un-book that lead");
+      return;
+    }
+    setError(null);
+    setRows((prev) => prev.filter((x) => x.lead.id !== id));
+  };
+
   return (
     <>
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
@@ -206,6 +229,21 @@ export default function Booked() {
               {lead.website && (
                 <a href={lead.website} target="_blank" rel="noreferrer" style={btnGhost}>Website</a>
               )}
+              <button
+                type="button"
+                onClick={() => unbook(lead.id)}
+                onBlur={() => setArming((a) => (a === lead.id ? null : a))}
+                disabled={busy === lead.id}
+                style={{
+                  ...btnGhost,
+                  ...(arming === lead.id
+                    ? { borderColor: "rgba(239,68,68,0.5)", color: "#f87171", background: "rgba(239,68,68,0.12)" }
+                    : {}),
+                  opacity: busy === lead.id ? 0.6 : 1,
+                }}
+              >
+                {busy === lead.id ? "Moving…" : arming === lead.id ? "Tap again to un-book" : "Not booked"}
+              </button>
             </div>
           </div>
         ))}

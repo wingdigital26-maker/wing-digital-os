@@ -48,6 +48,11 @@ type DayEntry = {
 
 type Payload = {
   configured: boolean;
+  // Set when the book is configured but could not be READ (2026-09-22). The
+  // distinction matters on this screen more than anywhere else in the OS: an
+  // unreadable ledger and a ledger with nothing in it are the same picture if
+  // you draw $0.00 for both, and one of them is a lie about money.
+  unavailable?: boolean;
   error?: string;
   items: Invoice[];
   clients: string[];
@@ -408,6 +413,18 @@ export default function InvoicesBoard() {
       <div style={card}>
         <p style={{ margin: 0, color: "var(--text-secondary)", fontSize: 13 }}>
           Invoices are not configured — SONAR_SUPABASE_URL / SONAR_SUPABASE_SERVICE_KEY are missing.
+        </p>
+      </div>
+    );
+  }
+  // The read was refused. Draw nothing rather than zeros: every figure below
+  // this point would be an assertion the data does not support.
+  if (data.unavailable) {
+    return (
+      <div style={card}>
+        <p style={{ margin: 0, fontWeight: 700, fontSize: 14 }}>Invoices could not be read</p>
+        <p style={{ margin: "6px 0 0", color: "var(--text-secondary)", fontSize: 13, lineHeight: 1.5 }}>
+          {data.error || "The invoice database did not answer. Nothing here is known to be zero."}
         </p>
       </div>
     );

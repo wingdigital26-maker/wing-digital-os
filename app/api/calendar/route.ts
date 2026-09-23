@@ -33,7 +33,6 @@ export type CalendarSource =
   | "school"
   | "blocks"
   | "stripe"
-  | "bookings";
 
 export type CalendarEvent = {
   id: string;
@@ -619,106 +618,28 @@ async function stripeLane(): Promise<{ lane: LaneStatus; events: CalendarEvent[]
   }
 }
 
-// ── Bookings lane ──────────────────────────────────────────────────────────
-//
-// Rows from public.bookings (migration 0017), created by the public /book
-// link through /api/booking. Same OS Supabase credentials as the callbacks
-// and blocks lanes. Cancelled bookings are left off the calendar; completed
-// and no-show stay visible so the day's history reads honestly.
 
-type BookingRow = {
-  id: string;
-  name: string;
-  email: string;
-  phone: string | null;
-  starts_at: string;
-  ends_at: string;
-  status: string;
-  source: string;
-  client_slug: string | null;
-  assigned_to: string | null;
-};
-
-const FIRST: Record<string, string> = { jack: "Jack", maddox: "Maddox", grant: "Grant" };
-
-async function bookingsLane(): Promise<{ lane: LaneStatus; events: CalendarEvent[] }> {
-  const url = sbUrl();
-  const key = sbService();
-  const lane: LaneStatus = {
-    source: "bookings",
-    label: "Bookings",
-    configured: Boolean(url && key),
-    missing: url && key ? null : "OS_SUPABASE_URL / OS_SUPABASE_SERVICE_KEY",
-    error: null,
-    count: 0,
-    note: null,
-  };
-  if (!url || !key) return { lane, events: [] };
-  try {
-    const res = await fetch(
-      `${url}/rest/v1/bookings?select=id,name,email,phone,starts_at,ends_at,status,source,client_slug,assigned_to` +
-        `&status=neq.cancelled&order=starts_at.asc&limit=1000`,
-      { headers: { apikey: key, Authorization: `Bearer ${key}` }, cache: "no-store" }
-    );
-    if (!res.ok) {
-      lane.error = `Bookings read failed (HTTP ${res.status})`;
-      return { lane, events: [] };
-    }
-    const rows = (await res.json()) as BookingRow[];
-    if (!rows.length) {
-      lane.note = "No bookings yet. Share the public link: /book";
-      return { lane, events: [] };
-    }
-    const events = rows.map<CalendarEvent>((r) => ({
-      id: `booking:${r.id}`,
-      source: "bookings",
-      title: r.name,
-      start: r.starts_at,
-      end: r.ends_at,
-      allDay: false,
-      detail:
-        [
-          r.assigned_to ? `with ${FIRST[r.assigned_to] ?? r.assigned_to}` : "not assigned yet",
-          r.email,
-          r.phone,
-          r.client_slug,
-        ]
-          .filter(Boolean)
-          .join(" · ") || null,
-      url: null,
-      external: false,
-      status: r.status,
-      color: "var(--accent-2)",
-      person: r.assigned_to,
-    }));
-    lane.count = events.length;
-    return { lane, events };
-  } catch (e) {
-    lane.error = `Bookings unreachable: ${String(e)}`;
-    return { lane, events: [] };
-  }
-}
+// bookingsLane was removed 2026-09-22 with the public /book page. The school
+// and blocks lanes are the working calendar data that remains.
 
 export async function GET() {
-  const [g, c, p, s, b, st, bk] = await Promise.all([
+  const [g, c, p, s, b, st] = await Promise.all([
     googleLane(),
     callbackLane(),
     paymentLane(),
     schoolLane(),
     blocksLane(),
     stripeLane(),
-    bookingsLane(),
   ]);
   const events = [
     ...g.events, ...c.events, ...p.events, ...s.events, ...b.events, ...st.events,
-    ...bk.events,
   ].sort((a, b2) =>
     a.start < b2.start ? -1 : a.start > b2.start ? 1 : 0
   );
   const now = new Date();
   return NextResponse.json({
     events,
-    lanes: [g.lane, c.lane, p.lane, s.lane, b.lane, st.lane, bk.lane],
+    lanes: [g.lane, c.lane, p.lane, s.lane, b.lane, st.lane],
     today: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
       now.getDate()
     ).padStart(2, "0")}`,

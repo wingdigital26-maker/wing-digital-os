@@ -94,11 +94,10 @@ function isPublicPath(pathname: string): boolean {
     // TWILIO_AUTH_TOKEN, else the ?k=TWILIO_WEBHOOK_KEY gate) inside the route.
     pathname === "/api/voice/inbound" ||
     pathname === "/api/voice/status" ||
-    // Public self-serve booking link (GHL calendar replacement). The page is
-    // public by design; /api/booking validates and rate-limits inside the
-    // route, and its staff-only modes (?admin=1, PATCH) re-check auth there.
-    pathname === "/book" ||
-    pathname === "/api/booking" ||
+    // The public /book page and /api/booking were deleted 2026-09-22 with the
+    // availability calendar, so their auth bypass went with them. Leaving an
+    // unauthenticated allow-listed path for a route that no longer exists is
+    // a hole waiting for whatever gets mounted there next.
     // Sequence-engine feed for the external sender. Bearer OUTBOUND_EXPORT_KEY
     // verified inside the route, fails closed, same contract as outbound/export.
     pathname === "/api/sequences/due" ||

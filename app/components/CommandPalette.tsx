@@ -40,17 +40,10 @@ function buildCommands(): Command[] {
     { id: "act:add-contact", label: "Add contact", group: "Actions", keywords: "new contact crm create", run: () => navigate("crm") },
     { id: "act:compose-email", label: "Compose email", group: "Actions", keywords: "send new message", run: () => go("/email") },
     { id: "act:new-automation", label: "New automation", group: "Actions", keywords: "workflow create", run: () => go("/automations") },
-    // /book is the PUBLIC prospect-facing booking page; staff never open it,
-    // they send it. Clipboard write is try/caught: on failure fall back to
-    // opening the page so the URL is still copyable by hand.
-    {
-      id: "act:copy-booking-link", label: "Copy booking link", group: "Actions",
-      keywords: "book appointment share prospect url",
-      run: () => {
-        const url = `${location.origin}/book`;
-        try { navigator.clipboard.writeText(url); } catch { location.href = "/book"; }
-      },
-    },
+    // "Copy booking link" was removed 2026-09-22 with the public /book page
+    // (Jack: "forget the calendar where everyone's available, just delete
+    // it"). A palette action that copies a URL nothing serves any more is a
+    // trap, not a shortcut.
   );
   for (const v of flattenShellViews()) {
     cmds.push({ id: `view:${v.id}`, label: v.label, group: v.group, keywords: v.keywords, run: () => navigate(v.id) });
@@ -121,7 +114,7 @@ export default function CommandPalette() {
   // there. Every other route, phone widths included, is untouched.
   useEffect(() => {
     const p = window.location.pathname;
-    const inert = ["/login", "/book", "/portal", "/d", "/nimbus"].some(
+    const inert = ["/login", "/portal", "/d", "/nimbus"].some(
       prefix => p === prefix || p.startsWith(prefix + "/")
     );
     setEnabled(!inert);

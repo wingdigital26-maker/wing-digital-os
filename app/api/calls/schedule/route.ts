@@ -178,47 +178,8 @@ export async function GET(req: Request) {
     }
   }
 
-  // ── Bookings from the public /book link (cancelled excluded) ──
-  type BookingRow = {
-    id: string;
-    name: string;
-    phone: string | null;
-    starts_at: string;
-    ends_at: string | null;
-    status: string;
-  };
-  const bookings = await sbGet<BookingRow>(
-    "bookings",
-    "select=id,name,phone,starts_at,ends_at,status&status=neq.cancelled&order=starts_at.asc&limit=500"
-  );
-  if (bookings === null) {
-    problems.push("Bookings could not be read.");
-  } else {
-    for (const r of bookings) {
-      const dt = new Date(r.starts_at);
-      if (Number.isNaN(dt.getTime())) continue;
-      const day = new Date(dt);
-      day.setHours(0, 0, 0, 0);
-      if (day < from || day > to) continue;
-      const endDt = r.ends_at ? new Date(r.ends_at) : null;
-      events.push({
-        id: `booking:${r.id}`,
-        kind: "booking",
-        title: `CALL: ${r.name}`,
-        person: "team",
-        date: ymd(dt),
-        start: `${String(dt.getHours()).padStart(2, "0")}:${String(dt.getMinutes()).padStart(2, "0")}`,
-        end:
-          endDt && !Number.isNaN(endDt.getTime())
-            ? `${String(endDt.getHours()).padStart(2, "0")}:${String(endDt.getMinutes()).padStart(2, "0")}`
-            : null,
-        category: null,
-        weekly: false,
-        detail: r.phone,
-        blockId: null,
-      });
-    }
-  }
+  // The bookings lane was cut 2026-09-22 with the public /book page. This
+  // schedule now draws callbacks and the call room's own rows only.
 
   events.sort((a, b) => (a.date + a.start < b.date + b.start ? -1 : 1));
   return NextResponse.json({

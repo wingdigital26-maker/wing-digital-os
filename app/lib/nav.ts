@@ -68,9 +68,9 @@ export const NAV_TREE: NavGroupDef[] = [
       // scheduled, failed -- with a reading pane. First = the CRM's default
       // landing, because email is the majority of this CRM.
       { id: "email", label: "Email", keywords: "messaging outgoing sent queue deliverability" },
-      // Reply Inbox: every inbound reply, hot first, with the thread and an
-      // editable draft. Read/draft only; never sends.
-      { id: "replies", label: "Reply Inbox", keywords: "inbound replies" },
+      // Reply Inbox left the rail 2026-09-22: the Email hub carries Replies as
+      // its second view, sharing the feed's list and reading pane, so a
+      // top-level tab drew the same board twice. "replies" aliases to Email.
       // People (2026-09-22): the lean list of who is in line for an email.
       // Call-room ergonomics, not the old everything-grid.
       { id: "people", label: "People", keywords: "contacts leads prospects email list" },
@@ -169,6 +169,8 @@ export const LEGACY_VIEW_ALIAS: Record<string, string> = {
   activity: "email",
   // 2026-09-22: Contacts (the old "Everything" grid) collapsed into People.
   contacts: "people",
+  // 2026-09-22: Replies is a view inside the Email hub now, not its own tab.
+  replies: "email",
   // 2026-09-22: Marketing lost its Customers tab.
   customers: "clients",
 };

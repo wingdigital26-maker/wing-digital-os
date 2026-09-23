@@ -18,9 +18,9 @@ import { sbUrl, sbService } from "@/lib/osSupabase";
 //    runs). If that file changes, this preview drifts — the payload carries
 //    that caveat on every rendered message rather than hiding it.
 //  * NULL/unreadable is reported as unknown, never as zero.
-//  * There is NO automated SMS lane today (GHL is retired and nothing
-//    replaced its texting). The payload says so explicitly so an empty texts
-//    panel reads as "does not exist", not "quiet".
+//  * The `texts` key was dropped 2026-09-22 when texting left the CRM. There
+//    is still no automated SMS lane and no plan for one; there is simply no
+//    panel left to explain that to.
 // ───────────────────────────────────────────────────────────────────────────
 
 export const runtime = "nodejs";
@@ -482,15 +482,5 @@ export async function GET() {
       "bad_email rows failed address verification. Neither will ever be mailed as-is.",
   };
 
-  // ── Automated texts: the honest answer ───────────────────────────────────
-  const texts = {
-    exists: false,
-    note:
-      "No automated SMS lane exists today. Texting went through GoHighLevel, which was retired " +
-      "on 2026-08-22, and nothing has replaced it. There is no queue to review because there is " +
-      "no pipe — an empty panel here means 'does not exist', not 'nothing scheduled'. Building a " +
-      "replacement is a platform decision for Jack.",
-  };
-
-  return NextResponse.json({ lane, queue, byVertical, sent, guardrails, texts });
+  return NextResponse.json({ lane, queue, byVertical, sent, guardrails });
 }

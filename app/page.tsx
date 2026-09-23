@@ -71,7 +71,8 @@ const PeopleBoard = dynamic(() => import("./components/PeopleBoard"), { ssr: fal
 // public booking link) stays on disk but nothing mounts it any more.
 const CalendarSection = dynamic(() => import("./components/InvoicesBoard"), { ssr: false });
 const CompetitorIntel = dynamic(() => import("./components/CompetitorIntel"), { ssr: false });
-const ReplyInboxBoard = dynamic(() => import("./components/ReplyInboxBoard"), { ssr: false });
+// ReplyInboxBoard is mounted by EmailHub as its Replies view (2026-09-22),
+// not by the shell -- one board, one place.
 const StormBoard = dynamic(() => import("./components/StormBoard"), { ssr: false });
 const SocialBoard = dynamic(() => import("./components/SocialBoard"), { ssr: false });
 const ReviewsBoard = dynamic(() => import("./components/ReviewsBoard"), { ssr: false });
@@ -474,7 +475,6 @@ export default function Home() {
           {visited.has("potential") && <div className="app-view" style={{ display: active === "potential" ? "block" : "none" }}><PotentialClientsBoard /></div>}
           {visited.has("people") && <div className="app-view" style={{ display: active === "people" ? "block" : "none" }}><PeopleBoard /></div>}
           {visited.has("email") && <div className="app-view" style={{ display: active === "email" ? "block" : "none" }}><EmailHub /></div>}
-          {visited.has("replies") && <div className="app-view" style={{ display: active === "replies" ? "block" : "none" }}><ReplyInboxBoard /></div>}
           {visited.has("storms") && <div className="app-view" style={{ display: active === "storms" ? "block" : "none" }}><StormBoard /></div>}
           {visited.has("social") && <div className="app-view" style={{ display: active === "social" ? "block" : "none" }}><SocialBoard /></div>}
           {visited.has("reviews") && <div className="app-view" style={{ display: active === "reviews" ? "block" : "none" }}><ReviewsBoard /></div>}

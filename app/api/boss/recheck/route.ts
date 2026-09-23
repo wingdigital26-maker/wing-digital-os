@@ -112,6 +112,14 @@ const WATCHDOG_ABS = () => path.resolve(VAULT_PATH, WATCHDOG_REL);
 // Prints current-state KEY=VALUE facts so the recheck can resolve/keep each
 // PROBLEM against reality instead of re-reading yesterday's report.
 const WATCHDOG_PROBE_PY = "C:\\Users\\wjack\\ghl-cli\\watchdog_probe.py";
+// The real patrol. "Run Da Boss" used to run only this route's own JS subset of
+// the checks and then try to strike resolved items out of the report with
+// rewriteWatchdog() -- which looks for a "## PROBLEMS" header that the report
+// has not carried since the plain-text rewrite on 2026-09-04. So the button
+// persisted nothing, ever: the overlay showed fresh findings and the banner
+// behind it went straight back to the old ones on the next load. Running the
+// producer regenerates the report for real. It sends nothing without --send.
+const BOSS_REPORT_PY = "C:\\Users\\wjack\\ghl-cli\\boss_report.py";
 const GHL_CLI_DIR = "C:\\Users\\wjack\\ghl-cli";
 // Thresholds mirrored from watchdog-heartbeat/SKILL.md so the route agrees with
 // the scheduled watchdog to the letter.
@@ -997,6 +1005,24 @@ function runProbe(): Promise<Probe | null> {
   });
 }
 
+// Regenerate the report by running the producer. Returns the reason it did not
+// run, or null on success. Local only: the cloud has no PC to patrol. Never
+// passes --send, so this transmits nothing anywhere.
+function runBossReport(): Promise<string | null> {
+  return new Promise((resolve) => {
+    try {
+      execFile(
+        "python",
+        [BOSS_REPORT_PY, "--out", WATCHDOG_ABS()],
+        { timeout: 120_000, windowsHide: true, cwd: GHL_CLI_DIR },
+        (err) => resolve(err ? (err.message || "boss_report.py failed").slice(0, 200) : null)
+      );
+    } catch {
+      resolve("could not start python");
+    }
+  });
+}
+
 // ── classifier: keep a PROBLEM only if LIVE state confirms it is still broken ─
 // This is the honesty inversion aligned with the hardened watchdog SKILL: a
 // block does NOT survive just because it exists. Every block is verified against
@@ -1233,6 +1259,11 @@ export async function POST(req: NextRequest) {
   const testUrl = process.env.NODE_ENV === "development" ? req.nextUrl.searchParams.get("testUrl") : null;
   const sites = testUrl && /^https?:\/\//.test(testUrl) ? [...siteList(), testUrl] : siteList();
 
+  // A full patrol regenerates the report FIRST, so everything below reads the
+  // run that just happened rather than the one from up to two hours ago.
+  const bossRunFailed = wantAll && !cloud ? await runBossReport() : null;
+  const bossRan = wantAll && !cloud && !bossRunFailed;
+
   const [watchdogRaw, healthRaw] = await Promise.all([
     wantAll || target === "urls" ? readVaultFile(WATCHDOG_REL) : Promise.resolve(null),
     wantAll || target === "urls" ? readVaultFile("wiki/state/health-board.md") : Promise.resolve(null),
@@ -1360,11 +1391,23 @@ export async function POST(req: NextRequest) {
         persisted = false; reason = "vault not writable and not cloud-backed";
         writeNote = "The report file can only be rewritten on the PC.";
       }
+    } else if (bossRan) {
+      // The producer already rewrote the report at the top of this request,
+      // measuring every check fresh, so there is nothing left to strike out.
+      persisted = true; mode = "local"; refetchMission = true;
+      pushedToCloud = await pushVaultToCloud();
+      writeNote = "Da Boss re-ran every check and rewrote the report."
+        + (pushedToCloud ? " Cloud copy synced." : " Cloud sync will catch up on the next scheduled push.");
     } else {
       // Nothing verifiable to clear: the report file stays as it is, and that
       // is honest. This is NOT a problem and is never counted as one.
       writeNote = resolvedMarks.length ? "No net change to write to the report file." : null;
     }
+  }
+  if (bossRunFailed) {
+    // Say so rather than letting the overlay imply the report is fresh.
+    reason = reason ?? `the full patrol could not run: ${bossRunFailed}`;
+    writeNote = writeNote ?? "Da Boss could not re-run on the PC, so the report below is the last one it wrote.";
   }
 
   // overall roll-up: ONLY verified problems count. A check that could not run

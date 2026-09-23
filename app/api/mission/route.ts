@@ -300,6 +300,38 @@ interface Watchdog {
 //   COULD NOT VERIFY (n)                 blind checks, not problems
 //   "n resolved: ..."                    resolved this run
 //   "Nothing needs you. Every check re-verified clean at HH:MM."  -> all clear
+//
+// AND THEN, after the machine report's terminator line, a second block written
+// by the Claude watchdog run:
+//   WATCHDOG ADDITIONS (...)             or ADDITIONS CARRIED FORWARD, written
+//                                        YYYY-MM-DD HH:MM, ... when boss_report
+//                                        preserved an earlier run's block
+//   "  <title>"                          indent 2 starts a finding
+//   "      VERIFIED|DO|OPEN|DECIDE ..."  indent 4+ belongs to it
+//   "  OK THIS RUN ..." / "  VERIFIED THIS RUN ..."  notes, NOT problems
+//
+// That block is where the only client-facing findings live, because
+// boss_report.py checks this machine, not client sites. Until 2026-09-22 this
+// parser hit the "[dry run]" line, set its section to null and dropped every
+// line after it -- so from 2026-09-04 onward the OS never once showed anything
+// the Claude run added, including "a paying client's blog has published nothing
+// for two weekdays". The report looked complete and was half thrown away.
+// Attach one OPEN / DO / DECIDE line to the finding above it. DECIDE is the
+// report's escalation line ("do it now or this check is retired") and on a
+// stuck item it is the only instruction there is, so it counts as the action
+// when no DO was printed — otherwise those rows reached Jack with nothing to do.
+function attachBossLine(cur: WatchdogProblem, kw: string, rest: string) {
+  const v = rest.trim();
+  if (kw === "OPEN") {
+    // Only a real web address is clickable. A Windows path or an app name is
+    // kept as text so the row still says WHERE, it just cannot be a link.
+    if (/^https?:\/\//i.test(v)) cur.url = v.replace(/[.,;:]+$/, "");
+    else if (!cur.open) cur.open = clean(redact(v)).slice(0, 300);
+  } else if ((kw === "DO" || kw === "DECIDE") && !cur.action) {
+    cur.action = clean(redact(v)).slice(0, 300);
+  }
+}
+
 // Returns null when the text is not in this format.
 function parseBossPlain(raw: string): Watchdog | null {
   const lines = raw.split(/\r?\n/);
@@ -323,13 +355,31 @@ function parseBossPlain(raw: string): Watchdog | null {
       wd.updated = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
     }
   }
-  type Sec = "top" | "hands" | "decision" | "chronic" | "blind" | null;
+  type Sec = "top" | "hands" | "decision" | "chronic" | "blind" | "additions" | null;
   let sec: Sec = null;
   let cur: WatchdogProblem | null = null;
   let topPending = false;
+  // HH:MM the carried-forward block was actually measured, when the report says
+  // it was preserved from an earlier run rather than written just now.
+  let carriedAt: string | null = null;
+  // Findings in the additions block are separated by a blank line and wrap at
+  // the same indent, so "is this a new finding or the rest of the last one?"
+  // is answered by the blank line, not the indent. Without this every wrapped
+  // line of a paragraph became its own problem row.
+  let blank = true;
   for (const line of lines.slice(1)) {
     const t = line.trim();
-    if (!t) continue;
+    if (!t) { blank = true; continue; }
+    const afterBlank = blank;
+    blank = false;
+    const addHead = t.match(/^(?:WATCHDOG ADDITIONS|ADDITIONS CARRIED FORWARD)\b(.*)$/i);
+    if (addHead) {
+      sec = "additions";
+      cur = null;
+      carriedAt = addHead[1].match(/written\s+\d{4}-\d{2}-\d{2}\s+(\d{1,2}:\d{2})/)?.[1] ?? null;
+      blank = true;   // the header separates, whether or not a blank line follows
+      continue;
+    }
     if (/^Nothing needs you\./i.test(t)) { wd.overall = "ok"; continue; }
     if (/^MOST EXPENSIVE THING/i.test(t)) { sec = "top"; topPending = true; cur = null; continue; }
     if (/^ALSO YOURS TO DO/i.test(t)) { sec = "hands"; cur = null; continue; }
@@ -343,6 +393,26 @@ function parseBossPlain(raw: string): Watchdog | null {
     if (/^Everything above was measured/i.test(t) || /^\[dry run/i.test(t)) { sec = null; cur = null; continue; }
     if (/^\+\d+ more/i.test(t)) { continue; }
     if (sec === "blind" || sec === null) continue;
+
+    if (sec === "additions") {
+      const indent = line.match(/^\s*/)?.[0].length ?? 0;
+      if (indent >= 4) {
+        // VERIFIED / DO / OPEN / DECIDE belong to the finding above them.
+        // Anything else this deep is a wrapped continuation line.
+        const kw = t.match(/^(VERIFIED|DO|OPEN|DECIDE)\s+(\S.*)$/);
+        if (kw && cur) attachBossLine(cur, kw[1].toUpperCase(), kw[2]);
+        continue;
+      }
+      // The watchdog run also records what it checked and found clean. Those
+      // lines are evidence the check ran, never a problem, and counting them
+      // would inflate "n problems" with good news.
+      if (!afterBlank) continue;               // the rest of the finding above
+      if (/^(OK THIS RUN|VERIFIED THIS RUN|NOTHING|ALL CLEAR|NOTE)\b/i.test(t)) { cur = null; continue; }
+      const title = carriedAt ? `${t}  (measured ${carriedAt}, earlier run)` : t;
+      cur = { text: clean(redact(title)).slice(0, 400), url: null };
+      wd.problems.push(cur);
+      continue;
+    }
 
     if (sec === "top" && topPending && !/^(VERIFIED|DO|OPEN|DECIDE)\b/.test(t)) {
       cur = { text: clean(redact(t)).slice(0, 400), url: null };
@@ -358,16 +428,14 @@ function parseBossPlain(raw: string): Watchdog | null {
       continue;
     }
     if (!cur) continue;
-    const open = t.match(/^OPEN\s+(\S.*)$/);
-    if (open) {
-      const target = open[1].trim();
-      if (/^https?:\/\//i.test(target)) cur.url = target.replace(/[.,;:]+$/, "");
-      else cur.open = clean(redact(target)).slice(0, 300);
-      continue;
-    }
-    const doLine = t.match(/^DO\s+(\S.*)$/);
-    if (doLine && !cur.action) cur.action = clean(redact(doLine[1])).slice(0, 300);
+    const kw = t.match(/^(VERIFIED|DO|OPEN|DECIDE)\s+(\S.*)$/);
+    if (kw) attachBossLine(cur, kw[1].toUpperCase(), kw[2]);
   }
+  // The additions block can state outright that one of its findings outranks
+  // the machine report. The banner only shows the first three rows, so an
+  // explicit ranking has to actually move the row, not just sit in the text.
+  const outranks = (p: WatchdogProblem) => /worse than anything above/i.test(p.text);
+  wd.problems = [...wd.problems.filter(outranks), ...wd.problems.filter((p) => !outranks(p))];
   wd.problemCount = wd.problems.length;
   if (wd.problemCount > 0) wd.overall = "problems";
   else if (wd.overall === "unknown" && /re-verified clean|Nothing needs you/i.test(raw)) wd.overall = "ok";

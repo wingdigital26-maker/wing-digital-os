@@ -1253,10 +1253,28 @@ export function WatchdogBanner({ watchdog, onRechecked }: { watchdog?: WatchdogD
 
   // Plain-English problem rows: "<title> · <what to do>" plus its link. File
   // paths and machine phrasing stay in the panel; the banner never shows them.
+  // NOTE: this used to also run .replace(/\s--\s.*$/, ""), which ate the half
+  // of the sentence that carried the finding -- "Last backup is INCOMPLETE --
+  // 7 table(s) have no dump" reached Jack as "Last backup is INCOMPLETE". The
+  // report writes "--" as a dash inside a sentence, not as a machine suffix.
   const plainTitle = (s: string) =>
-    s.replace(/\s*Open:\s*\S.*$/i, "").replace(/\s*Do:\s*.*$/i, "").replace(/\s--\s.*$/, "").replace(/[A-Za-z]:\\[^\s]+/g, "").replace(/\s{2,}/g, " ").trim();
-  const plainAction = (s: string | null | undefined) =>
-    (s ?? "").split(/\.\s|\s\s+/)[0].replace(/[A-Za-z]:\\[^\s]+/g, "").replace(/\s*\(.*$/, "").trim();
+    s.replace(/\s*Open:\s*\S.*$/i, "").replace(/\s*Do:\s*.*$/i, "").replace(/[A-Za-z]:\\[^\s]+/g, "").replace(/\s{2,}/g, " ").trim();
+  // A raw command mangles into nonsense once its path is stripped: "python
+  // C:\...\draft_post.py --client x" came out as "python --client x", which
+  // is not a command and not English. The banner is the plain-English line, so
+  // commands are left to the panel and the copy button, where they stay exact.
+  const CMD = /^(python|powershell|pwsh|cmd|npx|node|npm|py|git)\b/i;
+  const plainAction = (s: string | null | undefined) => {
+    const first = (s ?? "").split(/\.\s|\s\s+/)[0].trim();
+    if (CMD.test(first)) return "";
+    return first
+      .replace(/,?\s*then\s+(python|powershell|pwsh|cmd|npx|node|npm|py|git)\b.*$/i, "")
+      .replace(/[A-Za-z]:\\[^\s]+/g, "")
+      .replace(/\s*\(.*$/, "")
+      .replace(/\s{2,}/g, " ")
+      .replace(/[,;:]\s*$/, "")
+      .trim();
+  };
   const shown = isOpen ? problems : problems.slice(0, 3);
   const hidden = Math.max(0, count - shown.length);
   const rowStyle: React.CSSProperties = { display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap", fontSize: 12.5, lineHeight: 1.45, paddingLeft: 19, color: "var(--text-secondary, #9ca3af)" };
@@ -1292,10 +1310,16 @@ export function WatchdogBanner({ watchdog, onRechecked }: { watchdog?: WatchdogD
           <div key={i} style={rowStyle}>
             <span style={{ color: "var(--text-primary, inherit)", fontWeight: 600 }}>{plainTitle(p.text)}</span>
             {action && <span>· {action}</span>}
-            {p.url && (
+            {p.url ? (
               <a href={p.url} target="_blank" rel="noreferrer" style={{ color, textDecoration: "underline", fontSize: 12 }}>
                 Open &rarr;
               </a>
+            ) : (
+              // Standing rule: every red flag says where the broken thing is.
+              // Nothing outside the browser can be a link, so a local target
+              // shows as its last segment ("ghl_state_sync.py", "taskschd.msc")
+              // and the full path stays in the panel.
+              p.open && <span style={{ color: "var(--text-muted, #6b7280)", fontSize: 11.5 }}>in {p.open.split(/[\\/]/).pop()}</span>
             )}
           </div>
         );

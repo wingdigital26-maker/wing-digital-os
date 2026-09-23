@@ -1,8 +1,13 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Avatar, Chip, MailPanes, Note, label, when } from "./email/ui";
 
 // ───────────────────────────────────────────────────────────────────────────
 // ReplyInboxBoard — every inbound reply from cold outreach, hot first.
+//
+// The other half of email. Since 2026-09-22 it shares its shell, chips and
+// clock with the outgoing feed (app/components/email/ui.tsx) so the two read
+// as one product rather than two boards that happen to sit near each other.
 //
 // Left: replies grouped Hot / Warm / Cold / Other with counts; rows that
 // still need a human are highlighted. Right: the selected reply — the inbound
@@ -61,19 +66,6 @@ const GROUPS = [
 
 type FilterKey = "all" | "attention" | "handled";
 
-function when(iso: string | null): string {
-  if (!iso) return "no date";
-  const t = Date.parse(iso);
-  if (Number.isNaN(t)) return iso;
-  const mins = Math.round((Date.now() - t) / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.round(mins / 60);
-  if (hrs < 48) return `${hrs}h ago`;
-  const days = Math.round(hrs / 24);
-  return days < 60 ? `${days}d ago` : new Date(t).toLocaleDateString();
-}
-
 /** The prospect's address on the inbound message. */
 function replyAddress(r: Reply): string | null {
   return r.messages?.from_addr ?? null;
@@ -96,35 +88,6 @@ function needsAttention(r: Reply): boolean {
 function groupTone(c: Reply["classification"]): string {
   return GROUPS.find((g) => g.key === c)?.tone ?? "var(--text-muted)";
 }
-
-function Chip({ text, tone, solid }: { text: string; tone: string; solid?: boolean }) {
-  return (
-    <span style={{
-      fontSize: 10.5, fontWeight: 700, borderRadius: 6, padding: "1px 8px",
-      color: solid ? "var(--bg-card)" : tone,
-      background: solid ? tone : "transparent",
-      border: `1px solid ${tone}`, whiteSpace: "nowrap",
-    }}>
-      {text}
-    </span>
-  );
-}
-
-function Note({ text, tone = "var(--orange)" }: { text: string; tone?: string }) {
-  return (
-    <div style={{
-      border: `1px solid ${tone}`, borderRadius: 10, padding: "9px 12px",
-      background: "var(--bg-card)", fontSize: 12, lineHeight: 1.55, color: tone,
-    }}>
-      {text}
-    </div>
-  );
-}
-
-const label: React.CSSProperties = {
-  fontSize: 10.5, textTransform: "uppercase", letterSpacing: ".06em",
-  color: "var(--text-muted)", fontWeight: 700,
-};
 
 function pill(active: boolean): React.CSSProperties {
   return {
@@ -391,16 +354,32 @@ export default function ReplyInboxBoard() {
     [visible, data, selected]
   );
 
-  // j/k keyboard navigation over the visible list.
+  // Keyboard navigation, the same keys the outgoing feed uses: j/k or the
+  // arrows walk the list, Enter pulls the reading pane into view on a narrow
+  // screen, Escape clears the selection.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "j" && e.key !== "k") return;
       const t = e.target as HTMLElement | null;
-      if (t && (t.tagName === "TEXTAREA" || t.tagName === "INPUT" || t.isContentEditable)) return;
+      if (t && (t.tagName === "TEXTAREA" || t.tagName === "INPUT" || t.tagName === "SELECT" || t.isContentEditable)) return;
+      const down = e.key === "j" || e.key === "ArrowDown";
+      const up = e.key === "k" || e.key === "ArrowUp";
+      if (!down && !up && e.key !== "Enter" && e.key !== "Escape") return;
+      if (e.key === "Escape") { setSelected(null); return; }
       if (!visible.length) return;
+      if (e.key === "Enter") {
+        document.getElementById("wing-reply-reader")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        return;
+      }
+      e.preventDefault();
       const idx = visible.findIndex((r) => r.id === selected);
-      const next = e.key === "j" ? Math.min(visible.length - 1, idx + 1) : Math.max(0, idx <= 0 ? 0 : idx - 1);
-      setSelected(visible[next]?.id ?? null);
+      const next = down
+        ? Math.min(visible.length - 1, idx < 0 ? 0 : idx + 1)
+        : Math.max(0, idx <= 0 ? 0 : idx - 1);
+      const id = visible[next]?.id ?? null;
+      setSelected(id);
+      if (id != null) {
+        listRef.current?.querySelector(`[data-reply="${id}"]`)?.scrollIntoView({ block: "nearest" });
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -563,12 +542,14 @@ export default function ReplyInboxBoard() {
           </div>
         )}
 
-      {/* Flex, not a fixed two-column grid, so on a phone the list and the
-          detail stack instead of squeezing side by side. */}
+      {/* The same list-plus-reading-pane shell the outgoing feed uses, so the
+          two halves of email feel like one screen. MailPanes stacks on a phone
+          rather than squeezing both side by side. */}
       {data.items.length > 0 && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 14, alignItems: "flex-start" }}>
-          {/* Left: grouped list */}
-          <div ref={listRef} style={{ display: "grid", gap: 10, minWidth: 0, flex: "1 1 260px", maxWidth: "100%" }}>
+        <MailPanes
+          listWidth={330}
+          list={
+          <div ref={listRef} style={{ display: "grid", gap: 10, minWidth: 0 }}>
             {GROUPS.map((g) => {
               const rows = visible.filter((r) => r.classification === g.key);
               const total = data.items.filter((r) => r.classification === g.key).length;
@@ -593,15 +574,18 @@ export default function ReplyInboxBoard() {
                     return (
                       <div
                         key={r.id}
+                        data-reply={r.id}
                         onClick={() => setSelected(r.id)}
                         style={{
                           border: `1px solid ${isSel ? "var(--accent)" : attn ? g.tone : "var(--border)"}`,
                           borderRadius: 10, padding: "8px 11px", cursor: "pointer",
                           background: isSel ? "var(--bg-hover)" : "var(--bg-card)",
-                          display: "grid", gap: 3, minWidth: 0,
+                          display: "flex", gap: 10, alignItems: "flex-start", minWidth: 0,
                           opacity: attn ? 1 : 0.72,
                         }}
                       >
+                        <Avatar size={26} seedA={r.crm_contacts?.contact_name} seedB={r.crm_contacts?.business_name ?? replyAddress(r)} />
+                        <div style={{ display: "grid", gap: 3, minWidth: 0, flex: 1 }}>
                         <div style={{ display: "flex", gap: 6, alignItems: "baseline", minWidth: 0 }}>
                           <span style={{
                             fontSize: 12.5, fontWeight: attn ? 700 : 500, color: "var(--text-primary)",
@@ -645,6 +629,7 @@ export default function ReplyInboxBoard() {
                             {quickErr[r.id]}
                           </div>
                         )}
+                        </div>
                       </div>
                     );
                   })}
@@ -657,22 +642,19 @@ export default function ReplyInboxBoard() {
               </div>
             )}
           </div>
-
-          {/* Right: detail */}
-          <div style={{
-            border: "1px solid var(--border)", borderRadius: 12,
-            background: "var(--bg-secondary)", padding: "14px 16px", minWidth: 0,
-            flex: "3 1 340px", maxWidth: "100%",
-          }}>
-            {selectedReply ? (
-              <ReplyDetail key={selectedReply.id} reply={selectedReply} onChanged={applyChange} />
-            ) : (
-              <div style={{ fontSize: 12.5, color: "var(--text-muted)", lineHeight: 1.6 }}>
-                Pick a reply on the left to read it, see the earlier back and forth, and edit the draft.
-              </div>
-            )}
-          </div>
-        </div>
+          }
+          reader={
+            <div id="wing-reply-reader">
+              {selectedReply ? (
+                <ReplyDetail key={selectedReply.id} reply={selectedReply} onChanged={applyChange} />
+              ) : (
+                <div style={{ fontSize: 12.5, color: "var(--text-muted)", lineHeight: 1.6 }}>
+                  Pick a reply on the left to read it, see the earlier back and forth, and edit the draft.
+                </div>
+              )}
+            </div>
+          }
+        />
       )}
     </div>
   );

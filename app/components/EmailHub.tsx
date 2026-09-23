@@ -2,77 +2,101 @@
 import { useState } from "react";
 import dynamic from "next/dynamic";
 
+const EmailFeed = dynamic(() => import("./email/EmailFeed"), { ssr: false });
+const ReplyInboxBoard = dynamic(() => import("./ReplyInboxBoard"), { ssr: false });
 const SendQueueBoard = dynamic(() => import("./SendQueueBoard"), { ssr: false });
-const MessageLedger = dynamic(() => import("./MessageLedger"), { ssr: false });
 const DeliverabilityBoard = dynamic(() => import("./DeliverabilityBoard"), { ssr: false });
-const EmailComposer = dynamic(() => import("../email/EmailComposer"), { ssr: false });
+const Composer = dynamic(() => import("./email/Composer"), { ssr: false });
 
-// One Email tab instead of three. Jack asked for fewer CRM tabs (2026-09-01):
-// the automated-send queue, the email side of the message ledger, and email
-// health are all "email", so they live behind one nav entry with internal
-// pills. Texts moved to their own CRM tab 2026-09-04, so the ledger here is
-// locked to the email channel. The boards are mounted lazily and kept
-// mounted once visited, same keep-alive idea as the shell.
-const PILLS = [
-  { id: "queue", label: "Going out next" },
-  { id: "ledger", label: "Emails sent and received" },
-  { id: "health", label: "Email health" },
-  { id: "compose", label: "Compose" },
+// ───────────────────────────────────────────────────────────────────────────
+// EmailHub — the CRM's front door.
+//
+// 2026-09-22, Jack: "Primarily work on the emailing because that's what the
+// majority of our CRM is going to be." So the feed of everything going out is
+// not one pill among equals any more, it is what the tab opens on and what
+// gets the room. The other four are the jobs you go and do: read the replies,
+// check the QA on what is about to send, check whether the mail is landing,
+// write one.
+//
+// Texting used to live behind one of these pills. It was removed, not hidden.
+//
+// Boards mount lazily and stay mounted once visited, the same keep-alive the
+// shell uses, so switching back to the feed does not re-open its live stream.
+// ───────────────────────────────────────────────────────────────────────────
+const VIEWS = [
+  { id: "feed", label: "All email", blurb: "Every email going out and coming back, newest first." },
+  { id: "replies", label: "Replies", blurb: "Everyone who wrote back, hottest first." },
+  { id: "queue", label: "Going out next", blurb: "What the automated sender will send, and the QA on it." },
+  { id: "health", label: "Deliverability", blurb: "Whether the mail is landing in inboxes at all." },
+  { id: "compose", label: "Compose", blurb: "Write one. Sending stays gated on the server." },
 ] as const;
 
-type PillId = (typeof PILLS)[number]["id"];
+type ViewId = (typeof VIEWS)[number]["id"];
+
+function isViewId(v: string | null): v is ViewId {
+  return VIEWS.some((x) => x.id === v);
+}
 
 export default function EmailHub() {
-  const [active, setActive] = useState<PillId>(() => {
+  const [active, setActive] = useState<ViewId>(() => {
     try {
       const saved = window.localStorage.getItem("wingos.emailhub.tab");
-      if (saved === "queue" || saved === "ledger" || saved === "health" || saved === "compose") return saved;
-    } catch {}
-    return "queue";
+      if (isViewId(saved)) return saved;
+    } catch { /* private mode, fall through to the default */ }
+    return "feed";
   });
-  const [visited, setVisited] = useState<Set<PillId>>(() => new Set<PillId>([active] as PillId[]));
+  const [visited, setVisited] = useState<Set<ViewId>>(() => new Set<ViewId>([active]));
 
-  function go(id: PillId) {
+  function go(id: ViewId) {
     setActive(id);
-    setVisited(v => (v.has(id) ? v : new Set(v).add(id)));
-    try { window.localStorage.setItem("wingos.emailhub.tab", id); } catch {}
+    setVisited((v) => (v.has(id) ? v : new Set(v).add(id)));
+    try { window.localStorage.setItem("wingos.emailhub.tab", id); } catch { /* not worth failing over */ }
   }
 
+  const blurb = VIEWS.find((v) => v.id === active)?.blurb ?? "";
+
   return (
-    <div>
-      <div style={{ marginBottom: 20, paddingBottom: 16, borderBottom: "1px solid var(--border)" }}>
-        <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--accent)", marginBottom: 6 }}>
+    <div style={{ minWidth: 0 }}>
+      <div style={{ marginBottom: 16, paddingBottom: 14, borderBottom: "1px solid var(--border)" }}>
+        <div style={{
+          fontSize: 12, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase",
+          color: "var(--accent)", marginBottom: 6,
+        }}>
           CRM
         </div>
         <h2 style={{ fontSize: 22, fontWeight: 700, color: "var(--text-primary)", margin: "0 0 6px" }}>
           Email
         </h2>
-        <p style={{ fontSize: 13.5, color: "var(--text-secondary)", margin: 0, maxWidth: 560, lineHeight: 1.5 }}>
-          Everything going out and coming in by email lives here: the automated send queue, the full message history, and deliverability health. Need texts or replies instead? Use the tabs above.
+        <p style={{ fontSize: 13.5, color: "var(--text-secondary)", margin: 0, maxWidth: 620, lineHeight: 1.5 }}>
+          {blurb}
         </p>
       </div>
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 18 }}>
-        {PILLS.map(p => (
+
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 16 }}>
+        {VIEWS.map((v) => (
           <button
-            key={p.id}
-            onClick={() => go(p.id)}
+            key={v.id}
+            onClick={() => go(v.id)}
             style={{
               padding: "7px 16px", borderRadius: 999, fontSize: 12.5, cursor: "pointer",
-              fontWeight: active === p.id ? 700 : 500,
-              border: active === p.id ? "1px solid var(--accent)" : "1px solid var(--border)",
-              background: active === p.id ? "var(--accent-glow)" : "transparent",
-              color: active === p.id ? "var(--accent)" : "var(--text-secondary)",
+              fontFamily: "inherit",
+              fontWeight: active === v.id ? 700 : 500,
+              border: active === v.id ? "1px solid var(--accent)" : "1px solid var(--border)",
+              background: active === v.id ? "var(--accent-glow)" : "transparent",
+              color: active === v.id ? "var(--accent)" : "var(--text-secondary)",
               transition: "all 0.15s",
             }}
           >
-            {p.label}
+            {v.label}
           </button>
         ))}
       </div>
+
+      {visited.has("feed") && <div style={{ display: active === "feed" ? "block" : "none" }}><EmailFeed /></div>}
+      {visited.has("replies") && <div style={{ display: active === "replies" ? "block" : "none" }}><ReplyInboxBoard /></div>}
       {visited.has("queue") && <div style={{ display: active === "queue" ? "block" : "none" }}><SendQueueBoard /></div>}
-      {visited.has("ledger") && <div style={{ display: active === "ledger" ? "block" : "none" }}><MessageLedger channel="email" /></div>}
       {visited.has("health") && <div style={{ display: active === "health" ? "block" : "none" }}><DeliverabilityBoard /></div>}
-      {visited.has("compose") && <div style={{ display: active === "compose" ? "block" : "none", maxWidth: 760 }}><EmailComposer embedded /></div>}
+      {visited.has("compose") && <div style={{ display: active === "compose" ? "block" : "none" }}><Composer /></div>}
     </div>
   );
 }

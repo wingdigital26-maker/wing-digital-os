@@ -168,7 +168,7 @@ export default function SendQueueBoard() {
   }
   if (!data) return null;
 
-  const { lane, queue, byVertical, sent, guardrails, texts } = data;
+  const { lane, queue, byVertical, sent, guardrails } = data;
   const laneTone = lane.paused === true ? "var(--orange)" : lane.paused === false ? "var(--green)" : "var(--text-muted)";
   const laneWord = lane.paused === true ? "PAUSED" : lane.paused === false ? "ARMED" : "unknown";
 
@@ -370,13 +370,9 @@ export default function SendQueueBoard() {
         </div>
       </div>
 
-      {/* ── Automated texts ─────────────────────────────────────────────── */}
-      <div>
-        <div style={{ fontSize: 14.5, fontWeight: 700, color: "var(--text-primary)", marginBottom: 4 }}>
-          Automated texts
-        </div>
-        <Note tone="var(--text-muted)" text={texts.note} />
-      </div>
+      {/* The "Automated texts" block that used to close this board was removed
+          2026-09-22 with texting itself. /api/messaging still returns the
+          `texts` key; it is deliberately not rendered. */}
     </div>
   );
 }

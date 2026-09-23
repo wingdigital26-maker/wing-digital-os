@@ -34,10 +34,10 @@ type Tile =
 
 const TILES: Tile[] = [
   { icon: Users, name: "Clients", blurb: "Who pays you and how their sites are doing", view: "clients" },
-  { icon: Note, name: "CRM", blurb: "Every contact, deal, email, text and reply", view: "email" },
+  { icon: Note, name: "CRM", blurb: "Every email going out, the replies back, and who to call", view: "email" },
   { icon: Call, name: "Call Room", blurb: "Dial the lead list and log what happened", href: "/calls" },
   { icon: Route, name: "Automations", blurb: "When something happens, do these things, with nobody at the keyboard", href: "/automations" },
-  { icon: Calendar, name: "Calendar", blurb: "Bookings, call-backs, classes and payments", view: "calendar" },
+  { icon: Calendar, name: "Invoices", blurb: "What has been billed, what is owed, when it lands", view: "calendar" },
   { icon: Cpu, name: "Agents", blurb: "What the automated agents are doing", view: "agent" },
 ];
 
@@ -76,7 +76,7 @@ function ViewLink({ view, children }: { view: string; children: React.ReactNode 
 
 const GUIDE_SECTIONS: { name: string; blurb: string; view?: string; href?: string }[] = [
   { view: "clients", name: "Clients", blurb: "who pays us and how their sites are doing." },
-  { view: "email", name: "CRM", blurb: "everyone we talk to; emails and texts live here." },
+  { view: "email", name: "CRM", blurb: "every email going out, every reply back, and the people in line for one." },
   { href: "/automations", name: "Automations", blurb: "the robots; they draft, you approve." },
   { view: "agent", name: "Agents", blurb: "what ran overnight and whether it worked." },
 ];
@@ -128,7 +128,7 @@ function HowItWorks() {
           <p style={rowText}>
             <strong style={{ color: "var(--text-primary)" }}>Safety:</strong> no robot sends anything to a real
             person unless Jack arms it; automations only make drafts. The one exception is you:
-            hitting Send on an email or text yourself sends it for real, right away.
+            hitting Send on an email yourself sends it for real, right away.
           </p>
 
           <p style={rowText}>

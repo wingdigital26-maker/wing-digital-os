@@ -37,7 +37,7 @@ const TILES: Tile[] = [
   { icon: Note, name: "CRM", blurb: "Every email going out, the replies back, and who to call", view: "email" },
   { icon: Call, name: "Call Room", blurb: "Dial the lead list and log what happened", href: "/calls" },
   { icon: Route, name: "Automations", blurb: "When something happens, do these things, with nobody at the keyboard", href: "/automations" },
-  { icon: Calendar, name: "Invoices", blurb: "What has been billed, what is owed, when it lands", view: "calendar" },
+  { icon: Calendar, name: "Calendar", blurb: "Invoices and payments, on the day each one lands", view: "calendar" },
   { icon: Cpu, name: "Agents", blurb: "What the automated agents are doing", view: "agent" },
 ];
 

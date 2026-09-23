@@ -118,9 +118,9 @@ export const NAV_TREE: NavGroupDef[] = [
     // Forget the calendar where everyone's available. Just delete it." The
     // month/week grid and the Availability panel behind the booking link are
     // gone; what is left is the money.
-    id: "calendar", label: "Invoices",
-    hint: "Invoices and payments",
-    subs: [{ id: "calendar", label: "Invoices and payments", keywords: "invoices payments money billing stripe" }],
+    id: "calendar", label: "Calendar",
+    hint: "A month calendar of invoices and payments",
+    subs: [{ id: "calendar", label: "Invoices and payments", keywords: "calendar invoices payments money billing stripe" }],
   },
   // School section removed 2026-09-01 (Jack: "get rid of the school schedule
   // completely"). Classes still show as the school lane on the Calendar; the

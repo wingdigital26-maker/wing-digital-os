@@ -1,8 +1,8 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-// Invoices — what Wing has billed, what is still owed, and a 3-month payment
-// calendar so Jack can see when money is expected to land.
+// Invoices — a month calendar of money: what Wing has billed, what is still
+// owed, and which day each payment lands on.
 //
 // Reads /api/invoices (Sonar Supabase), so it works PC-off. Amounts are CENTS
 // as integers everywhere; they are only turned into a dollar string at render
@@ -156,6 +156,12 @@ export default function InvoicesBoard() {
   const [fDue, setFDue] = useState("");
   const [fRecurring, setFRecurring] = useState<"" | Recurring>("");
   const [formErr, setFormErr] = useState("");
+
+  // Which month the calendar is showing, as an offset from the current one.
+  // 2026-09-22 (Jack): "make the invoices a calendar". It was three cramped
+  // read-only minis under a row of tiles; now it is one month you navigate,
+  // so the horizon is however far you care to look rather than a fixed three.
+  const [monthOffset, setMonthOffset] = useState(0);
 
   // ── Day panel state ──────────────────────────────────────────────────────
   // The open day is a plain YYYY-MM-DD string, so it identifies a calendar day
@@ -336,7 +342,6 @@ export default function InvoicesBoard() {
   // month grid per month in the API's window, starting with the current month.
   // The month count comes from the API so the grid can never be shorter than
   // the horizon the header is counting.
-  const calendarMonths = Math.max(1, data?.calendar_months ?? 3);
   const months = useMemo(() => {
     // Two sources land on the same grid: the API's recurring `upcoming`
     // schedule, and the real invoice rows due on a day (which is how a one-off
@@ -366,7 +371,10 @@ export default function InvoicesBoard() {
     }
 
     const [ty, tm] = [Number(today.slice(0, 4)), Number(today.slice(5, 7))];
-    return Array.from({ length: calendarMonths }, (_, offset) => {
+    // One month: the one being looked at. Every payment still lands on the
+    // same buckets above, so stepping to a month far out shows what is really
+    // scheduled there rather than an empty grid.
+    return [monthOffset].map((offset) => {
       const total0 = ty * 12 + (tm - 1) + offset;
       const y = Math.floor(total0 / 12);
       const m1 = (total0 % 12) + 1;
@@ -384,7 +392,7 @@ export default function InvoicesBoard() {
       );
       return { y, m1, cells, monthTotal, current: offset === 0 };
     });
-  }, [data?.upcoming, byDay, today, calendarMonths]);
+  }, [data?.upcoming, byDay, today, monthOffset]);
 
   const grouped = useMemo(() => {
     const g: Record<string, Invoice[]> = {};
@@ -433,10 +441,9 @@ export default function InvoicesBoard() {
   const t = data.totals;
   const next = t.next_payment;
 
-  // Describe the window that is actually drawn below, so the "N expected" count
-  // beside it can never refer to money with no cell to land in.
-  const lastMonth = months[months.length - 1];
-  const windowLabel = `through ${MONTHS[lastMonth.m1 - 1]} ${lastMonth.y}`;
+  // The "through <month>, N expected" header went with the three-month strip.
+  // One navigable month has no fixed window to describe, and its own total
+  // sits in the header where the reader is already looking.
 
   return (
     <div
@@ -458,153 +465,120 @@ export default function InvoicesBoard() {
       `}</style>
       {err ? <p style={{ color: "var(--red)", fontSize: 13, margin: 0 }}>Invoices: {err}</p> : null}
 
-      {/* Summary tiles */}
-      <div
-        style={{
-          display: "grid",
-          gap: 12,
-          gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
-        }}
-      >
-        <Tile label="Outstanding" value={money(t.outstanding_cents)} tone="var(--text-primary)" />
-        <Tile label="Paid this month" value={money(t.paid_this_month_cents)} tone="var(--green)" />
-        <Tile
-          label="Overdue"
-          value={String(t.overdue_count)}
-          sub={t.overdue_count === 1 ? "invoice past due" : "invoices past due"}
-          tone={t.overdue_count ? "var(--red)" : "var(--text-primary)"}
-        />
-        <Tile
-          label="Next payment due"
-          value={next ? shortDate(next.due_on) : "—"}
-          sub={next ? `${next.client} · ${money(next.amount_cents, next.currency)}` : "no recurring schedule"}
-          tone={next ? "var(--accent)" : "var(--text-muted)"}
-        />
-      </div>
-
-      {/* Payment calendar */}
-      <section style={card}>
-        <header style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
-          <h3 style={{ margin: 0, fontSize: 14, letterSpacing: 0.3, color: "var(--text-primary)" }}>
-            Payment calendar
-          </h3>
-          <span style={{ ...num, fontSize: 12, color: "var(--text-muted)" }}>
-            {windowLabel} · {data.upcoming.length} expected
-          </span>
-        </header>
-
-        <div style={{ display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
-          {months.map((m) => (
-            <div
-              key={`${m.y}-${m.m1}`}
-              style={{
-                border: `1px solid ${m.current ? "var(--accent)" : "var(--border)"}`,
-                borderRadius: 12,
-                padding: m.current ? 12 : 10,
-                background: m.current ? "var(--bg-card)" : "var(--bg-secondary)",
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
-                <span
-                  style={{
-                    fontSize: m.current ? 14 : 13,
-                    fontWeight: m.current ? 600 : 500,
-                    color: m.current ? "var(--text-primary)" : "var(--text-secondary)",
-                  }}
-                >
-                  {MONTHS[m.m1 - 1]} <span style={num}>{m.y}</span>
-                </span>
-                <span style={{ ...num, fontSize: 12, color: m.monthTotal ? "var(--green)" : "var(--text-muted)" }}>
-                  {m.monthTotal ? money(m.monthTotal) : "—"}
-                </span>
+      {/* ── The calendar ──────────────────────────────────────────────────
+          2026-09-22 (Jack): "make the invoices a calendar". It leads now, at
+          full width, one month at a time, with each payment drawn ON its day
+          as a readable chip instead of a dot you had to hover to decode. The
+          summary tiles moved below it: they are the footnote, the month is
+          the screen. Clicking any day still opens the same day panel, so a
+          payment gets recorded where you are already looking. */}
+      {months.map((m) => {
+        const monthLabel = `${MONTHS[m.m1 - 1]} ${m.y}`;
+        const empty = m.cells.every((c) => !c || c.pays.length === 0);
+        return (
+          // Keyed on the section, not the month. Keying on the month made React
+          // tear the whole thing down and build a new one on every step, which
+          // threw keyboard focus off the arrow the moment it was pressed: you
+          // could click forward once and then had to find the button again.
+          <section key="month" style={card}>
+            <header style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--text-primary)" }}>
+                {MONTHS[m.m1 - 1]} <span style={{ ...num, color: "var(--text-secondary)", fontWeight: 500 }}>{m.y}</span>
+              </h3>
+              <span style={{ ...num, fontSize: 13, fontWeight: 700, color: m.monthTotal ? "var(--green)" : "var(--text-muted)" }}>
+                {m.monthTotal ? money(m.monthTotal) : "nothing expected"}
+              </span>
+              <div style={{ marginLeft: "auto", display: "flex", gap: 6, alignItems: "center" }}>
+                <button type="button" onClick={() => { setOpenDay(null); setMonthOffset((o) => o - 1); }}
+                  style={navBtn} aria-label="Previous month">&#8249;</button>
+                <button type="button" onClick={() => { setOpenDay(null); setMonthOffset(0); }}
+                  style={{ ...navBtn, width: "auto", padding: "0 12px", opacity: m.current ? 0.45 : 1 }}
+                  disabled={m.current} aria-label="Back to this month">Today</button>
+                <button type="button" onClick={() => { setOpenDay(null); setMonthOffset((o) => o + 1); }}
+                  style={navBtn} aria-label="Next month">&#8250;</button>
               </div>
+            </header>
 
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 3 }}>
-                {DOW.map((d, i) => (
-                  <div
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
+              {DOW.map((d, i) => (
+                <div key={i} style={{ fontSize: 11, fontWeight: 700, textAlign: "center", color: "var(--text-muted)", paddingBottom: 4 }}>
+                  {d}
+                </div>
+              ))}
+              {m.cells.map((c, i) => {
+                if (!c) return <div key={i} />;
+                const has = c.pays.length > 0;
+                const isToday = c.date === today;
+                const isOpen = openDay === c.date;
+                const sum = c.pays.reduce((s, p) => s + p.amount_cents, 0);
+                // Three chips fit a cell at every width this grid is used at;
+                // the rest are counted so a busy day never silently hides one.
+                const shown = c.pays.slice(0, 3);
+                const rest = c.pays.length - shown.length;
+                return (
+                  <button
                     key={i}
-                    style={{ ...num, fontSize: 10, textAlign: "center", color: "var(--text-muted)", paddingBottom: 2 }}
+                    type="button"
+                    className="day-cell"
+                    aria-expanded={isOpen}
+                    aria-label={
+                      has
+                        ? `${shortDate(c.date)}, ${money(sum)} across ${c.pays.length} payment${c.pays.length === 1 ? "" : "s"}`
+                        : `${shortDate(c.date)}, no payments, add one`
+                    }
+                    onClick={() => toggleDay(c.date)}
+                    style={{
+                      minHeight: 92, borderRadius: 9, padding: 6, textAlign: "left",
+                      cursor: "pointer", font: "inherit", display: "flex",
+                      flexDirection: "column", gap: 3, alignItems: "stretch", overflow: "hidden",
+                      border: isOpen || isToday ? "1px solid var(--accent)" : "1px solid var(--border)",
+                      background: isOpen ? "var(--bg-hover)" : isToday ? "var(--accent-glow)" : "var(--bg-secondary)",
+                    }}
                   >
-                    {d}
-                  </div>
-                ))}
-                {m.cells.map((c, i) => {
-                  if (!c) return <div key={i} />;
-                  const has = c.pays.length > 0;
-                  const isToday = c.date === today;
-                  const isOpen = openDay === c.date;
-                  const sum = c.pays.reduce((s, p) => s + p.amount_cents, 0);
-                  return (
-                    <button
-                      key={i}
-                      type="button"
-                      className="day-cell"
-                      aria-expanded={isOpen}
-                      aria-label={
-                        has
-                          ? `${shortDate(c.date)} — ${money(sum)} across ${c.pays.length} payment${c.pays.length === 1 ? "" : "s"}`
-                          : `${shortDate(c.date)} — no payments, add one`
-                      }
-                      onClick={() => toggleDay(c.date)}
-                      title={
-                        has
-                          ? c.pays.map((p) => `${p.client} — ${money(p.amount_cents, p.currency)}`).join("\n")
-                          : undefined
-                      }
-                      style={{
-                        ...num,
-                        minHeight: m.current ? 42 : 32,
-                        borderRadius: 6,
-                        padding: "2px 3px",
-                        fontSize: 10,
-                        textAlign: "left",
-                        cursor: "pointer",
-                        font: "inherit",
-                        fontVariantNumeric: "tabular-nums",
-                        border: isOpen
-                          ? "1px solid var(--accent)"
-                          : isToday
-                          ? "1px solid var(--accent)"
-                          : "1px solid transparent",
-                        background: isOpen
-                          ? "var(--bg-hover)"
-                          : has
-                          ? "var(--accent-glow)"
-                          : "transparent",
-                        color: "var(--text-secondary)",
-                        overflow: "hidden",
-                      }}
-                    >
-                      <div
-                        style={{
-                          ...num,
-                          fontSize: 10,
-                          color: has ? "var(--text-primary)" : "var(--text-muted)",
-                          fontWeight: has || isToday ? 600 : 400,
-                        }}
-                      >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 4 }}>
+                      <span style={{
+                        ...num, fontSize: 12,
+                        fontWeight: isToday ? 800 : has ? 700 : 500,
+                        color: isToday ? "var(--accent)" : has ? "var(--text-primary)" : "var(--text-muted)",
+                      }}>
                         {c.day}
-                      </div>
-                      {has && m.current ? (
-                        <div style={{ ...num, fontSize: 9, color: "var(--green)", lineHeight: 1.15 }}>
-                          {money(sum)}
-                        </div>
+                      </span>
+                      {c.pays.length > 1 ? (
+                        <span style={{ ...num, fontSize: 10, fontWeight: 700, color: "var(--green)" }}>{money(sum)}</span>
                       ) : null}
-                      {has && !m.current ? (
-                        <div
-                          style={{
-                            width: 5, height: 5, borderRadius: 99,
-                            background: "var(--green)", margin: "1px auto 0",
-                          }}
-                        />
-                      ) : null}
-                    </button>
-                  );
-                })}
-              </div>
+                    </div>
+                    {shown.map((p) => (
+                      <span key={p.id} style={{
+                        display: "block", borderRadius: 5, padding: "2px 5px",
+                        background: "var(--accent-glow)", borderLeft: "2px solid var(--green)",
+                        fontSize: 10, lineHeight: 1.3, color: "var(--text-primary)",
+                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                      }}>
+                        <span style={{ ...num, color: "var(--green)", fontWeight: 700 }}>
+                          {money(p.amount_cents, p.currency)}
+                        </span>{" "}
+                        {p.client}
+                      </span>
+                    ))}
+                    {rest > 0 ? (
+                      <span style={{ fontSize: 10, color: "var(--text-muted)", paddingLeft: 2 }}>
+                        +{rest} more
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
 
-              {/* Day panel — anchored under the month whose day is open. */}
-              {openDay && openDay.startsWith(`${m.y}-${String(m.m1).padStart(2, "0")}`) ? (
+            {empty ? (
+              <p style={{ fontSize: 12.5, color: "var(--text-muted)", margin: "12px 0 0" }}>
+                No payments land in {monthLabel}. Click any day to record one.
+              </p>
+            ) : null}
+
+            {/* Day panel, full width under the grid it belongs to. */}
+            {openDay && openDay.startsWith(`${m.y}-${String(m.m1).padStart(2, "0")}`) ? (
+              <div style={{ marginTop: 12 }}>
                 <DayPanel
                   date={openDay}
                   invoices={byDay[openDay] || []}
@@ -626,34 +600,35 @@ export default function InvoicesBoard() {
                   onAct={actOnDay}
                   onClose={() => setOpenDay(null)}
                 />
-              ) : null}
+              </div>
+            ) : null}
+          </section>
+        );
+      })}
 
-              {/* The legend that makes the grid readable: who is paying, when. */}
-              <ul style={{ listStyle: "none", margin: "10px 0 0", padding: 0, display: "grid", gap: 4 }}>
-                {m.cells
-                  .flatMap((c) => (c ? c.pays.map((p) => ({ ...p, day: c.day })) : []))
-                  .map((p) => (
-                    <li
-                      key={`${p.id}-${p.day}`}
-                      style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 11 }}
-                    >
-                      <span style={{ ...num, color: "var(--text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        <span style={{ color: "var(--text-muted)" }}>{String(p.day).padStart(2, "0")}</span>{" "}
-                        {p.client}
-                      </span>
-                      <span style={{ ...num, color: "var(--green)", flexShrink: 0 }}>
-                        {money(p.amount_cents, p.currency)}
-                      </span>
-                    </li>
-                  ))}
-                {m.cells.every((c) => !c || c.pays.length === 0) ? (
-                  <li style={{ fontSize: 11, color: "var(--text-muted)" }}>No payments expected</li>
-                ) : null}
-              </ul>
-            </div>
-          ))}
-        </div>
-      </section>
+      {/* Summary tiles — the footnote under the month, not the headline. */}
+      <div
+        style={{
+          display: "grid",
+          gap: 12,
+          gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
+        }}
+      >
+        <Tile label="Outstanding" value={money(t.outstanding_cents)} tone="var(--text-primary)" />
+        <Tile label="Paid this month" value={money(t.paid_this_month_cents)} tone="var(--green)" />
+        <Tile
+          label="Overdue"
+          value={String(t.overdue_count)}
+          sub={t.overdue_count === 1 ? "invoice past due" : "invoices past due"}
+          tone={t.overdue_count ? "var(--red)" : "var(--text-primary)"}
+        />
+        <Tile
+          label="Next payment due"
+          value={next ? shortDate(next.due_on) : "none"}
+          sub={next ? `${next.client} · ${money(next.amount_cents, next.currency)}` : "no recurring schedule"}
+          tone={next ? "var(--accent)" : "var(--text-muted)"}
+        />
+      </div>
 
       {/* Filters + create */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
@@ -1054,4 +1029,19 @@ const btnPrimary: React.CSSProperties = {
   ...btn,
   borderColor: "var(--accent)",
   color: "var(--accent)",
+};
+
+// The month stepper. Square so the two arrows read as a pair; "Today" widens
+// itself where it is used.
+const navBtn: React.CSSProperties = {
+  ...btn,
+  width: 30,
+  height: 30,
+  padding: 0,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  fontSize: 16,
+  lineHeight: 1,
+  fontFamily: "inherit",
 };

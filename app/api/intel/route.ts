@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { sbFailureReason } from "@/lib/osSupabase";
 
 // ───────────────────────────────────────────────────────────────────────────
 // Creator / competitor intel API — what the AI builders Wing follows shipped.
@@ -79,6 +80,16 @@ const PROPOSAL_COLS =
   "evidence_quote,evidence_ts,target_system,target_paths,effort,risk,status," +
   "decided_at,applied_at,outcome,created_at";
 
+// Every read below used to be `res.ok ? await res.json() : []`, so a refused
+// read rendered as a table holding nothing: total 0, new 0, reviewed 0. With
+// Supabase 402ing every request that made the whole Intel board assert, in
+// numbers, that there was no intel -- when the truth was that it could not
+// look. Throw the real reason instead and let the catch below report it.
+async function rows<T>(res: Response, table: string): Promise<T[]> {
+  if (res.ok) return (await res.json()) as T[];
+  throw new Error(sbFailureReason(res.status, await res.text().catch(() => ""), table));
+}
+
 export async function GET(req: Request) {
   const { url, key } = creds();
   if (!url || !key) {
@@ -100,13 +111,13 @@ export async function GET(req: Request) {
     const srcRes = await sb(
       "intel_sources?select=id,kind,handle,name,channel_url,why,active&order=id"
     );
-    const sources: Source[] = srcRes.ok ? await srcRes.json() : [];
+    const sources = await rows<Source>(srcRes, "intel_sources");
 
     // Counts come off one cheap pull so the filter chips can show real numbers.
     const allRes = await sb(
       "intel_items?select=status,source_handle&limit=5000&order=published_at.desc"
     );
-    const all: { status: string; source_handle: string }[] = allRes.ok ? await allRes.json() : [];
+    const all = await rows<{ status: string; source_handle: string }>(allRes, "intel_items");
 
     const totals = { total: all.length, new: 0, reviewed: 0, actioned: 0, ignored: 0 };
     const bySource: Record<string, number> = {};
@@ -123,11 +134,11 @@ export async function GET(req: Request) {
       "select=id,source_handle,title,url,published_at,summary,takeaway,actionable,status",
     ].filter(Boolean).join("&");
     const res = await sb(`intel_items?${filters}`);
-    const items: Item[] = res.ok ? await res.json() : [];
+    const items = await rows<Item>(res, "intel_items");
 
     // Proposal counts, same cheap-pull trick as the items above.
     const pAllRes = await sb("intel_proposals?select=status&limit=5000");
-    const pAll: { status: string }[] = pAllRes.ok ? await pAllRes.json() : [];
+    const pAll = await rows<{ status: string }>(pAllRes, "intel_proposals");
     const proposalTotals = {
       total: pAll.length, proposed: 0, approved: 0, rejected: 0, applied: 0, failed: 0,
     };
@@ -143,7 +154,7 @@ export async function GET(req: Request) {
       `select=${PROPOSAL_COLS}`,
     ].filter(Boolean).join("&");
     const pRes = await sb(`intel_proposals?${pFilters}`);
-    const proposals: Proposal[] = pRes.ok ? await pRes.json() : [];
+    const proposals = await rows<Proposal>(pRes, "intel_proposals");
 
     return NextResponse.json({
       configured: true,
@@ -155,11 +166,12 @@ export async function GET(req: Request) {
     });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
+    // `unavailable` plus null totals, never zeros. Nothing here is known.
     return NextResponse.json({
-      configured: true, error: msg, sources: [], items: [],
-      proposals: [],
-      proposalTotals: { total: 0, proposed: 0, approved: 0, rejected: 0, applied: 0, failed: 0 },
-    });
+      configured: true, unavailable: true, error: msg,
+      sources: [], items: [], proposals: [],
+      totals: null, proposalTotals: null,
+    }, { status: 502 });
   }
 }
 

@@ -10,6 +10,7 @@
 // wingos_session cookie, not from anything the client sent us.
 import { getOsSession, hasLegacyAuth, sbUrl, sbService } from "../../../lib/osSupabase";
 import type { Session } from "../../lib/session";
+import { sbFailureReason } from "@/lib/osSupabase";
 
 export type CallUser = {
   id: string;       // auth.users id, or "legacy" for shared-password access
@@ -81,21 +82,38 @@ export async function sbPatch<T = unknown>(
   }
 }
 
+// Why the last sbGet returned null. The signature stays `T[] | null` so every
+// caller keeps working, but "could not read leads" told Jack nothing about a
+// project that is 402ing every request, so the reason now travels beside the
+// null and the routes report it (2026-09-22).
+let lastFailure = "";
+export function sbLastFailure(): string {
+  return lastFailure || "The call room database did not answer.";
+}
+
 // GET with the service key (bypasses RLS; the role check above is the gate).
 export async function sbGet<T = unknown>(
   table: string,
   qs: string
 ): Promise<T[] | null> {
   const s = svc();
-  if (!s) return null;
+  if (!s) {
+    lastFailure = "The call room database is not configured on this server.";
+    return null;
+  }
   try {
     const r = await fetch(`${s.url}/rest/v1/${table}?${qs}`, {
       headers: { apikey: s.key, Authorization: `Bearer ${s.key}` },
       cache: "no-store",
     });
-    if (!r.ok) return null;
+    if (!r.ok) {
+      lastFailure = sbFailureReason(r.status, await r.text().catch(() => ""), table);
+      return null;
+    }
+    lastFailure = "";
     return (await r.json()) as T[];
-  } catch {
+  } catch (e) {
+    lastFailure = `Could not reach the call room database: ${String(e)}`;
     return null;
   }
 }

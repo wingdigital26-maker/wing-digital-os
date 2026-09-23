@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { sbFailureReason } from "@/lib/osSupabase";
 
 // ───────────────────────────────────────────────────────────────────────────
 // Sonar API — the free social + web lead engine's queue, surfaced in the OS.
@@ -785,7 +786,7 @@ export async function GET(req: Request) {
     const res = await sb(`${TABLE}?${filters}`);
     if (!res.ok) {
       return NextResponse.json(
-        { configured: true, error: `Supabase ${res.status}`, totals: null, leads: [] },
+        { configured: true, error: sbFailureReason(res.status, await res.text().catch(() => ""), "sonar leads"), totals: null, leads: [] },
         { status: 200 }
       );
     }

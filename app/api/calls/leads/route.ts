@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireCallUser, sbConfigured, sbGet, CLAIM_MINUTES } from "../_guard";
+import { requireCallUser, sbConfigured, sbGet, sbLastFailure, CLAIM_MINUTES } from "../_guard";
 import { sbUrl, sbService } from "../../../../lib/osSupabase";
 
 export const runtime = "nodejs";
@@ -238,7 +238,7 @@ export async function GET(req: Request) {
   const statusCounts = allCounts.slice(0, STATUSES.length);
   const tierCountsRaw = allCounts.slice(STATUSES.length);
   if (rows === null) {
-    return NextResponse.json({ error: "could not read leads" }, { status: 502 });
+    return NextResponse.json({ error: sbLastFailure() }, { status: 502 });
   }
 
   const counts: Record<string, number> = {};

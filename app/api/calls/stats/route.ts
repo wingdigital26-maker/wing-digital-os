@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireCallUser, sbConfigured, sbGet } from "../_guard";
+import { requireCallUser, sbConfigured, sbGet, sbLastFailure } from "../_guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -71,7 +71,7 @@ export async function GET() {
     `select=${LEAD_COLS}&excluded=is.false&order=score.desc,company.asc&limit=1000`
   );
   if (leads === null) {
-    return NextResponse.json({ error: "could not read leads" }, { status: 502 });
+    return NextResponse.json({ error: sbLastFailure() }, { status: 502 });
   }
 
   // Counted, not guessed: how many rows the audit threw out.

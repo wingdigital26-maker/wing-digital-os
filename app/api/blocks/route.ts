@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getOsSession, hasLegacyAuth, sbUrl, sbService } from "@/lib/osSupabase";
+import { sbFailureReason } from "@/lib/osSupabase";
 
 // ───────────────────────────────────────────────────────────────────────────
 // Time-blocks API — CRUD for the manual blocks Jack lays onto the calendar.
@@ -124,7 +125,7 @@ export async function GET() {
   if (!(await isStaff())) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const res = await rest("GET", "?select=*&order=date.asc,start_time.asc");
   if (!res) return noDb();
-  if (!res.ok) return NextResponse.json({ error: `Read failed (HTTP ${res.status})` }, { status: 502 });
+  if (!res.ok) return NextResponse.json({ error: sbFailureReason(res.status, await res.text().catch(() => ""), "blocks") }, { status: 502 });
   return NextResponse.json({ blocks: await res.json() });
 }
 

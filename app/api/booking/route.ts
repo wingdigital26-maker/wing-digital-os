@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { sbUrl, sbService } from "@/lib/osSupabase";
+import { sbUrl, sbService, sbFailureReason } from "@/lib/osSupabase";
 import { requireStaff, isAuthFailure } from "../pipeline/_lib";
 import { emitEvent } from "@/lib/automations/emit";
 import { normalizePhone } from "@/lib/phone";
@@ -194,13 +194,19 @@ async function loadBusy(): Promise<BusyInterval[]> {
   }
 }
 
-// Everything the rule needs, read once per request.
-async function loadRules(): Promise<
-  { availability: AvailabilityRow[]; blocks: AvailBlockRow[]; busy: BusyInterval[] } | null
-> {
-  const [availability, blocks, busy] = await Promise.all([loadAvailability(), loadBlocks(), loadBusy()]);
-  if (availability === null || blocks === null) return null;
-  return { availability, blocks, busy };
+// Everything the rule needs, read once per request. Either the rules, or the
+// sentence saying why there are none. Never a silent null: "we could not read
+// the hours" and "nobody works that day" have to look different.
+type Rules = { availability: AvailabilityRow[]; blocks: AvailBlockRow[]; busy: BusyInterval[] };
+type RulesRead = { rules: Rules; error: null } | { rules: null; error: string };
+
+async function loadRules(): Promise<RulesRead> {
+  try {
+    const [availability, blocks, busy] = await Promise.all([loadAvailability(), loadBlocks(), loadBusy()]);
+    return { rules: { availability, blocks, busy }, error: null };
+  } catch (e) {
+    return { rules: null, error: e instanceof Error ? e.message : String(e) };
+  }
 }
 
 // ── Bookings reads (service key: RLS is staff-only; this route validates) ──
@@ -220,14 +226,24 @@ type BookingRow = {
   assigned_to: string | null;
 };
 
+// Rows, or the sentence saying why there are none. Same reasoning as loadRules:
+// "the bookings table is empty" and "Supabase refused the read" are different
+// facts and the admin board has to be able to tell them apart.
+type BookingsRead = { rows: BookingRow[]; error: null } | { rows: null; error: string };
+
 async function bookingsBetween(
   fromIso: string,
   toIso: string,
   opts: { includeCancelled?: boolean } = {}
-): Promise<BookingRow[] | null> {
+): Promise<BookingsRead> {
   const url = sbUrl();
   const key = sbService();
-  if (!url || !key) return null;
+  if (!url || !key) {
+    return {
+      rows: null,
+      error: "OS Supabase is not configured (OS_SUPABASE_URL / OS_SUPABASE_SERVICE_KEY are missing).",
+    };
+  }
   const qs =
     `select=*${opts.includeCancelled ? "" : "&status=neq.cancelled"}` +
     `&starts_at=lt.${encodeURIComponent(toIso)}` +
@@ -238,10 +254,16 @@ async function bookingsBetween(
       headers: { apikey: key, Authorization: `Bearer ${key}` },
       cache: "no-store",
     });
-    if (!r.ok) return null;
-    return (await r.json()) as BookingRow[];
-  } catch {
-    return null;
+    if (!r.ok) {
+      const body = await r.text().catch(() => "");
+      return { rows: null, error: sbFailureReason(r.status, body, "bookings") };
+    }
+    return { rows: (await r.json()) as BookingRow[], error: null };
+  } catch (e) {
+    return {
+      rows: null,
+      error: `Could not reach Supabase reading bookings: ${e instanceof Error ? e.message : String(e)}`,
+    };
   }
 }
 
@@ -291,14 +313,11 @@ export async function GET(req: NextRequest) {
     // Completed or No show, and includes cancelled rows so Restore works.
     const fromIso = new Date(Date.now() - 7 * 86_400_000).toISOString();
     const farIso = new Date(Date.now() + 90 * 86_400_000).toISOString();
-    const rows = await bookingsBetween(fromIso, farIso, { includeCancelled: true });
-    if (rows === null) {
-      return NextResponse.json(
-        { error: "unavailable", message: "Bookings database is not configured or unreachable." },
-        { status: 503 }
-      );
+    const read = await bookingsBetween(fromIso, farIso, { includeCancelled: true });
+    if (read.rows === null) {
+      return NextResponse.json({ error: "unavailable", message: read.error }, { status: 503 });
     }
-    return NextResponse.json({ bookings: rows });
+    return NextResponse.json({ bookings: read.rows });
   }
 
   const today = wallAt(new Date());
@@ -332,13 +351,20 @@ export async function GET(req: NextRequest) {
   const [ly, lmo, ld] = lastDay.split("-").map(Number);
   const windowEnd = chicagoToUtc(ly, lmo, ld, 23, 59).toISOString();
 
-  const [existing, rules] = await Promise.all([bookingsBetween(windowStart, windowEnd), loadRules()]);
-  if (existing === null || rules === null) {
+  const [existing, rulesRead] = await Promise.all([bookingsBetween(windowStart, windowEnd), loadRules()]);
+  if (existing.rows === null || rulesRead.rules === null) {
+    // The visitor gets the plain version; the reason rides along so staff
+    // hitting the same URL can see which read failed and why.
     return NextResponse.json(
-      { error: "unavailable", message: "The booking calendar is not connected to its database right now. Please try again later." },
+      {
+        error: "unavailable",
+        message: "The booking calendar is not connected to its database right now. Please try again later.",
+        detail: existing.error ?? rulesRead.error,
+      },
       { status: 503 }
     );
   }
+  const rules = rulesRead.rules;
 
   const nowIso = new Date().toISOString();
   const days = dayList.map((ymd) => {
@@ -353,7 +379,7 @@ export async function GET(req: NextRequest) {
           slotEndIso: s.ends_at,
           availability: rules.availability,
           blocks: rules.blocks,
-          bookings: existing,
+          bookings: existing.rows,
           busy: rules.busy,
         });
         // Public shape on purpose: no names, no counts, only yes or no.
@@ -445,13 +471,18 @@ export async function POST(req: NextRequest) {
   // current bookings. This is the friendly fast path; the bookings_slot_unique
   // index on (starts_at, assigned_to) is the real guarantee, and the insert
   // below handles its 409 with the same friendly message.
-  const [existing, rules] = await Promise.all([bookingsBetween(slotStart, slotEnd), loadRules()]);
-  if (existing === null || rules === null) {
+  const [existing, rulesRead] = await Promise.all([bookingsBetween(slotStart, slotEnd), loadRules()]);
+  if (existing.rows === null || rulesRead.rules === null) {
     return NextResponse.json(
-      { error: "unavailable", message: "The booking calendar is not connected to its database right now. Please try again later." },
+      {
+        error: "unavailable",
+        message: "The booking calendar is not connected to its database right now. Please try again later.",
+        detail: existing.error ?? rulesRead.error,
+      },
       { status: 503 }
     );
   }
+  const rules = rulesRead.rules;
   const check = whoIsFree({
     ymd: slotYmd,
     startMin: slotStartMin,
@@ -460,7 +491,7 @@ export async function POST(req: NextRequest) {
     slotEndIso: slotEnd,
     availability: rules.availability,
     blocks: rules.blocks,
-    bookings: existing,
+    bookings: existing.rows,
     busy: rules.busy,
   });
   if (check.inHours.length === 0) {

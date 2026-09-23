@@ -5,7 +5,14 @@ import { listVaultFiles, readVaultFile } from "@/lib/vaultSource";
 import { getRevenueTruth, BASIS_LABEL, type RevenueBasis } from "@/lib/revenue";
 // OS-project Supabase helpers, used by the unified inbound+outbound section
 // below to read the call room (call_leads / call_activity) server-side.
-import { getOsSession, hasLegacyAuth, sbUrl, sbService } from "@/lib/osSupabase";
+import {
+  getOsSession,
+  hasLegacyAuth,
+  sbUrl,
+  sbService,
+  sbFailureReason,
+  contentRangeTotal,
+} from "@/lib/osSupabase";
 
 // ───────────────────────────────────────────────────────────────────────────
 // CRM API — every outbound message, compartmentalized by the client it is FOR.
@@ -34,10 +41,12 @@ async function sb(path: string, extra: Record<string, string> = {}) {
   });
 }
 
-async function countWhere(filter: string): Promise<number> {
+// null means "we could not count", never 0. A refused read has no
+// Content-Range header at all, and Number("") is 0, which is how a dead
+// connection used to report itself as an empty table.
+async function countWhere(filter: string): Promise<number | null> {
   const res = await sb(`outbound?${filter}&select=id`, { Prefer: "count=exact", Range: "0-0" });
-  const n = Number((res.headers.get("content-range") || "").split("/").pop());
-  return Number.isFinite(n) ? n : 0;
+  return contentRangeTotal(res.headers.get("content-range"));
 }
 
 // ── Pagination ──────────────────────────────────────────────────────────────
@@ -58,15 +67,17 @@ const PAGE = 500;
 
 async function scanOutbound(columns: string): Promise<{ rows: OutRow[]; meta: ScanMeta }> {
   const head = await sb("outbound?select=id&limit=1", { Prefer: "count=exact", Range: "0-0" });
-  const parsed = Number((head.headers.get("content-range") || "").split("/").pop());
-  const total = Number.isFinite(parsed) ? parsed : null;
+  const total = contentRangeTotal(head.headers.get("content-range"));
   const rows: OutRow[] = [];
   if (total == null) {
+    const body = head.ok ? "" : await head.text().catch(() => "");
     return { rows, meta: {
       contentRangeTotal: null, rowsRead: 0, complete: false, pages: 0,
-      note: "PostgREST returned no Content-Range total for outbound, so the true " +
-            "row count is unknown and nothing was scanned. Do not read the empty " +
-            "result as an empty table.",
+      note: head.ok
+        ? "PostgREST returned no Content-Range total for outbound, so the true " +
+          "row count is unknown and nothing was scanned. Do not read the empty " +
+          "result as an empty table."
+        : `Nothing was scanned: ${sbFailureReason(head.status, body, "outbound")}`,
     } };
   }
   let pages = 0;
@@ -826,10 +837,13 @@ async function osGet<T>(table: string, qs: string, exact = false): Promise<OsRes
     });
     if (!r.ok) {
       const body = await r.text().catch(() => "");
-      return { rows: [], total: null, error: `${table} returned HTTP ${r.status}: ${body.slice(0, 180)}` };
+      return { rows: [], total: null, error: sbFailureReason(r.status, body, table) };
     }
-    const n = Number((r.headers.get("content-range") || "").split("/").pop());
-    return { rows: (await r.json()) as T[], total: Number.isFinite(n) ? n : null, error: null };
+    return {
+      rows: (await r.json()) as T[],
+      total: contentRangeTotal(r.headers.get("content-range")),
+      error: null,
+    };
   } catch (e) {
     return { rows: [], total: null, error: `Could not reach ${table}: ${e instanceof Error ? e.message : String(e)}` };
   }
@@ -918,7 +932,7 @@ async function buildUnified() {
     available: !stagesR.error && !dealsR.error,
     reason: stagesR.error ?? dealsR.error,
     contacts: contactsTotal,
-    contactsReason: contactsTotal == null ? "crm_contacts could not be counted, so this is unknown — not zero." : null,
+    contactsReason: contactsTotal == null ? "crm_contacts could not be counted, so this is unknown, not zero." : null,
     doNotContact: contactsDnc,
     deals: openDeals.length,
     dealsTotal: dealsR.rows.length,
@@ -1054,9 +1068,18 @@ async function buildUnified() {
     );
   }
 
+  // A lane that could not be read is not a lane with nothing in it. This block
+  // reported available:true even when BOTH sides had been refused, which made a
+  // dead pipeline look like an empty one. It is only ok when every query behind
+  // it succeeded.
+  const downLanes = [
+    inbound.available ? null : `inbound: ${inbound.reason ?? "read failed"}`,
+    outbound.available ? null : `outbound: ${outbound.reason ?? "read failed"}`,
+  ].filter(Boolean) as string[];
+
   return {
-    available: true,
-    reason: null,
+    available: downLanes.length === 0,
+    reason: downLanes.length ? `The combined pipeline is incomplete. ${downLanes.join(" | ")}` : null,
     inbound,
     outbound,
     stream: {
@@ -1132,7 +1155,13 @@ export async function GET(req: Request) {
     // last_scraped_at, and naming a column that does not exist yet would make
     // PostgREST 400 the whole request. Read whatever is there and detect it.
     const cfgRes = await sb("crm_clients?select=*");
+    // A failed config read is not "no clients configured". It is said out loud
+    // in clientsReason below so the sidebar never shows an empty roster that
+    // nobody asked for.
     const cfgs = cfgRes.ok ? ((await cfgRes.json()) as Cfg[]) : [];
+    const clientsReason = cfgRes.ok
+      ? null
+      : sbFailureReason(cfgRes.status, await cfgRes.text().catch(() => ""), "crm_clients");
     // Only true if the column genuinely exists on the returned rows.
     const lastRanTracked = cfgs.some((c) => "last_scraped_at" in c);
     // A configured client with no outbound yet still belongs on the board.
@@ -1243,7 +1272,10 @@ export async function GET(req: Request) {
     });
 
     const totals = {
-      total: all.length,
+      // The authoritative count from Content-Range, not the number of rows this
+      // request managed to read. null when the count is unknown, so a refused
+      // scan cannot report itself as a table holding zero messages.
+      total: scanned.meta.contentRangeTotal,
       draft: await countWhere("status=eq.draft"),
       approved: await countWhere("status=eq.approved"),
       sent: await countWhere("status=eq.sent"),
@@ -1274,7 +1306,10 @@ export async function GET(req: Request) {
     // carried the column reported every single row as body-less. It comes from a
     // targeted count instead, which is the only honest way to ask the question.
     const missingBody = await countWhere("body=is.null");
-    const withBody = Math.max(0, scanned.meta.contentRangeTotal ?? all.length) - missingBody;
+    // null all the way through when the count could not be read: the body fill
+    // rate is then simply not reported, rather than reported as 100%.
+    const withBody =
+      missingBody === null ? null : Math.max(0, scanned.meta.contentRangeTotal ?? all.length) - missingBody;
     const evidence = {
       counts: byStrength,
       flaggedUnverified: byStrength.flagged_unverified ?? 0,
@@ -1287,18 +1322,20 @@ export async function GET(req: Request) {
         `stated fact rather than a quote, ${byStrength.flagged_unverified ?? 0} were ` +
         `flagged unverified by the drafter itself, and ${byStrength.none ?? 0} record ` +
         `no personalization at all. ` +
-        (missingBody
-          ? `${missingBody} row${missingBody === 1 ? " has" : "s have"} no message body at ` +
-            `all, the drafter created the row and never wrote the message, so there is ` +
-            `nothing there to approve.`
-          : `Every row has a message body.`) +
+        (missingBody === null
+          ? `How many rows are missing a message body could not be counted, so that is unknown.`
+          : missingBody
+            ? `${missingBody} row${missingBody === 1 ? " has" : "s have"} no message body at ` +
+              `all, the drafter created the row and never wrote the message, so there is ` +
+              `nothing there to approve.`
+            : `Every row has a message body.`) +
         (scanned.meta.complete ? "" : ` NOTE: ${scanned.meta.note}`),
     };
 
     // `body` is not in the scan, so its fill rate is measured directly rather
     // than being left out of the table (a missing row reads as "not collected").
     const totalRows = scanned.meta.contentRangeTotal ?? all.length;
-    if (totalRows > 0) {
+    if (totalRows > 0 && withBody !== null) {
       const pct = Math.round((withBody / totalRows) * 1000) / 10;
       coverage.push({
         column: "body", filled: withBody, rows: totalRows, pct,
@@ -1326,6 +1363,9 @@ export async function GET(req: Request) {
 
     return NextResponse.json({
       configured: true, clients, items, totals, content,
+      // null when the roster read succeeded. A sentence when it did not, so an
+      // empty `clients` array can be read as "unknown" instead of "none".
+      clientsReason,
       // Whether the list above is all of it. `capped` true means rows matching
       // the current filters were left out, and the UI must say so rather than
       // presenting a page as the whole table.

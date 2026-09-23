@@ -1,4 +1,4 @@
-import { sbUrl, sbService } from "@/lib/osSupabase";
+import { sbUrl, sbService, sbFailureReason } from "@/lib/osSupabase";
 
 // ───────────────────────────────────────────────────────────────────────────
 // Availability rules — who on the team is actually free for a public booking.
@@ -132,26 +132,42 @@ function creds(): { url: string; key: string } | null {
   return url && key ? { url, key } : null;
 }
 
-async function restGet<T>(path: string): Promise<T[] | null> {
+// Reads rows or THROWS with the real reason. It used to return null for every
+// kind of failure, which is why the hours panel blamed a missing migration for
+// what was actually a restricted project. Callers catch and show the message.
+export class AvailabilityReadError extends Error {}
+
+async function restGet<T>(path: string): Promise<T[]> {
+  const table = path.split("?")[0];
   const c = creds();
-  if (!c) return null;
+  if (!c) {
+    throw new AvailabilityReadError(
+      "OS Supabase is not configured (OS_SUPABASE_URL / OS_SUPABASE_SERVICE_KEY are missing)."
+    );
+  }
+  let r: Response;
   try {
-    const r = await fetch(`${c.url}/rest/v1/${path}`, {
+    r = await fetch(`${c.url}/rest/v1/${path}`, {
       headers: { apikey: c.key, Authorization: `Bearer ${c.key}` },
       cache: "no-store",
     });
-    if (!r.ok) return null;
-    return (await r.json()) as T[];
-  } catch {
-    return null;
+  } catch (e) {
+    throw new AvailabilityReadError(
+      `Could not reach Supabase reading ${table}: ${e instanceof Error ? e.message : String(e)}`
+    );
   }
+  if (!r.ok) {
+    const body = await r.text().catch(() => "");
+    throw new AvailabilityReadError(sbFailureReason(r.status, body, table));
+  }
+  return (await r.json()) as T[];
 }
 
-export async function loadAvailability(): Promise<AvailabilityRow[] | null> {
+export async function loadAvailability(): Promise<AvailabilityRow[]> {
   return restGet<AvailabilityRow>("availability?select=*&order=person.asc");
 }
 
-export async function loadBlocks(): Promise<BlockRow[] | null> {
+export async function loadBlocks(): Promise<BlockRow[]> {
   return restGet<BlockRow>(
     "calendar_blocks?select=id,date,start_time,end_time,recurrence,person&limit=2000"
   );

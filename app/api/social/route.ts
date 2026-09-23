@@ -47,11 +47,13 @@ type SocialPost = {
 
 // A missing table is a real state, not a failure: migration 0028 has not run
 // yet. Every route in this OS reports that honestly (see /api/storms).
+//
+// Matched on the PostgREST error codes ONLY. The table name used to be one of
+// the alternatives, which meant any error that merely mentioned social_posts
+// (a restricted project, a bad column) rendered as "run the migration" and
+// sent the reader after the wrong problem.
 function isMissingTable(e: unknown): boolean {
-  return (
-    e instanceof SbError &&
-    /social_posts|does not exist|PGRST205|42P01/i.test(e.detail || "")
-  );
+  return e instanceof SbError && /does not exist|PGRST205|42P01/i.test(e.detail || "");
 }
 
 const MISSING = {

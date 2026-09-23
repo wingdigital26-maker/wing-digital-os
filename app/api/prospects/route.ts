@@ -1,13 +1,11 @@
 import { NextResponse } from "next/server";
-import { execFile } from "child_process";
-import { promisify } from "util";
 import { isCloud, PC_REQUIRED_BODY } from "@/lib/runtime";
 import { readVaultFile } from "@/lib/vaultSource";
+import { runPython } from "@/lib/python";
 
 export const runtime = "nodejs";
 
-const execFileAsync = promisify(execFile);
-const GHL_CLI = "C:\\Users\\wjack\\ghl-cli";
+const GHL_CLI = "C:/Users/wjack/ghl-cli";
 
 export async function GET() {
   if (isCloud()) {
@@ -24,19 +22,20 @@ export async function GET() {
     return NextResponse.json({ ...PC_REQUIRED_BODY, prospects: [] });
   }
   try {
-    const { stdout } = await execFileAsync(
-      "python",
-      ["dump_prospects_json.py"],
-      { cwd: GHL_CLI, maxBuffer: 10 * 1024 * 1024 }
-    );
+    const { stdout } = await runPython(["dump_prospects_json.py"], { cwd: GHL_CLI });
     const prospects = JSON.parse(stdout);
     return NextResponse.json({ prospects });
   } catch (e: any) {
-    // Local-only data source (python + prospects.db on Jack's laptop). On a
-    // serverless host (Vercel) this is absent — degrade cleanly instead of 500.
+    // This used to answer 200 with an empty list, so "the database could not be
+    // opened" and "there are no prospects" arrived at the UI looking the same.
+    // A source that could not be read is a 503 with the reason on it.
     return NextResponse.json(
-      { source: "local-db-unavailable", error: e.message, prospects: [] },
-      { status: 200 }
+      {
+        source: "local-db-unavailable",
+        error: `prospects.db could not be read on this machine: ${e?.message ?? String(e)}`,
+        prospects: [],
+      },
+      { status: 503 }
     );
   }
 }
@@ -52,8 +51,8 @@ export async function POST(req: Request) {
     }
     const args = ["call_log.py", String(id), status];
     if (notes) args.push(notes);
-    const { stdout } = await execFileAsync("python", args, { cwd: GHL_CLI });
-    await execFileAsync("python", ["generate_call_sheet.py"], { cwd: GHL_CLI });
+    const { stdout } = await runPython(args, { cwd: GHL_CLI });
+    await runPython(["generate_call_sheet.py"], { cwd: GHL_CLI });
     return NextResponse.json({ ok: true, message: stdout.trim() });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });

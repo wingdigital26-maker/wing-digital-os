@@ -32,10 +32,14 @@ const noDb = () =>
 export async function GET() {
   const auth = await requireStaff();
   if (isAuthFailure(auth)) return auth;
-  const rows = await loadAvailability();
-  if (rows === null) {
+  let rows: AvailabilityRow[];
+  try {
+    rows = await loadAvailability();
+  } catch (e) {
+    // Say what actually went wrong. Guessing at a missing migration sent the
+    // reader to the wrong place every time the project itself was refusing.
     return NextResponse.json(
-      { error: "unavailable", message: "Availability could not be read. Has migration 0024 been applied?" },
+      { error: "unavailable", message: e instanceof Error ? e.message : String(e) },
       { status: 503 }
     );
   }

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { sbFailureReason } from "@/lib/osSupabase";
 
 // ───────────────────────────────────────────────────────────────────────────
 // Invoices API — what Wing has billed, what is still owed, and when the next
@@ -195,7 +196,23 @@ export async function GET(req: Request) {
     // One read of everything; the rollups below are cheap in memory and keep
     // the totals consistent with the list the board is showing.
     const allRes = await sb(`invoices?select=${SELECT}&order=created_at.desc&limit=5000`);
-    const all = allRes.ok ? ((await allRes.json()) as InvoiceRow[]) : [];
+    // A refused read is NOT an empty book. This used to fall through to [] and
+    // render $0 outstanding, $0 paid, 0 overdue, which is the most expensive
+    // possible lie on this screen. Now it says what happened and shows nothing.
+    if (!allRes.ok) {
+      const body = await allRes.text().catch(() => "");
+      return NextResponse.json({
+        configured: true,
+        unavailable: true,
+        error: sbFailureReason(allRes.status, body, "invoices"),
+        items: [],
+        clients: [],
+        totals: { outstanding_cents: 0, paid_this_month_cents: 0, overdue_count: 0, next_payment: null },
+        upcoming: [],
+        today: todayISO(),
+      });
+    }
+    const all = (await allRes.json()) as InvoiceRow[];
 
     const today = todayISO();
     const monthStart = today.slice(0, 7) + "-01";
@@ -268,11 +285,13 @@ export async function GET(req: Request) {
     const msg = e instanceof Error ? e.message : String(e);
     return NextResponse.json({
       configured: true,
-      error: msg,
+      unavailable: true,
+      error: `Invoices could not be read: ${msg}`,
       items: [],
       clients: [],
-      totals: { outstanding_cents: 0, paid_this_month_cents: 0, overdue_count: 0 },
+      totals: { outstanding_cents: 0, paid_this_month_cents: 0, overdue_count: 0, next_payment: null },
       upcoming: [],
+      today: todayISO(),
     });
   }
 }

@@ -15,7 +15,14 @@
 // it is never coerced to 0.
 // ───────────────────────────────────────────────────────────────────────────
 import { NextResponse } from "next/server";
-import { getOsSession, hasLegacyAuth, sbUrl, sbService } from "@/lib/osSupabase";
+import {
+  getOsSession,
+  hasLegacyAuth,
+  sbUrl,
+  sbService,
+  sbFailureReason,
+  contentRangeTotal,
+} from "@/lib/osSupabase";
 
 export const STAFF_ROLES = ["admin", "owner", "staff"];
 
@@ -79,6 +86,7 @@ function creds(): { url: string; key: string } {
 
 async function sbFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const { url, key } = creds();
+  const table = path.split("?")[0];
   let r: Response;
   try {
     r = await fetch(`${url}/rest/v1/${path}`, {
@@ -91,12 +99,15 @@ async function sbFetch(path: string, init: RequestInit = {}): Promise<Response> 
       cache: "no-store",
     });
   } catch (e) {
-    throw new SbError("Could not reach the CRM database.", 502, String(e));
+    throw new SbError(`Could not reach the CRM database (${table}).`, 502, String(e));
   }
   if (!r.ok) {
     const body = await r.text().catch(() => "");
+    // The message names the actual failure. "CRM query failed (402)" told the
+    // reader nothing; the 402 storage restriction is a project-wide switch-off
+    // that only Jack can clear, and the board should say so in words.
     throw new SbError(
-      `CRM query failed (${r.status}).`,
+      sbFailureReason(r.status, body, table),
       r.status === 404 ? 500 : 502,
       body.slice(0, 500) || null
     );
@@ -132,10 +143,9 @@ export async function sbGetPaged<T = any>(
       "Range-Unit": "items",
     },
   });
-  const parsed = Number((r.headers.get("content-range") || "").split("/").pop());
   return {
     rows: (await r.json()) as T[],
-    total: Number.isFinite(parsed) ? parsed : null,
+    total: contentRangeTotal(r.headers.get("content-range")),
   };
 }
 

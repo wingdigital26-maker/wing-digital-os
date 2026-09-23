@@ -132,3 +132,47 @@ export async function sbInsert<T = any>(
     return null;
   }
 }
+
+// ── Naming the failure ─────────────────────────────────────────────────────
+// Every read in this OS used to collapse into the same shrug ("query failed",
+// "not configured or unreachable"), which hid the one thing worth knowing:
+// WHICH failure it was. These two helpers exist so a route can say the real
+// reason in one sentence the reader can act on.
+
+const QUOTA_RE = /exceed_storage_size_quota/i;
+const MISSING_TABLE_RE = /PGRST205|42P01|does not exist/i;
+
+// One sentence for a failed PostgREST read. `body` is the raw response text.
+// The 402 storage restriction gets its own wording because it is not a bug in
+// the route: Supabase switches the whole project off at once, every table,
+// until the quota is cleared, and no amount of retrying will change that.
+export function sbFailureReason(status: number, body: string, table = ""): string {
+  const at = table ? ` (reading ${table})` : "";
+  if (status === 402) {
+    if (QUOTA_RE.test(body)) {
+      return (
+        "Supabase has restricted this project for exceeding its storage quota, so every table read " +
+        `is refused with HTTP 402${at}. This is not an empty table. Clear the quota in the Supabase ` +
+        "dashboard and the data comes back on its own."
+      );
+    }
+    return `Supabase has restricted this project: HTTP 402${at}. ${body.slice(0, 160)}`;
+  }
+  if (status === 401 || status === 403) {
+    return `Supabase refused the key: HTTP ${status}${at}. The service key is wrong, expired, or blocked by RLS.`;
+  }
+  if (status === 404 || MISSING_TABLE_RE.test(body)) {
+    return `That table is not in the database yet${at}. Its migration has not been applied.`;
+  }
+  return `Supabase returned HTTP ${status}${at}. ${body.slice(0, 160)}`.trim();
+}
+
+// PostgREST reports the real row count in Content-Range, as "0-24/1036". A
+// MISSING header means the count is UNKNOWN and must read as null: Number("")
+// is 0, and that one coercion is how a dead connection rendered as an empty
+// table all over this OS.
+export function contentRangeTotal(header: string | null | undefined): number | null {
+  const tail = (header || "").split("/").pop();
+  if (!tail || !/^\d+$/.test(tail)) return null;
+  return Number(tail);
+}

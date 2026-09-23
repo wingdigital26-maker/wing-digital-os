@@ -231,10 +231,7 @@ type Summary = {
   tasks_due_today: number | null;
   tasks_overdue: number | null;
   new_leads_7d: number | null;
-  bookings_upcoming_7d: number | null;
-  open_deals: number | null;
   automations_active: number | null;
-  unread_texts: number | null;
 };
 
 type TodayTile = { label: string; value: number | null; hint?: string | null } & (
@@ -278,10 +275,12 @@ export function TodayStrip() {
   const tiles: TodayTile[] = [
     { label: "Tasks due today", value: s.tasks_due_today, hint: overdue ? `${overdue} overdue` : null, href: "/automations/tasks" },
     { label: "New leads this week", value: s.new_leads_7d, href: "/automations/runs" },
-    { label: "Calls booked, next 7 days", value: s.bookings_upcoming_7d, view: "calendar" },
-    { label: "Open deals", value: s.open_deals, view: "crm" },
     { label: "Automations running", value: s.automations_active, href: "/automations" },
-    { label: "Unread texts", value: s.unread_texts, view: "text" },
+    // 2026-09-22: "Calls booked, next 7 days", "Open deals" and "Unread texts"
+    // were removed. Each pointed at a surface deleted the same day -- the
+    // booking calendar, the deals grid inside Contacts, and the texting tab.
+    // A tile that counts something you can no longer go and look at is worse
+    // than no tile: it invites a click that lands somewhere unrelated.
   ];
 
   return (

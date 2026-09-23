@@ -58,36 +58,29 @@ export async function GET() {
   const now = new Date();
   const today = centralDayBounds(now);
   const weekAgo = new Date(now.getTime() - 7 * 86400_000);
-  const weekAhead = new Date(now.getTime() + 7 * 86400_000);
 
   const [
     tasks_due_today,
     tasks_overdue,
     new_leads_7d,
-    bookings_upcoming_7d,
-    open_deals,
     automations_active,
-    unread_texts,
   ] = await Promise.all([
     // Due today = due at some point during today (Central). Overdue is the
     // separate figure below; the two do not overlap once a task is past due.
     count("tasks", `done_at=is.null&due_at=gte.${iso(today.start)}&due_at=lt.${iso(today.end)}`),
     count("tasks", `done_at=is.null&due_at=lt.${iso(now)}`),
     count("events", `type=in.(form.submitted,call.missed)&occurred_at=gte.${iso(weekAgo)}`),
-    count("bookings", `status=eq.confirmed&starts_at=gte.${iso(now)}&starts_at=lt.${iso(weekAhead)}`),
-    count("crm_deals", "status=eq.open"),
     count("workflows", "status=eq.active"),
-    count("messages", "direction=eq.inbound&channel=eq.sms&read_at=is.null"),
   ]);
+  // bookings / crm_deals / inbound sms counts were removed 2026-09-22 with the
+  // surfaces that displayed them. Counting rows nothing can show is three
+  // round trips spent to render nothing.
 
   return NextResponse.json({
     as_of: now.toISOString(),
     tasks_due_today,
     tasks_overdue,
     new_leads_7d,
-    bookings_upcoming_7d,
-    open_deals,
     automations_active,
-    unread_texts,
   });
 }

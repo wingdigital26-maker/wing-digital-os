@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 
 const EmailFeed = dynamic(() => import("./email/EmailFeed"), { ssr: false });
@@ -33,12 +33,20 @@ const VIEWS = [
 
 type ViewId = (typeof VIEWS)[number]["id"];
 
-function isViewId(v: string | null): v is ViewId {
+function isViewId(v: string | null | undefined): v is ViewId {
   return VIEWS.some((x) => x.id === v);
 }
 
 export default function EmailHub() {
   const [active, setActive] = useState<ViewId>(() => {
+    // A deep link that aliased into this hub (e.g. the old "replies" id) wins
+    // over the remembered tab: the reader asked for that view by name.
+    // Read it, do not consume it here: React runs this initializer twice in
+    // development, so clearing it on the first pass left the second pass with
+    // nothing and the deep link silently fell back to the feed. The effect
+    // below clears it once, after mount.
+    const pending = (window as unknown as { __wingosEmailView?: string }).__wingosEmailView;
+    if (isViewId(pending)) return pending;
     try {
       const saved = window.localStorage.getItem("wingos.emailhub.tab");
       if (isViewId(saved)) return saved;
@@ -52,6 +60,20 @@ export default function EmailHub() {
     setVisited((v) => (v.has(id) ? v : new Set(v).add(id)));
     try { window.localStorage.setItem("wingos.emailhub.tab", id); } catch { /* not worth failing over */ }
   }
+
+  // Old links pointed at "replies" when it was a top-level CRM tab. The shell
+  // aliases that id to Email and then tells us which view was actually asked
+  // for, so a bookmark to the Reply Inbox still opens the Reply Inbox rather
+  // than dropping the reader on the feed and making them hunt for the pill.
+  useEffect(() => {
+    delete (window as unknown as { __wingosEmailView?: string }).__wingosEmailView;
+    const onView = (e: Event) => {
+      const id = (e as CustomEvent).detail;
+      if (typeof id === "string" && isViewId(id)) go(id);
+    };
+    window.addEventListener("os:email-view", onView);
+    return () => window.removeEventListener("os:email-view", onView);
+  }, []);
 
   const blurb = VIEWS.find((v) => v.id === active)?.blurb ?? "";
 

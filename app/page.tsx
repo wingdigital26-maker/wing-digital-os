@@ -238,7 +238,18 @@ export default function Home() {
       const id = LEGACY_VIEW_ALIAS[raw] ?? raw;
       const href = EXTERNAL_SUB_LINKS[id];
       if (href) { window.location.href = href; return; }
-      if (NAV.some(g => g.subs.some(s => s.id === id))) setActive(id);
+      if (NAV.some(g => g.subs.some(s => s.id === id))) {
+        setActive(id);
+        // An id that aliased INTO the Email hub names one of its views, so
+        // pass the original through and let the hub open on it.
+        if (id === "email" && raw !== "email") {
+          // The hub mounts lazily, so it is not listening yet on a cold deep
+          // link. Leave the id where it can pick it up on mount AND fire the
+          // event for the case where it is already mounted.
+          (window as unknown as { __wingosEmailView?: string }).__wingosEmailView = raw;
+          window.dispatchEvent(new CustomEvent("os:email-view", { detail: raw }));
+        }
+      }
     };
     window.addEventListener("os:navigate", onNav);
     // Routed pages (SectionChrome) can deep-link into a shell view with

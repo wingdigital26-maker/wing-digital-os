@@ -54,29 +54,30 @@ export const NAV_TREE: NavGroupDef[] = [
     // Pipeline's data (Wing's own book of business, the GoHighLevel
     // replacement) is folded in as a category, never deleted.
     id: "crm", label: "CRM",
-    hint: "Contacts, outreach emails, texts and replies",
-    // Exactly four tabs (2026-09-04, Jack): Everything, Email, Text, Reply
-    // Inbox. Sequences and Automations moved to their own group below.
-    // 2026-09-15 (Jack): "Everything" dropped as the landing tab. Email is the
-    // default now; the everything view (CrmWorkspace) moved to a "Contacts" tab
-    // on the far right. Order is the tab order left-to-right.
+    hint: "Every email going out, the replies coming back, and who to call",
+    // 2026-09-22 (Jack): texting is gone from the CRM entirely, and so are the
+    // Activity and Contacts tabs. His words: "This should be like the call
+    // room, basically: call room plus people that are potentially going to
+    // email." So the CRM is now four tabs and nothing else -- the outgoing
+    // email feed (the landing), the replies, the people who could be emailed,
+    // and the call room folded in beside them. Activity was a second, weaker
+    // view of the same sends the Email tab now owns; Contacts (CrmWorkspace)
+    // was the everything-drawer. Both components stay on disk, off the rail.
     subs: [
-      // Email: the automated-send queue, the email side of the message
-      // ledger, and email health as internal pills. See EmailHub.tsx. First =
-      // the CRM group's default landing.
-      { id: "email", label: "Email", keywords: "messaging deliverability" },
-      // Text: the SMS conversations and the texting-line status, on their
-      // own. Same MessageLedger, locked to the sms channel.
-      { id: "text", label: "Text", keywords: "sms messages" },
-      // Reply Inbox (2026-09-01): every inbound cold-email reply, hot first,
-      // with the thread and an editable draft. Read/draft only; never sends.
-      { id: "replies", label: "Reply Inbox", keywords: "inbound" },
-      // Activity (2026-09-13): the "what is going out" board — sent + queued
-      // emails and texts with honest lane status. Routed page.
-      { id: "activity", label: "Activity", keywords: "emails texts sent going out messaging outbound" },
-      // Contacts (2026-09-15): the old "Everything" surface (CrmWorkspace) —
-      // every contact, deal and draft in one place — on the far right.
-      { id: "contacts", label: "Contacts", keywords: "everything contacts pipeline inbox outbound deals book" },
+      // Email: the live feed of every email going out -- sent, queued,
+      // scheduled, failed -- with a reading pane. First = the CRM's default
+      // landing, because email is the majority of this CRM.
+      { id: "email", label: "Email", keywords: "messaging outgoing sent queue deliverability" },
+      // Reply Inbox: every inbound reply, hot first, with the thread and an
+      // editable draft. Read/draft only; never sends.
+      { id: "replies", label: "Reply Inbox", keywords: "inbound replies" },
+      // People (2026-09-22): the lean list of who is in line for an email.
+      // Call-room ergonomics, not the old everything-grid.
+      { id: "people", label: "People", keywords: "contacts leads prospects email list" },
+      // Call Room moved here from Automations (2026-09-22) so "call room plus
+      // people that are potentially going to email" is one section, not two.
+      // /calls stays a routed page -- caller-role users still land there.
+      { id: "calls", label: "Call Room", keywords: "cold calling dialer" },
     ],
   },
   {
@@ -84,11 +85,12 @@ export const NAV_TREE: NavGroupDef[] = [
     // and onto the left rail as their own thing. Every sub is a routed page
     // (see EXTERNAL_SUB_LINKS), so clicking the group icon navigates too.
     id: "automate", label: "Automations",
-    hint: "Automations, email sequences, and the call room",
+    hint: "Automations and email sequences",
+    // Call Room left this group 2026-09-22 -- it sits in the CRM now, next to
+    // the people it dials.
     subs: [
       { id: "automations", label: "Automations", keywords: "workflows" },
       { id: "sequences", label: "Sequences" },
-      { id: "calls", label: "Call Room", keywords: "cold calling dialer" },
     ],
   },
   {
@@ -105,15 +107,20 @@ export const NAV_TREE: NavGroupDef[] = [
       { id: "seo", label: "SEO", keywords: "blog posts content pages published" },
       { id: "social", label: "Social", keywords: "posts schedule" },
       { id: "reviews", label: "Reviews" },
-      { id: "customers", label: "Customers" },
+      // Customers deleted from the nav 2026-09-22 (Jack: "for marketing, get
+      // rid of the customers tab"). CustomersBoard stays on disk, unmounted.
     ],
   },
   {
     // One sub only. The section owns its own Calendar/Invoices tabs, so listing
     // them here too showed everything twice.
-    id: "calendar", label: "Calendar",
-    hint: "Your schedule, plus invoices one tab over",
-    subs: [{ id: "calendar", label: "Calendar", keywords: "schedule invoices" }],
+    // 2026-09-22 (Jack): "The calendar should only have invoices and payments.
+    // Forget the calendar where everyone's available. Just delete it." The
+    // month/week grid and the Availability panel behind the booking link are
+    // gone; what is left is the money.
+    id: "calendar", label: "Invoices",
+    hint: "Invoices and payments",
+    subs: [{ id: "calendar", label: "Invoices and payments", keywords: "invoices payments money billing stripe" }],
   },
   // School section removed 2026-09-01 (Jack: "get rid of the school schedule
   // completely"). Classes still show as the school lane on the Calendar; the
@@ -142,9 +149,9 @@ export const NAV_TREE: NavGroupDef[] = [
 export const LEGACY_VIEW_ALIAS: Record<string, string> = {
   // 2026-09-15: the "Everything" view (id "crm") became the "Contacts" tab
   // (id "contacts"). Old links and any panel dispatching the old ids land there.
-  crm: "contacts",
-  inbox: "contacts",
-  pipeline: "contacts",
+  crm: "people",
+  inbox: "people",
+  pipeline: "people",
   money: "calendar",
   invoices: "calendar",
   // 2026-09-01 consolidation: School folded into Calendar, three email tabs
@@ -152,8 +159,18 @@ export const LEGACY_VIEW_ALIAS: Record<string, string> = {
   school: "calendar",
   // 2026-09-04: the message ledger split by channel. Texts have their own tab.
   messaging: "email",
-  messages: "text",
   deliverability: "email",
+  // 2026-09-22: texting deleted from the CRM. Every text/SMS id lands on Email,
+  // the surface that replaced it, rather than a dead screen.
+  text: "email",
+  messages: "email",
+  sms: "email",
+  // 2026-09-22: Activity was a second view of the sends Email now owns.
+  activity: "email",
+  // 2026-09-22: Contacts (the old "Everything" grid) collapsed into People.
+  contacts: "people",
+  // 2026-09-22: Marketing lost its Customers tab.
+  customers: "clients",
 };
 
 // Sub-tabs that are real routed pages rather than in-shell views. Clicking one
@@ -169,9 +186,10 @@ export const EXTERNAL_SUB_LINKS: Record<string, string> = {
   // (ActivityLog itself pointed users there). Was aliased to "knowledge",
   // which shares no content with it.
   log: "/automations/runs",
-  // 2026-09-13: two new routed sections reached from their sidebar subs.
+  // 2026-09-13: a routed section reached from its sidebar sub. /activity left
+  // this map 2026-09-22 when the Activity tab was deleted; the page still
+  // exists, but "activity" now aliases to Email (see LEGACY_VIEW_ALIAS).
   dashboards: "/dashboards",
-  activity: "/activity",
 };
 
 // ── Routed pages ─────────────────────────────────────────────────────────────

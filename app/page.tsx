@@ -5,9 +5,8 @@ import { motion, MotionConfig } from "motion/react";
 import { Bolt, Users, Cpu, Bulb, Calendar, Note, Sparkles, Home as HomeIcon, Call, Route, Radar, Logout, More } from "reicon-react";
 import StartHere, { TodayStrip } from "./components/StartHere";
 import NewIntelBanner from "./components/NewIntelBanner";
-import { staggerContainer, riseItem, hoverSpring, cardHover, cardHoverPassive, cardTap } from "./components/motion";
-import { Sparkline, Delta, buildDailySeries } from "./components/Charts";
-import { StatTiles, MissionPanels, MissionStyles, Selection, StatTile, WatchdogBanner, WatchdogData, MissionData } from "./components/MissionControlCore";
+import { staggerContainer, riseItem, cardHoverPassive } from "./components/motion";
+import { MissionPanels, Selection, WatchdogBanner, WatchdogData, MissionData } from "./components/MissionControlCore";
 import { sfx } from "./lib/sounds";
 import SfxMuteButton from "./components/SfxMuteButton";
 import Link from "next/link";
@@ -53,25 +52,31 @@ const PotentialClientsBoard = dynamic(() => import("./components/PotentialClient
 // One CRM surface (2026-08-30). Inbox was only Outbound filtered to drafts, so
 // it is a default filter now, not a screen. Pipeline is folded in as two record
 // types; no record and no field was dropped.
-const CrmWorkspace = dynamic(() => import("./components/CrmWorkspace"), { ssr: false });
-// Email hub (2026-09-01): SendQueueBoard + MessageLedger + DeliverabilityBoard
-// behind one tab with internal pills. The three boards moved there untouched.
+// 2026-09-22 (Jack): CrmWorkspace ("Contacts") and the sms-locked MessageLedger
+// ("Text") stopped being mounted. Texting is out of the CRM entirely and the
+// everything-grid was replaced by the leaner People board. Both files stay on
+// disk; nothing reaches them from the nav.
+// Email hub: the live feed of every email going out, plus the replies.
 const EmailHub = dynamic(() => import("./components/EmailHub"), { ssr: false });
-// Text tab (2026-09-04): the same message ledger locked to the sms channel.
-const MessageLedger = dynamic(() => import("./components/MessageLedger"), { ssr: false });
+// People (2026-09-22): the email half of the book, call-room ergonomics.
+const PeopleBoard = dynamic(() => import("./components/PeopleBoard"), { ssr: false });
 // CrmBoard / ClientInbox / PipelineBoard / SchoolBoard are no longer mounted
 // here. Files kept on disk as fallbacks; School was removed from the nav
 // 2026-09-01 (classes still show as the school lane on the Calendar).
-// InvoicesBoard is mounted by CalendarSection as its second tab, not directly.
-// Calendar replaced "Money" 2026-08-30. Invoices lives on as its second tab, so
-// billing data is one click away rather than gone.
-const CalendarSection = dynamic(() => import("./components/CalendarBoard"), { ssr: false });
+// 2026-09-22 (Jack): "The calendar should only have invoices and payments.
+// Forget the calendar where everyone's available. Just delete it." So the
+// section mounts InvoicesBoard directly -- it already carries the invoice list
+// AND the three-month payment calendar, which is the whole ask. CalendarBoard
+// (the month/week grid, the school lane, and the Availability panel behind the
+// public booking link) stays on disk but nothing mounts it any more.
+const CalendarSection = dynamic(() => import("./components/InvoicesBoard"), { ssr: false });
 const CompetitorIntel = dynamic(() => import("./components/CompetitorIntel"), { ssr: false });
 const ReplyInboxBoard = dynamic(() => import("./components/ReplyInboxBoard"), { ssr: false });
 const StormBoard = dynamic(() => import("./components/StormBoard"), { ssr: false });
 const SocialBoard = dynamic(() => import("./components/SocialBoard"), { ssr: false });
 const ReviewsBoard = dynamic(() => import("./components/ReviewsBoard"), { ssr: false });
-const CustomersBoard = dynamic(() => import("./components/CustomersBoard"), { ssr: false });
+// CustomersBoard stopped being mounted 2026-09-22 (Jack: "for marketing, get
+// rid of the customers tab"). File kept on disk, unreachable from the nav.
 
 type NavGroup = {
   id: string; label: string; icon: IconType;
@@ -462,19 +467,17 @@ export default function Home() {
           <style>{`@keyframes viewIn { from { transform: translateY(5px); } to { transform: none; } }`}</style>
           {/* Keep-alive views: each visited section stays mounted; only the
               active one is shown. Switching is instant, no reload/refetch. */}
-          {visited.has("command") && <div className="app-view" style={{ display: active === "command" ? "block" : "none" }}><CommandCenter data={revenueData} loading={loading} onSendToAI={sendToAI} /></div>}
+          {visited.has("command") && <div className="app-view" style={{ display: active === "command" ? "block" : "none" }}><CommandCenter data={revenueData} loading={loading} /></div>}
           {visited.has("today") && <div className="app-view" style={{ display: active === "today" ? "block" : "none" }}><TodayBoard /></div>}
           {visited.has("clients") && <div className="app-view" style={{ display: active === "clients" ? "block" : "none" }}><ClientsBoard /></div>}
           {visited.has("sonar") && <div className="app-view" style={{ display: active === "sonar" ? "block" : "none" }}><SonarBoard /></div>}
           {visited.has("potential") && <div className="app-view" style={{ display: active === "potential" ? "block" : "none" }}><PotentialClientsBoard /></div>}
-          {visited.has("contacts") && <div className="app-view" style={{ display: active === "contacts" ? "block" : "none" }}><CrmWorkspace /></div>}
+          {visited.has("people") && <div className="app-view" style={{ display: active === "people" ? "block" : "none" }}><PeopleBoard /></div>}
           {visited.has("email") && <div className="app-view" style={{ display: active === "email" ? "block" : "none" }}><EmailHub /></div>}
-          {visited.has("text") && <div className="app-view" style={{ display: active === "text" ? "block" : "none" }}><MessageLedger channel="sms" /></div>}
           {visited.has("replies") && <div className="app-view" style={{ display: active === "replies" ? "block" : "none" }}><ReplyInboxBoard /></div>}
           {visited.has("storms") && <div className="app-view" style={{ display: active === "storms" ? "block" : "none" }}><StormBoard /></div>}
           {visited.has("social") && <div className="app-view" style={{ display: active === "social" ? "block" : "none" }}><SocialBoard /></div>}
           {visited.has("reviews") && <div className="app-view" style={{ display: active === "reviews" ? "block" : "none" }}><ReviewsBoard /></div>}
-          {visited.has("customers") && <div className="app-view" style={{ display: active === "customers" ? "block" : "none" }}><CustomersBoard /></div>}
           {visited.has("calendar") && <div className="app-view" style={{ display: active === "calendar" ? "block" : "none" }}><CalendarSection /></div>}
           {visited.has("competitors") && <div className="app-view" style={{ display: active === "competitors" ? "block" : "none" }}><CompetitorIntel onSendToAI={sendToAI} /></div>}
           {visited.has("knowledge") && <div className="app-view" style={{ display: active === "knowledge" ? "block" : "none" }}><KnowledgeBase initialPath={openNotePath} onSendToAI={sendToAI} /></div>}
@@ -825,31 +828,14 @@ function GlobalDaBoss() {
   );
 }
 
-function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: boolean; onSendToAI: (ctx: string) => void }) {
-  const [showNewNote, setShowNewNote] = useState(false);
-  const [noteForm, setNoteForm] = useState({ title: "", content: "" });
-  const [saving, setSaving] = useState(false);
-  const [toast, setToast] = useState("");
-
-  // One calendar in the OS. Anything here that used to open an inline grid now
-  // jumps to the Calendar section, which has the real events on it.
-  const goToCalendar = useCallback(() => {
-    sfx.play("nav");
-    window.dispatchEvent(new CustomEvent("os:navigate", { detail: "calendar" }));
-  }, []);
-  const [coldStats, setColdStats] = useState<{ dialedToday: number; booked: number } | null>(null);
-  const [brief, setBrief] = useState<any>(null);
-  const [showBriefing, setShowBriefing] = useState(false);
-  const [showAllStats, setShowAllStats] = useState(false);
-  const [camp, setCamp] = useState<any>(null);
-  const [sentToday, setSentToday] = useState<number | null>(null);
-  const [agentHealth, setAgentHealth] = useState<any[]>([]);
-  const [missionStats, setMissionStats] = useState<{ tiles: StatTile[]; updated: string | null } | null>(null);
+function CommandCenter({ data, loading }: { data: any; loading: boolean }) {
+  // 2026-09-22 (Jack): the Command Center was cut back to the four things that
+  // change what he does next - MRR, Start Here, Today, and the watchdog banner.
+  // Everything below the Morning Briefing was deleted, and with it the campaign
+  // / sales-metrics / agent-health / prospects fetches that only fed it. What is
+  // left reads exactly one API: /api/mission, for the watchdog.
   const [watchdog, setWatchdog] = useState<WatchdogData | null | undefined>(undefined);
-  const [statSelection, setStatSelection] = useState<Selection>(null);
 
-  // Command Center absorbs the mission stats row (MRR, active clients,
-  // pipeline size, emails sent) — big tiles, zero configuration.
   // Da Boss coherence: the banner, the global chip, and the report panel all
   // read the SAME /api/mission watchdog block. Any refresh (Run Da Boss, the
   // granular recheck, pull-to-refresh, or the poll) broadcasts os:mission-refresh
@@ -857,10 +843,7 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
   const loadMission = useCallback(() => {
     fetch("/api/mission", { cache: "no-store" })
       .then(r => r.json())
-      .then(d => {
-        if (d?.stats?.tiles) setMissionStats(d.stats);
-        setWatchdog(d?.watchdog ?? null);
-      })
+      .then(d => { setWatchdog(d?.watchdog ?? null); })
       .catch(() => {});
   }, []);
   useEffect(() => {
@@ -875,74 +858,6 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
       window.removeEventListener("os:pull-refresh", onRefresh);
     };
   }, [loadMission]);
-
-  useEffect(() => {
-    fetch("/api/agents/brief")
-      .then(r => r.json())
-      .then(d => { if (d.brief) setBrief(d.brief); })
-      .catch(() => {});
-    fetch("/api/campaign")
-      .then(r => r.json())
-      .then(d => { if (!d.error) setCamp(d); })
-      .catch(() => {});
-    fetch("/api/sales-metrics")
-      .then(r => r.json())
-      .then(d => { if (typeof d.sentToday === "number") setSentToday(d.sentToday); })
-      .catch(() => {});
-    fetch("/api/agents/health")
-      .then(r => r.json())
-      .then(d => {
-        // only the 4 keeper agents remain in the system; filter out any dead
-        // scheduled tasks (guardian, radar, tempest, hound, scribe, per-client outreach)
-        const KEEPERS = new Set(["dispatch", "prospector", "outreach", "chronicler"]);
-        if (Array.isArray(d.agents)) setAgentHealth(d.agents.filter((a: any) => KEEPERS.has((a.name || "").toLowerCase())));
-      })
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    fetch("/api/prospects").then(r => r.json()).then(d => {
-      const rows = d.prospects ?? [];
-      const today = new Date().toDateString();
-      const dialedToday = rows.filter((p: any) =>
-        p.status && p.status !== "new" && p.status !== "closed" && p.status !== "enriching" &&
-        p.updated_at && new Date(p.updated_at).toDateString() === today
-      ).length;
-      const booked = rows.filter((p: any) => p.status === "booked").length;
-      setColdStats({ dialedToday, booked });
-    }).catch(() => {});
-  }, []);
-
-  // Stats row. MRR is the only figure with a real source (lib/revenue.ts).
-  // Opened emails and appointments-booked have no tracking installed, so they
-  // render an explicit no-data state, never a 0 as fact.
-  // Condensed 2026-08-30: only figures with a real source get a tile. Two of the
-  // three tiles here were permanently "no data" and were taking the best space on
-  // the screen to say nothing. They are now one honest footnote line below.
-  function showToast(msg: string) {
-    setToast(msg);
-    setTimeout(() => setToast(""), 3000);
-  }
-
-  async function submitNote() {
-    if (!noteForm.title.trim()) return;
-    setSaving(true);
-    const filePath = `wiki/${noteForm.title.trim().replace(/[^a-zA-Z0-9 _-]/g, "")}.md`;
-    const content = `# ${noteForm.title}\n\n${noteForm.content}`;
-    const res = await fetch("/api/vault/write", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ filePath, content }),
-    });
-    setSaving(false);
-    if (res.ok) {
-      showToast("Note saved to vault!");
-      setShowNewNote(false);
-      setNoteForm({ title: "", content: "" });
-    } else {
-      showToast("Error saving note.");
-    }
-  }
 
   return (
     <motion.div style={{ display: "flex", flexDirection: "column", gap: 24 }}
@@ -986,362 +901,13 @@ function CommandCenter({ data, loading, onSendToAI }: { data: any; loading: bool
         />
       )}
 
-      {/* Toast */}
-      {toast && (
-        <div style={{ position: "fixed", bottom: "calc(88px + env(safe-area-inset-bottom, 0px))", right: 24, background: "var(--green)", color: "#07080f", padding: "10px 18px", borderRadius: 10, fontWeight: 700, fontSize: 13, zIndex: 600 }}>
-          {toast}
-        </div>
-      )}
-
-      {/* Morning Briefing — skeleton while the dashboard loads so it never looks blank */}
-      {loading && (
-        <div style={{
-          borderRadius: 20, border: "1px solid rgba(61, 107, 240,0.15)", padding: "24px 28px",
-          background: "linear-gradient(180deg, var(--bg-card), var(--bg-card))",
-        }}>
-          <div className="skel" style={{ height: 12, width: 220, marginBottom: 20 }} />
-          <div style={{ display: "flex", gap: 40, flexWrap: "wrap" }}>
-            {[0, 1, 2, 3, 4].map(i => (
-              <div key={i}>
-                <div className="skel" style={{ height: 34, width: 74 }} />
-                <div className="skel" style={{ height: 10, width: 92, marginTop: 9 }} />
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Morning Briefing — hero banner */}
-      {!loading && (
-        <motion.div className="briefing-hero" variants={riseItem} style={{
-          position: "relative",
-          background: "linear-gradient(120deg, rgba(61, 107, 240,0.10), rgba(167,139,250,0.08) 55%, var(--bg-card))",
-          border: "1px solid rgba(61, 107, 240,0.25)",
-          borderRadius: 20, padding: "24px 28px",
-          boxShadow: "0 16px 48px var(--bg-hover), inset 0 1px 0 rgba(255,255,255,0.06)",
-          overflow: "hidden",
-        }}>
-          <div style={{
-            position: "absolute", top: -60, right: -40, width: 240, height: 240,
-            background: "radial-gradient(circle, rgba(61, 107, 240,0.14), transparent 65%)",
-            pointerEvents: "none",
-          }} />
-          <p style={{
-            fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 16,
-            background: "linear-gradient(90deg, var(--accent), var(--accent-2))",
-            WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent",
-          }}>
-            ⚡ Morning Briefing · {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
-          </p>
-          <div className="briefing-metrics" style={{ display: "flex", gap: 32, flexWrap: "wrap", alignItems: "flex-end" }}>
-            <div>
-              <div style={{ display: "flex", alignItems: "flex-end", gap: 10 }}>
-                {/* A send count with no feed must not render as 0: a real
-                    zero-send day and a dead data source would look identical. */}
-                {(() => {
-                  const todaySent = sentToday ?? camp?.by_day?.[new Date().toLocaleDateString("en-CA")];
-                  return typeof todaySent === "number" ? (
-                    <p style={{ fontSize: 36, fontWeight: 800, color: "var(--accent)", lineHeight: 1, textShadow: "0 0 24px rgba(61, 107, 240,0.35)", fontFamily: "'Space Grotesk', sans-serif" }}><CountUp value={todaySent} /></p>
-                  ) : (
-                    <p style={{ fontSize: 22, fontWeight: 700, color: "var(--text-muted)", lineHeight: 1.4, fontFamily: "'Space Grotesk', sans-serif" }}>no data</p>
-                  );
-                })()}
-                {camp?.by_day && (() => {
-                  const s = buildDailySeries(camp.by_day, 10).map(d => d.value);
-                  const today = sentToday ?? s[s.length - 1] ?? 0;
-                  if (today !== s[s.length - 1]) s[s.length - 1] = today;
-                  return (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-start" }}>
-                      <Sparkline data={s} color="var(--accent)" width={84} height={24} />
-                      <Delta value={today - (s[s.length - 2] ?? 0)} label="vs yday" />
-                    </div>
-                  );
-                })()}
-              </div>
-              <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>emails sent today</p>
-            </div>
-            {/* MRR moved to the basic strip at the top of the page (2026-09-15);
-                the verbose version that used to sit here was removed. */}
-            <button onClick={() => onSendToAI(`Today's Wing Digital briefing:\n- Emails sent today: ${sentToday ?? camp?.by_day?.[new Date().toLocaleDateString("en-CA")] ?? 0}\n- MRR: ${typeof data?.mrr === "number" ? `$${data.mrr}` : "unavailable"}\n- Replies and appointments: see Reply Inbox and Calendar.\n\nWhat should I prioritize today to grow Wing Digital?`)}
-              style={{
-                marginLeft: "auto", fontSize: 12, fontWeight: 600, color: "#fff",
-                background: "linear-gradient(135deg, #E8692A, #f59e0b)",
-                border: "none", cursor: "pointer", padding: "10px 18px", borderRadius: 999,
-                boxShadow: "0 4px 16px rgba(232,105,42,0.35)",
-              }}>
-              ✦ Ask Claude what to focus on
-            </button>
-          </div>
-          {/* No live reply or appointment COUNT feed; the views themselves
-              exist, so this line points at them instead of two dead cells. */}
-          <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 12 }}>
-            Replies and appointments: open the{" "}
-            <button type="button" onClick={() => { sfx.play("nav"); window.dispatchEvent(new CustomEvent("os:navigate", { detail: "replies" })); }}
-              style={{ background: "none", border: "none", padding: 0, minHeight: 0, cursor: "pointer", font: "inherit", color: "var(--accent)", textDecoration: "underline" }}>
-              Reply Inbox
-            </button>
-            {" "}or{" "}
-            <button type="button" onClick={goToCalendar}
-              style={{ background: "none", border: "none", padding: 0, minHeight: 0, cursor: "pointer", font: "inherit", color: "var(--accent)", textDecoration: "underline" }}>
-              Calendar
-            </button>
-          </p>
-          {(() => {
-            const upcoming = agentHealth
-              .filter((a: any) => a.nextRun && new Date(a.nextRun).getTime() > Date.now())
-              .sort((a: any, b: any) => new Date(a.nextRun).getTime() - new Date(b.nextRun).getTime())[0];
-            if (!upcoming) return null;
-            const d = new Date(upcoming.nextRun);
-            const sameDay = d.toDateString() === new Date().toDateString();
-            const when = sameDay
-              ? d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
-              : d.toLocaleDateString("en-US", { weekday: "short" }) + " " + d.toLocaleTimeString("en-US", { hour: "numeric" });
-            return (
-              <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 14, display: "flex", alignItems: "center", gap: 7 }}>
-                <span className="live-dot" style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--accent-2)", boxShadow: "0 0 8px #a78bfa", display: "inline-block" }} />
-                next agent run: <span style={{ color: "var(--accent-2)", fontWeight: 700, textTransform: "capitalize" }}>{upcoming.name}</span> · {when}
-              </p>
-            );
-          })()}
-        </motion.div>
-      )}
-
-      {/* Mission stats row — every tile clicks through to its breakdown panel */}
-      {/* Condensed 2026-08-30: this rendered up to 7 tiles, which read as a wall
-          rather than a summary. The 4 that drive a decision show by default; the
-          accounting detail is one click away rather than gone. Full Mission
-          Control still shows every tile. */}
-      {missionStats && missionStats.tiles.length > 0 && (() => {
-        const PRIMARY = ["Active Clients", "Pipeline", "Prospects in the pipeline", "Untouched Leads"];
-        // MRR is shown once now, as the basic strip at the top of the page
-        // (2026-09-15, Jack), so it is dropped from the mission tiles entirely
-        // rather than hiding under "show more".
-        const tiles = missionStats.tiles.filter(t => t.label !== "MRR");
-        const primary = tiles.filter(t => PRIMARY.includes(t.label));
-        const rest = tiles.filter(t => !PRIMARY.includes(t.label));
-        const shown = showAllStats ? [...primary, ...rest] : primary;
-        return (
-          <motion.div variants={riseItem}>
-            <MissionStyles />
-            <StatTiles tiles={shown} onSelect={setStatSelection} />
-            {rest.length > 0 && (
-              <button onClick={() => { sfx.play("nav"); setShowAllStats(s => !s); }} style={{
-                marginTop: 10, background: "none", border: "none", cursor: "pointer",
-                fontSize: 11, fontWeight: 700, color: "var(--text-muted)",
-                letterSpacing: "0.04em", padding: "4px 2px",
-              }}>
-                {showAllStats ? "Show fewer" : `Show ${rest.length} more number${rest.length === 1 ? "" : "s"}`}
-              </button>
-            )}
-          </motion.div>
-        );
-      })()}
-      <MissionPanels selection={statSelection} data={null} onSelect={setStatSelection} />
-
-      {/* Dispatch agent briefing */}
-      {brief && (
-        <div style={{
-          background: "radial-gradient(ellipse 90% 60% at 50% -20%, rgba(167,139,250,0.10), transparent 60%), linear-gradient(180deg, var(--bg-card), var(--bg-card))",
-          border: "1px solid rgba(167,139,250,0.3)", borderRadius: 16, padding: "16px 20px",
-          boxShadow: "0 8px 24px var(--bg-hover)",
-        }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", flexWrap: "wrap", gap: 8 }}
-            onClick={() => setShowBriefing(b => !b)}>
-            <p style={{ fontSize: 12.5, fontWeight: 700, color: "var(--accent-2)" }}>
-              🌅 Dispatch Briefing · <span style={{ color: "var(--text-muted)", fontWeight: 600 }}>{brief.date_label}</span>
-            </p>
-            <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-              {[
-                { l: "live", v: brief.stats.live, c: "var(--accent)" },
-                { l: "callbacks", v: brief.stats.callbacks, c: "var(--accent-2)" },
-                { l: "redials", v: brief.stats.followup, c: "var(--orange)" },
-                { l: "booked", v: brief.stats.booked, c: "var(--green)" },
-                { l: "staged", v: brief.stats.staged, c: "#6b7280" },
-              ].map(s => (
-                <span key={s.l} style={{ fontSize: 10.5, fontWeight: 700, color: s.c, background: `${s.c}14`, border: `1px solid ${s.c}33`, padding: "3px 10px", borderRadius: 999 }}>
-                  {s.v} {s.l}
-                </span>
-              ))}
-              <span style={{ fontSize: 12, color: "var(--text-muted)", marginLeft: 4 }}>{showBriefing ? "▲" : "▼"}</span>
-            </div>
-          </div>
-          {showBriefing && (
-            <div style={{ marginTop: 14 }}>
-              <p style={{ fontSize: 10.5, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>
-                Today's dial order
-              </p>
-              <div style={{ display: "flex", flexDirection: "column" }}>
-                {brief.dial_order.map((d: any) => (
-                  <div key={d.n} style={{
-                    display: "flex", alignItems: "center", gap: 12, padding: "7px 10px",
-                    borderRadius: 8, background: d.n % 2 ? "rgba(255,255,255,0.025)" : "transparent",
-                  }}>
-                    <span style={{ fontSize: 11, fontWeight: 800, color: d.why.includes("callback") ? "var(--accent-2)" : d.why === "redial" ? "var(--orange)" : "var(--text-muted)", width: 20, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif" }}>{d.n}</span>
-                    <span style={{ fontSize: 13, fontWeight: 700, flex: 1, minWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.name}</span>
-                    <span style={{ fontSize: 11.5, color: "var(--text-muted)", width: 110, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.city}</span>
-                    <span style={{
-                      fontSize: 10, fontWeight: 700, padding: "2px 9px", borderRadius: 999, whiteSpace: "nowrap",
-                      color: d.why.includes("callback") ? "var(--accent-2)" : d.why === "redial" ? "var(--orange)" : "var(--accent)",
-                      background: d.why.includes("callback") ? "rgba(167,139,250,0.12)" : d.why === "redial" ? "rgba(251,191,36,0.10)" : "rgba(61, 107, 240,0.08)",
-                    }}>{d.why}</span>
-                    <a href={`tel:${d.phone}`} onClick={e => e.stopPropagation()}
-                      style={{ fontSize: 12, fontWeight: 700, color: "var(--accent)", textDecoration: "none", whiteSpace: "nowrap", width: 130, textAlign: "right" }}>
-                      {d.phone}
-                    </a>
-                  </div>
-                ))}
-              </div>
-              <p style={{ fontSize: 10.5, color: "var(--text-muted)", marginTop: 10 }}>
-                Best windows 7:00-8:30am · 4:30-6:00pm — log every dial so Dispatch can order tomorrow's list
-              </p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Agent Workforce health strip */}
-      {agentHealth.length > 0 && (() => {
-        const HC: Record<string, string> = { ok: "var(--green)", crashed: "var(--red)", idle: "var(--orange)", running: "var(--accent)" };
-        const crashed = agentHealth.filter(a => a.health === "crashed").length;
-        const running = agentHealth.filter(a => a.state === "Running").length;
-        const onBattery = agentHealth.some(a => a.onBatteryBlocked);
-        const summary = crashed > 0 ? `${crashed} need attention` : onBattery ? "battery-blocked" : running > 0 ? `${running} running now` : "all healthy";
-        const summaryColor = crashed > 0 ? "var(--red)" : onBattery ? "var(--orange)" : "var(--green)";
-        function fmtNext(s: string) {
-          if (!s) return "—";
-          const d = new Date(s), now = new Date();
-          const sameDay = d.toDateString() === now.toDateString();
-          return sameDay
-            ? d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
-            : d.toLocaleDateString("en-US", { weekday: "short" }) + " " + d.toLocaleTimeString("en-US", { hour: "numeric" });
-        }
-        return (
-          <motion.div variants={riseItem} style={{
-            background: "linear-gradient(180deg, var(--bg-card), var(--bg-card))",
-            border: "1px solid var(--border)", borderRadius: 16, padding: "16px 20px",
-            boxShadow: "0 8px 24px var(--bg-hover)",
-          }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
-              <p style={{ fontSize: 12.5, fontWeight: 700, color: "var(--text)" }}>
-                🤖 Agent Workforce
-              </p>
-              <span style={{ fontSize: 10.5, fontWeight: 700, color: summaryColor, background: `${summaryColor}14`, border: `1px solid ${summaryColor}33`, padding: "3px 12px", borderRadius: 999 }}>
-                {agentHealth.length} agents · {summary}
-              </span>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 8 }}>
-              {agentHealth.map((a: any) => {
-                const c = HC[a.state === "Running" ? "running" : a.health] ?? "#6b7280";
-                return (
-                  <div key={a.name} style={{
-                    display: "flex", alignItems: "center", gap: 10, padding: "9px 12px",
-                    background: "rgba(255,255,255,0.025)", border: "1px solid var(--border)", borderRadius: 10,
-                  }}>
-                    <span className="live-dot" style={{ width: 8, height: 8, borderRadius: "50%", background: c, boxShadow: `0 0 8px ${c}`, flexShrink: 0 }} />
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <p style={{ fontSize: 12, fontWeight: 700, color: "var(--text)", textTransform: "capitalize", lineHeight: 1.2 }}>{a.name}</p>
-                      <p style={{ fontSize: 10, color: "var(--text-muted)", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {a.state === "Running" ? "running now" : a.health === "crashed" ? "last run failed" : a.health === "idle" ? "not run yet" : `next ${fmtNext(a.nextRun)}`}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            {onBattery && (
-              <p style={{ fontSize: 10.5, color: "var(--orange)", marginTop: 12 }}>
-                ⚠ Some agents are blocked from running on battery — they will queue until plugged in.
-              </p>
-            )}
-          </motion.div>
-        );
-      })()}
-
-      {/* The standalone MRR stat tile that used to sit here was removed
-          2026-09-15 (Jack): MRR now shows once, as the basic strip at the top. */}
-
-      {/* Removed 2026-08-30: this was a SECOND calendar, permanently empty
-          (appointments={[]} hardcoded). The Calendar section is now the one
-          calendar and carries real payments, call-backs and class schedule, so
-          both the quick action and the tile below navigate there instead. */}
-
-      {/* Quick Actions, floating pill row. "Add contact" opens the CRM, which
-          is where contacts are created (the CRM lives in the OS Supabase). */}
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", marginRight: 4 }}>Quick</span>
-        {[
-          { icon: Users, label: "Add contact", action: () => window.dispatchEvent(new CustomEvent("os:navigate", { detail: "contacts" })), c: "var(--green)" },
-          { icon: Calendar, label: "Calendar", action: goToCalendar, c: "var(--accent)" },
-          { icon: Note, label: "New Note", action: () => setShowNewNote(true), c: "var(--accent-2)" },
-          { icon: Sparkles, label: "Ask Claude", action: () => onSendToAI("What should I focus on today for Wing Digital?"), c: "#E8692A" },
-        ].map(btn => (
-          <motion.button key={btn.label} onClick={() => { sfx.play("blip"); btn.action(); }}
-            whileHover={cardHover} whileTap={cardTap} transition={hoverSpring} style={{
-            display: "inline-flex", alignItems: "center", gap: 7,
-            background: `${btn.c}10`, border: `1px solid ${btn.c}44`,
-            borderRadius: 999, padding: "8px 18px", color: "var(--text-primary)",
-            fontSize: 12.5, cursor: "pointer", fontWeight: 600,
-          }}><btn.icon size={14} color={btn.c} />{btn.label}</motion.button>
-        ))}
-      </div>
-
-      <motion.div variants={riseItem}>
-        {/* Active Clients */}
-        <div style={{
-          background: "linear-gradient(180deg, var(--bg-card), var(--bg-card))",
-          border: "1px solid var(--border)", borderRadius: 16, padding: 20,
-          boxShadow: "0 8px 24px var(--bg-hover), inset 0 1px 0 rgba(255,255,255,0.04)",
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-            <span className="live-dot" style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--accent)", boxShadow: "0 0 8px #3D6BF0" }} />
-            <p style={{ fontSize: 12, fontWeight: 700, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.07em" }}>Active Clients</p>
-          </div>
-          {loading ? <Spinner /> : (data?.activeClients?.length ? (
-            <motion.div style={{ display: "flex", flexDirection: "column", gap: 8 }}
-              variants={staggerContainer} initial="hidden" animate="show">
-              {data.activeClients.slice(0, 50).map((client: any) => (
-                <motion.div key={client.id} variants={riseItem} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
-                  <p style={{ fontSize: 13, fontWeight: 600 }}>{client.name}</p>
-                  {/* Every row states its basis. This used to print
-                      "${value}/mo" in green for EVERY client, so an expected
-                      (not-yet-earned) figure and an unverified one both rendered
-                      exactly like collected recurring revenue — and a client with
-                      no figure crashed on null. Green is reserved for money that
-                      actually counts toward MRR; everything else is muted and
-                      labelled with what it really is. */}
-                  <span style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-                    <span style={{
-                      fontSize: 13, fontWeight: 600,
-                      color: client.countsTowardMrr ? "var(--green)" : "var(--text-muted)",
-                    }}>
-                      {client.value == null
-                        ? "not recorded"
-                        : `$${client.value.toLocaleString()}${client.countsTowardMrr ? "/mo" : ""}`}
-                    </span>
-                    {!client.countsTowardMrr && (
-                      <span style={{ fontSize: 10, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                        {client.value == null ? "unknown" : client.basisLabel}
-                      </span>
-                    )}
-                  </span>
-                </motion.div>
-              ))}
-            </motion.div>
-          ) : <p style={{ color: "var(--text-muted)", fontSize: 13 }}>No active clients on the roster</p>)}
-        </div>
-      </motion.div>
-
-      {/* New Note Modal */}
-      {showNewNote && <Modal title="New Vault Note" onClose={() => setShowNewNote(false)}>
-        <ModalField label="Title" value={noteForm.title} onChange={v => setNoteForm(f => ({ ...f, title: v }))} placeholder="Note title..." />
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 12, color: "var(--text-muted)" }}>Content</label>
-          <textarea value={noteForm.content} onChange={e => setNoteForm(f => ({ ...f, content: e.target.value }))}
-            placeholder="Write your note..." rows={6}
-            style={{ background: "var(--bg-hover)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 12px", color: "var(--text-primary)", fontSize: 13, resize: "vertical", outline: "none" }} />
-        </div>
-        <ModalActions onCancel={() => setShowNewNote(false)} onSubmit={submitNote} saving={saving} submitLabel="Save to Vault" />
-      </Modal>}
+      {/* 2026-09-22 (Jack): "from morning briefing down, delete all of this."
+          The Morning Briefing hero, the mission stat tiles, the Dispatch
+          briefing, the agent-workforce strip, the quick-action pills and the
+          Active Clients list all lived here and are gone. What is left above
+          is the whole Command Center: MRR, Start Here, Today, and the
+          watchdog banner. The New Note modal went with it - its only trigger
+          was the deleted quick-action row. */}
     </motion.div>
   );
 }
@@ -1747,13 +1313,6 @@ function KnowledgeBase({ initialPath, onSendToAI }: { initialPath?: string; onSe
         </>
       )}
 
-      {/* Toast */}
-      {toast && (
-        <div style={{ position: "fixed", bottom: "calc(88px + env(safe-area-inset-bottom, 0px))", right: 24, background: "var(--green)", color: "#07080f", padding: "10px 18px", borderRadius: 10, fontWeight: 700, fontSize: 13, zIndex: 600 }}>
-          {toast}
-        </div>
-      )}
-
     </div>
   );
 }
@@ -1857,15 +1416,6 @@ function PersonalSection() {
   );
 }
 
-function Spinner() {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 9, padding: "6px 0" }} aria-label="Loading">
-      {[92, 74, 84].map((w, i) => (
-        <div key={i} className="skel" style={{ height: 14, width: `${w}%` }} />
-      ))}
-    </div>
-  );
-}
 
 // Animated count-up for big stat numbers (eased, ~700ms)
 function useCountUp(target: number, duration = 700) {
@@ -1891,55 +1441,9 @@ function useCountUp(target: number, duration = 700) {
   return val;
 }
 
-function CountUp({ value, prefix = "" }: { value: number; prefix?: string }) {
-  const v = useCountUp(value);
-  return <>{prefix}{v.toLocaleString()}</>;
-}
 
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  return (
-    <>
-      <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 200 }} />
-      <div style={{
-        position: "fixed", top: "15%", left: "50%", transform: "translateX(-50%)",
-        width: "min(500px, 90vw)", zIndex: 201,
-        // Short phone viewport with the keyboard open: clamp and scroll
-        // instead of clipping below the fold.
-        maxHeight: "min(70dvh, calc(100dvh - 120px))", overflowY: "auto",
-        background: "var(--bg-secondary)", border: "1px solid var(--border)",
-        borderRadius: 14, padding: 24, display: "flex", flexDirection: "column", gap: 16,
-        boxShadow: "0 24px 60px rgba(0,0,0,0.6)",
-      }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <p style={{ fontSize: 15, fontWeight: 700 }}>{title}</p>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-muted)", fontSize: 18, cursor: "pointer" }}>×</button>
-        </div>
-        {children}
-      </div>
-    </>
-  );
-}
 
-function ModalField({ label, value, onChange, placeholder, type = "text" }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string }) {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-      <label style={{ fontSize: 12, color: "var(--text-muted)" }}>{label}</label>
-      <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-        style={{ background: "var(--bg-hover)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 12px", color: "var(--text-primary)", fontSize: 13, outline: "none" }} />
-    </div>
-  );
-}
 
-function ModalActions({ onCancel, onSubmit, saving, submitLabel }: { onCancel: () => void; onSubmit: () => void; saving: boolean; submitLabel: string }) {
-  return (
-    <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 4 }}>
-      <button onClick={onCancel} style={{ padding: "8px 18px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg-card)", color: "var(--text-muted)", cursor: "pointer", fontSize: 13 }}>Cancel</button>
-      <button onClick={onSubmit} disabled={saving} style={{ padding: "8px 18px", borderRadius: 8, border: "none", background: "var(--accent)", color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 700, opacity: saving ? 0.6 : 1 }}>
-        {saving ? "Saving..." : submitLabel}
-      </button>
-    </div>
-  );
-}
 
 function Placeholder({ label, icon }: { label: string; icon: string }) {
   return (

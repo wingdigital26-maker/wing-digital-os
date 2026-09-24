@@ -17,7 +17,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const raw = Number(req.nextUrl.searchParams.get("limit"));
+  // A missing ?limit must mean the default, not Number(null) === 0 (which the
+  // loader clamps to 10 and silently hid most of the campaign's sends).
+  const param = req.nextUrl.searchParams.get("limit");
+  const raw = param == null || param === "" ? NaN : Number(param);
   const limit = Number.isFinite(raw) ? raw : 100;
   const payload = await loadEmailFeed({ limit });
   return NextResponse.json(payload, {

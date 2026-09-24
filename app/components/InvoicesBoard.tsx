@@ -38,12 +38,18 @@ type Upcoming = {
   due_on: string;
 };
 
-// One money marker on a calendar day, whatever its source.
-type DayEntry = {
+// A chip drawn on a calendar day: which invoice, what kind of money event,
+// and which colour edge marks that kind (paid / due / overdue / upcoming).
+type Chip = {
   id: number;
-  client: string;
+  key: string;
+  label: "Paid" | "Due" | "Overdue" | "Upcoming";
+  edge: string;
   amount_cents: number;
   currency: string;
+  client: string;
+  invoice_no: string;
+  status: string;
 };
 
 type Payload = {
@@ -110,7 +116,14 @@ const MONTHS = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ];
-const DOW = ["S", "M", "T", "W", "T", "F", "S"];
+const DOW_ABBR = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+// 26px filled circle marking today's date number, used in both grid views.
+const todayCircle: React.CSSProperties = {
+  width: 26, height: 26, borderRadius: "50%", background: "var(--accent)",
+  color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center",
+  fontSize: 12, fontWeight: 700, flexShrink: 0,
+};
 
 // Pretty date from a plain YYYY-MM-DD, without going through Date (which would
 // reinterpret it as UTC and can render the day before).
@@ -162,6 +175,11 @@ export default function InvoicesBoard() {
   // read-only minis under a row of tiles; now it is one month you navigate,
   // so the horizon is however far you care to look rather than a fixed three.
   const [monthOffset, setMonthOffset] = useState(0);
+
+  // Month grid vs. a single scrollable week. "Today" resets whichever offset
+  // the active view is using; switching views keeps each view's own place.
+  const [view, setView] = useState<"month" | "week">("month");
+  const [weekOffset, setWeekOffset] = useState(0);
 
   // ── Day panel state ──────────────────────────────────────────────────────
   // The open day is a plain YYYY-MM-DD string, so it identifies a calendar day
@@ -288,6 +306,48 @@ export default function InvoicesBoard() {
     return g;
   }, [data?.items]);
 
+  // Every chip the calendar draws, bucketed by the day it belongs on. Paid
+  // invoices land on paid_on ("Paid", green), unpaid ones on due_on ("Due", or
+  // "Overdue" once due_on is behind today), and live recurring schedules land
+  // on their next_due_on ("Upcoming"). Deduped by invoice id + day so a
+  // recurring row that is both due today and upcoming today never draws twice.
+  const dayChips = useMemo(() => {
+    const map: Record<string, Chip[]> = {};
+    const seen = new Set<string>();
+    const add = (date: string, chip: Omit<Chip, "key">) => {
+      const key = `${chip.id}:${date}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      (map[date] ||= []).push({ ...chip, key });
+    };
+    for (const it of data?.items || []) {
+      if (it.status === "void") continue;
+      if (it.status === "paid" && it.paid_on) {
+        add(it.paid_on.slice(0, 10), {
+          id: it.id, label: "Paid", edge: "var(--green)",
+          amount_cents: it.amount_cents, currency: it.currency || "USD",
+          client: it.client, invoice_no: it.invoice_no, status: it.status,
+        });
+      } else if (it.due_on) {
+        const date = it.due_on.slice(0, 10);
+        const overdue = date < today;
+        add(date, {
+          id: it.id, label: overdue ? "Overdue" : "Due", edge: overdue ? "var(--red)" : "var(--accent)",
+          amount_cents: it.amount_cents, currency: it.currency || "USD",
+          client: it.client, invoice_no: it.invoice_no, status: it.status,
+        });
+      }
+    }
+    for (const u of data?.upcoming || []) {
+      add(u.due_on.slice(0, 10), {
+        id: u.id, label: "Upcoming", edge: "var(--accent-2)",
+        amount_cents: u.amount_cents, currency: u.currency,
+        client: u.client, invoice_no: u.invoice_no, status: "upcoming",
+      });
+    }
+    return map;
+  }, [data?.items, data?.upcoming, today]);
+
   // Records a payment on the clicked day through the SAME create action the
   // main form uses. This never sends anything to anyone — it writes a row.
   async function createOnDay(e: React.FormEvent) {
@@ -338,61 +398,59 @@ export default function InvoicesBoard() {
   }
 
   // ── Payment calendar ─────────────────────────────────────────────────────
-  // Buckets every upcoming payment onto its due date, then lays out one real
-  // month grid per month in the API's window, starting with the current month.
-  // The month count comes from the API so the grid can never be shorter than
-  // the horizon the header is counting.
-  const months = useMemo(() => {
-    // Two sources land on the same grid: the API's recurring `upcoming`
-    // schedule, and the real invoice rows due on a day (which is how a one-off
-    // payment recorded from the day panel shows up at all). Deduped by invoice
-    // id so a recurring row present in both is never counted twice.
-    const byDate: Record<string, DayEntry[]> = {};
-    const seen: Record<string, Set<number>> = {};
-    const push = (date: string, e: DayEntry) => {
-      const ids = (seen[date] ||= new Set());
-      if (ids.has(e.id)) return;
-      ids.add(e.id);
-      (byDate[date] ||= []).push(e);
-    };
-    for (const u of data?.upcoming || []) {
-      push(u.due_on, { id: u.id, client: u.client, amount_cents: u.amount_cents, currency: u.currency });
-    }
-    for (const [date, list] of Object.entries(byDay)) {
-      for (const it of list) {
-        if (it.status === "void") continue;
-        push(date, {
-          id: it.id,
-          client: it.client,
-          amount_cents: it.amount_cents,
-          currency: it.currency || "USD",
-        });
-      }
-    }
-
+  // A real Google-Calendar-style month grid for the offset month: full weeks,
+  // padded with the tail of the previous month and the head of the next so
+  // every row has 7 days, exactly like a normal calendar.
+  const month = useMemo(() => {
     const [ty, tm] = [Number(today.slice(0, 4)), Number(today.slice(5, 7))];
-    // One month: the one being looked at. Every payment still lands on the
-    // same buckets above, so stepping to a month far out shows what is really
-    // scheduled there rather than an empty grid.
-    return [monthOffset].map((offset) => {
-      const total0 = ty * 12 + (tm - 1) + offset;
-      const y = Math.floor(total0 / 12);
-      const m1 = (total0 % 12) + 1;
-      const firstDow = new Date(Date.UTC(y, m1 - 1, 1)).getUTCDay();
-      const days = new Date(Date.UTC(y, m1, 0)).getUTCDate();
-      const cells: ({ day: number; date: string; pays: DayEntry[] } | null)[] = [];
-      for (let i = 0; i < firstDow; i++) cells.push(null);
-      for (let d = 1; d <= days; d++) {
-        const date = iso(y, m1, d);
-        cells.push({ day: d, date, pays: byDate[date] || [] });
-      }
-      const monthTotal = cells.reduce(
-        (sum, c) => sum + (c ? c.pays.reduce((s, p) => s + p.amount_cents, 0) : 0),
-        0
-      );
-      return { y, m1, cells, monthTotal, current: offset === 0 };
-    });
-  }, [data?.upcoming, byDay, today, monthOffset]);
+    const total0 = ty * 12 + (tm - 1) + monthOffset;
+    const y = Math.floor(total0 / 12);
+    const m1 = (total0 % 12) + 1;
+    const prevTotal0 = total0 - 1;
+    const py = Math.floor(prevTotal0 / 12);
+    const pm1 = (prevTotal0 % 12) + 1;
+    const nextTotal0 = total0 + 1;
+    const ny = Math.floor(nextTotal0 / 12);
+    const nm1 = (nextTotal0 % 12) + 1;
+
+    const firstDow = new Date(Date.UTC(y, m1 - 1, 1)).getUTCDay();
+    const daysInThis = new Date(Date.UTC(y, m1, 0)).getUTCDate();
+    const daysInPrev = new Date(Date.UTC(y, m1 - 1, 0)).getUTCDate();
+    const leading = firstDow;
+    const totalCells = Math.ceil((leading + daysInThis) / 7) * 7;
+    const trailing = totalCells - leading - daysInThis;
+
+    const cells: { day: number; date: string; inMonth: boolean }[] = [];
+    for (let i = 0; i < leading; i++) {
+      const day = daysInPrev - leading + 1 + i;
+      cells.push({ day, date: iso(py, pm1, day), inMonth: false });
+    }
+    for (let d = 1; d <= daysInThis; d++) cells.push({ day: d, date: iso(y, m1, d), inMonth: true });
+    for (let i = 1; i <= trailing; i++) cells.push({ day: i, date: iso(ny, nm1, i), inMonth: false });
+
+    const monthTotal = cells.reduce((sum, c) => {
+      if (!c.inMonth) return sum;
+      const chips = dayChips[c.date] || [];
+      return sum + chips.reduce((s, p) => s + p.amount_cents, 0);
+    }, 0);
+
+    return { y, m1, cells, monthTotal, current: monthOffset === 0 };
+  }, [dayChips, today, monthOffset]);
+
+  // The single week shown in week view: 7 days starting Sunday, stepped by
+  // `weekOffset` weeks from the week that contains today.
+  const weekCells = useMemo(() => {
+    const [ty, tm, td] = [Number(today.slice(0, 4)), Number(today.slice(5, 7)), Number(today.slice(8, 10))];
+    const base = Date.UTC(ty, tm - 1, td);
+    const dow = new Date(base).getUTCDay();
+    const sunday = base - dow * 86400000 + weekOffset * 7 * 86400000;
+    const cells: { day: number; date: string; month: number; year: number }[] = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(sunday + i * 86400000);
+      cells.push({ day: d.getUTCDate(), date: iso(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate()), month: d.getUTCMonth() + 1, year: d.getUTCFullYear() });
+    }
+    return cells;
+  }, [today, weekOffset]);
 
   const grouped = useMemo(() => {
     const g: Record<string, Invoice[]> = {};
@@ -416,34 +474,39 @@ export default function InvoicesBoard() {
       </div>
     );
   }
-  if (!data.configured) {
-    return (
-      <div className="v2-card" style={card}>
-        <p style={{ margin: 0, color: "var(--text-secondary)", fontSize: 13 }}>
-          Invoices are not configured — SONAR_SUPABASE_URL / SONAR_SUPABASE_SERVICE_KEY are missing.
-        </p>
-      </div>
-    );
-  }
-  // The read was refused. Draw nothing rather than zeros: every figure below
-  // this point would be an assertion the data does not support.
-  if (data.unavailable) {
-    return (
-      <div className="v2-card" style={card}>
-        <p style={{ margin: 0, fontWeight: 700, fontSize: 14 }}>Invoices could not be read</p>
-        <p style={{ margin: "6px 0 0", color: "var(--text-secondary)", fontSize: 13, lineHeight: 1.5 }}>
-          {data.error || "The invoice database did not answer. Nothing here is known to be zero."}
-        </p>
-      </div>
-    );
-  }
+  // The calendar always renders — a missing/unconfigured/errored book just
+  // means an empty grid with one explanatory line above it, never a screen
+  // with nothing to navigate.
+  const bannerMsg = !data.configured
+    ? "Invoices are not configured: SONAR_SUPABASE_URL / SONAR_SUPABASE_SERVICE_KEY are missing."
+    : data.unavailable
+    ? data.error || "The invoice database did not answer. Nothing here is known to be zero."
+    : "";
 
   const t = data.totals;
   const next = t.next_payment;
 
-  // The "through <month>, N expected" header went with the three-month strip.
-  // One navigable month has no fixed window to describe, and its own total
-  // sits in the header where the reader is already looking.
+  const weekTotal = weekCells.reduce(
+    (s, c) => s + (dayChips[c.date] || []).reduce((ss, p) => ss + p.amount_cents, 0),
+    0
+  );
+  const headerTotal = view === "month" ? month.monthTotal : weekTotal;
+
+  let headerTitle: string;
+  if (view === "month") {
+    headerTitle = `${MONTHS[month.m1 - 1]} ${month.y}`;
+  } else {
+    const first = weekCells[0];
+    const last = weekCells[6];
+    if (first.year !== last.year) {
+      headerTitle = `${MONTHS[first.month - 1]} ${first.day}, ${first.year} – ${MONTHS[last.month - 1]} ${last.day}, ${last.year}`;
+    } else if (first.month !== last.month) {
+      headerTitle = `${MONTHS[first.month - 1]} ${first.day} – ${MONTHS[last.month - 1]} ${last.day}, ${first.year}`;
+    } else {
+      headerTitle = `${MONTHS[first.month - 1]} ${first.day}–${last.day}, ${first.year}`;
+    }
+  }
+  const isCurrent = view === "month" ? month.current : weekOffset === 0;
 
   return (
     <div
@@ -462,8 +525,18 @@ export default function InvoicesBoard() {
         .day-cell:hover {
           background: var(--bg-hover) !important;
         }
+        .day-chips { display: grid; gap: 3px; }
+        .day-count-badge { display: none; }
+        @media (max-width: 600px) {
+          .day-chips { display: none; }
+          .day-count-badge {
+            display: inline-flex; align-items: center; justify-content: center;
+            min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px;
+            background: var(--accent-glow); color: var(--accent); font-size: 9px; font-weight: 700;
+          }
+        }
       `}</style>
-      {err ? <p style={{ color: "var(--red)", fontSize: 13, margin: 0 }}>Invoices: {err}</p> : null}
+      {err && !bannerMsg ? <p style={{ color: "var(--red)", fontSize: 13, margin: 0 }}>Invoices: {err}</p> : null}
 
       {/* ── The calendar ──────────────────────────────────────────────────
           2026-09-22 (Jack): "make the invoices a calendar". It leads now, at
@@ -472,49 +545,78 @@ export default function InvoicesBoard() {
           summary tiles moved below it: they are the footnote, the month is
           the screen. Clicking any day still opens the same day panel, so a
           payment gets recorded where you are already looking. */}
-      {months.map((m) => {
-        const monthLabel = `${MONTHS[m.m1 - 1]} ${m.y}`;
-        const empty = m.cells.every((c) => !c || c.pays.length === 0);
-        return (
-          // Keyed on the section, not the month. Keying on the month made React
-          // tear the whole thing down and build a new one on every step, which
-          // threw keyboard focus off the arrow the moment it was pressed: you
-          // could click forward once and then had to find the button again.
-          <section key="month" className="v2-card" style={card}>
-            <header style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
-              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--text-primary)" }}>
-                {MONTHS[m.m1 - 1]} <span style={{ ...num, color: "var(--text-secondary)", fontWeight: 500 }}>{m.y}</span>
-              </h3>
-              <span style={{ ...num, fontSize: 13, fontWeight: 700, color: m.monthTotal ? "var(--green)" : "var(--text-muted)" }}>
-                {m.monthTotal ? money(m.monthTotal) : "nothing expected"}
-              </span>
-              <div style={{ marginLeft: "auto", display: "flex", gap: 6, alignItems: "center" }}>
-                <button type="button" onClick={() => { setOpenDay(null); setMonthOffset((o) => o - 1); }}
-                  style={navBtn} aria-label="Previous month">&#8249;</button>
-                <button type="button" onClick={() => { setOpenDay(null); setMonthOffset(0); }}
-                  style={{ ...navBtn, width: "auto", padding: "0 12px", opacity: m.current ? 0.45 : 1 }}
-                  disabled={m.current} aria-label="Back to this month">Today</button>
-                <button type="button" onClick={() => { setOpenDay(null); setMonthOffset((o) => o + 1); }}
-                  style={navBtn} aria-label="Next month">&#8250;</button>
-              </div>
-            </header>
+      <section className="v2-card" style={card}>
+        <header style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
+          <h3 className="v2-h" style={{ margin: 0, fontSize: 22 }}>{headerTitle}</h3>
+          <span style={{ ...num, fontSize: 13, fontWeight: 700, color: headerTotal ? "var(--green)" : "var(--text-muted)" }}>
+            {headerTotal ? money(headerTotal) : "nothing expected"}
+          </span>
+          <div style={{ marginLeft: "auto", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <div className="v2-pills" role="tablist" aria-label="Calendar view">
+              <button type="button" role="tab" aria-selected={view === "month"} onClick={() => setView("month")}>
+                Month
+              </button>
+              <button type="button" role="tab" aria-selected={view === "week"} onClick={() => setView("week")}>
+                Week
+              </button>
+            </div>
+            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <button
+                type="button"
+                onClick={() => { setOpenDay(null); view === "month" ? setMonthOffset((o) => o - 1) : setWeekOffset((o) => o - 1); }}
+                style={navBtn}
+                aria-label={view === "month" ? "Previous month" : "Previous week"}
+              >
+                &#8249;
+              </button>
+              <button
+                type="button"
+                onClick={() => { setOpenDay(null); setMonthOffset(0); setWeekOffset(0); }}
+                style={{ ...navBtn, width: "auto", padding: "0 12px", opacity: isCurrent ? 0.45 : 1 }}
+                disabled={isCurrent}
+                aria-label="Back to today"
+              >
+                Today
+              </button>
+              <button
+                type="button"
+                onClick={() => { setOpenDay(null); view === "month" ? setMonthOffset((o) => o + 1) : setWeekOffset((o) => o + 1); }}
+                style={navBtn}
+                aria-label={view === "month" ? "Next month" : "Next week"}
+              >
+                &#8250;
+              </button>
+            </div>
+          </div>
+        </header>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
-              {DOW.map((d, i) => (
-                <div key={i} style={{ fontSize: 11, fontWeight: 700, textAlign: "center", color: "var(--text-muted)", paddingBottom: 4 }}>
+        {bannerMsg ? (
+          <p style={{ margin: "0 0 12px", fontSize: 12.5, color: "var(--text-secondary)" }}>{bannerMsg}</p>
+        ) : null}
+
+        {view === "month" ? (
+          <div style={{ border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 1, background: "var(--border)" }}>
+              {DOW_ABBR.map((d) => (
+                <div key={d} style={{ background: "var(--bg-card)", padding: "6px 4px", fontSize: 11, fontWeight: 700, textAlign: "center", color: "var(--text-muted)" }}>
                   {d}
                 </div>
               ))}
-              {m.cells.map((c, i) => {
-                if (!c) return <div key={i} />;
-                const has = c.pays.length > 0;
-                const isToday = c.date === today;
-                const isOpen = openDay === c.date;
-                const sum = c.pays.reduce((s, p) => s + p.amount_cents, 0);
-                // Three chips fit a cell at every width this grid is used at;
-                // the rest are counted so a busy day never silently hides one.
-                const shown = c.pays.slice(0, 3);
-                const rest = c.pays.length - shown.length;
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 1, background: "var(--border)" }}>
+              {month.cells.map((c, i) => {
+                const chips = dayChips[c.date] || [];
+                const isToday = c.inMonth && c.date === today;
+                const isOpen = c.inMonth && openDay === c.date;
+                if (!c.inMonth) {
+                  return (
+                    <div key={i} style={{ background: "var(--bg-card)", minHeight: 116, padding: 6, opacity: 0.45 }}>
+                      <span style={{ ...num, fontSize: 12, color: "var(--text-muted)" }}>{c.day}</span>
+                    </div>
+                  );
+                }
+                const shown = chips.slice(0, 3);
+                const rest = chips.length - shown.length;
                 return (
                   <button
                     key={i}
@@ -522,89 +624,146 @@ export default function InvoicesBoard() {
                     className="day-cell"
                     aria-expanded={isOpen}
                     aria-label={
-                      has
-                        ? `${shortDate(c.date)}, ${money(sum)} across ${c.pays.length} payment${c.pays.length === 1 ? "" : "s"}`
+                      chips.length
+                        ? `${shortDate(c.date)}, ${chips.length} payment${chips.length === 1 ? "" : "s"}`
                         : `${shortDate(c.date)}, no payments, add one`
                     }
                     onClick={() => toggleDay(c.date)}
                     style={{
-                      minHeight: 92, borderRadius: 9, padding: 6, textAlign: "left",
+                      minHeight: 116, padding: 6, textAlign: "left", minWidth: 0,
                       cursor: "pointer", font: "inherit", display: "flex",
-                      flexDirection: "column", gap: 3, alignItems: "stretch", overflow: "hidden",
-                      border: isOpen || isToday ? "1px solid var(--accent)" : "1px solid var(--border)",
-                      background: isOpen ? "var(--bg-hover)" : isToday ? "var(--accent-glow)" : "var(--bg-secondary)",
+                      flexDirection: "column", gap: 3, alignItems: "stretch", overflow: "hidden", border: "none",
+                      background: isOpen ? "var(--bg-hover)" : "var(--bg-card)",
                     }}
                   >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 4 }}>
-                      <span style={{
-                        ...num, fontSize: 12,
-                        fontWeight: isToday ? 800 : has ? 700 : 500,
-                        color: isToday ? "var(--accent)" : has ? "var(--text-primary)" : "var(--text-muted)",
-                      }}>
-                        {c.day}
-                      </span>
-                      {c.pays.length > 1 ? (
-                        <span style={{ ...num, fontSize: 10, fontWeight: 700, color: "var(--green)" }}>{money(sum)}</span>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 4 }}>
+                      {isToday ? (
+                        <span style={todayCircle}>{c.day}</span>
+                      ) : (
+                        <span style={{ ...num, fontSize: 12, fontWeight: 600, color: "var(--text-primary)" }}>{c.day}</span>
+                      )}
+                      <span className="day-count-badge">{chips.length || ""}</span>
+                    </div>
+                    <div className="day-chips">
+                      {shown.map((chip) => (
+                        <div
+                          key={chip.key}
+                          title={`${chip.label}: ${money(chip.amount_cents, chip.currency)} ${chip.client}`}
+                          aria-label={`${chip.label}, ${money(chip.amount_cents, chip.currency)}, ${chip.client}`}
+                          style={{
+                            borderRadius: 6, padding: "2px 5px", borderLeft: `3px solid ${chip.edge}`,
+                            background: `color-mix(in srgb, ${chip.edge} 12%, var(--bg-card))`,
+                            fontSize: 10, lineHeight: 1.3, color: "var(--text-primary)",
+                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                          }}
+                        >
+                          <span style={{ ...num, fontWeight: 700 }}>{money(chip.amount_cents, chip.currency)}</span> {chip.client}
+                        </div>
+                      ))}
+                      {rest > 0 ? (
+                        <span style={{ fontSize: 10, color: "var(--text-muted)", paddingLeft: 2 }}>+{rest} more</span>
                       ) : null}
                     </div>
-                    {shown.map((p) => (
-                      <span key={p.id} style={{
-                        display: "block", borderRadius: 5, padding: "2px 5px",
-                        background: "var(--accent-glow)", borderLeft: "2px solid var(--green)",
-                        fontSize: 10, lineHeight: 1.3, color: "var(--text-primary)",
-                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                      }}>
-                        <span style={{ ...num, color: "var(--green)", fontWeight: 700 }}>
-                          {money(p.amount_cents, p.currency)}
-                        </span>{" "}
-                        {p.client}
-                      </span>
-                    ))}
-                    {rest > 0 ? (
-                      <span style={{ fontSize: 10, color: "var(--text-muted)", paddingLeft: 2 }}>
-                        +{rest} more
-                      </span>
-                    ) : null}
                   </button>
                 );
               })}
             </div>
+          </div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 1, background: "var(--border)", border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden" }}>
+            {weekCells.map((c, wi) => {
+              const chips = dayChips[c.date] || [];
+              const isToday = c.date === today;
+              const isOpen = openDay === c.date;
+              return (
+                <button
+                  key={c.date}
+                  type="button"
+                  className="day-cell"
+                  aria-expanded={isOpen}
+                  aria-label={
+                    chips.length
+                      ? `${shortDate(c.date)}, ${chips.length} payment${chips.length === 1 ? "" : "s"}`
+                      : `${shortDate(c.date)}, no payments, add one`
+                  }
+                  onClick={() => toggleDay(c.date)}
+                  style={{
+                    minHeight: 280, minWidth: 0, padding: 8, textAlign: "left", cursor: "pointer", font: "inherit",
+                    display: "flex", flexDirection: "column", gap: 8, alignItems: "stretch", overflow: "hidden", border: "none",
+                    background: isOpen ? "var(--bg-hover)" : "var(--bg-card)",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)" }}>{DOW_ABBR[wi]}</span>
+                    <span className="day-count-badge">{chips.length || ""}</span>
+                  </div>
+                  {isToday ? (
+                    <span style={todayCircle}>{c.day}</span>
+                  ) : (
+                    <span style={{ ...num, fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>{c.day}</span>
+                  )}
+                  <div className="day-chips">
+                    {chips.length === 0 ? (
+                      <span style={{ fontSize: 11, color: "var(--text-muted)" }}>Nothing scheduled</span>
+                    ) : null}
+                    {chips.map((chip) => (
+                      <div
+                        key={chip.key}
+                        title={`${chip.label}: ${money(chip.amount_cents, chip.currency)} ${chip.client}`}
+                        style={{
+                          borderRadius: 6, padding: "4px 6px", borderLeft: `3px solid ${chip.edge}`,
+                          background: `color-mix(in srgb, ${chip.edge} 12%, var(--bg-card))`,
+                          display: "grid", gap: 3, overflow: "hidden",
+                        }}
+                      >
+                        <span style={{ ...num, fontSize: 11, fontWeight: 700, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {money(chip.amount_cents, chip.currency)} {chip.client}
+                        </span>
+                        <span style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                          <span
+                            className="v2-status"
+                            style={{ fontSize: 9, padding: "2px 7px", color: chip.edge, background: `color-mix(in srgb, ${chip.edge} 12%, var(--bg-card))` }}
+                          >
+                            {chip.label}
+                          </span>
+                          <span style={{ ...num, fontSize: 10, color: "var(--text-muted)" }}>{chip.invoice_no}</span>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
-            {empty ? (
-              <p style={{ fontSize: 12.5, color: "var(--text-muted)", margin: "12px 0 0" }}>
-                No payments land in {monthLabel}. Click any day to record one.
-              </p>
-            ) : null}
-
-            {/* Day panel, full width under the grid it belongs to. */}
-            {openDay && openDay.startsWith(`${m.y}-${String(m.m1).padStart(2, "0")}`) ? (
-              <div style={{ marginTop: 12 }}>
-                <DayPanel
-                  date={openDay}
-                  invoices={byDay[openDay] || []}
-                  clients={crmClients.length ? crmClients : data.clients}
-                  busy={dBusy}
-                  err={dErr}
-                  today={today}
-                  client={dClient}
-                  newClient={dNewClient}
-                  amount={dAmount}
-                  desc={dDesc}
-                  recurring={dRecurring}
-                  onClient={setDClient}
-                  onNewClient={setDNewClient}
-                  onAmount={setDAmount}
-                  onDesc={setDDesc}
-                  onRecurring={setDRecurring}
-                  onSubmit={createOnDay}
-                  onAct={actOnDay}
-                  onClose={() => setOpenDay(null)}
-                />
-              </div>
-            ) : null}
-          </section>
-        );
-      })}
+        {/* Day panel, full width under whichever grid it belongs to. */}
+        {openDay ? (
+          <div style={{ marginTop: 12 }}>
+            <DayPanel
+              date={openDay}
+              invoices={byDay[openDay] || []}
+              clients={crmClients.length ? crmClients : data.clients}
+              busy={dBusy}
+              err={dErr}
+              today={today}
+              client={dClient}
+              newClient={dNewClient}
+              amount={dAmount}
+              desc={dDesc}
+              recurring={dRecurring}
+              onClient={setDClient}
+              onNewClient={setDNewClient}
+              onAmount={setDAmount}
+              onDesc={setDDesc}
+              onRecurring={setDRecurring}
+              onSubmit={createOnDay}
+              onAct={actOnDay}
+              onClose={() => setOpenDay(null)}
+            />
+          </div>
+        ) : null}
+      </section>
 
       {/* Summary tiles — the footnote under the month, not the headline. */}
       <div

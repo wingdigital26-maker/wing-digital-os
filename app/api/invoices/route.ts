@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { sbFailureReason } from "@/lib/osSupabase";
+import { pgConfigured, pgSelect, pgPatch, pgInsert } from "@/lib/pgFallback";
 
 // ───────────────────────────────────────────────────────────────────────────
 // Invoices API — what Wing has billed, what is still owed, and when the next
@@ -9,6 +10,11 @@ import { sbFailureReason } from "@/lib/osSupabase";
 // so it works with the PC off. Money is stored in CENTS as integers and is
 // never converted to a float anywhere in this file. Nothing here SENDS: there
 // is no PDF generation and no email. `pdf_path` is carried but unused.
+//
+// Supabase answers 402 to every REST call while the project is over its
+// storage quota (2026-09-21), but the data itself is untouched and the direct
+// Postgres pooler still answers. On a 402, the same read/insert/update is
+// replayed over lib/pgFallback (same pattern as app/api/calls/_guard.ts).
 // ───────────────────────────────────────────────────────────────────────────
 
 export const runtime = "nodejs";
@@ -21,12 +27,41 @@ function creds() {
   };
 }
 
-async function sb(path: string, extra: Record<string, string> = {}) {
+function restricted(status: number): boolean {
+  return status === 402 && pgConfigured();
+}
+
+// "invoices?id=eq.5&select=..." -> ["invoices", "id=eq.5&select=..."]
+function splitPath(path: string): [string, string] {
+  const i = path.indexOf("?");
+  return i < 0 ? [path, ""] : [path.slice(0, i), path.slice(i + 1)];
+}
+
+// Just enough of a fetch Response for the callers below: .ok, .status,
+// .json(), .text(). Lets the pgFallback path stand in for a real REST
+// response without every call site needing its own branch.
+type FetchLike = { ok: boolean; status: number; json: () => Promise<unknown>; text: () => Promise<string> };
+
+function okRows(rows: unknown[]): FetchLike {
+  return { ok: true, status: 200, json: async () => rows, text: async () => JSON.stringify(rows) };
+}
+
+async function sb(path: string, extra: Record<string, string> = {}): Promise<Response | FetchLike> {
   const { url, key } = creds();
-  return fetch(`${url}/rest/v1/${path}`, {
+  const res = await fetch(`${url}/rest/v1/${path}`, {
     headers: { apikey: key as string, Authorization: `Bearer ${key}`, ...extra },
     cache: "no-store",
   });
+  if (restricted(res.status)) {
+    const [table, qs] = splitPath(path);
+    try {
+      const rows = await pgSelect(table, qs);
+      return okRows(rows as unknown[]);
+    } catch {
+      // Fall through to the real (failed) response so the caller reports it.
+    }
+  }
+  return res;
 }
 
 async function sbWrite(
@@ -34,9 +69,9 @@ async function sbWrite(
   method: "POST" | "PATCH" | "DELETE",
   body?: unknown,
   prefer = "return=representation"
-) {
+): Promise<Response | FetchLike> {
   const { url, key } = creds();
-  return fetch(`${url}/rest/v1/${path}`, {
+  const res = await fetch(`${url}/rest/v1/${path}`, {
     method,
     headers: {
       apikey: key as string,
@@ -47,6 +82,19 @@ async function sbWrite(
     body: body === undefined ? undefined : JSON.stringify(body),
     cache: "no-store",
   });
+  if (restricted(res.status) && (method === "POST" || method === "PATCH")) {
+    const [table, qs] = splitPath(path);
+    try {
+      const rows =
+        method === "POST"
+          ? await pgInsert(table, body)
+          : await pgPatch(table, qs, (body || {}) as Record<string, unknown>);
+      return okRows(rows as unknown[]);
+    } catch {
+      // Fall through to the real (failed) response so the caller reports it.
+    }
+  }
+  return res;
 }
 
 export type Recurring = "monthly" | "quarterly" | "annual";

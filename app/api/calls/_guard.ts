@@ -12,6 +12,7 @@ import { getOsSession, hasLegacyAuth, sbUrl, sbService } from "../../../lib/osSu
 import type { Session } from "../../lib/session";
 import { sbFailureReason } from "@/lib/osSupabase";
 import { pgConfigured, pgSelect, pgPatch, pgInsert } from "@/lib/pgFallback";
+import { snapshotHas, snapshotSelect } from "@/lib/callSnapshot";
 
 // Supabase answers 402 to every REST call while the account is over its storage
 // quota, but the data is still there and the pooler still answers. On a 402 the
@@ -115,10 +116,20 @@ export async function sbGet<T = unknown>(
       headers: { apikey: s.key, Authorization: `Bearer ${s.key}` },
       cache: "no-store",
     });
-    if (restricted(r.status)) {
-      const rows = await pgSelect<T>(table, qs);
-      lastFailure = "";
-      return rows;
+    if (r.status === 402) {
+      if (pgConfigured()) {
+        try {
+          const rows = await pgSelect<T>(table, qs);
+          lastFailure = "";
+          return rows;
+        } catch {
+          // fall through to the shipped copy
+        }
+      }
+      if (snapshotHas(table)) {
+        lastFailure = "";
+        return snapshotSelect<T>(table, qs);
+      }
     }
     if (!r.ok) {
       lastFailure = sbFailureReason(r.status, await r.text().catch(() => ""), table);

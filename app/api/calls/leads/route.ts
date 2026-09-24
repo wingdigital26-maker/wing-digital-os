@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireCallUser, sbConfigured, sbGet, sbLastFailure, CLAIM_MINUTES } from "../_guard";
 import { sbUrl, sbService } from "../../../../lib/osSupabase";
+import { pgConfigured, pgColumnExists, pgCount } from "@/lib/pgFallback";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -63,6 +64,7 @@ async function columnExists(table: string, column: string): Promise<boolean> {
       headers: { apikey: key, Authorization: `Bearer ${key}` },
       cache: "no-store",
     });
+    if (r.status === 402 && pgConfigured()) return await pgColumnExists(table, column);
     return r.ok;
   } catch {
     return false;
@@ -112,6 +114,7 @@ async function sbCount(table: string, qs: string): Promise<number | null> {
       },
       cache: "no-store",
     });
+    if (r.status === 402 && pgConfigured()) return await pgCount(table, qs);
     if (!r.ok) return null;
     const range = r.headers.get("content-range"); // "0-99/714" or "*/714"
     const total = range?.split("/")[1];

@@ -11,6 +11,14 @@
 import { getOsSession, hasLegacyAuth, sbUrl, sbService } from "../../../lib/osSupabase";
 import type { Session } from "../../lib/session";
 import { sbFailureReason } from "@/lib/osSupabase";
+import { pgConfigured, pgSelect, pgPatch, pgInsert } from "@/lib/pgFallback";
+
+// Supabase answers 402 to every REST call while the account is over its storage
+// quota, but the data is still there and the pooler still answers. On a 402 the
+// helpers below replay the same query over the direct connection (lib/pgFallback).
+function restricted(status: number): boolean {
+  return status === 402 && pgConfigured();
+}
 
 export type CallUser = {
   id: string;       // auth.users id, or "legacy" for shared-password access
@@ -75,6 +83,7 @@ export async function sbPatch<T = unknown>(
       },
       body: JSON.stringify(patch),
     });
+    if (restricted(r.status)) return await pgPatch<T>(table, filter, patch);
     if (!r.ok) return null;
     return (await r.json()) as T[];
   } catch {
@@ -106,6 +115,11 @@ export async function sbGet<T = unknown>(
       headers: { apikey: s.key, Authorization: `Bearer ${s.key}` },
       cache: "no-store",
     });
+    if (restricted(r.status)) {
+      const rows = await pgSelect<T>(table, qs);
+      lastFailure = "";
+      return rows;
+    }
     if (!r.ok) {
       lastFailure = sbFailureReason(r.status, await r.text().catch(() => ""), table);
       return null;
@@ -135,6 +149,7 @@ export async function sbPost<T = unknown>(
       },
       body: JSON.stringify(body),
     });
+    if (restricted(r.status)) return await pgInsert<T>(table, body);
     if (!r.ok) return null;
     return (await r.json()) as T[];
   } catch {

@@ -217,16 +217,13 @@ export const ROUTED_PAGES: RoutedPage[] = [
   // (view:calls etc.) cover the palette, so listing the page too showed every
   // one twice with identical labels.
   { href: "/calls", label: "Call Room", keywords: "cold calling dialer", inStrip: true, inPalette: false },
-  { href: "/calls/booked", label: "Booked Calls", keywords: "appointments" },
-  { href: "/calls/callbacks", label: "Callbacks" },
-  { href: "/calls/schedule", label: "Call Schedule" },
+  // One room only (Jack, 2026-09-24): Booked / Callbacks / Schedule / Sources /
+  // Team were separate screens and are no longer linked from anywhere.
   // /calls/list merged into the Call Room root (2026-09-15); the route now just
   // redirects, so it is off the strip and out of the palette.
-  { href: "/calls/sources", label: "Call Sources" },
   // Admin-only (proxy.ts redirects non-admins to /calls). Kept out of the
   // command palette so a caller is never shown a door that only bounces them;
   // admins reach it from the "Manage callers" button in the Call Room header.
-  { href: "/calls/team", label: "Call Team", inPalette: false },
   { href: "/sequences", label: "Sequences", inStrip: true, inPalette: false },
   { href: "/sequences/people", label: "Sequence People" },
   // /email dropped from the strip 2026-09-05: "Email" appeared twice in one

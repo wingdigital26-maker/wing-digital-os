@@ -496,7 +496,7 @@ export default function Home() {
           {visited.has("automations") && <div className="app-view" style={{ display: active === "automations" ? "block" : "none" }}><div style={{ maxWidth: 1080, margin: "0 auto", padding: "8px 4px" }}><SectionSubTabs prefix="/automations" /><AutomationsList /></div></div>}
           {visited.has("sequences") && <div className="app-view" style={{ display: active === "sequences" ? "block" : "none" }}><div style={{ maxWidth: 1080, margin: "0 auto", padding: "8px 4px" }}><SectionSubTabs prefix="/sequences" /><SequencesList /></div></div>}
           {visited.has("seo") && <div className="app-view" style={{ display: active === "seo" ? "block" : "none" }}><SeoBoard /></div>}
-          {visited.has("calls") && <div className="app-view" style={{ display: active === "calls" ? "block" : "none" }}><div style={{ maxWidth: 1080, margin: "0 auto", padding: "8px 4px" }}><SectionSubTabs prefix="/calls" /><CallsToday /></div></div>}
+          {visited.has("calls") && <div className="app-view" style={{ display: active === "calls" ? "block" : "none" }}><div style={{ maxWidth: 1080, margin: "0 auto", padding: "8px 4px" }}><CallsToday /></div></div>}
           {/* Jack-only views never mount for a restricted session, even when a
               stale `visited` entry exists from before the role resolved. */}
           {fullAccess && visited.has("personal") && <div className="app-view" style={{ display: active === "personal" ? "block" : "none" }}><PersonalSection /></div>}

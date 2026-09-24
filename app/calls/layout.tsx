@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import SectionChrome, { sectionBtn, type SectionTab } from "../components/SectionChrome";
+import SectionChrome, { type SectionTab } from "../components/SectionChrome";
 
 // Shared chrome for the whole Call Room section. Every screen under /calls
 // hangs off this nav, so it must have exactly one author. The header itself is
@@ -15,14 +15,9 @@ const TABS: SectionTab[] = [
   // "Today" and "Dial list" merged into one Call Room screen (2026-09-15), so
   // the section root IS the working list now — no separate Dial list tab.
   { href: "/calls", label: "Dial list", exact: true },
-  { href: "/calls/callbacks", label: "Callbacks" },
-  { href: "/calls/booked", label: "Booked" },
-  { href: "/calls/schedule", label: "Schedule" },
-  { href: "/calls/sources", label: "Sources" },
 ];
 
 export default function CallsLayout({ children }: { children: React.ReactNode }) {
-  const [isAdmin, setIsAdmin] = useState(false);
   const [email, setEmail] = useState<string | null>(null);
 
   useEffect(() => {
@@ -31,7 +26,6 @@ export default function CallsLayout({ children }: { children: React.ReactNode })
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (!alive || !d?.me) return;
-        setIsAdmin(Boolean(d.me.isAdmin));
         setEmail(d.me.email ?? null);
       })
       .catch(() => {});
@@ -48,11 +42,6 @@ export default function CallsLayout({ children }: { children: React.ReactNode })
         <>
           {email && (
             <span className="sc-email" title={email}>{email}</span>
-          )}
-          {isAdmin && (
-            <a href="/calls/team" style={sectionBtn}>
-              Manage callers
-            </a>
           )}
         </>
       }

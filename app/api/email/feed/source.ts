@@ -205,7 +205,7 @@ function campaignState(code: number | null | undefined): string | null {
 // SSE stream ticking every 20s in several tabs cannot get the workspace blocked.
 type Fetched<T> = { ok: true; data: T } | { ok: false; reason: string };
 
-async function iGet<T>(path: string, ttlMs = 15_000): Promise<Fetched<T>> {
+async function iGet<T>(path: string, ttlMs = 30_000): Promise<Fetched<T>> {
   const r = await iRequest<T>(path, { ttlMs });
   return r.ok ? { ok: true, data: r.data } : { ok: false, reason: r.reason };
 }
@@ -234,6 +234,7 @@ type RawAnalytics = {
   campaign_id?: string; campaign_name?: string; campaign_status?: number;
   emails_sent_count?: number; open_count?: number; link_click_count?: number;
   reply_count?: number; bounced_count?: number; unsubscribed_count?: number;
+  reply_count_unique?: number; reply_count_automatic_unique?: number;
 };
 
 // The campaign roster, lead directory and analytics change slowly and cost an
@@ -395,7 +396,10 @@ async function loadCold(limit: number, forceContext: boolean): Promise<{ lane: L
     sent: a.emails_sent_count ?? null,
     opens: a.open_count ?? null,
     clicks: a.link_click_count ?? null,
-    replies: a.reply_count ?? null,
+    // Same definition as /api/outreach/instantly: people who replied, minus auto-replies.
+    replies: a.reply_count_unique != null || a.reply_count != null
+      ? Math.max(0, (a.reply_count_unique ?? a.reply_count ?? 0) - (a.reply_count_automatic_unique ?? 0))
+      : null,
     bounces: a.bounced_count ?? null,
     unsubscribes: a.unsubscribed_count ?? null,
     waiting: null,

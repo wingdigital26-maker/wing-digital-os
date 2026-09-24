@@ -81,14 +81,19 @@ type Payload = {
   stats: Stats | null;
   sequence: Array<{ step: number; delayDays: number; subject: string; body: string }>;
   sent: Array<{ to: string; from: string; at: string; subject: string; body: string }>;
+  /** False when the latest-sends read failed: `sent` is then empty but UNKNOWN, not "none". */
+  sentOk: boolean;
+  sentReason: string | null;
   leads: Array<{ email: string; name: string; company: string; contacted: boolean; replied: boolean }>;
+  leadsOk: boolean;
   notes: string[];
 };
 
 function empty(status: Payload["status"], reason: string, errorKind: InstantlyErrorKind | null = null): Payload {
   return {
     status, available: false, errorKind, reason, stale: false, staleReason: null, checkedAt: null,
-    campaigns: [], totals: null, campaign: null, stats: null, sequence: [], sent: [], leads: [], notes: [],
+    campaigns: [], totals: null, campaign: null, stats: null, sequence: [], sent: [], sentOk: false, sentReason: null,
+    leads: [], leadsOk: false, notes: [],
   };
 }
 
@@ -110,15 +115,15 @@ function stateOf(code: number | null | undefined): string {
 function statsOf(a: InstantlyAnalytics | undefined): Stats | null {
   if (!a) return null;
   const n = (v: number | undefined) => (typeof v === "number" && Number.isFinite(v) ? v : null);
-  const auto = n(a.reply_count_automatic);
-  const replies = n(a.reply_count);
+  // People who replied (unique), minus unique auto-replies (out-of-office etc).
+  const auto = n((a as { reply_count_automatic_unique?: number }).reply_count_automatic_unique) ?? n(a.reply_count_automatic);
+  const replies = n(a.reply_count_unique) ?? n(a.reply_count);
   return {
     leads: n(a.leads_count),
     // new_leads_contacted_count is people; contacted_count counts per-step touches.
     contacted: n((a as { new_leads_contacted_count?: number }).new_leads_contacted_count) ?? n(a.contacted_count),
     sent: n(a.emails_sent_count),
     opens: n(a.open_count_unique) ?? n(a.open_count),
-    // Human replies: Instantly's reply_count, minus the auto-replies it counted.
     replies: replies == null ? null : Math.max(0, replies - (auto ?? 0)),
     autoReplies: auto,
     clicks: n(a.link_click_count),
@@ -227,9 +232,21 @@ export async function GET() {
     stats: campaigns.find((c) => c.id === focus.id)?.stats ?? null,
     sequence: sequenceFromCampaign(detail),
     sent: [],
+    sentOk: sentR.ok,
+    sentReason: sentR.ok ? null : sentR.reason,
     leads: [],
+    leadsOk: leadsR.ok,
     notes,
   };
+
+  // Any section served from an older answer makes the whole payload stale.
+  for (const r of [sentR, leadsR, detailR]) {
+    if (r.ok && r.stale && !payload.stale) {
+      payload.stale = true;
+      payload.staleReason = r.staleReason ?? "Instantly did not answer just now.";
+      payload.checkedAt = new Date(Math.min(Date.parse(payload.checkedAt ?? new Date().toISOString()), r.at)).toISOString();
+    }
+  }
 
   if (sentR.ok) {
     payload.sent = (sentR.data.items ?? [])

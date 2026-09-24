@@ -61,7 +61,10 @@ const READ_ONLY_POSTS = new Set(["/leads/list"]);
 
 const DEFAULT_TIMEOUT_MS = 8_000;
 const STALE_MAX_MS = 15 * 60 * 1000;
-const EMAILS_PER_MIN = 14;
+// Per server instance. Several warm instances can each spend this, so it sits
+// well under Instantly's 20; if the workspace still hits 429 the client backs
+// off and serves the last answer, labelled stale.
+const EMAILS_PER_MIN = 10;
 
 type CacheEntry = { at: number; data: unknown; expired?: boolean };
 const cache = new Map<string, CacheEntry>();
@@ -373,7 +376,7 @@ export async function fetchAnalytics() {
 export async function fetchSentEmails(campaignId: string, limit = 25) {
   return iRequest<{ items?: InstantlyEmail[] }>(
     `/emails?campaign_id=${encodeURIComponent(campaignId)}&email_type=sent&limit=${Math.min(100, limit)}`,
-    { ttlMs: 20_000 }
+    { ttlMs: 60_000 }
   );
 }
 

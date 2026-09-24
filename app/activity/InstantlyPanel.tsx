@@ -35,6 +35,9 @@ type Summary = {
   stats: Stats | null;
   sequence: { step: number; delayDays: number; subject: string; body: string }[];
   sent: { to: string; from: string; at: string; subject: string; body: string }[];
+  sentOk: boolean;
+  sentReason: string | null;
+  leadsOk: boolean;
   leads: { email: string; name: string; company: string; contacted: boolean; replied: boolean }[];
   notes: string[];
 };
@@ -263,7 +266,9 @@ export default function InstantlyPanel() {
           {sum.campaign && (
             <>
               <h3 className="inst-subhead">Latest sends · {sum.campaign.name}</h3>
-              {sum.sent.length === 0 ? (
+              {!sum.sentOk ? (
+                <div className="act-note warn">Latest sends are unknown right now. {sum.sentReason}</div>
+              ) : sum.sent.length === 0 ? (
                 <div className="act-note">Instantly shows no emails sent from this campaign yet.</div>
               ) : (
                 <div className="inst-inbox">
@@ -284,10 +289,14 @@ export default function InstantlyPanel() {
 
               {(() => {
                 const pending = sum.leads.filter((l) => !l.contacted);
-                if (sum.leads.length === 0) return null;
+                if (!sum.leadsOk || sum.leads.length === 0) return null;
                 return (
                   <>
-                    <h3 className="inst-subhead inst-subhead-sm">Queued next ({pending.length} of {sum.leads.length} leads not emailed yet)</h3>
+                    <h3 className="inst-subhead inst-subhead-sm">
+                      {pending.length === 0
+                        ? `Queued next: none. All ${sum.leads.length} leads have had their first email`
+                        : `Queued next: ${pending.length} of ${sum.leads.length} leads not emailed yet`}
+                    </h3>
                     {pending.length > 0 && (
                       <div className="inst-queue">
                         {pending.slice(0, 12).map((l, i) => (

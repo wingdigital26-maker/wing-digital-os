@@ -54,8 +54,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Bad or missing webhook secret." }, { status: 401 });
   }
 
+  const declared = Number(req.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > MAX_BYTES) {
+    return NextResponse.json({ ok: false, error: "Payload too large." }, { status: 413 });
+  }
   const raw = await req.text();
-  if (raw.length > MAX_BYTES) {
+  if (Buffer.byteLength(raw, "utf8") > MAX_BYTES) {
     return NextResponse.json({ ok: false, error: "Payload too large." }, { status: 413 });
   }
   let body: Record<string, unknown>;

@@ -95,22 +95,52 @@ const COLD = new Set(["0", "-1", "-2", "-3", "-4"]);
 
 /** Cut the quoted thread ("On Tue, ... wrote:", "> ...", "From: ...") off a reply. */
 export function stripQuoted(text: string): string {
-  const lines = text.replace(/\r\n/g, "\n").split("\n");
+  const lines = text.replace(/\r\n?/g, "\n").split("\n");
   const out: string[] = [];
   for (let i = 0; i < lines.length; i++) {
-    const l = lines[i];
-    const t = l.trim();
-    if (/^On .{4,200}wrote:\s*$/i.test(t)) break;
-    // "On Tue, Sep 24, 2026 at 9:14 AM Grant <x@y.com>" + "wrote:" on the next line
-    if (/^On .{4,200}$/i.test(t) && /^wrote:\s*$/i.test((lines[i + 1] ?? "").trim())) break;
+    const t = lines[i].trim();
+    // "On Tue, Sep 24 ... wrote:" on one line.
+    if (/^On\s.{4,300}wrote:\s*$/i.test(t)) break;
+    // The same header wrapped over two or three lines by the mail client:
+    // "On Tue, Sep 24, 2026 at 9:14 AM Grant <" / "g@x.com> wrote:" / "wrote:".
+    if (/^On\s.{4,300}$/i.test(t)) {
+      const next = [lines[i + 1], lines[i + 2]].map((l) => (l ?? "").trim());
+      if (next.some((l) => /wrote:\s*$/i.test(l))) break;
+    }
     if (/^-{2,}\s*Original Message\s*-{2,}$/i.test(t)) break;
     if (/^_{5,}$/.test(t)) break;
-    if (/^From:\s.+/i.test(t) && out.length > 0 && /^(Sent|Date):\s/i.test((lines[i + 1] ?? "").trim())) break;
+    if (/^From:\s.+/i.test(t) && out.length > 0 && /^(Sent|Date|To):\s/i.test((lines[i + 1] ?? "").trim())) break;
     if (t.startsWith(">")) continue;
-    out.push(l);
+    out.push(lines[i]);
   }
   const cleaned = out.join("\n").replace(/\n{3,}/g, "\n\n").trim();
   return cleaned || text.trim();
+}
+
+/** HTML-only replies: drop the quoted history (blockquote / Gmail / Outlook markers) before converting. */
+export function stripQuotedHtml(html: string): string {
+  const cut = html.search(/<blockquote|<div[^>]*class=["'][^"']*gmail_quote|<div[^>]*id=["'](divRplyFwdMsg|appendonsend)["']|<hr[^>]*id=["']stopSpelling["']/i);
+  return cut > 0 ? html.slice(0, cut) : html;
+}
+
+/** Reply text we keep per row. Longer replies are cut with a pointer to Instantly. */
+const MAX_TEXT = 20_000;
+function capText(t: string): string {
+  return t.length > MAX_TEXT ? `${t.slice(0, MAX_TEXT)}\n\n[… cut here; the full reply is in Instantly]` : t;
+}
+
+/** Webhook timestamps are untrusted: accept ISO or epoch s/ms, never the future, else the time we received it. */
+export function trustedTime(raw: unknown, receivedAt: string): string {
+  const recv = Date.parse(receivedAt);
+  let t = NaN;
+  if (typeof raw === "number" && Number.isFinite(raw)) t = raw < 1e12 ? raw * 1000 : raw;
+  else if (typeof raw === "string" && raw.trim()) {
+    const n = Number(raw);
+    t = Number.isFinite(n) ? (n < 1e12 ? n * 1000 : n) : Date.parse(raw);
+  }
+  // Plausible = not after we received it (5 min clock skew) and not more than 30 days before.
+  if (!Number.isFinite(t) || t > recv + 5 * 60_000 || t < recv - 30 * 24 * 3600_000) return new Date(recv).toISOString();
+  return new Date(t).toISOString();
 }
 
 function snippetOf(text: string, len = 180): string {
@@ -160,8 +190,8 @@ export async function loadReplies(opts: { force?: boolean } = {}): Promise<Repli
       if (e.ue_type != null && e.ue_type !== 2) continue; // received only
       const fromEmail = (e.from_address_email ?? e.lead ?? "").trim();
       const lead = leads.get(fromEmail.toLowerCase());
-      const raw = e.body?.text?.trim() || htmlToText(e.body?.html ?? "") || e.content_preview || "";
-      const text = stripQuoted(raw);
+      const raw = e.body?.text?.trim() || htmlToText(stripQuotedHtml(e.body?.html ?? "")) || e.content_preview || "";
+      const text = capText(stripQuoted(raw));
       const code = e.i_status != null ? String(e.i_status) : lead?.lt_interest_status != null ? String(lead.lt_interest_status) : null;
       const auto = e.is_auto_reply === true || e.is_auto_reply === 1;
       replies.push({
@@ -193,32 +223,41 @@ export async function loadReplies(opts: { force?: boolean } = {}): Promise<Repli
     polledAt.set(k, [...(polledAt.get(k) ?? []), Date.parse(r.at)]);
   }
   const interestByLead = new Map<string, string>();
-  for (const ev of events) {
+  const webhookSeen: { email: string; at: number; fp: string }[] = [];
+  const str = (v: unknown) => (typeof v === "string" ? v : "");
+  // Oldest first, so a retried delivery collapses onto the first copy.
+  for (const ev of [...events].reverse()) {
     const p = ev.payload;
-    const email = String(p.lead_email ?? ev.leadEmail ?? "").trim();
+    const email = (ev.leadEmail ?? "").trim();
     if (!email) continue;
     if (ev.eventType === "lead_interested") interestByLead.set(email.toLowerCase(), "1");
     if (ev.eventType === "lead_meeting_booked") interestByLead.set(email.toLowerCase(), "2");
     if (ev.eventType !== "reply_received" && ev.eventType !== "auto_reply_received") continue;
-    const at = String(p.timestamp ?? ev.receivedAt);
+    const at = trustedTime(p.timestamp, ev.receivedAt);
+    const atMs = Date.parse(at);
     const times = polledAt.get(email.toLowerCase()) ?? [];
-    if (times.some((t) => Math.abs(t - Date.parse(at)) < 10 * 60 * 1000)) continue;
+    if (times.some((t) => Math.abs(t - atMs) < 10 * 60 * 1000)) continue;
     const lead = leads.get(email.toLowerCase());
-    const raw = String(p.reply_text ?? "") || htmlToText(String(p.reply_html ?? "")) || String(p.reply_text_snippet ?? "");
-    const text = stripQuoted(raw);
+    const raw = str(p.reply_text) || htmlToText(stripQuotedHtml(str(p.reply_html))) || str(p.reply_text_snippet);
+    const text = capText(stripQuoted(raw));
+    // Instantly retries deliveries: same person + same words within 15 min = one reply.
+    const fp = `${str(p.reply_subject)}|${text.slice(0, 200)}`;
+    const lower = email.toLowerCase();
+    if (webhookSeen.some((w) => w.email === lower && w.fp === fp && Math.abs(w.at - atMs) < 15 * 60 * 1000)) continue;
+    webhookSeen.push({ email: lower, at: atMs, fp });
     const auto = ev.eventType === "auto_reply_received";
-    const campaignId = (p.campaign_id as string) ?? ev.campaignId ?? null;
+    const campaignId = ev.campaignId ?? null;
     replies.push({
-      key: `w:${email}-${at}`,
+      key: `w:${lower}-${atMs}-${webhookSeen.length}`,
       source: "webhook",
       at,
       fromEmail: email,
       name: [lead?.first_name ?? p.firstName ?? p.first_name, lead?.last_name ?? p.lastName ?? p.last_name]
         .filter((x) => typeof x === "string" && x).join(" ").trim() || null,
-      company: lead?.company_name ?? ((p.companyName ?? p.company_name) as string | undefined) ?? null,
+      company: lead?.company_name ?? (str(p.companyName) || str(p.company_name) || null),
       campaignId,
-      campaign: (p.campaign_name as string) ?? (campaignId ? campaignNames.get(campaignId) ?? null : null),
-      subject: String(p.reply_subject ?? "").trim() || "(no subject)",
+      campaign: str(p.campaign_name) || (campaignId ? campaignNames.get(campaignId) ?? null : null),
+      subject: str(p.reply_subject).trim() || "(no subject)",
       text,
       snippet: snippetOf(text),
       unread: null,

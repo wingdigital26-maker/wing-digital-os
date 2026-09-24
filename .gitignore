@@ -60,3 +60,6 @@ __pycache__/
 # They live in the private wing-os-vault repo (_data/leads/) instead.
 public/data/leads/
 .auto/
+
+# Call Room fallback copy: contact details, shipped by the CLI deploy only
+data/callroom-snapshot.json

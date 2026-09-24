@@ -36,8 +36,9 @@ export function useOrigin(): string {
 
 export const card: React.CSSProperties = {
   background: "var(--bg-card)",
-  border: "1px solid var(--border)",
-  borderRadius: 12,
+  border: "1px solid transparent",
+  borderRadius: "var(--v2-radius)",
+  boxShadow: "var(--v2-shadow)",
   padding: 16,
 };
 export const btn: React.CSSProperties = {
@@ -75,9 +76,11 @@ export const label: React.CSSProperties = {
   marginBottom: 4,
 };
 export const h1: React.CSSProperties = {
-  fontFamily: "'Space Grotesk',sans-serif",
+  fontFamily: "'Space Grotesk','Inter',sans-serif",
   fontSize: 24,
   fontWeight: 700,
+  letterSpacing: "-0.02em",
+  color: "var(--text-primary)",
   margin: 0,
 };
 export const muted: React.CSSProperties = { fontSize: 13, color: "var(--text-muted)" };
@@ -154,13 +157,10 @@ export function StatusPill({ status, text }: { status: string; text?: string }) 
   const color = pillColor(status);
   return (
     <span
+      className="v2-status"
       style={{
-        fontSize: 12,
-        fontWeight: 700,
         color,
-        border: `1px solid ${color}`,
-        borderRadius: 999,
-        padding: "3px 10px",
+        background: `color-mix(in srgb, ${color} 14%, var(--bg-card))`,
         whiteSpace: "nowrap",
       }}
     >

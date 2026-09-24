@@ -247,7 +247,7 @@ export default function CustomersBoard() {
 
       {/* Import box */}
       {slug && showImport && (
-        <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 14, padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+        <div className="v2-card" style={{ padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
           <div style={{ fontSize: 13.5, fontWeight: 600 }}>Import past customers</div>
           <div style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>
             Paste a CSV of this client's past customers. A header row with columns like
@@ -317,7 +317,7 @@ export default function CustomersBoard() {
 
       {/* List / states */}
       {slug && loadErr && (
-        <div style={{ border: "1px solid var(--border)", borderRadius: 14, padding: 16, background: "var(--bg-card)", display: "grid", gap: 8, maxWidth: 560 }}>
+        <div className="v2-card" style={{ padding: 16, display: "grid", gap: 8, maxWidth: 560 }}>
           <div style={{ fontSize: 14, fontWeight: 600 }}>Customers could not be loaded</div>
           <div style={{ fontSize: 13, color: "var(--red)", lineHeight: 1.5 }}>{loadErr}</div>
           <div><button type="button" onClick={load} style={btn}>Retry</button></div>
@@ -325,7 +325,7 @@ export default function CustomersBoard() {
       )}
 
       {slug && !loadErr && reason && (
-        <div style={{ border: "1px solid var(--orange)", borderRadius: 14, padding: 16, background: "var(--bg-card)", fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.55, maxWidth: 620 }}>
+        <div className="v2-card" style={{ borderColor: "var(--orange)", padding: 16, fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.55, maxWidth: 620 }}>
           {reason}
         </div>
       )}
@@ -349,7 +349,7 @@ export default function CustomersBoard() {
             {dncCount > 0 ? ` (${dncCount} opted out and cannot be selected)` : ""}
             {capped ? ". Showing the first 500." : ""}
           </div>
-          <div style={{ border: "1px solid var(--border)", borderRadius: 14, overflow: "hidden" }}>
+          <div className="v2-card" style={{ overflow: "hidden" }}>
             {rows.map((c, i) => {
               const dnc = c.do_not_contact === true;
               const on = selected.has(c.id);

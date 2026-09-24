@@ -1617,8 +1617,8 @@ export function AgentFeed({ entries }: { entries: AgentFeedEntry[] }) {
   const [all, setAll] = useState(false);
   const shown = all ? entries.slice(0, 25) : entries.slice(0, 6);
   return (
-    <section style={{ background: "var(--bg-card, #0d1117)", border: "1px solid var(--border, var(--border))", borderRadius: 12, padding: 16 }}>
-      <h2 style={{ fontSize: 11, letterSpacing: "0.14em", color: "var(--text-muted)", marginBottom: 10 }}>AGENT FEED</h2>
+    <section className="v2-card" style={{ padding: 16 }}>
+      <h2 className="v2-h" style={{ fontSize: 11, letterSpacing: "0.14em", color: "var(--text-muted)", marginBottom: 10 }}>AGENT FEED</h2>
       {entries.length === 0 && (
         <div style={{ fontSize: 12, color: "var(--text-muted)" }}>no agent reports yet</div>
       )}
@@ -1686,7 +1686,7 @@ export function ClientHealthStrip({
   onSelect: (s: Selection) => void;
 }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 14, background: "var(--bg-card, #0d1117)", border: "1px solid var(--border, var(--border))", borderRadius: 12, padding: "10px 16px", flexWrap: "wrap" }}>
+    <div className="v2-card" style={{ display: "flex", alignItems: "center", gap: 14, padding: "10px 16px", flexWrap: "wrap" }}>
       <span style={{ fontSize: 10, letterSpacing: "0.12em", color: "var(--text-muted)" }}>CLIENT HEALTH</span>
       {health.clients.length === 0 && (
         <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
@@ -1721,12 +1721,11 @@ function SlideOver({ title, accent, onClose, children }: {
   const overlay = (
     <div style={{ position: "fixed", inset: 0, zIndex: 200 }}>
       <div onClick={close} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)" }} />
-      <div className="mo-panel" style={{
+      <div className="mo-panel v2-card" style={{
         position: "absolute", top: 0, right: 0, bottom: 0,
         width: "min(480px, 94vw)",
-        background: "var(--bg-secondary, #0a0d14)",
+        borderRadius: 0,
         borderLeft: `1px solid ${accent}55`,
-        boxShadow: "-12px 0 40px rgba(0,0,0,0.5)",
         display: "flex", flexDirection: "column",
       }}>
         {/* tap-close handle target (styled as a grab handle on the phone bottom sheet) */}

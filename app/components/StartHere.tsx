@@ -171,13 +171,12 @@ export default function StartHere() {
   }
 
   return (
-    <section className="start-here" aria-label="Start here" style={{
-      border: "1px solid var(--border)", borderRadius: 16, padding: "18px 20px",
-      background: "var(--bg-card)", boxShadow: "0 8px 24px var(--bg-hover)",
+    <section className="start-here v2-card" aria-label="Start here" style={{
+      padding: "18px 20px",
     }}>
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
         <div style={{ minWidth: 0 }}>
-          <h2 style={{ fontSize: 16, fontWeight: 800, color: "var(--text-primary)" }}>Start here</h2>
+          <h2 className="v2-h" style={{ fontSize: 16 }}>Start here</h2>
           <p style={{ fontSize: 12.5, color: "var(--text-secondary)", marginTop: 3 }}>
             This is your whole business in one place. Tap a section to open it.
           </p>
@@ -208,14 +207,13 @@ export default function StartHere() {
           );
           const style: React.CSSProperties = {
             display: "flex", gap: 10, alignItems: "flex-start", textAlign: "left",
-            padding: "12px 14px", borderRadius: 12, cursor: "pointer",
-            border: "1px solid var(--border)", background: "var(--bg-secondary)",
-            color: "inherit", textDecoration: "none", width: "100%", minHeight: 0,
+            padding: "12px 14px", cursor: "pointer", border: "none",
+            color: "inherit", textDecoration: "none", width: "100%", minHeight: 44,
           };
           return typeof t.view === "string" ? (
-            <button key={t.name} type="button" className="start-here-tile" style={style} onClick={() => goToView(t.view as string)}>{inner}</button>
+            <button key={t.name} type="button" className="start-here-tile v2-inner v2-lift" style={style} onClick={() => goToView(t.view as string)}>{inner}</button>
           ) : (
-            <a key={t.name} href={t.href ?? "#"} className="start-here-tile" style={style}>{inner}</a>
+            <a key={t.name} href={t.href ?? "#"} className="start-here-tile v2-inner v2-lift" style={style}>{inner}</a>
           );
         })}
       </div>
@@ -272,10 +270,10 @@ export function TodayStrip() {
   }
 
   const overdue = s.tasks_overdue;
-  const tiles: TodayTile[] = [
-    { label: "Tasks due today", value: s.tasks_due_today, hint: overdue ? `${overdue} overdue` : null, href: "/automations/tasks" },
-    { label: "New leads this week", value: s.new_leads_7d, href: "/automations/runs" },
-    { label: "Automations running", value: s.automations_active, href: "/automations" },
+  const tiles: (TodayTile & { variant: "amber" | "blue" | "violet" })[] = [
+    { label: "Tasks due today", value: s.tasks_due_today, hint: overdue ? `${overdue} overdue` : null, href: "/automations/tasks", variant: "amber" },
+    { label: "New leads this week", value: s.new_leads_7d, href: "/automations/runs", variant: "blue" },
+    { label: "Automations running", value: s.automations_active, href: "/automations", variant: "violet" },
     // 2026-09-22: "Calls booked, next 7 days", "Open deals" and "Unread texts"
     // were removed. Each pointed at a surface deleted the same day -- the
     // booking calendar, the deals grid inside Contacts, and the texting tab.
@@ -291,27 +289,27 @@ export function TodayStrip() {
           const known = typeof t.value === "number";
           const inner = (
             <>
-              <span style={{
-                display: "block", fontSize: known ? 24 : 12.5, fontWeight: known ? 800 : 600, lineHeight: 1.2,
-                color: known ? "var(--text-primary)" : "var(--text-muted)",
-                fontFamily: known ? "'Space Grotesk', sans-serif" : undefined,
+              <div className="v2-icon-chip" aria-hidden="true" style={{ width: 32, height: 32 }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" /></svg>
+              </div>
+              <span className="v2-tile__num" style={{
+                fontSize: known ? 24 : 13, color: known ? "var(--text-primary)" : "var(--text-muted)",
               }}>
                 {known ? t.value!.toLocaleString() : "not available"}
               </span>
-              <span style={{ display: "block", fontSize: 11, color: "var(--text-secondary)", marginTop: 4, lineHeight: 1.3 }}>
+              <span className="v2-tile__label" style={{ color: "var(--text-secondary)" }}>
                 {t.label}{t.hint ? <span style={{ color: "var(--orange)" }}> · {t.hint}</span> : null}
               </span>
             </>
           );
           const style: React.CSSProperties = {
-            display: "block", textAlign: "left", padding: "12px 14px", borderRadius: 12, cursor: "pointer",
-            border: "1px solid var(--border)", background: "var(--bg-card)", color: "inherit",
-            textDecoration: "none", width: "100%", minHeight: 0,
+            display: "flex", flexDirection: "column", gap: 6, textAlign: "left", cursor: "pointer",
+            color: "inherit", textDecoration: "none", width: "100%",
           };
           return typeof t.view === "string" ? (
-            <button key={t.label} type="button" style={style} title={`Open ${t.label.toLowerCase()}`} onClick={() => goToView(t.view as string)}>{inner}</button>
+            <button key={t.label} type="button" className={`v2-tile v2-tile--${t.variant} v2-lift`} style={style} title={`Open ${t.label.toLowerCase()}`} onClick={() => goToView(t.view as string)}>{inner}</button>
           ) : (
-            <a key={t.label} href={t.href ?? "#"} style={style} title={`Open ${t.label.toLowerCase()}`}>{inner}</a>
+            <a key={t.label} href={t.href ?? "#"} className={`v2-tile v2-tile--${t.variant} v2-lift`} style={style} title={`Open ${t.label.toLowerCase()}`}>{inner}</a>
           );
         })}
       </div>

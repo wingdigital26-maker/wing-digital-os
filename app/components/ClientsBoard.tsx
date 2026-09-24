@@ -65,19 +65,13 @@ export default function ClientsBoard() {
           // Active clients is the ROSTER count, not "clients who happen to have
           // a figure on file" — those are different questions and were being
           // answered with the same number.
-          { label: "Active clients", v: activeCount, c: "var(--green)" },
-          { label: "MRR", v: `$${payingMrr.toLocaleString()}`, c: "var(--accent)" },
-          { label: "Pipeline (not revenue)", v: `$${pipelineTotal.toLocaleString()}`, c: "var(--orange)" },
+          { label: "Active clients", v: activeCount, variant: "green" },
+          { label: "MRR", v: `$${payingMrr.toLocaleString()}`, variant: "blue" },
+          { label: "Pipeline (not revenue)", v: `$${pipelineTotal.toLocaleString()}`, variant: "amber" },
         ].map(s => (
-          <div key={s.label} style={{
-            background: `radial-gradient(ellipse 90% 70% at 50% -20%, ${s.c}14, transparent 60%), linear-gradient(180deg, var(--bg-card), var(--bg-card))`,
-            border: "1px solid var(--border)", borderRadius: 14, padding: "14px 18px",
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-              <span style={{ width: 6, height: 6, borderRadius: "50%", background: s.c, boxShadow: `0 0 8px ${s.c}` }} />
-              <p style={{ fontSize: 10.5, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>{s.label}</p>
-            </div>
-            <p style={{ fontSize: 26, fontWeight: 800, color: s.c, fontFamily: "'Space Grotesk', sans-serif", lineHeight: 1 }}>{s.v}</p>
+          <div key={s.label} className={`v2-tile v2-tile--${s.variant}`}>
+            <p className="v2-tile__label">{s.label}</p>
+            <p className="v2-tile__num">{s.v}</p>
           </div>
         ))}
       </div>
@@ -102,11 +96,8 @@ export default function ClientsBoard() {
               onClick={() => { if (!c.dashboardUrl) return; sfx.play("nav"); window.open(c.dashboardUrl, "_blank", "noopener"); }}
               onKeyDown={(e) => { if (c.dashboardUrl && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); window.open(c.dashboardUrl, "_blank", "noopener"); } }}
               title={c.dashboardUrl ? "Open this client's dashboard" : "No dashboard yet"}
-              style={{
-                background: "radial-gradient(ellipse 90% 70% at 50% -20%, rgba(52,211,153,0.12), transparent 60%), linear-gradient(180deg, var(--bg-card), var(--bg-card))",
-                border: "1px solid rgba(52,211,153,0.35)",
-                borderRadius: 14, padding: "16px 18px", cursor: c.dashboardUrl ? "pointer" : "default",
-              }}>
+              className="v2-card v2-lift"
+              style={{ padding: "16px 18px", cursor: c.dashboardUrl ? "pointer" : "default" }}>
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
                 <div style={{ display: "flex", gap: 10, alignItems: "center", minWidth: 0 }}>
                   <span style={{ fontSize: 20 }}>{icon}</span>
@@ -137,7 +128,7 @@ export default function ClientsBoard() {
                 {c.location && (
                   <span style={{ fontSize: 10, fontWeight: 600, color: "var(--text-muted)", background: "rgba(255,255,255,0.05)", padding: "2px 9px", borderRadius: 999 }}>{c.location}</span>
                 )}
-                <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 9px", borderRadius: 999, color: "var(--green)", background: "rgba(52,211,153,0.1)" }}>active</span>
+                <span className="v2-status v2-status--ok">active</span>
               </div>
               {/* No per-client CRM filter exists yet, so this is one generic
                   link into the CRM rather than a count that would be a guess. */}
@@ -199,10 +190,8 @@ export default function ClientsBoard() {
                   <div key={c.file}
                     onClick={() => { sfx.play("blip"); setHealthClient(c.name); }}
                     title="Click for client health"
-                    style={{
-                      background: "linear-gradient(180deg, var(--bg-card), var(--bg-card))",
-                      border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", cursor: "pointer",
-                    }}>
+                    className="v2-card v2-lift"
+                    style={{ padding: "12px 14px", cursor: "pointer" }}>
                     <div style={{ display: "flex", gap: 9, alignItems: "center", minWidth: 0 }}>
                       <span style={{ fontSize: 16 }}>{icon}</span>
                       <div style={{ minWidth: 0 }}>

@@ -603,9 +603,9 @@ const HANDOVER_NOTE =
 
 function Note({ text, tone = "var(--orange)" }: { text: string; tone?: string }) {
   return (
-    <div style={{
-      border: `1px solid ${tone}`, borderRadius: 10, padding: "9px 12px",
-      background: "var(--bg-card)", fontSize: 12, lineHeight: 1.55, color: tone,
+    <div className="v2-inner" style={{
+      border: `1px solid ${tone}`, padding: "9px 12px",
+      fontSize: 12, lineHeight: 1.55, color: tone,
     }}>
       {text}
     </div>
@@ -615,7 +615,7 @@ function Note({ text, tone = "var(--orange)" }: { text: string; tone?: string })
 function BlockerCell({ blockers }: { blockers: Blocker[] }) {
   if (blockers.length === 0) {
     return (
-      <span style={{ fontSize: 11.5, color: "var(--green)", fontWeight: 600 }}>
+      <span className="v2-status v2-status--ok" style={{ fontSize: 11.5 }}>
         nothing blocking it
       </span>
     );
@@ -626,11 +626,8 @@ function BlockerCell({ blockers }: { blockers: Blocker[] }) {
         <span
           key={b.code}
           title={b.detail}
-          style={{
-            fontSize: 10.5, fontWeight: 700, color: "var(--red)",
-            border: "1px solid var(--red)", borderRadius: 6, padding: "1px 7px",
-            whiteSpace: "nowrap",
-          }}
+          className="v2-status v2-status--bad"
+          style={{ fontSize: 10.5, whiteSpace: "nowrap" }}
         >
           {b.label}
         </span>
@@ -671,9 +668,10 @@ function PipelineDetail({ row, onClose, onViewContact }: {
       role="region"
       aria-label={`Full details for ${row.key}`}
       onClick={(e) => e.stopPropagation()}
+      className="v2-card"
       style={{
-        border: "1px solid var(--accent)", borderRadius: 12, padding: "14px 16px",
-        background: "var(--bg-secondary)", display: "flex", flexDirection: "column", gap: 12,
+        border: "1px solid var(--accent)", padding: "14px 16px",
+        display: "flex", flexDirection: "column", gap: 12,
       }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
@@ -1312,7 +1310,6 @@ export default function CrmWorkspace({
     return (
       <div key={r.key} style={{ display: "grid", gap: 8 }}>
         <div
-          className="crm-row"
           role="button"
           tabIndex={0}
           title={TYPE_LABEL[r.type]}
@@ -1320,11 +1317,11 @@ export default function CrmWorkspace({
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openRow(r); }
           }}
+          className="crm-row v2-inner v2-lift"
           style={{
-            border: `1px solid ${isOpen ? "var(--accent)" : "var(--border)"}`,
+            border: `1px solid ${isOpen ? "var(--accent)" : "transparent"}`,
             borderLeft: `3px solid ${STATUS_COLOR[r.status]}`,
-            borderRadius: 10, padding: "8px 12px", cursor: "pointer",
-            background: "var(--bg-card)",
+            padding: "8px 12px", cursor: "pointer", minHeight: 52,
           }}
         >
           <div className="crm-row-main">
@@ -1335,16 +1332,20 @@ export default function CrmWorkspace({
             {n > 0 && (
               <span
                 title={r.blockers.map((b) => `${b.label}: ${b.detail}`).join("\n\n")}
-                style={{
-                  fontSize: 10.5, fontWeight: 700, color: "var(--red)",
-                  border: "1px solid var(--red)", borderRadius: 6, padding: "1px 7px",
-                  whiteSpace: "nowrap",
-                }}
+                className="v2-status v2-status--bad"
+                style={{ fontSize: 10.5, whiteSpace: "nowrap" }}
               >
                 {n === 1 ? r.blockers[0].label : `${n} things blocking it`}
               </span>
             )}
-            <span style={{ fontSize: 11.5, fontWeight: 700, color: STATUS_COLOR[r.status], whiteSpace: "nowrap" }}>
+            <span
+              className="v2-status"
+              style={{
+                color: STATUS_COLOR[r.status],
+                background: `color-mix(in srgb, ${STATUS_COLOR[r.status]} 14%, var(--bg-card))`,
+                whiteSpace: "nowrap",
+              }}
+            >
               {r.statusText}
             </span>
             <span style={{ fontSize: 11, color: "var(--text-muted)", whiteSpace: "nowrap" }}>
@@ -1405,7 +1406,7 @@ export default function CrmWorkspace({
 
       {/* ── Header: search, add, refresh ─────────────────────────────────── */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
-        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "var(--text-primary)" }}>
+        <h2 className="v2-h" style={{ margin: 0, fontSize: 18 }}>
           CRM
         </h2>
         <input
@@ -1440,9 +1441,9 @@ export default function CrmWorkspace({
       </div>
 
       {addOpen && (
-        <div style={{
-          border: "1px solid var(--accent)", borderRadius: 12, padding: "12px 14px",
-          background: "var(--bg-card)", display: "grid", gap: 10,
+        <div className="v2-card" style={{
+          border: "1px solid var(--accent)", padding: "12px 14px",
+          display: "grid", gap: 10,
         }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>New contact</div>
           <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))" }}>
@@ -1486,29 +1487,24 @@ export default function CrmWorkspace({
 
       {/* ── The three pills + filters ────────────────────────────────────── */}
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-        {pills.map((p) => {
-          const on = pane === p.id;
-          return (
-            <button
-              key={p.id}
-              type="button"
-              className="crm-pane-pill"
-              onClick={() => choosePane(p.id)}
-              aria-pressed={on}
-              style={{
-                fontWeight: on ? 700 : 500,
-                border: `1px solid ${on ? "var(--accent)" : "var(--border)"}`,
-                background: on ? "var(--accent-glow)" : "transparent",
-                color: on ? "var(--accent)" : "var(--text-secondary)",
-              }}
-            >
-              {p.label}
-              <span style={{ marginLeft: 6, fontWeight: 700, color: on ? "var(--accent)" : "var(--text-muted)" }}>
-                {loading && rows.length === 0 ? "" : p.count.toLocaleString("en-US")}
-              </span>
-            </button>
-          );
-        })}
+        <div className="v2-pills">
+          {pills.map((p) => {
+            const on = pane === p.id;
+            return (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => choosePane(p.id)}
+                aria-selected={on}
+              >
+                {p.label}
+                <span style={{ marginLeft: 6, fontWeight: 700, opacity: on ? 1 : 0.7 }}>
+                  {loading && rows.length === 0 ? "" : p.count.toLocaleString("en-US")}
+                </span>
+              </button>
+            );
+          })}
+        </div>
 
         <button
           type="button"
@@ -1528,9 +1524,8 @@ export default function CrmWorkspace({
       </div>
 
       {more && (
-        <div style={{
-          border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px",
-          background: "var(--bg-card)", display: "grid", gap: 10,
+        <div className="v2-card" style={{
+          padding: "12px 14px", display: "grid", gap: 10,
         }}>
           <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
             {pane !== "contacts" && (
@@ -1596,8 +1591,8 @@ export default function CrmWorkspace({
           ))}
         </div>
       ) : pane === null ? null : filtered.length === 0 ? (
-        <div style={{
-          border: "1px dashed var(--border)", borderRadius: 12, padding: 18,
+        <div className="v2-inner" style={{
+          border: "1px dashed var(--border)", padding: 18,
           fontSize: 13, color: "var(--text-muted)", lineHeight: 1.6,
         }}>
           {rows.length === 0 ? (

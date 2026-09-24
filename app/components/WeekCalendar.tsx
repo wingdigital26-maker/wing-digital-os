@@ -188,7 +188,7 @@ export default function WeekCalendar({
   }
 
   return (
-    <div className="cal-time" style={{ display: "flex", flexDirection: "column", gap: 0, background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 14, overflow: "hidden" }}>
+    <div className="cal-time v2-card" style={{ display: "flex", flexDirection: "column", gap: 0, overflow: "hidden" }}>
       <style>{`
         .app-view .cal-time-row { grid-template-columns: 48px repeat(var(--cal-cols, 7), minmax(0, 1fr)) !important; }
         @media (max-width: 768px) {
@@ -337,7 +337,7 @@ export default function WeekCalendar({
                 .join(" · ")}
             </p>
             {selected.status ? (
-              <span style={{ fontSize: 10, color: colorFor(selected), fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+              <span className="v2-status" style={{ color: colorFor(selected), background: `color-mix(in srgb, ${colorFor(selected)} 12%, var(--bg-card))`, marginTop: 4, textTransform: "uppercase", letterSpacing: "0.04em" }}>
                 {selected.status.replace("_", " ")}
               </span>
             ) : null}

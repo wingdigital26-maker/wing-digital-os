@@ -130,21 +130,20 @@ export default function SeoBoard() {
       )}
 
       {/* Filters */}
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 14 }}>
-        <button style={chip(clientFilter === null && typeFilter === null)} onClick={() => { setClientFilter(null); setTypeFilter(null); }}>All</button>
+      <div className="v2-pills" role="tablist" style={{ marginTop: 14 }}>
+        <button aria-selected={clientFilter === null && typeFilter === null} onClick={() => { setClientFilter(null); setTypeFilter(null); }}>All</button>
         {feeds.filter(f => f.state === "ok").map(f => (
-          <button key={f.slug} style={chip(clientFilter === f.slug)}
+          <button key={f.slug} aria-selected={clientFilter === f.slug}
             onClick={() => setClientFilter(c => (c === f.slug ? null : f.slug))}>{f.name}</button>
         ))}
-        <span style={{ width: 8 }} />
         {typesPresent.map(t => (
-          <button key={t} style={chip(typeFilter === t)}
+          <button key={t} aria-selected={typeFilter === t}
             onClick={() => setTypeFilter(v => (v === t ? null : t))}>{t}</button>
         ))}
       </div>
 
       {/* Feed */}
-      <div style={{ marginTop: 14, border: "1px solid var(--border)", borderRadius: 12, background: "var(--bg-card)", overflow: "hidden" }}>
+      <div className="v2-card" style={{ marginTop: 14, overflow: "hidden" }}>
         {!allLoaded && merged.length === 0 && (
           <div style={{ padding: 18, fontSize: 13, color: "var(--text-muted)" }}>Loading the live sites…</div>
         )}

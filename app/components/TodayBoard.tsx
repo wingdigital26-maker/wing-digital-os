@@ -188,9 +188,6 @@ function trunc(s: string, n: number): string {
 // ── Presentational bits (inline styles, existing CSS tokens only) ──────────
 
 const card: React.CSSProperties = {
-  background: "var(--bg-card)",
-  border: "1px solid var(--border)",
-  borderRadius: 12,
   padding: "14px 16px",
   display: "flex",
   flexDirection: "column",
@@ -218,14 +215,10 @@ const rowBtn: React.CSSProperties = {
 function Badge({ color, children }: { color: string; children: React.ReactNode }) {
   return (
     <span
+      className="v2-status"
       style={{
         color,
-        border: `1px solid ${color}`,
-        borderRadius: 999,
-        padding: "1px 8px",
-        fontSize: 11,
-        fontWeight: 600,
-        whiteSpace: "nowrap",
+        background: `color-mix(in srgb, ${color} 12%, var(--bg-card))`,
         textTransform: "uppercase",
         letterSpacing: "0.04em",
       }}
@@ -264,7 +257,7 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section style={card}>
+    <section className="v2-card" style={card}>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "var(--text-primary)", flex: 1 }}>
           {title}

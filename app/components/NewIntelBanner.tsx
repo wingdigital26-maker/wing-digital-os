@@ -44,11 +44,11 @@ export default function NewIntelBanner() {
   return (
     <section
       role="status"
+      className="v2-card"
       style={{
         display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
-        border: "1px solid var(--border)", borderLeft: "3px solid var(--accent)",
-        borderRadius: 12, padding: "10px 14px", marginBottom: 14,
-        background: "var(--bg-card)",
+        borderLeft: "3px solid var(--accent)",
+        padding: "10px 14px", marginBottom: 14,
       }}
     >
       <span aria-hidden style={{ fontSize: 16 }}>📺</span>

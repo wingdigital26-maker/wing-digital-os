@@ -322,107 +322,86 @@ export default function Home() {
 
       {/* Sidebar (desktop side rail; hidden on phone in favor of the bottom tab bar) */}
       <aside className="app-sidebar" style={{
-        width: sidebarOpen ? 220 : 60,
-        background: "var(--bg-secondary)",
+        width: 92,
+        background: "var(--bg-card)",
         borderRight: "1px solid var(--border)",
-        display: "flex", flexDirection: "column",
-        transition: "width 0.2s ease",
-        flexShrink: 0, overflow: "hidden",
+        display: "flex", flexDirection: "column", alignItems: "center",
+        flexShrink: 0, overflow: "hidden", padding: "18px 0 12px",
       }}>
-        <div style={{
-          padding: "20px 16px", borderBottom: "1px solid var(--border)",
-          display: "flex", alignItems: "center", gap: 10,
-        }}>
-          <div style={{
-            width: 32, height: 32, borderRadius: 8,
-            background: "linear-gradient(135deg, #3D6BF0, #1E44B8)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 16, flexShrink: 0, fontWeight: 700,
-          }}>W</div>
-          {sidebarOpen && (
-            <span style={{ fontWeight: 700, fontSize: 14, color: "var(--text-primary)", whiteSpace: "nowrap" }}>
-              Wing Digital OS
-            </span>
-          )}
-        </div>
+        {/* Dashboards V2 icon rail (2026-09-24): brand mark, then icon + short
+            label per section; the active section gets a filled Wing-blue tile. */}
+        <div title="Wing Digital OS" style={{
+          width: 44, height: 44, borderRadius: 14, marginBottom: 18,
+          background: "linear-gradient(135deg, #3D6BF0, #1E44B8)", color: "#fff",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 18, fontWeight: 700, fontFamily: "'Space Grotesk', Inter, sans-serif",
+          boxShadow: "var(--v2-shadow)",
+        }}>W</div>
 
-        <nav style={{ flex: 1, padding: "12px 8px", display: "flex", flexDirection: "column", gap: 2 }}>
+        <nav aria-label="Main" style={{ flex: 1, width: "100%", padding: "0 8px", display: "flex", flexDirection: "column", gap: 4, overflowY: "auto" }}>
           {railNav.map(item => {
             const isActive = groupOf(active).id === item.id;
             const hasBadge = item.id === "command" && newLeadCount > 0;
             return (
               <button key={item.id} onClick={() => {
                 sfx.play("nav");
-                // A group whose first sub is a routed page (Automations) has
-                // no in-shell view to mount, so the icon navigates instead.
                 const href = EXTERNAL_SUB_LINKS[item.subs[0].id];
                 if (href) { window.location.href = href; return; }
                 setActive(item.subs[0].id);
                 if (item.id === "command") setNewLeadCount(0);
               }}
-              // Plain-English hover hint; doubly useful when the rail is
-              // collapsed to icons only.
               title={item.hint}
+              aria-current={isActive ? "page" : undefined}
+              className="v2-rail-btn"
               style={{
-                display: "flex", alignItems: "center", gap: 10,
-                padding: "10px 10px", borderRadius: 8, border: "none",
-                background: isActive ? "var(--accent-glow)" : "transparent",
-                borderLeft: isActive ? "2px solid var(--accent)" : "2px solid transparent",
+                display: "flex", flexDirection: "column", alignItems: "center", gap: 5,
+                padding: "6px 2px", minHeight: 64, border: "none", background: "transparent",
                 color: isActive ? "var(--text-primary)" : "var(--text-secondary)",
-                cursor: "pointer", width: "100%", textAlign: "left",
-                fontSize: 13, fontWeight: isActive ? 600 : 400,
-                transition: "all 0.15s", position: "relative",
+                cursor: "pointer", width: "100%", position: "relative",
+                fontSize: 11, fontWeight: isActive ? 700 : 500, lineHeight: 1.15, textAlign: "center",
               }}>
-                <span style={{ display: "inline-flex", flexShrink: 0, position: "relative", color: "currentColor" }}>
-                  <item.icon size={16} />
+                <span style={{
+                  width: 42, height: 42, borderRadius: 13, display: "grid", placeItems: "center",
+                  position: "relative",
+                  background: isActive ? "var(--accent)" : "transparent",
+                  color: isActive ? "#fff" : "currentColor",
+                  boxShadow: isActive ? "0 6px 16px var(--accent-glow)" : "none",
+                  transition: "background-color .2s ease-out, color .2s ease-out",
+                }} className={isActive ? undefined : "v2-rail-icon"}>
+                  <item.icon size={18} />
                   {hasBadge && (
                     <span style={{
-                      position: "absolute", top: -4, right: -6,
+                      position: "absolute", top: -3, right: -3,
                       background: "var(--red)", color: "#fff",
                       fontSize: 9, fontWeight: 700, borderRadius: 20,
-                      padding: "1px 4px", minWidth: 14, textAlign: "center",
+                      padding: "1px 4px", minWidth: 15, textAlign: "center",
                       lineHeight: "14px",
                     }}>{newLeadCount}</span>
                   )}
                 </span>
-                {sidebarOpen && <span style={{ whiteSpace: "nowrap" }}>{item.label}</span>}
+                <span>{item.label}</span>
               </button>
             );
           })}
         </nav>
-
-        {/* NOTE: the sidebar Jarvis launcher was removed — it was a second AI
-            trigger sitting bottom-left (right by the Da Boss chip), duplicating
-            the floating Jarvis FAB (JarvisButton, bottom-right). Jarvis is now
-            reached from exactly ONE place per screen: the FAB on desktop and the
-            Jarvis tab in the bottom bar on phone. */}
-
-        <button onClick={toggleSidebar} title={sidebarOpen ? "Collapse the menu" : "Show menu names"} style={{
-          margin: "8px", padding: "8px", borderRadius: 8, border: "none",
-          background: "transparent", color: "var(--text-muted)",
-          cursor: "pointer", fontSize: 16,
-        }}>
-          {sidebarOpen ? "◀" : "▶"}
-        </button>
       </aside>
 
       {/* Main */}
       <main className="app-main" style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <header className="app-header" style={{
-          padding: "16px 24px", borderBottom: "1px solid var(--border)",
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          background: "var(--bg-secondary)", flexShrink: 0,
+          padding: "14px 28px", borderBottom: "1px solid var(--border)",
+          display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16,
+          background: "var(--bg-primary)", flexShrink: 0,
         }}>
-          <div>
-            <h1 style={{ fontSize: 18, fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}>
-              {(() => { const Icon = groupOf(active).icon; return <Icon size={18} />; })()}
+          <div style={{ minWidth: 0 }}>
+            <h1 className="v2-h" style={{ fontSize: 24, display: "flex", alignItems: "center", gap: 10 }}>
               {groupOf(active).label}
             </h1>
-            <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
+            <p style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 3 }}>
               {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
             </p>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div className="v2-topbar-tools" style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <SfxMuteButton />
             <Search onOpenNote={handleSearchOpenNote} />
             <AccountMenu role={role} email={meEmail} />
@@ -435,27 +414,19 @@ export default function Home() {
           // or deep-link landing there is never trapped on a tab-less view.
           const subs = groupOf(active).subs.filter(s => !hiddenViews.has(s.id) && !(isPhone && MOBILE_HIDDEN_SUBS.has(s.id) && s.id !== active));
           return subs.length > 1 && (
-          <div style={{
-            display: "flex", gap: 6, padding: "10px 24px 0 24px",
-            background: "var(--bg-primary)", flexShrink: 0, flexWrap: "wrap",
-          }}>
+          <div style={{ padding: "16px 28px 0", background: "var(--bg-primary)", flexShrink: 0 }}>
+            <div className="v2-pills" role="tablist" aria-label={`${groupOf(active).label} views`}>
             {subs.map(sub => (
-              <button key={sub.id} onClick={() => {
+              <button key={sub.id} role="tab" aria-selected={active === sub.id} onClick={() => {
                 sfx.play("nav");
                 const href = EXTERNAL_SUB_LINKS[sub.id];
                 if (href) { window.location.href = href; return; }
                 setActive(sub.id);
-              }} style={{
-                padding: "7px 16px", borderRadius: 999, fontSize: 12.5, cursor: "pointer",
-                fontWeight: active === sub.id ? 700 : 500,
-                border: active === sub.id ? "1px solid var(--accent)" : "1px solid var(--border)",
-                background: active === sub.id ? "var(--accent-glow)" : "transparent",
-                color: active === sub.id ? "var(--accent)" : "var(--text-secondary)",
-                transition: "all 0.15s",
               }}>
                 {sub.label}
               </button>
             ))}
+            </div>
           </div>
           );
         })()}
@@ -463,7 +434,7 @@ export default function Home() {
         <div
           ref={scrollRef}
           className="app-scroll"
-          style={{ flex: 1, overflow: "auto", padding: "24px" }}
+          style={{ flex: 1, overflow: "auto", padding: "24px 28px 32px" }}
           onTouchStart={onTouchStart}
           onTouchMove={onTouchMove}
           onTouchEnd={onTouchEnd}
@@ -876,24 +847,38 @@ function CommandCenter({ data, loading }: { data: any; loading: boolean }) {
       {/* Basic MRR, first thing on the page (2026-09-15, Jack). Deliberately
           minimal — just the number and the client count. The expiry/pipeline
           detail and the standalone MRR tile that used to live lower down were
-          removed; this one line is the whole MRR story now. */}
+          removed; this one line is the whole MRR story now.
+          2026-09-24: restyled to Dashboards V2 pastel KPI tiles (same tokens,
+          same two real numbers — nothing invented). */}
       <motion.div variants={riseItem} style={{
-        display: "flex", alignItems: "baseline", gap: 14, flexWrap: "wrap",
-        background: "linear-gradient(180deg, var(--bg-card), var(--bg-card))",
-        border: "1px solid var(--border)", borderRadius: 14, padding: "14px 20px",
-        boxShadow: "0 8px 24px var(--bg-hover)",
+        display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14,
       }}>
-        <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.09em", color: "var(--text-muted)" }}>Making this month</span>
-        {typeof data?.mrr === "number" ? (
-          <span style={{ fontSize: 30, fontWeight: 800, color: "var(--green)", lineHeight: 1, fontFamily: "'Space Grotesk', sans-serif" }}>${data.mrr.toLocaleString()}</span>
-        ) : (
-          <span style={{ fontSize: 20, fontWeight: 700, color: "var(--text-muted)" }}>{loading ? "..." : "unavailable"}</span>
-        )}
-        {typeof data?.activeClientCount === "number" && (
-          <span style={{ fontSize: 12.5, color: "var(--text-muted)" }}>
-            {data.activeClientCount} active client{data.activeClientCount === 1 ? "" : "s"}
-          </span>
-        )}
+        <div className="v2-tile v2-tile--green">
+          <div className="v2-icon-chip" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>
+          </div>
+          <div>
+            {typeof data?.mrr === "number" ? (
+              <div className="v2-tile__num">${data.mrr.toLocaleString()}</div>
+            ) : (
+              <div className="v2-tile__num" style={{ fontSize: 22, color: "var(--text-muted)" }}>{loading ? "..." : "unavailable"}</div>
+            )}
+            <div className="v2-tile__label" style={{ color: "var(--text-secondary)" }}>Making this month</div>
+          </div>
+        </div>
+        <div className="v2-tile v2-tile--blue">
+          <div className="v2-icon-chip" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+          </div>
+          <div>
+            {typeof data?.activeClientCount === "number" ? (
+              <div className="v2-tile__num">{data.activeClientCount}</div>
+            ) : (
+              <div className="v2-tile__num" style={{ fontSize: 22, color: "var(--text-muted)" }}>{loading ? "..." : "unavailable"}</div>
+            )}
+            <div className="v2-tile__label" style={{ color: "var(--text-secondary)" }}>Active client{data?.activeClientCount === 1 ? "" : "s"}</div>
+          </div>
+        </div>
       </motion.div>
       {/* Start here + Today: the map and the numbers that change what you do
           next, before anything else. Built for someone who is not Jack. */}

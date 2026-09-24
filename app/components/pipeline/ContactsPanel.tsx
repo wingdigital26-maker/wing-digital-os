@@ -69,16 +69,17 @@ export default function ContactsPanel({
         value={q}
         onChange={(e) => { setQ(e.target.value); setOffset(0); }}
         placeholder="Search business, person, phone, email"
+        className="v2-inner"
         style={{
-          width: "100%", padding: "10px 12px", fontSize: 15, borderRadius: 10,
-          border: "1px solid var(--border)", background: "var(--bg-card)",
+          width: "100%", padding: "10px 12px", fontSize: 16,
+          border: "1px solid var(--border)",
           color: "inherit", boxSizing: "border-box",
         }}
       />
 
       {err && (
-        <div style={{
-          border: "1px solid var(--red)", borderRadius: 10, padding: 12,
+        <div className="v2-inner" style={{
+          border: "1px solid var(--red)", padding: 12,
           color: "var(--red)", fontSize: 13,
         }}>
           {err}
@@ -102,10 +103,10 @@ export default function ContactsPanel({
               key={c.id}
               type="button"
               onClick={() => { setOpen(c); setReloadKey((k) => k + 1); }}
+              className="v2-card v2-lift"
               style={{
                 textAlign: "left", cursor: "pointer",
-                border: "1px solid var(--border)", borderRadius: 10,
-                background: "var(--bg-card)", padding: 12, color: "inherit",
+                padding: 12, color: "inherit", minHeight: 44,
               }}
             >
               <div style={{ fontWeight: 600, fontSize: 15 }}>{c.business_name}</div>
@@ -397,10 +398,7 @@ export function ContactDetail({
                   {c.trade ? ` · ${c.trade}` : ""}
                 </div>
                 {c.do_not_contact && (
-                  <div style={{
-                    display: "inline-block", marginTop: 6, fontSize: 12, fontWeight: 700,
-                    color: "var(--red)", border: "1px solid var(--red)", borderRadius: 6, padding: "2px 8px",
-                  }}>
+                  <div className="v2-status v2-status--bad" style={{ marginTop: 6 }}>
                     Do not contact{c.dnc_reason ? `: ${c.dnc_reason}` : ""}
                   </div>
                 )}
@@ -413,8 +411,8 @@ export function ContactDetail({
         </div>
 
         {err && (
-          <div style={{
-            border: "1px solid var(--red)", borderRadius: 10, padding: 12,
+          <div className="v2-inner" style={{
+            border: "1px solid var(--red)", padding: 12,
             color: "var(--red)", fontSize: 13,
           }}>
             {err}
@@ -422,7 +420,7 @@ export function ContactDetail({
         )}
 
         {data && data.errors && data.errors.length > 0 && (
-          <div style={{ border: "1px solid var(--orange)", borderRadius: 10, padding: 10, fontSize: 12, color: "var(--orange)" }}>
+          <div className="v2-inner" style={{ border: "1px solid var(--orange)", padding: 10, fontSize: 12, color: "var(--orange)" }}>
             Some of the history for this contact could not be loaded: {data.errors.map((e) => e.list).join(", ")}.
             What is shown below is incomplete.
           </div>
@@ -579,7 +577,7 @@ export function ContactDetail({
             <LogActivity contactId={contactId} onSaved={() => { void load(); }} />
 
             {stages && stages.length > 0 && (
-              <div style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 12, display: "grid", gap: 8 }}>
+              <div className="v2-inner" style={{ border: "1px solid var(--border)", padding: 12, display: "grid", gap: 8 }}>
                 <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Start a deal</div>
                 <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Deal title" style={inputStyle} />
                 <select value={stageId} onChange={(e) => setStageId(e.target.value)} style={inputStyle}>

@@ -129,6 +129,18 @@ export async function proxy(req: NextRequest) {
   }
   if (isPublicPath(pathname)) return NextResponse.next();
 
+  // Local dev switch (Jack, 2026-09-24: no login on the local builds). OS_NO_LOGIN=1
+  // opens the OS as staff on `next dev` ONLY; any production build ignores it, so
+  // it can never ship open. The deployed gate below is unchanged.
+  if (process.env.OS_NO_LOGIN === "1" && process.env.NODE_ENV === "development") {
+    if (pathname === "/login") {
+      const url = req.nextUrl.clone();
+      url.pathname = "/";
+      return NextResponse.redirect(url);
+    }
+    return NextResponse.next();
+  }
+
   // ── The Nimbus desktop window ──────────────────────────────────────────────
   // The hotkey window is Nimbus alone, not the OS, and Jack should never meet a
   // login screen to ask his own assistant a question. It carries a machine key

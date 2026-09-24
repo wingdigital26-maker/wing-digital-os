@@ -21,8 +21,9 @@ import { useMemo, useState } from "react";
 // light and dark. Mirrors app/automations/_ui and MessageLedger.
 const card: React.CSSProperties = {
   background: "var(--bg-card)",
-  border: "1px solid var(--border)",
-  borderRadius: 12,
+  border: "1px solid transparent",
+  borderRadius: "var(--v2-radius)",
+  boxShadow: "var(--v2-shadow)",
   padding: 18,
 };
 const labelStyle: React.CSSProperties = {
@@ -39,7 +40,7 @@ const inputStyle: React.CSSProperties = {
   border: "1px solid var(--border)",
   background: "var(--bg-card)",
   color: "var(--text-primary)",
-  fontSize: 13.5,
+  fontSize: 16,
   boxSizing: "border-box",
   fontFamily: "inherit",
 };
@@ -61,19 +62,6 @@ function copyProblem(...parts: (string | undefined)[]): string | null {
 
 function isEmail(v: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
-}
-
-function tab(active: boolean): React.CSSProperties {
-  return {
-    padding: "8px 16px",
-    borderRadius: 999,
-    fontSize: 13,
-    fontWeight: 600,
-    cursor: "pointer",
-    border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`,
-    color: active ? "#fff" : "var(--text-secondary)",
-    background: active ? "var(--accent)" : "transparent",
-  };
 }
 
 function Field({
@@ -359,7 +347,7 @@ export default function EmailComposer({ embedded = false }: { embedded?: boolean
     <div style={{ display: "grid", gap: 18 }}>
       <div>
         {!embedded && (
-          <h1 style={{ margin: 0, fontFamily: "'Space Grotesk',sans-serif", fontSize: 24, fontWeight: 700 }}>
+          <h1 className="v2-h" style={{ margin: 0, fontSize: 24 }}>
             Email
           </h1>
         )}
@@ -368,11 +356,11 @@ export default function EmailComposer({ embedded = false }: { embedded?: boolean
         </p>
       </div>
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <button type="button" onClick={() => setMode("send")} style={tab(mode === "send")}>
+      <div className="v2-pills">
+        <button type="button" onClick={() => setMode("send")} aria-selected={mode === "send"}>
           Send now (1:1)
         </button>
-        <button type="button" onClick={() => setMode("campaign")} style={tab(mode === "campaign")}>
+        <button type="button" onClick={() => setMode("campaign")} aria-selected={mode === "campaign"}>
           Add to cold campaign
         </button>
       </div>

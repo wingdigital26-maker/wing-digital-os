@@ -218,9 +218,6 @@ export default function CompetitorIntel({ onSendToAI }: { onSendToAI?: (ctx: str
     : "";
 
   const card: React.CSSProperties = {
-    background: "var(--bg-card)",
-    border: "1px solid var(--border)",
-    borderRadius: 14,
     padding: 20,
   };
 
@@ -301,7 +298,7 @@ export default function CompetitorIntel({ onSendToAI }: { onSendToAI?: (ctx: str
       </div>
 
       {!configured && (
-        <div style={{ ...card, borderColor: "var(--orange)" }}>
+        <div className="v2-card" style={{ ...card, borderColor: "var(--orange)" }}>
           <p style={{ ...body, color: "var(--text-primary)" }}>
             Intel is not configured. The server is missing SONAR_SUPABASE_URL or SONAR_SUPABASE_SERVICE_KEY,
             so there is nothing to read.
@@ -309,7 +306,7 @@ export default function CompetitorIntel({ onSendToAI }: { onSendToAI?: (ctx: str
         </div>
       )}
       {error && (
-        <div style={{ ...card, borderColor: "var(--red)" }}>
+        <div className="v2-card" style={{ ...card, borderColor: "var(--red)" }}>
           <p style={{ ...body, color: "var(--red)", fontWeight: 600 }}>Could not load intel: {error}</p>
           <button onClick={() => void load()} style={{ ...actionBtn, marginTop: 10 }}>Try again</button>
         </div>
@@ -342,7 +339,7 @@ export default function CompetitorIntel({ onSendToAI }: { onSendToAI?: (ctx: str
 
       {/* ── Who we watch: one card per creator ─────────────────────────── */}
       {loading && sources.length === 0 && !error && configured && (
-        <div style={card}><p style={body}>Loading the watch list.</p></div>
+        <div className="v2-card" style={card}><p style={body}>Loading the watch list.</p></div>
       )}
       {!loading && configured && !error && sources.length === 0 && (
         <div style={card}>
@@ -460,12 +457,12 @@ export default function CompetitorIntel({ onSendToAI }: { onSendToAI?: (ctx: str
           or run anything.
         </p>
 
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-          <button onClick={() => setProposalStatus("")} style={chip(proposalStatus === "")}>
+        <div className="v2-pills" role="tablist">
+          <button onClick={() => setProposalStatus("")} aria-selected={proposalStatus === ""}>
             All{proposalTotals ? ` (${proposalTotals.total})` : ""}
           </button>
           {PROPOSAL_STATUSES.map((s) => (
-            <button key={s} onClick={() => setProposalStatus(s)} style={chip(proposalStatus === s)}>
+            <button key={s} onClick={() => setProposalStatus(s)} aria-selected={proposalStatus === s}>
               {s === "proposed" ? "waiting on you" : s}
               {proposalTotals ? ` (${proposalTotals[s]})` : ""}
             </button>
@@ -476,7 +473,7 @@ export default function CompetitorIntel({ onSendToAI }: { onSendToAI?: (ctx: str
           <p style={{ ...body, color: "var(--text-muted)" }}>Loading proposals.</p>
         )}
         {!loading && proposals.length === 0 && (
-          <div style={card}>
+          <div className="v2-card" style={card}>
             <p style={body}>
               {proposalTotals && proposalTotals.total > 0
                 ? `No proposals with status "${proposalStatus || "any"}"${source ? " from this creator" : ""}. Nothing is hidden; the other filters above hold the rest.`
@@ -508,12 +505,12 @@ export default function CompetitorIntel({ onSendToAI }: { onSendToAI?: (ctx: str
 
         {showFeed && (
           <>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-              <button onClick={() => setStatus("")} style={chip(status === "")}>
+            <div className="v2-pills" role="tablist">
+              <button onClick={() => setStatus("")} aria-selected={status === ""}>
                 All{totals ? ` (${totals.total})` : ""}
               </button>
               {STATUSES.map((s) => (
-                <button key={s} onClick={() => setStatus(s)} style={chip(status === s)}>
+                <button key={s} onClick={() => setStatus(s)} aria-selected={status === s}>
                   {s}{totals ? ` (${totals[s]})` : ""}
                 </button>
               ))}
@@ -521,7 +518,7 @@ export default function CompetitorIntel({ onSendToAI }: { onSendToAI?: (ctx: str
 
             {loading && items.length === 0 && <p style={{ ...body, color: "var(--text-muted)" }}>Loading videos.</p>}
             {!loading && items.length === 0 && (
-              <div style={card}>
+              <div className="v2-card" style={card}>
                 <p style={body}>
                   Nothing filed{status ? ` with status "${status}"` : ""}{source ? " from this creator" : ""}.
                   The watcher files new videos on each cloud run.
@@ -537,7 +534,7 @@ export default function CompetitorIntel({ onSendToAI }: { onSendToAI?: (ctx: str
                 const open = expanded === it.id;
                 const long = (it.summary?.length ?? 0) > 240;
                 return (
-                  <article key={it.id} style={card}>
+                  <article key={it.id} className="v2-card" style={card}>
                     <div style={{ display: "flex", gap: 10, alignItems: "baseline", flexWrap: "wrap", marginBottom: 8, fontSize: 13.5 }}>
                       <span style={{ fontWeight: 700, color: "var(--text-secondary)" }}>
                         {sources.find((s) => s.handle === it.source_handle)?.name || it.source_handle}

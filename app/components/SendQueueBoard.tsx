@@ -91,9 +91,9 @@ function when(iso: string | null): string {
 
 function Note({ text, tone = "var(--orange)" }: { text: string; tone?: string }) {
   return (
-    <div style={{
-      border: `1px solid ${tone}`, borderRadius: 10, padding: "9px 12px",
-      background: "var(--bg-card)", fontSize: 12, lineHeight: 1.55, color: tone,
+    <div className="v2-inner" style={{
+      border: `1px solid ${tone}`, padding: "9px 12px",
+      fontSize: 12, lineHeight: 1.55, color: tone,
     }}>
       {text}
     </div>
@@ -118,9 +118,9 @@ function Stat({ n, v, tone }: { n: string; v: string; tone?: string }) {
 
 function MessageBody({ title, subject, body }: { title: string; subject: string | null; body: string }) {
   return (
-    <div style={{
-      border: "1px solid var(--border)", borderRadius: 10, padding: "10px 12px",
-      background: "var(--bg-card)", minWidth: 0,
+    <div className="v2-inner" style={{
+      border: "1px solid var(--border)", padding: "10px 12px",
+      minWidth: 0,
     }}>
       <div style={{ ...label, marginBottom: 5 }}>{title}</div>
       {subject !== null && (
@@ -175,7 +175,7 @@ export default function SendQueueBoard() {
   return (
     <div style={{ display: "grid", gap: 14 }}>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "baseline" }}>
-        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "var(--text-primary)" }}>
+        <h2 className="v2-h" style={{ margin: 0, fontSize: 18 }}>
           Automated messaging
         </h2>
         <span style={{ fontSize: 12.5, color: "var(--text-muted)" }}>
@@ -199,9 +199,9 @@ export default function SendQueueBoard() {
       {!lane.available && lane.reason && (
         <Note tone="var(--red)" text={`The engine's state could not be read: ${lane.reason}. Paused/armed and today's count are unknown below.`} />
       )}
-      <div style={{
-        border: `1px solid ${laneTone}`, borderRadius: 12, padding: "12px 14px",
-        background: "var(--bg-card)", display: "flex", flexWrap: "wrap", gap: 18, alignItems: "flex-start",
+      <div className="v2-card" style={{
+        border: `1px solid ${laneTone}`, padding: "12px 14px",
+        display: "flex", flexWrap: "wrap", gap: 18, alignItems: "flex-start",
       }}>
         <Stat n="Engine" v={laneWord} tone={laneTone} />
         <Stat n="Sent today" v={lane.sentToday == null ? "unknown" : `${lane.sentToday} / ${lane.dailyCap}`} />
@@ -254,9 +254,10 @@ export default function SendQueueBoard() {
               <div
                 key={it.id}
                 onClick={() => setOpen(isOpen ? null : it.id)}
+                className="v2-card v2-lift"
                 style={{
-                  border: `1px solid ${isOpen ? "var(--accent)" : it.flags.length ? "var(--red)" : "var(--border)"}`,
-                  borderRadius: 12, padding: "11px 14px", background: "var(--bg-card)",
+                  border: `1px solid ${isOpen ? "var(--accent)" : it.flags.length ? "var(--red)" : "transparent"}`,
+                  padding: "11px 14px",
                   cursor: "pointer", display: "grid", gap: 8,
                 }}
               >
@@ -281,10 +282,7 @@ export default function SendQueueBoard() {
                 {it.flags.length > 0 && (
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
                     {it.flags.map((f) => (
-                      <span key={f.code} title={f.detail} style={{
-                        fontSize: 10.5, fontWeight: 700, color: "var(--red)",
-                        border: "1px solid var(--red)", borderRadius: 6, padding: "1px 7px",
-                      }}>
+                      <span key={f.code} title={f.detail} className="v2-status v2-status--bad" style={{ fontSize: 10.5 }}>
                         {f.label}
                       </span>
                     ))}
@@ -324,9 +322,9 @@ export default function SendQueueBoard() {
       </div>
 
       {/* ── Guardrails ──────────────────────────────────────────────────── */}
-      <div style={{
-        border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px",
-        background: "var(--bg-card)", display: "flex", flexWrap: "wrap", gap: 18, alignItems: "flex-start",
+      <div className="v2-card" style={{
+        padding: "12px 14px",
+        display: "flex", flexWrap: "wrap", gap: 18, alignItems: "flex-start",
       }}>
         <Stat n="Blocked by copy QA" v={guardrails.qaFailed == null ? "unknown" : String(guardrails.qaFailed)} />
         <Stat n="Blocked bad address" v={guardrails.badEmail == null ? "unknown" : String(guardrails.badEmail)} />
@@ -356,10 +354,9 @@ export default function SendQueueBoard() {
         )}
         <div style={{ display: "grid", gap: 4 }}>
           {sent.items.map((r) => (
-            <div key={r.id} style={{
+            <div key={r.id} className="v2-inner" style={{
               display: "flex", flexWrap: "wrap", gap: 10, alignItems: "baseline",
-              fontSize: 12.5, padding: "7px 10px", borderRadius: 9,
-              border: "1px solid var(--border)", background: "var(--bg-card)",
+              fontSize: 12.5, padding: "7px 10px",
             }}>
               <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>{r.company || "no company name"}</span>
               <span style={{ color: "var(--text-secondary)" }}>{r.email || "no address recorded"}</span>

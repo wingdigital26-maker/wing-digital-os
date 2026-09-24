@@ -90,11 +90,7 @@ function groupTone(c: Reply["classification"]): string {
 }
 
 function pill(active: boolean): React.CSSProperties {
-  return {
-    padding: "3px 11px", borderRadius: 999, fontSize: 11.5, fontWeight: 600, cursor: "pointer",
-    border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`,
-    color: active ? "var(--accent)" : "var(--text-secondary)", background: "transparent",
-  };
+  return { fontSize: 11.5 };
 }
 
 function statusWord(r: Reply): { text: string; tone: string } {
@@ -211,9 +207,9 @@ function ReplyDetail({ reply, onChanged }: { reply: Reply; onChanged: (r: Reply)
       </div>
 
       {/* The inbound reply itself */}
-      <div style={{
-        border: `1px solid ${groupTone(reply.classification)}`, borderRadius: 12,
-        background: "var(--bg-card)", padding: "11px 14px", display: "grid", gap: 6,
+      <div className="v2-inner" style={{
+        border: `1px solid ${groupTone(reply.classification)}`,
+        padding: "11px 14px", display: "grid", gap: 6,
       }}>
         <span style={label}>What they wrote</span>
         <pre style={{
@@ -246,11 +242,11 @@ function ReplyDetail({ reply, onChanged }: { reply: Reply; onChanged: (r: Reply)
           thread
             .filter((m) => m.id !== reply.message_id)
             .map((m) => (
-              <div key={m.id} style={{
+              <div key={m.id} className={m.direction === "inbound" ? "v2-inner" : undefined} style={{
                 justifySelf: m.direction === "inbound" ? "start" : "end",
                 maxWidth: "min(560px, 94%)",
-                border: "1px solid var(--border)", borderRadius: 10, padding: "7px 11px",
-                background: m.direction === "inbound" ? "var(--bg-card)" : "transparent",
+                border: m.direction === "inbound" ? "none" : "1px solid var(--border)",
+                borderRadius: 10, padding: "7px 11px",
               }}>
                 <div style={{ display: "flex", gap: 6, alignItems: "baseline", marginBottom: 3, flexWrap: "wrap" }}>
                   <span style={{ fontSize: 10.5, fontWeight: 700, color: "var(--text-muted)" }}>
@@ -287,10 +283,11 @@ function ReplyDetail({ reply, onChanged }: { reply: Reply; onChanged: (r: Reply)
               : "Cold and Other replies do not get drafts automatically. You can still write one here."
           }
           rows={6}
+          className="v2-inner"
           style={{
-            resize: "vertical", borderRadius: 10, border: "1px solid var(--border)",
-            background: "var(--bg-card)", color: "var(--text-primary)",
-            fontSize: 13, lineHeight: 1.6, padding: "10px 12px", fontFamily: "inherit",
+            resize: "vertical", border: "1px solid var(--border)",
+            color: "var(--text-primary)",
+            fontSize: 16, lineHeight: 1.6, padding: "10px 12px", fontFamily: "inherit",
             minWidth: 0, width: "100%", boxSizing: "border-box",
           }}
         />
@@ -448,7 +445,7 @@ export default function ReplyInboxBoard() {
     <div style={{ display: "grid", gap: 14 }}>
       {/* Header */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "baseline" }}>
-        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "var(--text-primary)" }}>
+        <h2 className="v2-h" style={{ margin: 0, fontSize: 18 }}>
           Reply Inbox
         </h2>
         {attentionCount > 0 && <Chip solid tone="var(--accent)" text={`${attentionCount} need attention`} />}
@@ -470,10 +467,10 @@ export default function ReplyInboxBoard() {
       {/* Refresh failed but old rows exist: say so loudly instead of quietly
           showing stale data as if it were current. */}
       {err && (
-        <div style={{
+        <div className="v2-inner" style={{
           display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap",
-          border: "1px solid var(--red)", borderRadius: 10, padding: "9px 12px",
-          background: "var(--bg-card)", fontSize: 12, lineHeight: 1.55, color: "var(--red)",
+          border: "1px solid var(--red)", padding: "9px 12px",
+          fontSize: 12, lineHeight: 1.55, color: "var(--red)",
         }}>
           <span>
             Could not refresh. Showing data from{" "}
@@ -498,25 +495,29 @@ export default function ReplyInboxBoard() {
       )}
 
       {/* Filters */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
-        {([
-          ["all", "All"],
-          ["attention", "Needs attention"],
-          ["handled", "Handled"],
-        ] as const).map(([k, name]) => (
-          <button key={k} type="button" onClick={() => setFilter(k)} style={pill(filter === k)}>
-            {name}
-          </button>
-        ))}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
+        <div className="v2-pills">
+          {([
+            ["all", "All"],
+            ["attention", "Needs attention"],
+            ["handled", "Handled"],
+          ] as const).map(([k, name]) => (
+            <button key={k} type="button" onClick={() => setFilter(k)} aria-selected={filter === k}>
+              {name}
+            </button>
+          ))}
+        </div>
         {data.clientSlugs.length > 0 && (
           <>
-            <span style={{ ...label, marginLeft: 12 }}>Client</span>
-            <button type="button" onClick={() => setClient("")} style={pill(client === "")}>all</button>
-            {data.clientSlugs.map((s) => (
-              <button key={s} type="button" onClick={() => setClient(s)} style={pill(client === s)}>
-                {s}
-              </button>
-            ))}
+            <span style={label}>Client</span>
+            <div className="v2-pills">
+              <button type="button" onClick={() => setClient("")} aria-selected={client === ""}>all</button>
+              {data.clientSlugs.map((s) => (
+                <button key={s} type="button" onClick={() => setClient(s)} aria-selected={client === s}>
+                  {s}
+                </button>
+              ))}
+            </div>
           </>
         )}
         <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-muted)" }}>
@@ -576,10 +577,11 @@ export default function ReplyInboxBoard() {
                         key={r.id}
                         data-reply={r.id}
                         onClick={() => setSelected(r.id)}
+                        className={isSel ? "v2-inner v2-lift" : "v2-inner"}
                         style={{
-                          border: `1px solid ${isSel ? "var(--accent)" : attn ? g.tone : "var(--border)"}`,
-                          borderRadius: 10, padding: "8px 11px", cursor: "pointer",
-                          background: isSel ? "var(--bg-hover)" : "var(--bg-card)",
+                          border: `1px solid ${isSel ? "var(--accent)" : attn ? g.tone : "transparent"}`,
+                          padding: "8px 11px", cursor: "pointer",
+                          background: isSel ? "var(--bg-hover)" : undefined,
                           display: "flex", gap: 10, alignItems: "flex-start", minWidth: 0,
                           opacity: attn ? 1 : 0.72,
                         }}

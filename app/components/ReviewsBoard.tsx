@@ -222,7 +222,7 @@ export default function ReviewsBoard() {
 
       {/* Missing table: honest setup note, not a scary failure. */}
       {data && !data.available && data.tableMissing && (
-        <div style={{ border: "1px solid var(--orange)", borderRadius: 14, padding: 16, background: "var(--bg-card)", display: "grid", gap: 6, maxWidth: 620 }}>
+        <div className="v2-card" style={{ borderColor: "var(--orange)", padding: 16, display: "grid", gap: 6, maxWidth: 620 }}>
           <div style={{ fontSize: 14, fontWeight: 600 }}>Reviews are not set up yet</div>
           <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5 }}>{data.reason}</div>
         </div>
@@ -230,7 +230,7 @@ export default function ReviewsBoard() {
 
       {/* Load failure */}
       {loadErr && (
-        <div style={{ border: "1px solid var(--border)", borderRadius: 14, padding: 16, background: "var(--bg-card)", display: "grid", gap: 8, maxWidth: 560 }}>
+        <div className="v2-card" style={{ padding: 16, display: "grid", gap: 8, maxWidth: 560 }}>
           <div style={{ fontSize: 14, fontWeight: 600 }}>Reviews could not be loaded</div>
           <div style={{ fontSize: 13, color: "var(--red)", lineHeight: 1.5 }}>{loadErr}</div>
           <div><button type="button" onClick={load} style={btn}>Retry</button></div>
@@ -256,10 +256,11 @@ export default function ReviewsBoard() {
                     key={s.client_slug}
                     type="button"
                     onClick={() => setClientFilter(on ? "" : s.client_slug)}
+                    className="v2-card v2-lift"
                     style={{
                       textAlign: "left", cursor: "pointer", fontFamily: "inherit",
-                      background: "var(--bg-card)", borderRadius: 14, padding: "14px 16px",
-                      border: `1px solid ${on ? "var(--accent)" : "var(--border)"}`,
+                      padding: "14px 16px",
+                      borderColor: on ? "var(--accent)" : undefined,
                       display: "flex", flexDirection: "column", gap: 6,
                     }}
                   >
@@ -292,9 +293,9 @@ export default function ReviewsBoard() {
           {/* Queue a request */}
           <form
             onSubmit={(e) => { e.preventDefault(); queue(); }}
+            className="v2-card"
             style={{
-              display: "flex", gap: 10, flexWrap: "wrap", alignItems: "stretch",
-              background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 14, padding: 14,
+              display: "flex", gap: 10, flexWrap: "wrap", alignItems: "stretch", padding: 14,
             }}
           >
             <input
@@ -375,13 +376,13 @@ function Row({ row: r, busy, err, onSave, onRemove }: {
   const color = STATUS_COLOR[r.status];
 
   return (
-    <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
+    <div className="v2-card" style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
       {/* Header row */}
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
         <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <span style={{ fontSize: 15, fontWeight: 700 }}>{r.client_slug}</span>
-            <span style={{ fontSize: 11, fontWeight: 700, color, border: `1px solid ${color}`, padding: "1px 9px", borderRadius: 999 }}>
+            <span className="v2-status" style={{ color, background: `color-mix(in srgb, ${color} 12%, var(--bg-card))` }}>
               {STATUS_LABEL[r.status]}
             </span>
           </div>

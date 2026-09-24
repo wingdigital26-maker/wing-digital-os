@@ -71,14 +71,11 @@ function hailSize(size: number | null): string {
 function Chip({ text, tone, solid }: { text: string; tone: string; solid?: boolean }) {
   return (
     <span
+      className="v2-status"
       style={{
         fontSize: 10.5,
-        fontWeight: 700,
-        borderRadius: 6,
-        padding: "1px 8px",
         color: solid ? "var(--bg-card)" : tone,
-        background: solid ? tone : "transparent",
-        border: `1px solid ${tone}`,
+        background: solid ? tone : `color-mix(in srgb, ${tone} 12%, var(--bg-card))`,
         whiteSpace: "nowrap",
       }}
     >
@@ -90,11 +87,10 @@ function Chip({ text, tone, solid }: { text: string; tone: string; solid?: boole
 function Note({ text, tone = "var(--orange)" }: { text: string; tone?: string }) {
   return (
     <div
+      className="v2-card"
       style={{
-        border: `1px solid ${tone}`,
-        borderRadius: 10,
+        borderColor: tone,
         padding: "9px 12px",
-        background: "var(--bg-card)",
         fontSize: 12,
         lineHeight: 1.55,
         color: tone,
@@ -221,11 +217,9 @@ function DraftCard({
   const text = draftText(draft.content);
   return (
     <div
+      className="v2-card"
       style={{
-        border: "1px solid var(--border)",
-        borderRadius: 10,
         padding: "12px 14px",
-        background: "var(--bg-card)",
         opacity: dismissed ? 0.55 : 1,
         display: "flex",
         flexDirection: "column",
@@ -316,11 +310,9 @@ function EventCard({
   };
   return (
     <div
+      className="v2-card"
       style={{
-        border: "1px solid var(--border)",
-        borderRadius: 12,
         padding: "16px 18px",
-        background: "var(--bg-card)",
         display: "flex",
         flexDirection: "column",
         gap: open ? 12 : 0,

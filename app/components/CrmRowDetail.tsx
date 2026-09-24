@@ -194,9 +194,10 @@ export default function CrmRowDetail({
     <div
       role="region"
       aria-label={`Full details for row ${it.id}`}
+      className="v2-card"
       style={{
-        border: "1px solid var(--accent)", borderRadius: 12, padding: "14px 16px",
-        background: "var(--bg-secondary)", display: "flex", flexDirection: "column", gap: 12,
+        border: "1px solid var(--accent)", padding: "14px 16px",
+        display: "flex", flexDirection: "column", gap: 12,
         marginTop: 2, maxWidth: "100%", overflowX: "hidden",
       }}
       // A detail panel is a sibling section, not the trigger; clicks inside
@@ -218,9 +219,8 @@ export default function CrmRowDetail({
       </div>
 
       {actions && (
-        <div style={{
-          border: "1px solid var(--border)", borderRadius: 10, padding: "10px 12px",
-          background: "var(--bg-card)",
+        <div className="v2-inner" style={{
+          border: "1px solid var(--border)", padding: "10px 12px",
         }}>
           {actions}
         </div>
@@ -233,10 +233,10 @@ export default function CrmRowDetail({
         <div>
           <div style={label}>Body</div>
           {it.body ? (
-            <pre style={{
+            <pre className="v2-inner" style={{
               margin: "4px 0 0", fontSize: 12.5, lineHeight: 1.65, color: "var(--text-primary)",
               whiteSpace: "pre-wrap", wordBreak: "break-word", fontFamily: "inherit",
-              background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8,
+              border: "1px solid var(--border)",
               padding: "11px 13px", maxHeight: 420, overflowY: "auto", boxSizing: "border-box",
             }}>
               {it.body}
@@ -286,18 +286,17 @@ export default function CrmRowDetail({
         {/* Evidence: the verbatim quote, and the evidence/recipient_only line
             kept visually distinct so an unevidenced row never borrows a
             proven look. */}
-        <div style={{
-          border: `1px solid ${EVIDENCE_COLOR[sourceKind]}`, borderRadius: 10, padding: "10px 12px",
-          background: "var(--bg-card)",
+        <div className="v2-inner" style={{
+          border: `1px solid ${EVIDENCE_COLOR[sourceKind]}`, padding: "10px 12px",
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <span style={{ fontSize: 11.5, fontWeight: 700, color: EVIDENCE_COLOR[sourceKind] }}>
               {ev?.label ?? "No evidence data returned"}
             </span>
-            <span style={{
-              fontSize: 9.5, fontWeight: 700, padding: "1px 8px", borderRadius: 20, textTransform: "uppercase",
-              letterSpacing: ".05em", color: EVIDENCE_COLOR[sourceKind], border: `1px solid ${EVIDENCE_COLOR[sourceKind]}`,
-            }}>
+            <span
+              className={`v2-status ${sourceKind === "evidence" ? "v2-status--ok" : sourceKind === "recipient_only" ? "v2-status--warn" : "v2-status--bad"}`}
+              style={{ fontSize: 9.5, textTransform: "uppercase", letterSpacing: ".05em" }}
+            >
               {sourceKind === "evidence" ? "verified evidence"
                 : sourceKind === "recipient_only" ? "prospect's own page, not proof"
                 : "no source"}
@@ -357,13 +356,12 @@ export default function CrmRowDetail({
         <span style={heading}>Sending status</span>
         <div>
           <div style={label}>Sendable</div>
-          <div style={{
-            fontSize: 12.5, marginTop: 3, fontWeight: 600,
-            color: it.sendable === true ? "var(--green)" : it.sendable === false ? "var(--orange)" : "var(--text-muted)",
-          }}>
-            {it.sendable === true ? "Yes, in the sendable queue"
-              : it.sendable === false ? "No"
-              : "Not known, the sendable queue could not be checked"}
+          <div style={{ marginTop: 4 }}>
+            <span className={`v2-status ${it.sendable === true ? "v2-status--ok" : it.sendable === false ? "v2-status--warn" : "v2-status--info"}`}>
+              {it.sendable === true ? "Yes, in the sendable queue"
+                : it.sendable === false ? "No"
+                : "Not known, the sendable queue could not be checked"}
+            </span>
           </div>
           {it.notSendableReason && (
             <p style={{ margin: "3px 0 0", fontSize: 12, lineHeight: 1.5, color: "var(--text-secondary)" }}>

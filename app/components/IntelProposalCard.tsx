@@ -98,9 +98,6 @@ function stamp(iso: string | null): string {
 }
 
 const card: React.CSSProperties = {
-  background: "var(--bg-card)",
-  border: "1px solid var(--border)",
-  borderRadius: 12,
   padding: 18,
 };
 
@@ -136,6 +133,7 @@ export default function IntelProposalCard({
 
   return (
     <div
+      className="v2-card"
       style={{
         ...card,
         borderColor: p.status === "proposed" ? "var(--accent)" : "var(--border)",
@@ -153,11 +151,11 @@ export default function IntelProposalCard({
           </h3>
         </div>
         <span
+          className="v2-status"
           style={{
-            fontSize: 11, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase",
+            letterSpacing: 0.6, textTransform: "uppercase", whiteSpace: "nowrap",
             color: PROPOSAL_STATUS_COLOR[p.status] ?? "var(--text-muted)",
-            border: `1px solid ${PROPOSAL_STATUS_COLOR[p.status] ?? "var(--border)"}`,
-            borderRadius: 999, padding: "4px 10px", whiteSpace: "nowrap",
+            background: `color-mix(in srgb, ${PROPOSAL_STATUS_COLOR[p.status] ?? "var(--text-muted)"} 12%, var(--bg-card))`,
           }}
         >
           {p.status}

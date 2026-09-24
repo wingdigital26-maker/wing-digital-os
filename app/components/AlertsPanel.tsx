@@ -45,23 +45,27 @@ export default function AlertsPanel() {
   if (open.length === 0 && recent.length === 0) return null;
 
   return (
-    <section style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 12, padding: 14, marginBottom: 16 }}>
-      <h2 style={{ fontSize: 11, letterSpacing: "0.14em", color: "var(--text-muted)", marginBottom: 10 }}>
+    <section className="v2-card" style={{ padding: 14, marginBottom: 16 }}>
+      <h2 className="v2-h" style={{ fontSize: 11, letterSpacing: "0.14em", color: "var(--text-muted)", marginBottom: 10 }}>
         NOTIFICATIONS — WHY
       </h2>
       {open.map((a) => (
-        <div key={a.key} style={{ marginBottom: 10, paddingLeft: 10, borderLeft: "3px solid var(--red)" }}>
-          <div style={{ fontSize: 13, fontWeight: 600 }}>🔴 {a.title}</div>
-          {a.body && <div style={{ fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.5 }}>{a.body}</div>}
-          <div style={{ fontSize: 10, color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace" }}>
+        <div key={a.key} className="v2-inner" style={{ marginBottom: 10, padding: "8px 10px" }}>
+          <div style={{ fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
+            <span className="v2-status v2-status--bad">Open</span> {a.title}
+          </div>
+          {a.body && <div style={{ fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.5, marginTop: 4 }}>{a.body}</div>}
+          <div style={{ fontSize: 10, color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace", marginTop: 4 }}>
             since {ago(a.first_seen)}{a.last_pushed ? ` · pushed ${ago(a.last_pushed)}` : " · not pushed yet"}
           </div>
         </div>
       ))}
       {recent.map((a) => (
-        <div key={a.key} style={{ marginBottom: 8, paddingLeft: 10, borderLeft: "3px solid var(--green)", opacity: 0.75 }}>
-          <div style={{ fontSize: 12 }}>✅ {a.title} <span style={{ color: "var(--text-muted)" }}>— recovered {ago(a.resolved_at)}</span></div>
-          {a.body && <div style={{ fontSize: 11, color: "var(--text-muted)", lineHeight: 1.4 }}>{a.body}</div>}
+        <div key={a.key} className="v2-inner" style={{ marginBottom: 8, padding: "8px 10px", opacity: 0.8 }}>
+          <div style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 8 }}>
+            <span className="v2-status v2-status--ok">Resolved</span> {a.title} <span style={{ color: "var(--text-muted)" }}>— recovered {ago(a.resolved_at)}</span>
+          </div>
+          {a.body && <div style={{ fontSize: 11, color: "var(--text-muted)", lineHeight: 1.4, marginTop: 4 }}>{a.body}</div>}
         </div>
       ))}
     </section>

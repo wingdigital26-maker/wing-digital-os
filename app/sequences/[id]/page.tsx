@@ -154,14 +154,14 @@ export default function SequenceEditorPage() {
       </a>
 
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", margin: "10px 0 4px" }}>
-        <h1 style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 24, fontWeight: 700, margin: 0 }}>
+        <h1 className="v2-h" style={{ fontSize: 24 }}>
           {seq.name}
         </h1>
         <span
+          className="v2-status"
           style={{
-            fontSize: 12, fontWeight: 700, borderRadius: 999, padding: "3px 10px",
             color: seq.status === "active" ? "var(--green)" : seq.status === "paused" ? "var(--orange)" : "var(--text-muted)",
-            border: `1px solid ${seq.status === "active" ? "var(--green)" : seq.status === "paused" ? "var(--orange)" : "var(--text-muted)"}`,
+            background: `color-mix(in srgb, ${seq.status === "active" ? "var(--green)" : seq.status === "paused" ? "var(--orange)" : "var(--text-muted)"} 14%, var(--bg-card))`,
           }}
         >
           {seq.status === "active" ? "Active" : seq.status === "paused" ? "Paused" : "Draft"}
@@ -344,8 +344,9 @@ function StepForm({
 
 const card: React.CSSProperties = {
   background: "var(--bg-card)",
-  border: "1px solid var(--border)",
-  borderRadius: 12,
+  border: "1px solid transparent",
+  borderRadius: "var(--v2-radius)",
+  boxShadow: "var(--v2-shadow)",
   padding: 16,
 };
 const btn: React.CSSProperties = {

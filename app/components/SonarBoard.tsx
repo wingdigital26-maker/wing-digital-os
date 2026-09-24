@@ -50,7 +50,7 @@ const SOURCE_ICON: Record<string, string> = {
 };
 
 function needColor(n: number | null): string {
-  if (n == null) return "var(--muted, #94a3b8)";
+  if (n == null) return "var(--text-muted)";
   if (n >= 0.7) return "var(--red, #fb7185)";
   if (n >= 0.5) return "var(--orange, #fbbf24)";
   return "var(--green, #4ade80)";
@@ -140,10 +140,7 @@ export default function SonarBoard() {
   // as text with a Retry, never as a skeleton.
   if ((err && !data?.leads?.length) || (!data && timedOut)) {
     return (
-      <div style={{
-        border: "1px solid var(--border)", borderRadius: 14, padding: 16,
-        background: "var(--bg-card)", display: "grid", gap: 10, maxWidth: 560,
-      }}>
+      <div className="v2-card" style={{ padding: 16, display: "grid", gap: 10, maxWidth: 560 }}>
         <div style={{ fontSize: 14, fontWeight: 600 }}>Sonar leads could not be loaded</div>
         {err ? (
           <div style={{ fontSize: 13, color: "var(--red)", lineHeight: 1.5 }}>{err}</div>
@@ -180,9 +177,9 @@ export default function SonarBoard() {
   }
   if (!data.configured) {
     return (
-      <div style={{ padding: 18, border: "1px solid var(--line,#26313a)", borderRadius: 14 }}>
+      <div className="v2-card" style={{ padding: 18 }}>
         <h3 style={{ margin: "0 0 6px", fontSize: 15 }}>Sonar is not connected yet</h3>
-        <p style={{ margin: 0, fontSize: 13, color: "var(--muted,#94a3b8)" }}>
+        <p style={{ margin: 0, fontSize: 13, color: "var(--text-muted)" }}>
           Add <code>SONAR_SUPABASE_URL</code> and <code>SONAR_SUPABASE_SERVICE_KEY</code> to the
           environment, then reload. Sonar keeps its leads in a separate Supabase
           project from the OS, so it needs its own credentials.
@@ -196,8 +193,8 @@ export default function SonarBoard() {
   return (
     <div ref={rootRef} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
       <header style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
-        <h2 style={{ margin: 0, fontSize: 18, letterSpacing: "-0.01em" }}>Sonar</h2>
-        <span style={{ fontSize: 12.5, color: "var(--muted,#94a3b8)" }}>
+        <h2 className="v2-h" style={{ margin: 0, fontSize: 18 }}>Sonar</h2>
+        <span style={{ fontSize: 12.5, color: "var(--text-muted)" }}>
           Free social + web lead engine. Runs daily on its own. Nothing here sends.
         </span>
       </header>
@@ -205,39 +202,36 @@ export default function SonarBoard() {
       {/* Totals */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 12 }}>
         {t && ([
-          ["Prospects found", t.total, null],
-          ["Awaiting review", t.awaiting, null],
-          ["Need help most", t.highNeed, "var(--red,#fb7185)"],
-          ["Have a phone", t.withPhone, null],
-          ["Approved", t.approved, "var(--green,#4ade80)"],
-          ["Not checked yet", t.unaudited, t.unaudited > 200 ? "var(--orange,#fbbf24)" : null],
-        ] as [string, number, string | null][]).map(([label, value, color]) => (
-          <div key={label} style={{
-            border: "1px solid var(--line,#26313a)", borderRadius: 14, padding: "12px 14px",
-            background: "var(--card,#121a20)",
-          }}>
-            <div style={{ fontSize: 22, fontWeight: 700, color: color || "inherit", fontVariantNumeric: "tabular-nums" }}>
+          ["Prospects found", t.total, "blue"],
+          ["Awaiting review", t.awaiting, "blue"],
+          ["Need help most", t.highNeed, "amber"],
+          ["Have a phone", t.withPhone, "violet"],
+          ["Approved", t.approved, "green"],
+          ["Not checked yet", t.unaudited, "amber"],
+        ] as [string, number, "blue" | "violet" | "green" | "amber"][]).map(([label, value, variant]) => (
+          <div key={label} className={`v2-tile v2-tile--${variant}`} style={{ minHeight: 88, padding: "12px 14px" }}>
+            <div className="v2-tile__num" style={{ fontSize: 22 }}>
               {value.toLocaleString()}
             </div>
-            <div style={{ fontSize: 11.5, color: "var(--muted,#94a3b8)", marginTop: 2 }}>{label}</div>
+            <div className="v2-tile__label">{label}</div>
           </div>
         ))}
       </div>
 
       {/* Filters */}
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-        <label style={{ fontSize: 12, color: "var(--muted,#94a3b8)" }}>
+        <label style={{ fontSize: 12, color: "var(--text-muted)" }}>
           City{" "}
           <select value={city} onChange={(e) => setCity(e.target.value)}
-            style={{ background: "var(--card,#121a20)", color: "inherit", border: "1px solid var(--line,#26313a)", borderRadius: 8, padding: "5px 8px", fontSize: 12.5 }}>
+            style={{ background: "var(--bg-card)", color: "inherit", border: "1px solid var(--border)", borderRadius: 8, padding: "5px 8px", fontSize: 12.5 }}>
             <option value="">All</option>
             {(data.cities || []).map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
         </label>
-        <label style={{ fontSize: 12, color: "var(--muted,#94a3b8)" }}>
+        <label style={{ fontSize: 12, color: "var(--text-muted)" }}>
           Show{" "}
           <select value={minNeed} onChange={(e) => setMinNeed(e.target.value)}
-            style={{ background: "var(--card,#121a20)", color: "inherit", border: "1px solid var(--line,#26313a)", borderRadius: 8, padding: "5px 8px", fontSize: 12.5 }}>
+            style={{ background: "var(--bg-card)", color: "inherit", border: "1px solid var(--border)", borderRadius: 8, padding: "5px 8px", fontSize: 12.5 }}>
             {([
               ["0.7", "Only the neediest"],
               ["0.6", "Worth a look"],
@@ -247,17 +241,17 @@ export default function SonarBoard() {
           </select>
         </label>
         <button onClick={load} style={{
-          border: "1px solid var(--line,#26313a)", background: "transparent", color: "inherit",
+          border: "1px solid var(--border)", background: "transparent", color: "inherit",
           borderRadius: 8, padding: "5px 12px", fontSize: 12.5, cursor: "pointer",
         }}>Refresh</button>
-        <span style={{ fontSize: 11.5, color: "var(--muted,#94a3b8)" }}>
+        <span style={{ fontSize: 11.5, color: "var(--text-muted)" }}>
           {data.leads.length} shown
         </span>
       </div>
 
       {/* Leads */}
       {data.leads.length === 0 ? (
-        <p style={{ fontSize: 13, color: "var(--muted,#94a3b8)" }}>
+        <p style={{ fontSize: 13, color: "var(--text-muted)" }}>
           Nothing matches that filter. Lower the min need, or wait for tonight&apos;s run.
         </p>
       ) : (
@@ -266,16 +260,15 @@ export default function SonarBoard() {
             const warns = (l.audit_gaps || []).filter((g) => g.startsWith("WARNING") || g.startsWith("CHECK"));
             const gaps = (l.audit_gaps || []).filter((g) => !warns.includes(g));
             return (
-              <article key={l.id} style={{
-                border: "1px solid var(--line,#26313a)", borderRadius: 14, padding: "13px 15px 15px",
-                background: "var(--card,#121a20)", display: "flex", flexDirection: "column", gap: 9,
+              <article key={l.id} className="v2-card v2-lift" style={{
+                padding: "13px 15px 15px", display: "flex", flexDirection: "column", gap: 9,
               }}>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start" }}>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontWeight: 650, fontSize: 14.5, lineHeight: 1.25 }}>
                       {l.title || "(untitled)"}
                     </div>
-                    <div style={{ fontSize: 11.5, color: "var(--muted,#94a3b8)", marginTop: 2 }}>
+                    <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginTop: 2 }}>
                       {[l.place_name, l.category].filter(Boolean).join(" · ")}
                       {l.source ? ` · ${SOURCE_ICON[l.source] || l.source}` : ""}
                     </div>
@@ -284,7 +277,7 @@ export default function SonarBoard() {
                     <div style={{ fontSize: 12.5, fontWeight: 700, color: needColor(l.need_score) }}>
                       {needLabel(l.need_score)}
                     </div>
-                    <div style={{ fontSize: 10, color: "var(--muted,#94a3b8)", fontVariantNumeric: "tabular-nums" }}>
+                    <div style={{ fontSize: 10, color: "var(--text-muted)", fontVariantNumeric: "tabular-nums" }}>
                       need score {l.need_score?.toFixed(2) ?? "n/a"}
                     </div>
                   </div>
@@ -293,22 +286,19 @@ export default function SonarBoard() {
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap", fontSize: 11, alignItems: "center" }}>
                   {/* The best use of today: high need + a real phone number. */}
                   {l.phone && (l.need_score ?? 0) >= 0.7 && (
-                    <span style={{
-                      fontSize: 10, fontWeight: 700, color: "var(--red,#fb7185)",
-                      border: "1px solid rgba(251,113,133,.4)", borderRadius: 20, padding: "1px 8px",
-                    }}>call first</span>
+                    <span className="v2-status v2-status--bad" style={{ fontSize: 10 }}>call first</span>
                   )}
-                  {l.phone && <a href={`tel:${l.phone.replace(/\D/g, "")}`} style={{ color: "var(--green,#4ade80)", textDecoration: "none", fontVariantNumeric: "tabular-nums" }}>{l.phone}</a>}
-                  {l.seo_rank != null && <span style={{ color: "var(--muted,#94a3b8)" }}>ranks #{l.seo_rank}</span>}
-                  {l.gmb_rating != null && <span style={{ color: "var(--muted,#94a3b8)" }}>{l.gmb_rating}★ {l.gmb_reviews ?? "?"} reviews</span>}
+                  {l.phone && <a href={`tel:${l.phone.replace(/\D/g, "")}`} style={{ color: "var(--green)", textDecoration: "none", fontVariantNumeric: "tabular-nums" }}>{l.phone}</a>}
+                  {l.seo_rank != null && <span style={{ color: "var(--text-muted)" }}>ranks #{l.seo_rank}</span>}
+                  {l.gmb_rating != null && <span style={{ color: "var(--text-muted)" }}>{l.gmb_rating}★ {l.gmb_reviews ?? "?"} reviews</span>}
                 </div>
 
                 {gaps.length > 0 && (
                   <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexWrap: "wrap", gap: 4 }}>
                     {gaps.slice(0, 4).map((g, i) => (
                       <li key={i} style={{
-                        fontSize: 10.5, border: "1px solid var(--line,#26313a)", borderRadius: 20,
-                        padding: "2px 8px", color: "var(--muted,#94a3b8)",
+                        fontSize: 10.5, border: "1px solid var(--border)", borderRadius: 20,
+                        padding: "2px 8px", color: "var(--text-muted)",
                       }}>{g}</li>
                     ))}
                   </ul>
@@ -318,9 +308,8 @@ export default function SonarBoard() {
                     flags same-name businesses in other states and social
                     accounts it could not confirm. */}
                 {warns.length > 0 && (
-                  <div style={{
-                    fontSize: 11, color: "var(--orange,#fbbf24)",
-                    border: "1px solid rgba(251,191,36,.35)", borderRadius: 8, padding: "6px 8px",
+                  <div className="v2-status v2-status--warn" style={{
+                    fontSize: 11, display: "block", padding: "6px 8px",
                   }}>
                     {warns.map((w, i) => <div key={i}>{w}</div>)}
                   </div>
@@ -329,7 +318,7 @@ export default function SonarBoard() {
                 <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginTop: 2 }}>
                   {(l.website || l.url) && (
                     <a href={l.website || l.url || "#"} target="_blank" rel="noopener"
-                      style={{ fontSize: 11.5, color: "var(--accent,#5eead4)", textDecoration: "none" }}>
+                      style={{ fontSize: 11.5, color: "var(--accent)", textDecoration: "none" }}>
                       open ↗
                     </a>
                   )}
@@ -339,7 +328,7 @@ export default function SonarBoard() {
                     </button>
                   )}
                   <button disabled={busy === l.id} onClick={() => act(l.id, "approve")}
-                    style={{ ...btn, borderColor: "rgba(74,222,128,.4)", color: "var(--green,#4ade80)" }}>
+                    style={{ ...btn, borderColor: "var(--green)", color: "var(--green)" }}>
                     approve
                   </button>
                   <button disabled={busy === l.id} onClick={() => act(l.id, "reject")} style={btn}>
@@ -357,5 +346,5 @@ export default function SonarBoard() {
 
 const btn: React.CSSProperties = {
   fontSize: 11.5, padding: "3px 10px", borderRadius: 8, cursor: "pointer",
-  border: "1px solid var(--line,#26313a)", background: "transparent", color: "inherit",
+  border: "1px solid var(--border)", background: "transparent", color: "inherit",
 };

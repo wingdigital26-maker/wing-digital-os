@@ -79,9 +79,8 @@ const primary: CSSProperties = {
 
 function Chip({ ok, yes, no }: { ok: boolean | undefined; yes: string; no: string }) {
   if (ok === undefined) return null;
-  const c = ok ? "var(--green)" : "var(--red)";
   return (
-    <span style={{ fontSize: 10.5, fontWeight: 600, color: c, border: `1px solid ${c}`, padding: "1px 8px", borderRadius: 999, opacity: 0.9 }}>
+    <span className={`v2-status ${ok ? "v2-status--ok" : "v2-status--bad"}`}>
       {ok ? yes : no}
     </span>
   );
@@ -230,7 +229,7 @@ export default function PotentialClientsBoard() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
       <header style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
-        <h2 style={{ margin: 0, fontSize: 18, letterSpacing: "-0.01em" }}>Potential clients</h2>
+        <h2 className="v2-h" style={{ margin: 0, fontSize: 18 }}>Potential clients</h2>
         <span style={{ fontSize: 12.5, color: "var(--text-muted)" }}>
           Paste a website. The OS reads it and starts a card. Nothing here sends anything.
         </span>
@@ -239,9 +238,10 @@ export default function PotentialClientsBoard() {
       {/* Intake */}
       <form
         onSubmit={(e) => { e.preventDefault(); add(); }}
+        className="v2-card"
         style={{
           display: "flex", gap: 10, flexWrap: "wrap", alignItems: "stretch",
-          background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 14, padding: 14,
+          padding: 14,
         }}
       >
         <input
@@ -264,20 +264,17 @@ export default function PotentialClientsBoard() {
 
       {/* Filters */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-        {STATUSES.map(([key, label]) => {
-          const n = key ? counts[key] : counts.all;
-          const on = status === key;
-          return (
-            <button key={key} type="button" onClick={() => setStatus(key)} style={{
-              ...btn, padding: "4px 11px", fontSize: 12,
-              border: `1px solid ${on ? "var(--accent)" : "var(--border)"}`,
-              color: on ? "var(--accent)" : "var(--text-secondary)",
-              background: on ? "var(--accent-glow)" : "transparent",
-            }}>
-              {label}{typeof n === "number" ? <span style={{ opacity: 0.7, marginLeft: 6 }}>{n}</span> : null}
-            </button>
-          );
-        })}
+        <div className="v2-pills">
+          {STATUSES.map(([key, label]) => {
+            const n = key ? counts[key] : counts.all;
+            const on = status === key;
+            return (
+              <button key={key} type="button" onClick={() => setStatus(key)} aria-selected={on}>
+                {label}{typeof n === "number" ? <span style={{ opacity: 0.7, marginLeft: 6 }}>{n}</span> : null}
+              </button>
+            );
+          })}
+        </div>
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
@@ -288,7 +285,7 @@ export default function PotentialClientsBoard() {
 
       {/* List */}
       {loadErr && (
-        <div style={{ border: "1px solid var(--border)", borderRadius: 14, padding: 16, background: "var(--bg-card)", display: "grid", gap: 8, maxWidth: 560 }}>
+        <div className="v2-card" style={{ padding: 16, display: "grid", gap: 8, maxWidth: 560 }}>
           <div style={{ fontSize: 14, fontWeight: 600 }}>Potential clients could not be loaded</div>
           <div style={{ fontSize: 13, color: "var(--red)", lineHeight: 1.5 }}>{loadErr}</div>
           <div><button type="button" onClick={load} style={btn}>Retry</button></div>
@@ -352,12 +349,12 @@ function Card({ row: r, busy, err, highlighted, onAct, onSave, onRemove }: {
   const color = STATUS_COLOR[r.status] || "var(--text-muted)";
 
   return (
-    <div style={{
+    <div className="v2-card v2-lift" style={{
       background: highlighted
-        ? "radial-gradient(ellipse 90% 70% at 50% -20%, var(--accent-glow), transparent 60%), linear-gradient(180deg, var(--bg-card), var(--bg-card))"
-        : "var(--bg-card)",
-      border: `1px solid ${highlighted ? "var(--accent)" : "var(--border)"}`,
-      borderRadius: 14, padding: "16px 18px", display: "flex", flexDirection: "column", gap: 10, minWidth: 0,
+        ? "radial-gradient(ellipse 90% 70% at 50% -20%, var(--accent-glow), transparent 60%), var(--bg-card)"
+        : undefined,
+      border: `1px solid ${highlighted ? "var(--accent)" : "transparent"}`,
+      padding: "16px 18px", display: "flex", flexDirection: "column", gap: 10, minWidth: 0,
     }}>
       {/* Title row */}
       <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start" }}>
@@ -407,7 +404,7 @@ function Card({ row: r, busy, err, highlighted, onAct, onSave, onRemove }: {
           {s.has_ssl === false && <Chip ok={false} yes="" no="No SSL" />}
           {s.mobile_viewport === false && <Chip ok={false} yes="" no="Not mobile ready" />}
           {s.platform && s.platform !== "unknown" && (
-            <span style={{ fontSize: 10.5, fontWeight: 600, color: "var(--text-secondary)", border: "1px solid var(--border)", padding: "1px 8px", borderRadius: 999 }}>
+            <span className="v2-status v2-status--info">
               {PLATFORM_LABEL[s.platform] || s.platform}
             </span>
           )}

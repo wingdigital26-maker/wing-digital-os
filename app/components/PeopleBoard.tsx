@@ -166,12 +166,14 @@ export default function PeopleBoard() {
 
       {feed && !unreachable && (
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-          {FILTERS.map(f => (
-            <button key={f.id} type="button" onClick={() => setFilter(f.id)}
-              style={pill(filter === f.id)} aria-pressed={filter === f.id}>
-              {f.label}{counts[f.id] != null ? ` ${counts[f.id].toLocaleString()}` : ""}
-            </button>
-          ))}
+          <div className="v2-pills" role="tablist">
+            {FILTERS.map(f => (
+              <button key={f.id} type="button" onClick={() => setFilter(f.id)}
+                aria-selected={filter === f.id}>
+                {f.label}{counts[f.id] != null ? ` ${counts[f.id].toLocaleString()}` : ""}
+              </button>
+            ))}
+          </div>
           <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search name, address, city"
             style={{
               marginLeft: "auto", minWidth: 220, flex: "0 1 280px",
@@ -188,7 +190,7 @@ export default function PeopleBoard() {
             Nobody matches that. Clear the search or pick a different filter.
           </p>
         ) : (
-          <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
+          <ul className="v2-card" style={{ listStyle: "none", display: "flex", flexDirection: "column", overflow: "hidden" }}>
             {rows.map((p, i) => {
               const quality = p.email_status ? QUALITY[p.email_status] : null;
               return (

@@ -418,7 +418,7 @@ export default function InvoicesBoard() {
   }
   if (!data.configured) {
     return (
-      <div style={card}>
+      <div className="v2-card" style={card}>
         <p style={{ margin: 0, color: "var(--text-secondary)", fontSize: 13 }}>
           Invoices are not configured — SONAR_SUPABASE_URL / SONAR_SUPABASE_SERVICE_KEY are missing.
         </p>
@@ -429,7 +429,7 @@ export default function InvoicesBoard() {
   // this point would be an assertion the data does not support.
   if (data.unavailable) {
     return (
-      <div style={card}>
+      <div className="v2-card" style={card}>
         <p style={{ margin: 0, fontWeight: 700, fontSize: 14 }}>Invoices could not be read</p>
         <p style={{ margin: "6px 0 0", color: "var(--text-secondary)", fontSize: 13, lineHeight: 1.5 }}>
           {data.error || "The invoice database did not answer. Nothing here is known to be zero."}
@@ -480,7 +480,7 @@ export default function InvoicesBoard() {
           // tear the whole thing down and build a new one on every step, which
           // threw keyboard focus off the arrow the moment it was pressed: you
           // could click forward once and then had to find the button again.
-          <section key="month" style={card}>
+          <section key="month" className="v2-card" style={card}>
             <header style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
               <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--text-primary)" }}>
                 {MONTHS[m.m1 - 1]} <span style={{ ...num, color: "var(--text-secondary)", fontWeight: 500 }}>{m.y}</span>
@@ -650,7 +650,7 @@ export default function InvoicesBoard() {
       </div>
 
       {showForm ? (
-        <form onSubmit={create} style={{ ...card, display: "grid", gap: 10 }}>
+        <form onSubmit={create} className="v2-card" style={{ ...card, display: "grid", gap: 10 }}>
           <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))" }}>
             <label style={lbl}>
               Client
@@ -687,13 +687,13 @@ export default function InvoicesBoard() {
 
       {/* Invoice list, grouped by client */}
       {grouped.length === 0 ? (
-        <div style={card}>
+        <div className="v2-card" style={card}>
           <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>No invoices yet.</p>
         </div>
       ) : null}
 
       {grouped.map((g) => (
-        <section key={g.client} style={card}>
+        <section key={g.client} className="v2-card" style={card}>
           <header style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, marginBottom: 10 }}>
             <h3 style={{ margin: 0, fontSize: 14, color: "var(--text-primary)" }}>{g.client}</h3>
             <span style={{ ...num, fontSize: 12, color: g.owed ? "var(--orange)" : "var(--text-muted)" }}>
@@ -720,12 +720,10 @@ export default function InvoicesBoard() {
                   <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
                     <span style={{ ...num, fontSize: 12, color: "var(--text-muted)" }}>{it.invoice_no}</span>
                     <span
+                      className="v2-status"
                       style={{
-                        fontSize: 11,
-                        padding: "2px 8px",
-                        borderRadius: 99,
-                        border: `1px solid ${overdue ? "var(--red)" : STATUS_COLOR[it.status] || "var(--border)"}`,
                         color: overdue ? "var(--red)" : STATUS_COLOR[it.status] || "var(--text-secondary)",
+                        background: `color-mix(in srgb, ${overdue ? "var(--red)" : STATUS_COLOR[it.status] || "var(--text-secondary)"} 12%, var(--bg-card))`,
                       }}
                     >
                       {overdue ? "overdue" : it.status}
@@ -866,12 +864,11 @@ function DayPanel(props: {
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
               <span style={{ fontSize: 12, color: "var(--text-primary)" }}>{it.client}</span>
               <span
+                className="v2-status"
                 style={{
                   fontSize: 10,
-                  padding: "1px 7px",
-                  borderRadius: 99,
-                  border: `1px solid ${STATUS_COLOR[it.status] || "var(--border)"}`,
                   color: STATUS_COLOR[it.status] || "var(--text-secondary)",
+                  background: `color-mix(in srgb, ${STATUS_COLOR[it.status] || "var(--text-secondary)"} 12%, var(--bg-card))`,
                 }}
               >
                 {it.status}
@@ -979,7 +976,7 @@ function DayPanel(props: {
 
 function Tile({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone: string }) {
   return (
-    <div style={{ ...card, padding: 14 }}>
+    <div className="v2-card" style={{ ...card, padding: 14 }}>
       <div style={{ fontSize: 11, letterSpacing: 0.4, textTransform: "uppercase", color: "var(--text-muted)" }}>
         {label}
       </div>
@@ -992,9 +989,6 @@ function Tile({ label, value, sub, tone }: { label: string; value: string; sub?:
 }
 
 const card: React.CSSProperties = {
-  background: "var(--bg-card)",
-  border: "1px solid var(--border)",
-  borderRadius: 14,
   padding: 16,
 };
 

@@ -72,27 +72,21 @@ export default function LogActivity({
   }
 
   return (
-    <div style={{
-      border: "1px solid var(--border)", borderRadius: 10,
-      padding: 12, background: "var(--bg-card)",
+    <div className="v2-inner" style={{
+      border: "1px solid var(--border)", padding: 12,
     }}>
       <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 8 }}>
         Log an activity
       </div>
 
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+      <div className="v2-pills" style={{ marginBottom: 8 }}>
         {KINDS.map((k) => (
           <button
             key={k}
             type="button"
             onClick={() => { setKind(k); if (k !== "call") setOutcome(""); }}
-            style={{
-              padding: "6px 10px", borderRadius: 999, fontSize: 12,
-              cursor: "pointer", textTransform: "capitalize",
-              border: `1px solid ${kind === k ? "var(--accent)" : "var(--border)"}`,
-              color: kind === k ? "var(--accent)" : "var(--text-muted)",
-              background: "transparent",
-            }}
+            aria-selected={kind === k}
+            style={{ textTransform: "capitalize" }}
           >
             {k}
           </button>
@@ -103,10 +97,10 @@ export default function LogActivity({
         <select
           value={outcome}
           onChange={(e) => setOutcome(e.target.value)}
+          className="v2-inner"
           style={{
-            width: "100%", padding: "8px 10px", marginBottom: 8, fontSize: 14,
-            borderRadius: 8, border: "1px solid var(--border)",
-            background: "var(--bg-card)", color: "inherit",
+            width: "100%", padding: "8px 10px", marginBottom: 8, fontSize: 16,
+            border: "1px solid var(--border)", color: "inherit",
           }}
         >
           <option value="">Call outcome (optional)</option>
@@ -121,9 +115,10 @@ export default function LogActivity({
         onChange={(e) => setBody(e.target.value)}
         rows={3}
         placeholder="What happened?"
+        className="v2-inner"
         style={{
-          width: "100%", padding: "8px 10px", fontSize: 14, borderRadius: 8,
-          border: "1px solid var(--border)", background: "var(--bg-card)",
+          width: "100%", padding: "8px 10px", fontSize: 16,
+          border: "1px solid var(--border)",
           color: "inherit", resize: "vertical", boxSizing: "border-box",
         }}
       />

@@ -122,8 +122,8 @@ const readSocials = (v: unknown): Social[] =>
 
 const chipTone = (tone: string): { fg: string; bg: string; bd: string } => {
   const t = tone.toLowerCase();
-  if (t === "has" || t === "good" || t === "yes") return { fg: "#4ade80", bg: "rgba(34,197,94,0.10)", bd: "rgba(34,197,94,0.30)" };
-  if (t === "miss" || t === "gap" || t === "no") return { fg: "#fbbf24", bg: "rgba(251,191,36,0.10)", bd: "rgba(251,191,36,0.30)" };
+  if (t === "has" || t === "good" || t === "yes") return { fg: "var(--green)", bg: "var(--v2-tint-green)", bd: "var(--green)" };
+  if (t === "miss" || t === "gap" || t === "no") return { fg: "var(--orange)", bg: "var(--v2-tint-amber)", bd: "var(--orange)" };
   return { fg: "var(--text-muted)", bg: "var(--bg-hover)", bd: "var(--border)" };
 };
 
@@ -137,9 +137,9 @@ const readTier = (v: unknown): "A" | "B" | "C" | null => {
 };
 
 const TIER_META: Record<string, { label: string; tone: string }> = {
-  A: { label: "A", tone: "#4ade80" },
-  B: { label: "B", tone: "#38bdf8" },
-  C: { label: "C", tone: "#94a3b8" },
+  A: { label: "A", tone: "var(--green)" },
+  B: { label: "B", tone: "var(--accent)" },
+  C: { label: "C", tone: "var(--text-muted)" },
 };
 
 // "maddox@wingdigital.co" -> "Maddox's sheet". Names come from the data, never
@@ -206,25 +206,25 @@ type Today = {
 };
 
 const OUTCOMES: { key: string; label: string; tone: string }[] = [
-  { key: "signed", label: "Signed", tone: "#10b981" },
-  { key: "booked", label: "Booked a call", tone: "#22c55e" },
-  { key: "callback", label: "Call back later", tone: "#eab308" },
-  { key: "contacted", label: "Spoke, no yes", tone: "#38bdf8" },
-  { key: "no_answer", label: "No answer", tone: "#94a3b8" },
-  { key: "not_interested", label: "Not interested", tone: "#f97316" },
-  { key: "bad_number", label: "Bad number", tone: "#a78bfa" },
-  { key: "dnc", label: "Do not call", tone: "#ef4444" },
+  { key: "signed", label: "Signed", tone: "var(--green)" },
+  { key: "booked", label: "Booked a call", tone: "var(--green)" },
+  { key: "callback", label: "Call back later", tone: "var(--orange)" },
+  { key: "contacted", label: "Spoke, no yes", tone: "var(--accent)" },
+  { key: "no_answer", label: "No answer", tone: "var(--text-muted)" },
+  { key: "not_interested", label: "Not interested", tone: "var(--orange)" },
+  { key: "bad_number", label: "Bad number", tone: "var(--accent-2)" },
+  { key: "dnc", label: "Do not call", tone: "var(--red)" },
 ];
 
 // The outcomes that cover nearly every cold call, offered one tap deep on the
 // card itself. Anything rarer (do not call, bad number, notes, a callback date)
 // still lives in the panel.
 const QUICK: { key: string; short: string; tone: string }[] = [
-  { key: "signed", short: "Signed", tone: "#10b981" },
-  { key: "booked", short: "Booked", tone: "#22c55e" },
-  { key: "callback", short: "Call back", tone: "#eab308" },
-  { key: "no_answer", short: "No answer", tone: "#94a3b8" },
-  { key: "not_interested", short: "Not interested", tone: "#f97316" },
+  { key: "signed", short: "Signed", tone: "var(--green)" },
+  { key: "booked", short: "Booked", tone: "var(--green)" },
+  { key: "callback", short: "Call back", tone: "var(--orange)" },
+  { key: "no_answer", short: "No answer", tone: "var(--text-muted)" },
+  { key: "not_interested", short: "Not interested", tone: "var(--orange)" },
 ];
 
 const FILTERS = [
@@ -237,7 +237,7 @@ const FILTERS = [
 ];
 
 const statusColor = (s: string) =>
-  OUTCOMES.find((o) => o.key === s)?.tone ?? "#64748b";
+  OUTCOMES.find((o) => o.key === s)?.tone ?? "var(--text-muted)";
 
 // Same "when is this due" phrasing as the Callbacks board, so a caller who
 // bounces between the two screens reads one language, not two.
@@ -595,13 +595,13 @@ export default function CallRoom() {
                 flex: "1 1 220px", minWidth: 200, textAlign: "left",
                 display: "flex", alignItems: "center", gap: 12, cursor: "pointer",
                 borderRadius: 14, padding: "12px 16px",
-                border: `1px solid ${today.callbacksOverdue > 0 ? "color-mix(in srgb, var(--red) 55%, transparent)" : "rgba(234,179,8,0.5)"}`,
-                background: today.callbacksOverdue > 0 ? "color-mix(in srgb, var(--red) 10%, var(--bg-card))" : "rgba(234,179,8,0.10)",
+                border: `1px solid ${today.callbacksOverdue > 0 ? "color-mix(in srgb, var(--red) 55%, transparent)" : "var(--orange)"}`,
+                background: today.callbacksOverdue > 0 ? "color-mix(in srgb, var(--red) 10%, var(--bg-card))" : "var(--v2-tint-amber)",
               }}
             >
               <span style={{
                 fontSize: 22, fontWeight: 800, fontVariantNumeric: "tabular-nums",
-                color: today.callbacksOverdue > 0 ? "var(--red)" : "#eab308",
+                color: today.callbacksOverdue > 0 ? "var(--red)" : "var(--orange)",
               }}>
                 {today.callbacksDue}
               </span>
@@ -620,7 +620,7 @@ export default function CallRoom() {
         </div>
 
         {flash && (
-          <div style={{ ...banner, background: "rgba(34,197,94,0.12)", borderColor: "rgba(34,197,94,0.4)", color: "#4ade80" }}>
+          <div style={{ ...banner, background: "var(--v2-tint-green)", borderColor: "var(--green)", color: "var(--green)" }}>
             Logged: {flash}
           </div>
         )}
@@ -631,7 +631,7 @@ export default function CallRoom() {
               Sign in to load the dial list. Your session may have expired. Refresh after signing back in.
             </div>
           ) : (
-            <div style={{ ...banner, background: "rgba(239,68,68,0.12)", borderColor: "rgba(239,68,68,0.4)", color: "#f87171" }}>
+            <div style={{ ...banner, background: "color-mix(in srgb, var(--red) 12%, var(--bg-card))", borderColor: "var(--red)", color: "var(--red)" }}>
               {error}
             </div>
           );
@@ -639,43 +639,30 @@ export default function CallRoom() {
 
         {/* filters */}
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 20, alignItems: "center" }}>
-          {FILTERS.map((f) => {
-            const on = filter === f.key;
-            const n = f.key === "all" ? Object.values(counts).reduce((a, b) => a + b, 0) : counts[f.key] ?? 0;
-            return (
-              <button key={f.key} onClick={() => setFilter(f.key)} style={{
-                ...chip,
-                background: on ? "linear-gradient(135deg,#3D6BF0,#1E44B8)" : "var(--bg-card)",
-                borderColor: on ? "transparent" : "var(--border)",
-                color: on ? "#fff" : "var(--text-muted)",
-                fontWeight: on ? 700 : 500,
-              }}>
-                {f.label} {n > 0 && <span style={{ opacity: 0.75 }}>{n}</span>}
-              </button>
-            );
-          })}
+          <div className="v2-pills">
+            {FILTERS.map((f) => {
+              const on = filter === f.key;
+              const n = f.key === "all" ? Object.values(counts).reduce((a, b) => a + b, 0) : counts[f.key] ?? 0;
+              return (
+                <button key={f.key} onClick={() => setFilter(f.key)} aria-selected={on}>
+                  {f.label} {n > 0 && <span style={{ opacity: 0.75 }}>{n}</span>}
+                </button>
+              );
+            })}
+          </div>
           {/* Buy-likelihood pills, in the same row as the status filters. They
               appear only once the enrichment has tiered at least one lead. */}
           {(Object.values(tierCounts).some((n) => n > 0) || tier !== "all") && (
-            <>
-              <span style={{ width: 1, alignSelf: "stretch", background: "var(--border)", margin: "0 2px" }} />
+            <div className="v2-pills">
               {[{ key: "all", label: "Any tier" }, ...["A", "B", "C"].filter((t) => (tierCounts[t] ?? 0) > 0).map((t) => ({ key: t, label: `Tier ${t}` }))].map((f) => {
                 const on = tier === f.key;
-                const tone = TIER_META[f.key]?.tone ?? "#3D6BF0";
-                const n = f.key === "all" ? null : tierCounts[f.key] ?? 0;
                 return (
-                  <button key={f.key} onClick={() => setTier(f.key)} style={{
-                    ...chip,
-                    background: on ? `${tone}22` : "var(--bg-card)",
-                    borderColor: on ? tone : "var(--border)",
-                    color: on ? tone : "var(--text-muted)",
-                    fontWeight: on ? 700 : 500,
-                  }}>
-                    {f.label} {n !== null && n > 0 && <span style={{ opacity: 0.75 }}>{n}</span>}
+                  <button key={f.key} onClick={() => setTier(f.key)} aria-selected={on}>
+                    {f.label} {tierCounts[f.key] !== undefined && tierCounts[f.key] > 0 && <span style={{ opacity: 0.75 }}>{tierCounts[f.key]}</span>}
                   </button>
                 );
               })}
-            </>
+            </div>
           )}
           <input
             value={q}
@@ -696,24 +683,20 @@ export default function CallRoom() {
             <span style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: "var(--text-muted)", fontWeight: 700 }}>
               Sheet
             </span>
-            {[
-              { key: "all", label: "All" },
-              ...assignedEmails.map((e) => ({ key: e, label: sheetLabel(e) })),
-              { key: "unassigned", label: "Unassigned" },
-            ].map((f) => {
-              const on = assigned === f.key;
-              return (
-                <button key={f.key} onClick={() => setAssigned(f.key)} title={f.key !== "all" && f.key !== "unassigned" ? f.key : undefined} style={{
-                  ...chip,
-                  background: on ? "linear-gradient(135deg,#a78bfa,#6d28d9)" : "var(--bg-card)",
-                  borderColor: on ? "transparent" : "var(--border)",
-                  color: on ? "#fff" : "var(--text-muted)",
-                  fontWeight: on ? 700 : 500,
-                }}>
-                  {f.label}
-                </button>
-              );
-            })}
+            <div className="v2-pills">
+              {[
+                { key: "all", label: "All" },
+                ...assignedEmails.map((e) => ({ key: e, label: sheetLabel(e) })),
+                { key: "unassigned", label: "Unassigned" },
+              ].map((f) => {
+                const on = assigned === f.key;
+                return (
+                  <button key={f.key} onClick={() => setAssigned(f.key)} title={f.key !== "all" && f.key !== "unassigned" ? f.key : undefined} aria-selected={on}>
+                    {f.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
 
@@ -726,21 +709,16 @@ export default function CallRoom() {
             <span style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: "var(--text-muted)", fontWeight: 700 }}>
               Trade
             </span>
-            {verticals.map((v) => {
-              const on = q.trim().toLowerCase() === v.toLowerCase();
-              return (
-                <button key={v} onClick={() => setQ(on ? "" : v)} style={{
-                  ...chip,
-                  background: on ? "linear-gradient(135deg,#0ea5a4,#0f766e)" : "var(--bg-card)",
-                  borderColor: on ? "transparent" : "var(--border)",
-                  color: on ? "#fff" : "var(--text-muted)",
-                  fontWeight: on ? 700 : 500,
-                  textTransform: "capitalize",
-                }}>
-                  {v}
-                </button>
-              );
-            })}
+            <div className="v2-pills">
+              {verticals.map((v) => {
+                const on = q.trim().toLowerCase() === v.toLowerCase();
+                return (
+                  <button key={v} onClick={() => setQ(on ? "" : v)} aria-selected={on} style={{ textTransform: "capitalize" }}>
+                    {v}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
 
@@ -765,7 +743,7 @@ export default function CallRoom() {
             const d = derived.get(l.id);
             const overdue = d?.overdue ?? false;
             return (
-            <div key={l.id} style={{
+            <div key={l.id} className="v2-lift" style={{
               ...card, display: "flex", gap: 14, alignItems: "flex-start", flexWrap: "wrap",
               // Nameless leads (most of the list) are still fully workable but
               // read as secondary: a muted left rail and a hair less presence.
@@ -787,7 +765,7 @@ export default function CallRoom() {
                   display: "flex", alignItems: "center", justifyContent: "center",
                   background: "var(--bg-hover)", border: "1px solid var(--border)",
                   fontSize: 14, fontWeight: 800, fontVariantNumeric: "tabular-nums",
-                  color: (l.score ?? 0) >= 65 ? "#4ade80" : "var(--text-muted)",
+                  color: (l.score ?? 0) >= 65 ? "var(--green)" : "var(--text-muted)",
                 }}>{l.score ?? 0}</div>
 
               <div style={{ flex: "1 1 260px", minWidth: 0 }}>
@@ -821,7 +799,7 @@ export default function CallRoom() {
                     </span>
                   )}
                   {l.claim === "taken" && (
-                    <span style={{ ...pill, borderColor: "#f97316", color: "#f97316" }}>
+                    <span style={{ ...pill, borderColor: "var(--orange)", color: "var(--orange)" }}>
                       on a call with {l.claimed_by_email ? displayName(l.claimed_by_email) : "someone"}
                     </span>
                   )}
@@ -841,7 +819,7 @@ export default function CallRoom() {
                         {d.cautions > 0 && (
                           <span
                             title={`${d.cautions} thing${d.cautions === 1 ? "" : "s"} to check before you dial`}
-                            style={{ ...pill, borderColor: "#fbbf24", color: "#fbbf24" }}
+                            style={{ ...pill, borderColor: "var(--orange)", color: "var(--orange)" }}
                           >
                             ! check {d.cautions}
                           </span>
@@ -1040,12 +1018,12 @@ export default function CallRoom() {
             style={{
               width: "min(680px, 100%)", maxHeight: "92vh", overflowY: "auto",
               background: "var(--bg-card)", border: "1px solid var(--border)",
-              borderRadius: "20px 20px 0 0", padding: 24,
-              boxShadow: "0 -20px 60px rgba(0,0,0,0.6)",
+              borderRadius: "var(--v2-radius) var(--v2-radius) 0 0", padding: 24,
+              boxShadow: "var(--v2-shadow-lift)",
             }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
               <div>
-                <h2 id="call-panel-company" style={{ fontSize: 20, fontWeight: 800 }}>{active.company}</h2>
+                <h2 id="call-panel-company" className="v2-h" style={{ fontSize: 20 }}>{active.company}</h2>
                 {/* The name he asks for, at a size he can read while the phone
                     is already ringing. */}
                 {active.contact_name ? (
@@ -1171,7 +1149,7 @@ export default function CallRoom() {
                 marginTop: 16, padding: "13px 15px", borderRadius: 12,
                 background: "rgba(251,191,36,0.10)", border: "1px solid rgba(251,191,36,0.45)",
               }}>
-                <p style={{ fontSize: 11.5, textTransform: "uppercase", letterSpacing: 0.6, color: "#fbbf24", fontWeight: 800 }}>
+                <p style={{ fontSize: 11.5, textTransform: "uppercase", letterSpacing: 0.6, color: "var(--orange)", fontWeight: 800 }}>
                   Check before you dial
                 </p>
                 <ul style={{ margin: "7px 0 0", paddingLeft: 18 }}>
@@ -1300,8 +1278,8 @@ export default function CallRoom() {
 }
 
 const card: React.CSSProperties = {
-  background: "var(--bg-card)", border: "1px solid var(--border)",
-  borderRadius: 14, padding: "14px 16px",
+  background: "var(--bg-card)", border: "1px solid transparent",
+  borderRadius: "var(--v2-radius)", boxShadow: "var(--v2-shadow)", padding: "14px 16px",
 };
 const chip: React.CSSProperties = {
   padding: "7px 13px", borderRadius: 999, border: "1px solid", fontSize: 12.5, cursor: "pointer",
@@ -1313,18 +1291,19 @@ const miniChip: React.CSSProperties = {
 const pill: React.CSSProperties = {
   padding: "2px 8px", borderRadius: 999, border: "1px solid", fontSize: 10.5, fontWeight: 700,
   textTransform: "uppercase", letterSpacing: 0.4,
+  background: "color-mix(in srgb, currentColor 12%, var(--bg-card))",
 };
 // Compact today-strip stat tile: a small fixed-width number-over-label card that
 // sits inline with the call-back alert. Deliberately smaller than the old Today
 // dashboard's stat cards — this is a glance, not the main event.
 const miniStat: React.CSSProperties = {
   display: "flex", flexDirection: "column", justifyContent: "center",
-  minWidth: 110, padding: "10px 16px", borderRadius: 14,
-  background: "var(--bg-card)", border: "1px solid var(--border)",
+  minWidth: 110, padding: "10px 16px", borderRadius: "var(--v2-radius)",
+  background: "var(--v2-tint-blue)", border: "1px solid transparent",
 };
 const miniStatNum: React.CSSProperties = {
   fontSize: 24, fontWeight: 800, letterSpacing: -0.5, lineHeight: 1.1,
-  fontVariantNumeric: "tabular-nums",
+  fontVariantNumeric: "tabular-nums", fontFamily: "'Space Grotesk', 'Inter', sans-serif",
 };
 const miniStatLabel: React.CSSProperties = {
   fontSize: 11.5, color: "var(--text-muted)", marginTop: 2,
@@ -1333,7 +1312,7 @@ const btnPrimary: React.CSSProperties = {
   padding: "12px 18px", minHeight: 44,
   display: "inline-flex", alignItems: "center", justifyContent: "center",
   borderRadius: 10, border: "none",
-  background: "linear-gradient(135deg,#3D6BF0,#1E44B8)", color: "#fff",
+  background: "var(--accent)", color: "#fff",
   fontSize: 13, fontWeight: 700, cursor: "pointer",
 };
 const btnGhost: React.CSSProperties = {

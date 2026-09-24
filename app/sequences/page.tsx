@@ -124,7 +124,7 @@ export default function SequencesPage() {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
-        <h1 style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 24, fontWeight: 700, margin: 0 }}>
+        <h1 className="v2-h" style={{ fontSize: 24 }}>
           Email sequences
         </h1>
         <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>
@@ -184,7 +184,7 @@ export default function SequencesPage() {
 
       <div style={{ display: "grid", gap: 10 }}>
         {items?.map((s) => (
-          <div key={s.id} style={{ ...card, display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+          <div key={s.id} className="v2-lift" style={{ ...card, display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
             <Link href={`/sequences/${s.id}`} style={{ textDecoration: "none", color: "inherit", flex: "1 1 260px" }}>
               <div style={{ fontWeight: 700, fontSize: 15 }}>{s.name}</div>
               <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 3 }}>
@@ -232,10 +232,8 @@ function StatusPill({ status }: { status: string }) {
   const label = status === "active" ? "Active" : status === "paused" ? "Paused" : "Draft";
   return (
     <span
-      style={{
-        fontSize: 12, fontWeight: 700, color,
-        border: `1px solid ${color}`, borderRadius: 999, padding: "3px 10px",
-      }}
+      className="v2-status"
+      style={{ color, background: `color-mix(in srgb, ${color} 14%, var(--bg-card))` }}
     >
       {label}
     </span>
@@ -244,8 +242,9 @@ function StatusPill({ status }: { status: string }) {
 
 const card: React.CSSProperties = {
   background: "var(--bg-card)",
-  border: "1px solid var(--border)",
-  borderRadius: 12,
+  border: "1px solid transparent",
+  borderRadius: "var(--v2-radius)",
+  boxShadow: "var(--v2-shadow)",
   padding: 16,
 };
 const btn: React.CSSProperties = {

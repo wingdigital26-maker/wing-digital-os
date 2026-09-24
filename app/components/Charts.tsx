@@ -92,18 +92,18 @@ export function KpiCard({
     <motion.div
       variants={{ hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 260, damping: 26 } } }}
       initial="hidden" animate="show"
+      className="v2-tile"
       style={{
-      background: `radial-gradient(ellipse 90% 70% at 50% -20%, ${color}14, transparent 60%), linear-gradient(180deg, var(--bg-card), var(--bg-card))`,
-      border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px",
-      boxShadow: "0 8px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.04)",
+      background: `color-mix(in srgb, ${color} 11%, var(--bg-card))`,
+      minHeight: 0, padding: "16px 18px",
       display: "flex", flexDirection: "column", gap: 10, minWidth: 0,
     }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <span className="live-dot" style={{ width: 6, height: 6, borderRadius: "50%", background: color, boxShadow: `0 0 8px ${color}`, flexShrink: 0 }} />
-        <p style={{ fontSize: 10.5, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</p>
+        <p className="v2-tile__label" style={{ color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</p>
       </div>
       <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-        <p style={{ fontSize: 28, fontWeight: 800, color, fontFamily: GROTESK, lineHeight: 1, textShadow: `0 0 20px ${color}44` }}>{value}</p>
+        <p className="v2-tile__num" style={{ color, fontFamily: GROTESK }}>{value}</p>
         <Delta value={delta} label={deltaLabel} />
       </div>
       {spark && spark.length > 1 && (
@@ -266,16 +266,11 @@ export function ChartCard({
   children: React.ReactNode;
 }) {
   return (
-    <div style={{
-      background: "linear-gradient(180deg, var(--bg-card), var(--bg-card))",
-      border: "1px solid var(--border)", borderRadius: 16, padding: "16px 20px 14px",
-      boxShadow: "0 8px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.04)",
-      minWidth: 0,
-    }}>
+    <div className="v2-card" style={{ padding: "16px 20px 14px", minWidth: 0 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, gap: 8, flexWrap: "wrap" }}>
         <p style={{ fontSize: 11, fontWeight: 700, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.07em" }}>{title}</p>
         {badge && (
-          <span style={{ fontSize: 10, fontWeight: 700, color: badgeColor, background: `${badgeColor}14`, border: `1px solid ${badgeColor}33`, padding: "2px 10px", borderRadius: 999, whiteSpace: "nowrap" }}>{badge}</span>
+          <span className="v2-status" style={{ color: badgeColor, background: `color-mix(in srgb, ${badgeColor} 12%, var(--bg-card))`, whiteSpace: "nowrap" }}>{badge}</span>
         )}
       </div>
       {children}

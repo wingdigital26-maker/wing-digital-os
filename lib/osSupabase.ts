@@ -28,6 +28,10 @@ export async function getOsSession(): Promise<Session | null> {
 // cookie with any other value is not auth. Used to let staff-on-OS_PASSWORD
 // still reach endpoints that don't strictly need a user id.
 export async function hasLegacyAuth(): Promise<boolean> {
+  // Local dev switch (see proxy.ts): OS_NO_LOGIN=1 on `next dev` only counts as
+  // the shared owner login so in-route guards (Call Room) work without signing in.
+  // Production builds never take this branch.
+  if (process.env.OS_NO_LOGIN === "1" && process.env.NODE_ENV === "development") return true;
   const jar = await cookies();
   const cookie = jar.get("wingos_auth")?.value;
   if (!cookie) return false;

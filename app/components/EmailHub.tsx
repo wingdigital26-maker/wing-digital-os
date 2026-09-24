@@ -86,7 +86,7 @@ export default function EmailHub() {
         }}>
           CRM
         </div>
-        <h2 style={{ fontSize: 22, fontWeight: 700, color: "var(--text-primary)", margin: "0 0 6px" }}>
+        <h2 className="v2-h" style={{ fontSize: 22, margin: "0 0 6px" }}>
           Email
         </h2>
         <p style={{ fontSize: 13.5, color: "var(--text-secondary)", margin: 0, maxWidth: 620, lineHeight: 1.5 }}>
@@ -94,20 +94,13 @@ export default function EmailHub() {
         </p>
       </div>
 
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 16 }}>
+      <div className="v2-pills" style={{ marginBottom: 16 }}>
         {VIEWS.map((v) => (
           <button
             key={v.id}
             onClick={() => go(v.id)}
-            style={{
-              padding: "7px 16px", borderRadius: 999, fontSize: 12.5, cursor: "pointer",
-              fontFamily: "inherit",
-              fontWeight: active === v.id ? 700 : 500,
-              border: active === v.id ? "1px solid var(--accent)" : "1px solid var(--border)",
-              background: active === v.id ? "var(--accent-glow)" : "transparent",
-              color: active === v.id ? "var(--accent)" : "var(--text-secondary)",
-              transition: "all 0.15s",
-            }}
+            aria-selected={active === v.id}
+            style={{ fontFamily: "inherit" }}
           >
             {v.label}
           </button>

@@ -100,7 +100,7 @@ function PeopleInner() {
 
   return (
     <div>
-      <h1 style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 24, fontWeight: 700, margin: "0 0 4px" }}>
+      <h1 className="v2-h" style={{ fontSize: 24, margin: "0 0 4px" }}>
         People on sequences
       </h1>
       <div style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 18 }}>
@@ -174,7 +174,7 @@ function PeopleInner() {
 
       <div style={{ display: "grid", gap: 8 }}>
         {rows?.map((r) => (
-          <div key={r.id} style={{ ...card, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <div key={r.id} className="v2-lift" style={{ ...card, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
             <div style={{ flex: "1 1 240px" }}>
               <div style={{ fontWeight: 700, fontSize: 14 }}>
                 {r.name || r.email}
@@ -255,7 +255,7 @@ function StatusPill({ status }: { status: string }) {
     : status === "bounced" ? "Bounced"
     : status;
   return (
-    <span style={{ fontSize: 12, fontWeight: 700, color, border: `1px solid ${color}`, borderRadius: 999, padding: "3px 10px" }}>
+    <span className="v2-status" style={{ color, background: `color-mix(in srgb, ${color} 14%, var(--bg-card))` }}>
       {label}
     </span>
   );
@@ -263,8 +263,9 @@ function StatusPill({ status }: { status: string }) {
 
 const card: React.CSSProperties = {
   background: "var(--bg-card)",
-  border: "1px solid var(--border)",
-  borderRadius: 12,
+  border: "1px solid transparent",
+  borderRadius: "var(--v2-radius)",
+  boxShadow: "var(--v2-shadow)",
   padding: 14,
 };
 const btn: React.CSSProperties = {

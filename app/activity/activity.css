@@ -10,7 +10,10 @@
 .act-head h1 {
   margin: 0 0 4px;
   font-size: 26px;
-  letter-spacing: -0.01em;
+  font-family: 'Space Grotesk', 'Inter', sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
 }
 .act-head p {
   margin: 0 0 22px;
@@ -28,11 +31,17 @@
   margin-bottom: 26px;
 }
 .act-lane {
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  border: 1px solid transparent;
+  border-radius: var(--v2-radius);
+  box-shadow: var(--v2-shadow);
   background: var(--bg-card);
   padding: 14px 15px;
   border-left-width: 4px;
+  transition: transform .2s ease-out, box-shadow .2s ease-out;
+}
+.act-lane:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--v2-shadow-lift);
 }
 .act-lane .lane-name {
   font-size: 13px;
@@ -66,24 +75,37 @@
 
 /* ── Tabs ──────────────────────────────────────────────────────────── */
 .act-tabs {
-  display: flex;
-  gap: 8px;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
   margin-bottom: 20px;
-  border-bottom: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-card);
+  box-shadow: var(--v2-shadow);
 }
 .act-tab {
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: transparent;
+  border: 0;
+  color: var(--text-secondary);
   font-size: 14px;
-  font-weight: 600;
-  padding: 8px 4px 12px;
+  font-weight: 500;
   cursor: pointer;
+  transition: background-color .2s ease-out, color .2s ease-out;
+}
+.act-tab:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
 }
 .act-tab[data-active="true"] {
-  color: var(--text-primary);
-  border-bottom-color: var(--accent);
+  color: #fff;
+  background: var(--accent);
+  font-weight: 600;
 }
 
 /* ── Sections ──────────────────────────────────────────────────────── */
@@ -101,7 +123,7 @@
 
 .act-note {
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--v2-radius-sm);
   padding: 12px 14px;
   font-size: 12.5px;
   line-height: 1.55;
@@ -119,17 +141,30 @@
   margin-bottom: 14px;
 }
 .act-stat {
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--bg-card);
-  padding: 10px 14px;
+  border-radius: var(--v2-radius);
+  background: var(--v2-tint-blue);
+  padding: 14px 16px;
   min-width: 110px;
 }
-.act-stat .n { font-size: 20px; font-weight: 700; }
-.act-stat .l { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.act-stat .n {
+  font-family: 'Space Grotesk', 'Inter', sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+.act-stat .l { font-size: 12px; font-weight: 600; margin-top: 6px; color: var(--text-secondary); }
 
 /* ── Tables ────────────────────────────────────────────────────────── */
-.act-tablewrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; }
+.act-tablewrap {
+  overflow-x: auto;
+  border: 1px solid transparent;
+  border-radius: var(--v2-radius);
+  box-shadow: var(--v2-shadow);
+  background: var(--bg-card);
+}
 table.act-table {
   width: 100%;
   border-collapse: collapse;
@@ -138,18 +173,18 @@ table.act-table {
 }
 .act-table th {
   text-align: left;
-  padding: 9px 12px;
+  padding: 14px 16px;
   background: var(--bg-secondary);
   color: var(--text-muted);
   font-weight: 600;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
+  font-size: 12px;
+  letter-spacing: 0.01em;
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
 }
 .act-table td {
-  padding: 9px 12px;
+  padding: 14px 16px;
+  min-height: 52px;
   border-bottom: 1px solid var(--border);
   color: var(--text-secondary);
   vertical-align: top;
@@ -159,19 +194,20 @@ table.act-table {
 
 .act-badge {
   display: inline-block;
-  font-size: 10.5px;
+  font-size: 12px;
   font-weight: 600;
-  padding: 2px 7px;
+  padding: 4px 10px;
   border-radius: 999px;
-  border: 1px solid var(--border);
-  color: var(--text-muted);
+  color: var(--accent);
+  background: var(--v2-tint-blue);
   white-space: nowrap;
 }
 
 /* ── Queue preview cards ───────────────────────────────────────────── */
 .act-queue-item {
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  border: 1px solid transparent;
+  border-radius: var(--v2-radius);
+  box-shadow: var(--v2-shadow);
   background: var(--bg-card);
   padding: 14px 16px;
   margin-bottom: 12px;
@@ -249,8 +285,9 @@ table.act-table {
   gap: 10px;
 }
 .inst-email {
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  border: 1px solid transparent;
+  border-radius: var(--v2-radius);
+  box-shadow: var(--v2-shadow);
   background: var(--bg-card);
   padding: 14px 16px;
 }
@@ -315,5 +352,6 @@ table.act-table {
   border-radius: 8px;
   font-size: 12px;
   padding: 6px 12px;
+  min-height: 44px;
   cursor: pointer;
 }

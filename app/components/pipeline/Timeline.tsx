@@ -54,7 +54,7 @@ export function UnifiedTimeline({
 
   return (
     <div style={{ display: "grid", gap: 10 }}>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+      <div className="v2-pills">
         {TIMELINE_FILTERS.map((f) => {
           const on = f.key === filter;
           return (
@@ -62,11 +62,7 @@ export function UnifiedTimeline({
               key={f.key}
               type="button"
               onClick={() => { onFilter(f.key); setShown(PAGE); }}
-              style={{
-                padding: "6px 10px", borderRadius: 999, fontSize: 12, cursor: "pointer",
-                border: `1px solid ${on ? "var(--accent)" : "var(--border)"}`,
-                color: on ? "var(--accent)" : "var(--text-muted)", background: "transparent",
-              }}
+              aria-selected={on}
             >
               {f.label}
             </button>

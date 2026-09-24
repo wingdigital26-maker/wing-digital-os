@@ -169,9 +169,8 @@ export default function SocialBoard() {
       </header>
 
       {/* The one rule that matters here, said plainly and always visible. */}
-      <div style={{
-        display: "flex", gap: 10, alignItems: "flex-start",
-        background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 12, padding: "10px 14px",
+      <div className="v2-card" style={{
+        display: "flex", gap: 10, alignItems: "flex-start", padding: "10px 14px",
       }}>
         <span aria-hidden style={{ fontSize: 15, lineHeight: 1.4 }}>&#9432;</span>
         <p style={{ margin: 0, fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.5 }}>
@@ -183,9 +182,9 @@ export default function SocialBoard() {
       {/* Composer */}
       <form
         onSubmit={(e) => { e.preventDefault(); add(); }}
+        className="v2-card"
         style={{
-          display: "flex", flexDirection: "column", gap: 10,
-          background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 14, padding: 14,
+          display: "flex", flexDirection: "column", gap: 10, padding: 14,
         }}
       >
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -235,7 +234,7 @@ export default function SocialBoard() {
 
       {/* States */}
       {loadErr && (
-        <div style={{ border: "1px solid var(--border)", borderRadius: 14, padding: 16, background: "var(--bg-card)", display: "grid", gap: 8, maxWidth: 560 }}>
+        <div className="v2-card" style={{ padding: 16, display: "grid", gap: 8, maxWidth: 560 }}>
           <div style={{ fontSize: 14, fontWeight: 600 }}>Social posts could not be loaded</div>
           <div style={{ fontSize: 13, color: "var(--red)", lineHeight: 1.5 }}>{loadErr}</div>
           <div><button type="button" onClick={load} style={btn}>Retry</button></div>
@@ -243,7 +242,7 @@ export default function SocialBoard() {
       )}
 
       {!loadErr && missing && (
-        <div style={{ border: "1px solid var(--border)", borderRadius: 14, padding: 16, background: "var(--bg-card)", display: "grid", gap: 8, maxWidth: 560 }}>
+        <div className="v2-card" style={{ padding: 16, display: "grid", gap: 8, maxWidth: 560 }}>
           <div style={{ fontSize: 14, fontWeight: 600 }}>The social posts table is not in the database yet</div>
           <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5 }}>
             Apply migration <code>0028_social_posts.sql</code>, then reload. Your drafts will appear here.
@@ -308,8 +307,7 @@ function PostCard({ post: p, busy, err, onSave, onRemove }: {
   const sub = [p.client_slug, PLATFORM_LABEL[p.platform] || p.platform].filter(Boolean).join(" · ");
 
   return (
-    <div style={{
-      background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 14,
+    <div className="v2-card" style={{
       padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10, minWidth: 0,
     }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "baseline" }}>

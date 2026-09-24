@@ -160,9 +160,7 @@ function RosterSection({ title, note, empty, agents, onSelect }: {
   const shown = expanded ? agents : agents.slice(0, ROW_CAP);
 
   return (
-    <section style={{
-      background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 14, overflow: "hidden",
-    }}>
+    <section className="v2-card" style={{ overflow: "hidden" }}>
       <header style={{ padding: "14px 18px 10px", display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
         <h2 style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--text-primary)", margin: 0 }}>
           {title}
@@ -252,8 +250,7 @@ export function AgentUplinkState({ error, timedOut, lastHeartbeat, onRetry }: {
     return <div style={{ color: "var(--text-muted)", fontSize: 13 }}>Loading agent activity...</div>;
   }
   return (
-    <div style={{
-      background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 12,
+    <div className="v2-card" style={{
       padding: 16, display: "grid", gap: 10, maxWidth: 560,
     }}>
       <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>
@@ -403,10 +400,7 @@ export default function MissionOps() {
           {/* Ops map — first-class, always visible, but contained: a card with
               its own heading + legend and a bounded height so it never takes
               over the page. Same Wing-only agent list as the roster below. */}
-          <section style={{
-            background: "var(--bg-card)", border: "1px solid var(--border)",
-            borderRadius: 14, overflow: "hidden",
-          }}>
+          <section className="v2-card" style={{ overflow: "hidden" }}>
             <header style={{
               padding: "14px 18px 12px", display: "flex", alignItems: "baseline",
               gap: 10, flexWrap: "wrap",
@@ -452,10 +446,7 @@ export default function MissionOps() {
             </div>
 
             {/* Compact activity ticker */}
-            <section style={{
-              background: "var(--bg-card)", border: "1px solid var(--border)",
-              borderRadius: 14, padding: "14px 16px",
-            }}>
+            <section className="v2-card" style={{ padding: "14px 16px" }}>
               <h2 style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--text-primary)", margin: "0 0 12px", display: "flex", alignItems: "center", gap: 8 }}>
                 <Dot color="var(--green)" pulse /> Activity
                 <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 10, fontWeight: 400, color: "var(--text-muted)", letterSpacing: 0 }}>

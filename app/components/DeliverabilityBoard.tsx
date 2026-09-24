@@ -56,6 +56,25 @@ const LIGHT_WORD: Record<Light, string> = {
   gray: "Nothing to check yet",
 };
 
+const LIGHT_TINT: Record<Light, string> = {
+  green: "var(--v2-tint-green)",
+  yellow: "var(--v2-tint-amber)",
+  red: "color-mix(in srgb, var(--red) 12%, var(--bg-card))",
+  gray: "var(--bg-secondary)",
+};
+
+/** Status as a soft tinted pill with a word, not a bare colour dot. */
+function StatusPill({ status }: { status: Light }) {
+  return (
+    <span
+      className="v2-status"
+      style={{ color: LIGHT_COLOR[status], background: LIGHT_TINT[status] }}
+    >
+      {LIGHT_WORD[status]}
+    </span>
+  );
+}
+
 function Dot({ status, size = 14 }: { status: Light; size?: number }) {
   return (
     <span
@@ -92,8 +111,8 @@ function CheckRow({ check }: { check: Check }) {
           cursor: hasMore ? "pointer" : "default",
         }}
       >
-        <span style={{ marginTop: 3 }}>
-          <Dot status={check.status} size={10} />
+        <span style={{ marginTop: 1 }}>
+          <StatusPill status={check.status} />
         </span>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ color: "var(--text-primary)", fontSize: 13, fontWeight: 600 }}>
@@ -135,13 +154,11 @@ function CheckRow({ check }: { check: Check }) {
           )}
           {check.detail && (
             <div
+              className="v2-inner"
               style={{
                 fontSize: 11.5,
                 color: "var(--text-muted)",
                 fontFamily: "ui-monospace, monospace",
-                background: "var(--bg-card)",
-                border: "1px solid var(--border)",
-                borderRadius: 6,
                 padding: "6px 8px",
                 overflowX: "auto",
                 whiteSpace: "pre-wrap",
@@ -161,10 +178,8 @@ function SectionCard({ section }: { section: Section }) {
   const [open, setOpen] = useState(section.status === "red" || section.status === "yellow");
   return (
     <div
+      className="v2-card"
       style={{
-        background: "var(--bg-card)",
-        border: "1px solid var(--border)",
-        borderRadius: 12,
         overflow: "hidden",
       }}
     >
@@ -178,14 +193,11 @@ function SectionCard({ section }: { section: Section }) {
           cursor: section.checks.length ? "pointer" : "default",
         }}
       >
-        <span style={{ marginTop: 3 }}>
-          <Dot status={section.status} />
-        </span>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div
             style={{
               display: "flex",
-              alignItems: "baseline",
+              alignItems: "center",
               gap: 8,
               flexWrap: "wrap",
             }}
@@ -193,9 +205,7 @@ function SectionCard({ section }: { section: Section }) {
             <span style={{ color: "var(--text-primary)", fontWeight: 700, fontSize: 15 }}>
               {section.label}
             </span>
-            <span style={{ color: LIGHT_COLOR[section.status], fontSize: 12, fontWeight: 600 }}>
-              {LIGHT_WORD[section.status]}
-            </span>
+            <StatusPill status={section.status} />
           </div>
           <div style={{ color: "var(--text-secondary)", fontSize: 13.5, marginTop: 4 }}>
             {section.summary}
@@ -253,10 +263,10 @@ export default function DeliverabilityBoard() {
   return (
     <div style={{ display: "grid", gap: 14, maxWidth: 860 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-        <h2 style={{ color: "var(--text-primary)", fontSize: 18, fontWeight: 700, margin: 0 }}>
+        <h2 className="v2-h" style={{ fontSize: 18, margin: 0 }}>
           Email Health
         </h2>
-        {data && <Dot status={data.overall} />}
+        {data && <StatusPill status={data.overall} />}
         {data && (
           <span style={{ color: "var(--text-muted)", fontSize: 12 }}>
             Checked {new Date(data.fetchedAt).toLocaleTimeString()}
@@ -273,6 +283,7 @@ export default function DeliverabilityBoard() {
             color: "var(--text-secondary)",
             fontSize: 12.5,
             padding: "6px 12px",
+            minHeight: 44,
             cursor: loading ? "default" : "pointer",
           }}
         >
@@ -289,9 +300,9 @@ export default function DeliverabilityBoard() {
         const n = broken.length + worry.length;
         const tone = broken.length ? "var(--red)" : worry.length ? "var(--orange)" : "var(--green)";
         return (
-          <div style={{
-            border: `1px solid ${tone}`, borderRadius: 12, padding: "12px 16px",
-            background: "var(--bg-card)", display: "grid", gap: 3,
+          <div className="v2-card" style={{
+            border: `1px solid ${tone}`, padding: "12px 16px",
+            display: "grid", gap: 3,
           }}>
             <div style={{ fontSize: 15, fontWeight: 700, color: tone }}>
               {n === 0
@@ -316,10 +327,9 @@ export default function DeliverabilityBoard() {
 
       {error && (
         <div
+          className="v2-card"
           style={{
-            background: "var(--bg-card)",
             border: "1px solid var(--red)",
-            borderRadius: 12,
             padding: "12px 16px",
             color: "var(--text-primary)",
             fontSize: 13.5,

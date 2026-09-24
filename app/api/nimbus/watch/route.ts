@@ -233,7 +233,7 @@ export async function GET(req: NextRequest) {
       id: "watch",
       label: "Core watch",
       state: "watched",
-      note: "Sending, revenue, agent fleet, lead pipeline, call room, and client publishing.",
+      note: "Sending, Instantly replies, revenue, agent fleet, lead pipeline, call room, and client publishing.",
     },
   ];
 

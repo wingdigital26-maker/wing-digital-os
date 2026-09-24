@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 // every campaign's real totals, then the focus campaign's detail.
 //
 // Read-only. Two endpoints:
-//   /api/outreach/instantly/replies   re-checked every 30s while the tab is visible
+//   /api/outreach/instantly/replies   re-checked every 15s while the tab is visible
 //   /api/outreach/instantly           campaigns + totals, re-checked every 2 min
 // Both are cached and rate-budgeted server-side, so an open tab is cheap.
 //
@@ -57,7 +57,7 @@ type Replies = {
   checkedAt: string | null;
 };
 
-const REPLIES_EVERY_MS = 30_000;
+const REPLIES_EVERY_MS = 15_000;
 const SUMMARY_EVERY_MS = 120_000;
 
 function num(v: number | null | undefined): string {
@@ -215,7 +215,7 @@ export default function InstantlyPanel() {
           </div>
         )}
         {rep && rep.checkedAt && !rep.stale && (
-          <p className="inst-fresh">Checked Instantly {ago(rep.checkedAt, now)}. Re-checks every 30 seconds while this page is open.</p>
+          <p className="inst-fresh">Checked Instantly {ago(rep.checkedAt, now)}. Re-checks every 15 seconds while this page is open.</p>
         )}
       </div>
 

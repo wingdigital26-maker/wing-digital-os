@@ -20,6 +20,7 @@
 import { getRevenueTruth } from "@/lib/revenue";
 import { sbUrl, sbService } from "@/lib/osSupabase";
 import { EXPECTED_HEARTBEATS, inPcWindow } from "@/lib/watchdogExpected";
+import { loadReplies } from "@/lib/instantlyReplies";
 
 export type CheckState = "ok" | "problem" | "unknown";
 export type Check = {
@@ -234,6 +235,52 @@ async function checkSending(): Promise<Check[]> {
     out.push(unknown("send:errors", "Email send errors", errText(e)));
   }
   return out;
+}
+
+// Instantly: is the connection readable, and is a human reply sitting unanswered.
+// One problem per unread reply, keyed by the sender, so each hot lead alerts
+// once (the watch de-dupes alerts by id) and the alert opens the reply.
+async function checkInstantly(): Promise<Check[]> {
+  const LINK = { label: "Instantly replies", href: "/activity#replies" };
+  try {
+    const r = await loadReplies();
+    if (r.status === "error" && r.errorKind === "no_key") {
+      return [unknown("instantly:read", "Instantly", r.reason ?? "INSTANTLY_API_KEY is not set")];
+    }
+    if (r.status === "error" && r.errorKind === "auth") {
+      return [problem(
+        "instantly:auth", "Instantly connection",
+        r.reason ?? "Instantly rejected the API key.",
+        LINK,
+        "Create a new API key in Instantly (Settings > Integrations > API keys, read scopes are enough) and replace INSTANTLY_API_KEY in Vercel production, then redeploy.",
+        "high"
+      )];
+    }
+    if (r.status === "error") return [unknown("instantly:read", "Instantly", r.reason ?? "Instantly could not be read")];
+
+    const out: Check[] = [];
+    const cutoff = Date.now() - 3 * 86400000;
+    const waiting = r.replies.filter(
+      (x) => x.unread === true && !x.autoReply && x.temperature !== "cold" && Date.parse(x.at) >= cutoff
+    );
+    for (const x of waiting.slice(0, 5)) {
+      const who = x.name ? `${x.name} (${x.fromEmail})` : x.fromEmail;
+      out.push(problem(
+        `instantly:reply:${x.fromEmail.toLowerCase()}`,
+        x.temperature === "hot" ? "Interested reply waiting" : "Cold email reply waiting",
+        `${who}${x.company ? ` at ${x.company}` : ""} replied ${x.campaign ? `to "${x.campaign}" ` : ""}and it is still unread in Instantly: "${x.snippet.slice(0, 120)}"`,
+        LINK,
+        "Answer it from Instantly's Unibox today. A reply answered within the hour is several times more likely to book.",
+        "high"
+      ));
+    }
+    if (!out.length) {
+      out.push(ok("instantly:replies", "Instantly replies", `${r.counts.total} repl${r.counts.total === 1 ? "y" : "ies"} on record, none unread from the last 3 days.`));
+    }
+    return out;
+  } catch (e) {
+    return [unknown("instantly:read", "Instantly", errText(e))];
+  }
 }
 
 // Money: is a retainer about to run out, and is anything unpriced.
@@ -631,6 +678,7 @@ async function checkClientPublishing(): Promise<Check[]> {
 export async function runNimbusWatch(): Promise<WatchResult> {
   const groups = await Promise.all([
     checkSending(),
+    checkInstantly(),
     checkRevenue(),
     checkAgents(),
     checkPipeline(),

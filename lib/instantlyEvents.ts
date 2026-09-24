@@ -47,9 +47,14 @@ function capped<T>(p: Promise<T>, ms = DB_CAP_MS): Promise<T> {
   ]).finally(() => clearTimeout(timer));
 }
 
+// After a failure, leave the database alone for a minute so every page load
+// does not wait out the cap on a sick pooler.
+let downUntil = 0;
+function markDown() { downUntil = Date.now() + 60_000; }
+
 function pg(): Sql | null {
   const url = process.env.OS_DB_URL;
-  if (!url) return null;
+  if (!url || Date.now() < downUntil) return null;
   if (!sql) sql = postgres(url, { prepare: false, max: 2, idle_timeout: 20, connect_timeout: 5 });
   return sql;
 }
@@ -89,6 +94,7 @@ export async function recordInstantlyEvent(ev: InstantlyWebhookEvent): Promise<{
     })());
     return { persisted: true };
   } catch {
+    markDown();
     return { persisted: false };
   }
 }
@@ -125,6 +131,7 @@ export async function recentInstantlyEvents(types: string[], sinceMs = 14 * 24 *
     }
     return merged.sort((a, b) => Date.parse(b.receivedAt) - Date.parse(a.receivedAt));
   } catch {
+    markDown();
     return fromRing;
   }
 }

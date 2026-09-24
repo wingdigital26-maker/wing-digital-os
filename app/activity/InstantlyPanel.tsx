@@ -174,7 +174,7 @@ export default function InstantlyPanel() {
           <div className="act-note warn">Showing replies as of {ago(rep.checkedAt, now)}. {rep.staleReason}</div>
         )}
 
-        {rep && rep.status === "ok" && rep.replies.length === 0 && (
+        {rep && rep.status === "ok" && !rep.stale && rep.replies.length === 0 && (
           <div className="act-note">
             No replies yet. Instantly&apos;s inbox has none{t?.sent != null ? ` across ${num(t.sent)} emails sent` : ""}. This is the real number, not a failed read.
           </div>
@@ -283,7 +283,9 @@ export default function InstantlyPanel() {
                       <div className="inst-email-body">{s.body}</div>
                     </details>
                   ))}
-                  {sum.sent.length > 10 && <p className="lane-detail">+ {sum.sent.length - 10} more in Instantly.</p>}
+                  {(sum.stats?.sent ?? sum.sent.length) > 10 && (
+                    <p className="lane-detail">+ {(sum.stats?.sent ?? sum.sent.length) - 10} more in Instantly.</p>
+                  )}
                 </div>
               )}
 

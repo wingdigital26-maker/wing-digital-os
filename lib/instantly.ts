@@ -67,9 +67,20 @@ const STALE_MAX_MS = 15 * 60 * 1000;
 const EMAILS_PER_MIN = 10;
 
 type CacheEntry = { at: number; data: unknown; expired?: boolean };
-const cache = new Map<string, CacheEntry>();
-const inflight = new Map<string, Promise<Fetched<unknown>>>();
-const emailCalls: number[] = [];
+// Kept on globalThis, not in module scope: Next can load this module more than
+// once in one server process (one copy per route bundle, and again on dev
+// reloads). Module-level state would give each route its own cache and its own
+// /emails budget, which is exactly how a workspace overspends a 20/min limit.
+type ClientState = {
+  cache: Map<string, CacheEntry>;
+  inflight: Map<string, Promise<Fetched<unknown>>>;
+  emailCalls: number[];
+};
+const G = globalThis as typeof globalThis & { __wingInstantly?: ClientState };
+const state: ClientState = (G.__wingInstantly ??= { cache: new Map(), inflight: new Map(), emailCalls: [] });
+const cache = state.cache;
+const inflight = state.inflight;
+const emailCalls = state.emailCalls;
 
 function emailsBudgetLeft(): boolean {
   const now = Date.now();

@@ -244,10 +244,10 @@ async function checkInstantly(): Promise<Check[]> {
   const LINK = { label: "Instantly replies", href: "/activity#replies" };
   try {
     const r = await loadReplies();
-    if (r.status === "error" && r.errorKind === "no_key") {
+    if (r.errorKind === "no_key") {
       return [unknown("instantly:read", "Instantly", r.reason ?? "INSTANTLY_API_KEY is not set")];
     }
-    if (r.status === "error" && r.errorKind === "auth") {
+    if (r.errorKind === "auth") {
       return [problem(
         "instantly:auth", "Instantly connection",
         r.reason ?? "Instantly rejected the API key.",
@@ -256,14 +256,20 @@ async function checkInstantly(): Promise<Check[]> {
         "high"
       )];
     }
-    if (r.status === "error") return [unknown("instantly:read", "Instantly", r.reason ?? "Instantly could not be read")];
+    // Anything short of a fresh, full read is "could not check", never ok: a
+    // partial (webhook-only) or stale list can hide an unread reply.
+    if (r.status !== "ok") return [unknown("instantly:read", "Instantly", r.reason ?? "Instantly could not be read")];
+    if (r.stale) return [unknown("instantly:read", "Instantly", r.staleReason ?? "Instantly did not answer just now")];
 
     const out: Check[] = [];
     const cutoff = Date.now() - 3 * 86400000;
     const waiting = r.replies.filter(
       (x) => x.unread === true && !x.autoReply && x.temperature !== "cold" && Date.parse(x.at) >= cutoff
     );
-    for (const x of waiting.slice(0, 5)) {
+    // One alert per person (ids must be unique; newest reply wins).
+    const bySender = new Map<string, (typeof waiting)[number]>();
+    for (const x of waiting) if (!bySender.has(x.fromEmail.toLowerCase())) bySender.set(x.fromEmail.toLowerCase(), x);
+    for (const x of [...bySender.values()].slice(0, 5)) {
       const who = x.name ? `${x.name} (${x.fromEmail})` : x.fromEmail;
       out.push(problem(
         `instantly:reply:${x.fromEmail.toLowerCase()}`,

@@ -29,7 +29,11 @@ export type InstantlyWebhookEvent = {
 };
 
 const RING_MAX = 200;
-const ring: InstantlyWebhookEvent[] = [];
+// On globalThis so the webhook route and the replies route share one ring in a
+// process even when Next bundles this module once per route. Across separate
+// server instances (Vercel), only the Postgres layer below is shared.
+const G = globalThis as typeof globalThis & { __wingInstantlyRing?: InstantlyWebhookEvent[]; __wingInstantlyDbDownUntil?: number };
+const ring: InstantlyWebhookEvent[] = (G.__wingInstantlyRing ??= []);
 
 type Sql = ReturnType<typeof postgres>;
 let sql: Sql | null = null;
@@ -49,12 +53,13 @@ function capped<T>(p: Promise<T>, ms = DB_CAP_MS): Promise<T> {
 
 // After a failure, leave the database alone for a minute so every page load
 // does not wait out the cap on a sick pooler.
-let downUntil = 0;
-function markDown() { downUntil = Date.now() + 60_000; }
+// Reads only: writes always try, because a lost webhook event cannot be re-read.
+function markDown() { G.__wingInstantlyDbDownUntil = Date.now() + 60_000; }
 
-function pg(): Sql | null {
+function pg(forRead = false): Sql | null {
   const url = process.env.OS_DB_URL;
-  if (!url || Date.now() < downUntil) return null;
+  if (!url) return null;
+  if (forRead && Date.now() < (G.__wingInstantlyDbDownUntil ?? 0)) return null;
   if (!sql) sql = postgres(url, { prepare: false, max: 2, idle_timeout: 20, connect_timeout: 5 });
   return sql;
 }
@@ -94,7 +99,6 @@ export async function recordInstantlyEvent(ev: InstantlyWebhookEvent): Promise<{
     })());
     return { persisted: true };
   } catch {
-    markDown();
     return { persisted: false };
   }
 }
@@ -103,7 +107,7 @@ export async function recordInstantlyEvent(ev: InstantlyWebhookEvent): Promise<{
 export async function recentInstantlyEvents(types: string[], sinceMs = 14 * 24 * 3600 * 1000): Promise<InstantlyWebhookEvent[]> {
   const cutoff = Date.now() - sinceMs;
   const fromRing = ring.filter((e) => types.includes(e.eventType) && Date.parse(e.receivedAt) >= cutoff);
-  const db = pg();
+  const db = pg(true);
   if (!db) return fromRing;
   try {
     // One cap for the whole read: a page waits at most 2.5s on this layer.

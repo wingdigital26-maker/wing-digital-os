@@ -4,14 +4,16 @@
 // built to be FAST and HONEST:
 //
 //   Fast path  POST /api/webhooks/instantly (reply_received) records the reply
-//              the moment Instantly fires it and expires the reply cache, so
-//              the next look at the OS (the board re-checks every 30s) shows it.
+//              the moment Instantly fires it (Postgres over OS_DB_URL, shared by
+//              every server instance) and expires the reply cache, so the next
+//              look at the OS (the board re-checks every 15s) shows it.
 //   Fallback   GET /emails?email_type=received from Instantly's own inbox,
 //              cached 20s per server instance and budgeted against Instantly's
 //              20-a-minute inbox limit. This alone catches every reply within
 //              about half a minute, webhook or not.
 //
-// The two are merged and de-duplicated (same person, within 10 minutes). If
+// The two are merged and de-duplicated (same person within 10 minutes of an
+// inbox row; webhook retries with the same words within 24h). If
 // Instantly cannot be read, the payload says exactly why (no key, key
 // rejected, rate limited, down) and still carries any webhook replies we hold,
 // so a reply is never hidden behind an outage and a failure never reads as
@@ -120,7 +122,7 @@ export function stripQuoted(text: string): string {
 /** HTML-only replies: drop the quoted history (blockquote / Gmail / Outlook markers) before converting. */
 export function stripQuotedHtml(html: string): string {
   const cut = html.search(/<blockquote|<div[^>]*class=["'][^"']*gmail_quote|<div[^>]*id=["'](divRplyFwdMsg|appendonsend)["']|<hr[^>]*id=["']stopSpelling["']/i);
-  return cut > 0 ? html.slice(0, cut) : html;
+  return cut >= 0 ? html.slice(0, cut) : html;
 }
 
 /** Reply text we keep per row. Longer replies are cut with a pointer to Instantly. */
@@ -240,10 +242,10 @@ export async function loadReplies(opts: { force?: boolean } = {}): Promise<Repli
     const lead = leads.get(email.toLowerCase());
     const raw = str(p.reply_text) || htmlToText(stripQuotedHtml(str(p.reply_html))) || str(p.reply_text_snippet);
     const text = capText(stripQuoted(raw));
-    // Instantly retries deliveries: same person + same words within 15 min = one reply.
+    // Instantly retries deliveries: same person + same words within 24h = one reply.
     const fp = `${str(p.reply_subject)}|${text.slice(0, 200)}`;
     const lower = email.toLowerCase();
-    if (webhookSeen.some((w) => w.email === lower && w.fp === fp && Math.abs(w.at - atMs) < 15 * 60 * 1000)) continue;
+    if (webhookSeen.some((w) => w.email === lower && w.fp === fp && Math.abs(w.at - atMs) < 24 * 3600 * 1000)) continue;
     webhookSeen.push({ email: lower, at: atMs, fp });
     const auto = ev.eventType === "auto_reply_received";
     const campaignId = ev.campaignId ?? null;

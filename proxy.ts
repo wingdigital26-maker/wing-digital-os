@@ -15,6 +15,8 @@ function isPublicPath(pathname: string): boolean {
     pathname === "/icon.svg" ||
     pathname.startsWith("/icon-") ||
     pathname === "/apple-touch-icon.png" ||
+    // The login card logo. Must load before sign-in or the login page shows a broken image.
+    pathname === "/wing-mark.png" ||
     // Interactive client dashboards (scripts/client_dashboard/build.py). Each file
     // is self-contained: the client's own published content, no secrets, no API
     // calls. Public by design so a client can open the link without a login.

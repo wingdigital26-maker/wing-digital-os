@@ -3,6 +3,9 @@ import { useState } from "react";
 
 export default function Login() {
   const [email, setEmail] = useState("");
+  // Password-only by default (Jack, 2026-09-26). Email accounts (callers,
+  // client portals) open the email box with the link under the button.
+  const [useEmail, setUseEmail] = useState(false);
   const [pw, setPw] = useState("");
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -13,7 +16,7 @@ export default function Login() {
     const res = await fetch("/api/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: email.trim(), password: pw }),
+      body: JSON.stringify({ email: useEmail ? email.trim() : "", password: pw }),
     });
     setLoading(false);
     if (res.ok) {
@@ -55,6 +58,7 @@ export default function Login() {
           <p style={{ fontSize: 18, fontWeight: 700 }}>Wing Digital OS</p>
           <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>Sign in to continue</p>
         </div>
+        {useEmail && (
         <input
           type="email" value={email} autoFocus autoComplete="username"
           onChange={e => { setEmail(e.target.value); setError(false); }}
@@ -66,11 +70,9 @@ export default function Login() {
             fontSize: 14, outline: "none", textAlign: "center",
           }}
         />
-        <p style={{ fontSize: 11.5, color: "var(--text-muted)", marginTop: -12, lineHeight: 1.4 }}>
-          Only have a password? Leave email blank.
-        </p>
+        )}
         <input
-          type="password" value={pw} autoComplete="current-password"
+          type="password" value={pw} autoFocus={!useEmail} autoComplete="current-password"
           onChange={e => { setPw(e.target.value); setError(false); }}
           onKeyDown={e => e.key === "Enter" && submit()}
           placeholder="Password"
@@ -82,7 +84,7 @@ export default function Login() {
         />
         {error && (
           <p style={{ fontSize: 12.5, color: "var(--red)", lineHeight: 1.5 }}>
-            That email and password did not match. Check for typos and try again.
+            {useEmail ? "That email and password did not match." : "That password did not match."} Check for typos and try again.
           </p>
         )}
         <button onClick={submit} disabled={loading || !pw} style={{
@@ -91,6 +93,12 @@ export default function Login() {
           fontSize: 14, fontWeight: 700, opacity: loading || !pw ? 0.6 : 1,
         }}>
           {loading ? "Checking..." : "Enter"}
+        </button>
+        <button type="button" onClick={() => { setUseEmail(v => !v); setError(false); }} style={{
+          background: "none", border: "none", cursor: "pointer", padding: 0,
+          fontSize: 11.5, color: "var(--text-muted)", marginTop: -6,
+        }}>
+          {useEmail ? "Sign in with just the password" : "Have an email account? Sign in with email"}
         </button>
       </div>
     </div>

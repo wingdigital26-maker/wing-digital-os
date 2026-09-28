@@ -1,5 +1,5 @@
 import { sbUrl, sbService } from "@/lib/osSupabase";
-import { instantlyKey, type InstantlyEmail } from "@/lib/instantly";
+import { instantlyKey, iRequest, iListAll, fetchLeads, type InstantlyEmail } from "@/lib/instantly";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // The email feed loader — one normalized list of every email Wing sends.
@@ -200,51 +200,14 @@ function campaignState(code: number | null | undefined): string | null {
 
 // ── Instantly (the cold campaign lane) ──────────────────────────────────────
 
-const INSTANTLY_BASE = "https://api.instantly.ai/api/v2";
-const UA =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
-
+// Every read goes through the shared client in lib/instantly.ts: timeouts,
+// retries, caching, and Instantly's 20-a-minute inbox budget live there, so the
+// SSE stream ticking every 20s in several tabs cannot get the workspace blocked.
 type Fetched<T> = { ok: true; data: T } | { ok: false; reason: string };
 
-async function iGet<T>(path: string): Promise<Fetched<T>> {
-  const key = instantlyKey();
-  if (!key) return { ok: false, reason: "INSTANTLY_API_KEY is not set on this deployment." };
-  try {
-    const res = await fetch(`${INSTANTLY_BASE}${path}`, {
-      headers: { Authorization: `Bearer ${key}`, Accept: "application/json", "User-Agent": UA },
-      cache: "no-store",
-    });
-    if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      return { ok: false, reason: `Instantly ${path.split("?")[0]} returned HTTP ${res.status}: ${body.slice(0, 160)}` };
-    }
-    return { ok: true, data: (await res.json()) as T };
-  } catch (e) {
-    return { ok: false, reason: `Instantly ${path.split("?")[0]} unreachable: ${e instanceof Error ? e.message : String(e)}` };
-  }
-}
-
-async function iPost<T>(path: string, body: unknown): Promise<Fetched<T>> {
-  const key = instantlyKey();
-  if (!key) return { ok: false, reason: "INSTANTLY_API_KEY is not set on this deployment." };
-  try {
-    const res = await fetch(`${INSTANTLY_BASE}${path}`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${key}`, Accept: "application/json",
-        "Content-Type": "application/json", "User-Agent": UA,
-      },
-      body: JSON.stringify(body),
-      cache: "no-store",
-    });
-    if (!res.ok) {
-      const t = await res.text().catch(() => "");
-      return { ok: false, reason: `Instantly ${path} returned HTTP ${res.status}: ${t.slice(0, 160)}` };
-    }
-    return { ok: true, data: (await res.json()) as T };
-  } catch (e) {
-    return { ok: false, reason: `Instantly ${path} unreachable: ${e instanceof Error ? e.message : String(e)}` };
-  }
+async function iGet<T>(path: string, ttlMs = 30_000): Promise<Fetched<T>> {
+  const r = await iRequest<T>(path, { ttlMs });
+  return r.ok ? { ok: true, data: r.data } : { ok: false, reason: r.reason };
 }
 
 type RawEmail = InstantlyEmail & {
@@ -271,6 +234,7 @@ type RawAnalytics = {
   campaign_id?: string; campaign_name?: string; campaign_status?: number;
   emails_sent_count?: number; open_count?: number; link_click_count?: number;
   reply_count?: number; bounced_count?: number; unsubscribed_count?: number;
+  reply_count_unique?: number; reply_count_automatic_unique?: number;
 };
 
 // The campaign roster, lead directory and analytics change slowly and cost an
@@ -294,26 +258,26 @@ async function coldContext(force = false): Promise<ColdContext> {
   const leads = new Map<string, RawLead>();
   let analytics: RawAnalytics[] = [];
 
-  const cRes = await iGet<{ items?: RawCampaign[] }>("/campaigns?limit=100");
+  const cRes = await iGet<{ items?: RawCampaign[] }>("/campaigns?limit=100", 60_000);
   if (cRes.ok) {
     for (const c of cRes.data.items ?? []) if (c.id) campaigns.set(c.id, c);
   } else {
     notes.push(`Campaign names could not be read (${cRes.reason}), so rows show the campaign id instead.`);
   }
 
-  const aRes = await iGet<RawAnalytics[]>("/campaigns/analytics");
+  const aRes = await iGet<RawAnalytics[]>("/campaigns/analytics", 30_000);
   if (aRes.ok && Array.isArray(aRes.data)) analytics = aRes.data;
   else if (!aRes.ok) notes.push(`Campaign totals are unavailable (${aRes.reason}).`);
 
   // Lead records carry the recipient's name, company and per-person engagement.
   // Pulled per campaign because /leads/list is scoped that way.
   for (const id of campaigns.keys()) {
-    const lRes = await iPost<{ items?: RawLead[] }>("/leads/list", { campaign_ids: [id], limit: 100 });
+    const lRes = await fetchLeads(id);
     if (!lRes.ok) {
       notes.push(`Recipient names for one campaign could not be read (${lRes.reason}); those rows show the bare address.`);
       continue;
     }
-    for (const l of lRes.data.items ?? []) {
+    for (const l of lRes.data as RawLead[]) {
       if (l.email) leads.set(l.email.toLowerCase(), l);
     }
   }
@@ -344,7 +308,16 @@ async function loadCold(limit: number, forceContext: boolean): Promise<{ lane: L
   }
 
   const ctx = await coldContext(forceContext);
-  const raw = eRes.data.items ?? [];
+  const raw = [...(eRes.data.items ?? [])];
+
+  // Replies older than the newest `limit` emails would fall off the list above.
+  // Pull the reply inbox too (same cached read the Replies board uses, so it is
+  // usually free) and add any reply not already present.
+  const inbox = await iListAll<RawEmail>("/emails?email_type=received&sort_order=desc", { ttlMs: 20_000, maxPages: 3 });
+  if (inbox.ok) {
+    const have = new Set(raw.map((e) => e.id).filter(Boolean));
+    for (const e of inbox.data) if (e.id && !have.has(e.id)) raw.push(e);
+  }
 
   // Every thread that has an inbound message in this page is a thread that got
   // a reply. Used to mark the outgoing email as replied without inventing it.
@@ -423,7 +396,10 @@ async function loadCold(limit: number, forceContext: boolean): Promise<{ lane: L
     sent: a.emails_sent_count ?? null,
     opens: a.open_count ?? null,
     clicks: a.link_click_count ?? null,
-    replies: a.reply_count ?? null,
+    // Same definition as /api/outreach/instantly: people who replied, minus auto-replies.
+    replies: a.reply_count_unique != null || a.reply_count != null
+      ? Math.max(0, (a.reply_count_unique ?? a.reply_count ?? 0) - (a.reply_count_automatic_unique ?? 0))
+      : null,
     bounces: a.bounced_count ?? null,
     unsubscribes: a.unsubscribed_count ?? null,
     waiting: null,

@@ -40,3 +40,42 @@ or `INSTANTLY_DEFAULT_CAMPAIGN`.
 `/api/email/send` and the personalization on `/api/email/campaign` reject em/en
 dashes and unrendered `{tokens}` before sending (Wing house rules). `text` is
 sent plain-text only.
+
+## Reading Instantly (campaigns, sends, replies)
+
+Everything the OS shows about Instantly is read-only and goes through
+`lib/instantly.ts` `iRequest()`, which refuses any call that is not a read
+(GET, or POST `/leads/list`). Instantly API v2 only.
+
+| Route | What | Freshness |
+|---|---|---|
+| `GET /api/outreach/instantly` | every campaign + totals, focus campaign's sends, leads, sequence | cached 30-60s per server instance |
+| `GET /api/outreach/instantly/replies` | who replied, what they said (quoted thread stripped), interest label | cached 20s; `?force=1` skips it |
+| `POST /api/webhooks/instantly` | Instantly pushes events here (reply_received etc.) | instant |
+
+Shown on `/activity` (Instantly section, replies first; the board re-checks
+every 30s while open) and in the Email hub's cold lane.
+
+Limits: Instantly allows 20 `GET /emails` calls a minute per workspace. The
+client spends at most 14 a minute per server instance and serves the last good
+answer (labelled with its age) past that, so open tabs cannot get us blocked.
+
+Honest states: no key, key rejected, Instantly down/timeout and rate limited
+each come back as a sentence; a number that could not be read shows
+"unknown", never 0.
+
+### Webhook (fast path for replies)
+
+Env: `INSTANTLY_WEBHOOK_SECRET` (any random string, 16+ chars). Without it the
+route answers 503 and stores nothing. Register in Instantly (Settings >
+Integrations > Webhooks, or `POST /api/v2/webhooks`):
+
+- URL: `https://<os-domain>/api/webhooks/instantly`
+- Header: `X-Wing-Webhook-Secret: <INSTANTLY_WEBHOOK_SECRET>` (if the UI cannot
+  add headers, append `?secret=<INSTANTLY_WEBHOOK_SECRET>` to the URL instead)
+- Events: `reply_received` (plus `lead_interested`, `lead_meeting_booked`,
+  `auto_reply_received` if wanted)
+
+Events are stored in `instantly_webhook_events` (created on first use over
+`OS_DB_URL`) and trigger a phone push. If the webhook is never registered the
+OS still shows replies from polling within about 30-50 seconds.

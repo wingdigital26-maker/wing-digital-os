@@ -242,7 +242,7 @@ export const ROUTED_PAGES: RoutedPage[] = [
   // 2026-09-13 swarm: client dashboards inside the OS, and the messaging
   // activity board (what emails/texts are going out).
   { href: "/dashboards", label: "Client Dashboards", keywords: "reporting clients dashboard" },
-  { href: "/activity", label: "Messaging Activity", keywords: "emails texts sent going out outbound queue" },
+  { href: "/activity", label: "Messaging Activity", keywords: "emails texts sent going out outbound queue instantly replies campaigns cold email" },
 ];
 
 /** Routed sections shown in SectionChrome's top switcher strip. */

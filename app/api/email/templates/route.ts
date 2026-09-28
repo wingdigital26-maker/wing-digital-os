@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { instantlyKey, fetchCampaign, htmlToText } from "@/lib/instantly";
+import { instantlyKey, fetchCampaign, fetchCampaigns, htmlToText } from "@/lib/instantly";
 
 // ───────────────────────────────────────────────────────────────────────────
 // GET /api/email/templates — the copy the composer can start from.
@@ -17,9 +17,6 @@ import { instantlyKey, fetchCampaign, htmlToText } from "@/lib/instantly";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const UA =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
 
 type Template = {
   id: string;
@@ -42,28 +39,16 @@ export async function GET() {
   }
 
   // The campaign roster first, then each campaign's sequence.
-  let ids: { id: string; name: string }[] = [];
-  try {
-    const r = await fetch("https://api.instantly.ai/api/v2/campaigns?limit=50", {
-      headers: { Authorization: `Bearer ${key}`, Accept: "application/json", "User-Agent": UA },
-      cache: "no-store",
-    });
-    if (!r.ok) {
-      return NextResponse.json({
-        templates: [], available: false,
-        reason: `The campaign list returned HTTP ${r.status}, so no saved copy is available to start from.`,
-      });
-    }
-    const j = (await r.json()) as { items?: { id?: string; name?: string }[] };
-    ids = (j.items ?? [])
-      .filter((c): c is { id: string; name?: string } => Boolean(c.id))
-      .map((c) => ({ id: c.id, name: c.name ?? c.id }));
-  } catch (e) {
+  const list = await fetchCampaigns();
+  if (!list.ok) {
     return NextResponse.json({
       templates: [], available: false,
-      reason: `The campaign list could not be reached: ${e instanceof Error ? e.message : String(e)}`,
+      reason: `The campaign list could not be read (${list.reason}), so no saved copy is available to start from.`,
     });
   }
+  const ids = list.data
+    .filter((c) => Boolean(c.id))
+    .map((c) => ({ id: c.id, name: c.name ?? c.id }));
 
   const templates: Template[] = [];
   const notes: string[] = [];

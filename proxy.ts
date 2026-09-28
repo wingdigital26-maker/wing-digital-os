@@ -68,6 +68,9 @@ function isPublicPath(pathname: string): boolean {
     // the X-Twilio-Signature inside the route with TWILIO_AUTH_TOKEN and fail
     // closed (503 when Twilio is unconfigured, 403 on a bad signature).
     pathname === "/api/sms/inbound" ||
+    // Instantly webhooks (reply_received etc). Checks INSTANTLY_WEBHOOK_SECRET
+    // itself in constant time and fails closed (503 unset, 401 wrong).
+    pathname === "/api/webhooks/instantly" ||
     pathname === "/api/sms/status" ||
     // SMS send + message-ledger ingest: machine endpoints. /api/sms/send
     // accepts x-heartbeat-key OR a staff session and fails closed; nothing

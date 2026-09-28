@@ -10,7 +10,7 @@
 //   TWILIO_AUTH_TOKEN. TWILIO_WEBHOOK_KEY gates the inbound/status webhooks
 //   when no auth token is available for signature validation (see below).
 import crypto from "node:crypto";
-import { sbUrl, sbService } from "./osSupabase";
+import { dbSelect, dbInsert, dbPatch } from "./restOrPooler";
 
 export type TwilioCreds = {
   /** The AC... account SID — always in the REST URL path. */
@@ -161,30 +161,13 @@ export type MessageRow = {
 export async function logMessage(
   row: MessageRow
 ): Promise<{ id: number | null; error: string | null }> {
-  const url = sbUrl();
-  const key = sbService();
-  if (!url || !key) {
-    return { id: null, error: "OS_SUPABASE_URL / OS_SUPABASE_SERVICE_KEY are not set." };
-  }
+  // REST first, direct pooler on a 402 (lib/restOrPooler), so the ledger keeps
+  // working while the Supabase REST layer is restricted.
   try {
-    const r = await fetch(`${url}/rest/v1/messages`, {
-      method: "POST",
-      headers: {
-        apikey: key,
-        Authorization: `Bearer ${key}`,
-        "Content-Type": "application/json",
-        Prefer: "return=representation",
-      },
-      body: JSON.stringify(row),
-    });
-    if (!r.ok) {
-      const body = await r.text().catch(() => "");
-      return { id: null, error: `messages insert failed (HTTP ${r.status}): ${body.slice(0, 200)}` };
-    }
-    const rows = (await r.json()) as { id: number }[];
-    return { id: rows?.[0]?.id ?? null, error: null };
+    const r = await dbInsert<{ id: number }>("messages", row as Record<string, unknown>);
+    return { id: r?.id ?? null, error: null };
   } catch (e) {
-    return { id: null, error: e instanceof Error ? e.message : String(e) };
+    return { id: null, error: `messages insert failed: ${e instanceof Error ? e.message : String(e)}` };
   }
 }
 
@@ -196,7 +179,7 @@ export async function logMessage(
 //   * public.crm_contacts.do_not_contact = true for a row with that phone — a
 //     manual "never contact".
 // This never invents tables; it reads those through the service key.
-// FAIL CLOSED: if Supabase is unreachable or the service key is missing we
+// FAIL CLOSED: if neither the REST API nor the direct pooler can answer we
 // cannot prove the number is clear, so we treat it as suppressed (skip send).
 //
 // Format note: the send route validates `to` as strict E.164 (+digits) and the
@@ -214,35 +197,19 @@ export type SmsSuppressionResult = { suppressed: boolean; reason: string | null 
 export async function isPhoneSuppressed(phone: string): Promise<SmsSuppressionResult> {
   const to = (phone || "").trim();
   if (!to) return { suppressed: true, reason: "empty number" };
-
-  const url = sbUrl();
-  const key = sbService();
-  if (!url || !key) {
-    return {
-      suppressed: true,
-      reason: "suppression list unreachable (OS_SUPABASE_URL / OS_SUPABASE_SERVICE_KEY not set)",
-    };
-  }
-  const headers = { apikey: key, Authorization: `Bearer ${key}` };
   const last10 = to.replace(/\D/g, "").slice(-10);
 
   // 1) Revoked sms-consent row for this number (exact E.164 match).
   try {
-    const q =
-      `select=id&channel=eq.sms&revoked_at=not.is.null` +
-      `&address=eq.${encodeURIComponent(to)}&limit=1`;
-    const r = await fetch(`${url}/rest/v1/consent?${q}`, { headers, cache: "no-store" });
-    if (!r.ok) {
-      return { suppressed: true, reason: `suppression check failed (consent HTTP ${r.status})` };
-    }
-    const rows = (await r.json()) as unknown[];
-    if (Array.isArray(rows) && rows.length > 0) {
-      return { suppressed: true, reason: "recipient opted out (revoked sms consent)" };
-    }
+    const rows = await dbSelect<{ id: number }>(
+      "consent",
+      `select=id&channel=eq.sms&revoked_at=not.is.null&address=eq.${encodeURIComponent(to)}&limit=1`
+    );
+    if (rows.length > 0) return { suppressed: true, reason: "recipient opted out (revoked sms consent)" };
   } catch (e) {
     return {
       suppressed: true,
-      reason: `suppression check errored: ${e instanceof Error ? e.message : String(e)}`,
+      reason: `suppression check failed (consent): ${e instanceof Error ? e.message : String(e)}`,
     };
   }
 
@@ -251,21 +218,15 @@ export async function isPhoneSuppressed(phone: string): Promise<SmsSuppressionRe
   try {
     const parts = [`phone.eq.${to}`];
     if (last10.length === 10) parts.push(`phone.like.*${last10}`);
-    const q =
-      `select=id&do_not_contact=is.true` +
-      `&or=(${encodeURIComponent(parts.join(","))})&limit=1`;
-    const r = await fetch(`${url}/rest/v1/crm_contacts?${q}`, { headers, cache: "no-store" });
-    if (!r.ok) {
-      return { suppressed: true, reason: `suppression check failed (crm_contacts HTTP ${r.status})` };
-    }
-    const rows = (await r.json()) as unknown[];
-    if (Array.isArray(rows) && rows.length > 0) {
-      return { suppressed: true, reason: "recipient is marked do_not_contact" };
-    }
+    const rows = await dbSelect<{ id: number }>(
+      "crm_contacts",
+      `select=id&do_not_contact=is.true&or=(${encodeURIComponent(parts.join(","))})&limit=1`
+    );
+    if (rows.length > 0) return { suppressed: true, reason: "recipient is marked do_not_contact" };
   } catch (e) {
     return {
       suppressed: true,
-      reason: `suppression check errored: ${e instanceof Error ? e.message : String(e)}`,
+      reason: `suppression check failed (crm_contacts): ${e instanceof Error ? e.message : String(e)}`,
     };
   }
 
@@ -277,26 +238,10 @@ export async function patchMessages(
   filter: string,
   patch: Record<string, unknown>
 ): Promise<string | null> {
-  const url = sbUrl();
-  const key = sbService();
-  if (!url || !key) return "OS_SUPABASE_URL / OS_SUPABASE_SERVICE_KEY are not set.";
   try {
-    const r = await fetch(`${url}/rest/v1/messages?${filter}`, {
-      method: "PATCH",
-      headers: {
-        apikey: key,
-        Authorization: `Bearer ${key}`,
-        "Content-Type": "application/json",
-        Prefer: "return=minimal",
-      },
-      body: JSON.stringify(patch),
-    });
-    if (!r.ok) {
-      const body = await r.text().catch(() => "");
-      return `messages update failed (HTTP ${r.status}): ${body.slice(0, 200)}`;
-    }
+    await dbPatch("messages", filter, patch);
     return null;
   } catch (e) {
-    return e instanceof Error ? e.message : String(e);
+    return `messages update failed: ${e instanceof Error ? e.message : String(e)}`;
   }
 }

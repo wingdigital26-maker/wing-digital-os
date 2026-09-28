@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sbUrl, sbService } from "@/lib/osSupabase";
+import { dbSelect, dbInsert } from "@/lib/restOrPooler";
 import { verifyUnsubToken } from "@/lib/email";
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -50,48 +50,29 @@ function page(title: string, message: string, status: number): NextResponse {
 }
 
 /** Write the REVOKED email-consent row, idempotently. Returns null on success
- *  or a reason string. Fails closed: no backend => nothing recorded. */
+ *  or a reason string. REST first, direct pooler on a 402 (lib/restOrPooler),
+ *  so an opt-out is still recorded while the REST layer is restricted. */
 async function recordOptOut(email: string, token: string): Promise<string | null> {
-  const url = sbUrl();
-  const key = sbService();
-  if (!url || !key) return "suppression backend not configured";
-  const headers = {
-    apikey: key,
-    Authorization: `Bearer ${key}`,
-    "Content-Type": "application/json",
-  };
-
   // Idempotency: skip if a live revocation already exists for this address.
   try {
-    const q =
-      `select=id&channel=eq.email&revoked_at=not.is.null` +
-      `&address=ilike.${encodeURIComponent(email)}&limit=1`;
-    const r = await fetch(`${url}/rest/v1/consent?${q}`, { headers, cache: "no-store" });
-    if (r.ok) {
-      const rows = (await r.json()) as unknown[];
-      if (Array.isArray(rows) && rows.length > 0) return null; // already opted out
-    }
+    const rows = await dbSelect<{ id: number }>(
+      "consent",
+      `select=id&channel=eq.email&revoked_at=not.is.null&address=ilike.${encodeURIComponent(
+        email.replace(/([\\%_])/g, "\\$1")
+      )}&limit=1`
+    );
+    if (rows.length > 0) return null; // already opted out
   } catch {
     // fall through to attempt the insert
   }
-
   try {
-    const now = new Date().toISOString();
-    const r = await fetch(`${url}/rest/v1/consent`, {
-      method: "POST",
-      headers: { ...headers, Prefer: "return=minimal" },
-      body: JSON.stringify({
-        address: email,
-        channel: "email",
-        revoked_at: now,
-        method: "email-unsubscribe",
-        proof: token,
-      }),
+    await dbInsert("consent", {
+      address: email,
+      channel: "email",
+      revoked_at: new Date().toISOString(),
+      method: "email-unsubscribe",
+      proof: token,
     });
-    if (!r.ok) {
-      const body = await r.text().catch(() => "");
-      return `consent insert failed (HTTP ${r.status}): ${body.slice(0, 200)}`;
-    }
     return null;
   } catch (e) {
     return e instanceof Error ? e.message : String(e);

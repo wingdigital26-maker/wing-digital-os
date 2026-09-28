@@ -20,7 +20,7 @@
 //                 INSTANTLY_DEFAULT_CAMPAIGN fallback).
 import nodemailer from "nodemailer";
 import crypto from "node:crypto";
-import { sbUrl, sbService } from "./osSupabase";
+import { dbSelect } from "./restOrPooler";
 
 // ── House-rule copy guard (Wing rules, ported from SENDING-CONTRACT.md) ──────
 // Not a deliverability check — a brand-voice gate. Returns a reason string if
@@ -73,9 +73,13 @@ export async function smtpSend(
   to: string,
   subject: string,
   body: string,
-  opts?: { unsubscribeMailto?: string; unsubscribeUrl?: string; replyTo?: string }
+  opts?: { unsubscribeMailto?: string; unsubscribeUrl?: string; replyTo?: string; fromName?: string }
 ): Promise<SmtpSendResult> {
-  const from = `${creds.name} <${creds.user}>`;
+  // fromName lets a client's review request show the client's business name
+  // (the address stays the authenticated mailbox, so SPF/DKIM still align).
+  // Quotes, angle brackets and line breaks are stripped so it cannot inject.
+  const name = (opts?.fromName ?? "").replace(/["<>\r\n]/g, "").trim().slice(0, 80) || creds.name;
+  const from = `"${name}" <${creds.user}>`;
   try {
     const transporter = nodemailer.createTransport({
       host: creds.host,
@@ -200,54 +204,34 @@ function likeEscape(s: string): string {
 export async function isEmailSuppressed(addr: string): Promise<SuppressionResult> {
   const email = normAddr(addr);
   if (!email) return { suppressed: true, reason: "empty address" };
-
-  const url = sbUrl();
-  const key = sbService();
-  if (!url || !key) {
-    return {
-      suppressed: true,
-      reason: "suppression list unreachable (OS_SUPABASE_URL / OS_SUPABASE_SERVICE_KEY not set)",
-    };
-  }
-  const headers = { apikey: key, Authorization: `Bearer ${key}` };
+  const lit = encodeURIComponent(likeEscape(email));
 
   // 1) Revoked email consent row for this address (case-insensitive match).
+  //    REST first, direct pooler on a 402 (lib/restOrPooler).
   try {
-    const q =
-      `select=id&channel=eq.email&revoked_at=not.is.null` +
-      `&address=ilike.${encodeURIComponent(likeEscape(email))}&limit=1`;
-    const r = await fetch(`${url}/rest/v1/consent?${q}`, { headers, cache: "no-store" });
-    if (!r.ok) {
-      return { suppressed: true, reason: `suppression check failed (consent HTTP ${r.status})` };
-    }
-    const rows = (await r.json()) as unknown[];
-    if (Array.isArray(rows) && rows.length > 0) {
-      return { suppressed: true, reason: "recipient opted out (revoked email consent)" };
-    }
+    const rows = await dbSelect<{ id: number }>(
+      "consent",
+      `select=id&channel=eq.email&revoked_at=not.is.null&address=ilike.${lit}&limit=1`
+    );
+    if (rows.length > 0) return { suppressed: true, reason: "recipient opted out (revoked email consent)" };
   } catch (e) {
     return {
       suppressed: true,
-      reason: `suppression check errored: ${e instanceof Error ? e.message : String(e)}`,
+      reason: `suppression check failed (consent): ${e instanceof Error ? e.message : String(e)}`,
     };
   }
 
   // 2) crm_contacts.do_not_contact = true for this email.
   try {
-    const q =
-      `select=id&do_not_contact=is.true` +
-      `&email=ilike.${encodeURIComponent(likeEscape(email))}&limit=1`;
-    const r = await fetch(`${url}/rest/v1/crm_contacts?${q}`, { headers, cache: "no-store" });
-    if (!r.ok) {
-      return { suppressed: true, reason: `suppression check failed (crm_contacts HTTP ${r.status})` };
-    }
-    const rows = (await r.json()) as unknown[];
-    if (Array.isArray(rows) && rows.length > 0) {
-      return { suppressed: true, reason: "recipient is marked do_not_contact" };
-    }
+    const rows = await dbSelect<{ id: number }>(
+      "crm_contacts",
+      `select=id&do_not_contact=is.true&email=ilike.${lit}&limit=1`
+    );
+    if (rows.length > 0) return { suppressed: true, reason: "recipient is marked do_not_contact" };
   } catch (e) {
     return {
       suppressed: true,
-      reason: `suppression check errored: ${e instanceof Error ? e.message : String(e)}`,
+      reason: `suppression check failed (crm_contacts): ${e instanceof Error ? e.message : String(e)}`,
     };
   }
 

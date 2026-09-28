@@ -24,7 +24,8 @@ import {
 //    outright if it cannot be logged first.
 //
 // Body: { to, subject, body, client_slug?, contact_id?, replyTo?,
-//         unsubscribeMailto? }
+//         unsubscribeMailto?, fromName? }  (fromName: display name only; the
+//         address is always the authenticated mailbox)
 // ───────────────────────────────────────────────────────────────────────────
 
 export const runtime = "nodejs";
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest) {
   const b = (await req.json().catch(() => null)) as {
     to?: string; subject?: string; body?: string;
     client_slug?: string; contact_id?: number;
-    replyTo?: string; unsubscribeMailto?: string;
+    replyTo?: string; unsubscribeMailto?: string; fromName?: string;
   } | null;
   const to = (b?.to ?? "").trim();
   const subject = (b?.subject ?? "").trim();
@@ -125,6 +126,7 @@ export async function POST(req: NextRequest) {
     replyTo: (b?.replyTo ?? "").trim() || undefined,
     unsubscribeMailto: (b?.unsubscribeMailto ?? "").trim() || undefined,
     unsubscribeUrl,
+    fromName: (b?.fromName ?? "").trim() || undefined,
   });
 
   // 3) Record the outcome on the same row.

@@ -10,6 +10,7 @@ import {
   recentCustomers,
   hasReviewRequest,
   queueReview,
+  recordAttestedConsent,
   lastPath,
 } from "@/lib/clientIntake";
 
@@ -264,6 +265,15 @@ export async function POST(req: NextRequest, ctx: Params) {
   let reviewQueued = false;
   let reviewNote: string | null = null;
   if (askReview) {
+    // Paper trail first; best effort, it never blocks the save.
+    await recordAttestedConsent({
+      contact_id: contactId,
+      client_slug: slug,
+      phone: phone.e164,
+      email,
+      job_date: jobDate,
+    }).catch((e) => console.error("[intake] consent record failed:", e instanceof Error ? e.message : e));
+
     try {
       if (!created && (await hasReviewRequest(slug, contactId))) {
         reviewNote = "already_asked";

@@ -8,142 +8,23 @@
 // WHY THIS FILE EXISTS INSTEAD OF REUSING sbSelect / verifyClientKey
 //   * sbSelect collapses every failure into [] -- a dead database would read as
 //     "no customers yet" and, worse, a failed save could look like success.
-//     Every helper here THROWS IntakeDbError on failure, so the route can tell
+//     Every helper here THROWS IntakeDbError (lib/restOrPooler DbError) on failure, so the route can tell
 //     the client plainly that nothing was saved.
 //   * Since 2026-09-21 Supabase answers HTTP 402 to every REST call (storage
-//     quota), while Postgres itself is fine. Like the Call Room, each call here
-//     tries REST first and, on a 402 or a network failure, replays the same
-//     query over the direct pooler connection (OS_DB_URL, lib/pgFallback).
-//     With no REST config at all it goes straight to the pooler.
+//     quota), while Postgres itself is fine. Every call here goes through
+//     lib/restOrPooler: REST first, the direct pooler (OS_DB_URL) on a 402.
 //
 // Nothing in this file sends a text or an email.
 // ───────────────────────────────────────────────────────────────────────────
-import { sbUrl, sbService, sbFailureReason } from "@/lib/osSupabase";
-import { pgConfigured, pgSelect, pgInsert, pgPatch } from "@/lib/pgFallback";
+import { DbError, dbSelect, dbInsert, dbPatch, lastPath as dbLastPath } from "@/lib/restOrPooler";
 
-export class IntakeDbError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "IntakeDbError";
-  }
-}
+// The intake route catches this name; it is the shared DbError.
+export { DbError as IntakeDbError };
+export const lastPath = dbLastPath;
 
-type Via = "rest" | "pooler";
-// Which path answered the most recent call. Surfaced in the dev-only proof
-// header so a test can show a save really went through the pooler under 402.
-let lastVia: Via | null = null;
-export function lastPath(): Via | null {
-  return lastVia;
-}
-
-function svc(): { url: string; key: string } | null {
-  const url = sbUrl();
-  const key = sbService();
-  return url && key ? { url, key } : null;
-}
-
-async function viaPooler<T>(fn: () => Promise<T[]>): Promise<T[]> {
-  try {
-    const rows = await fn();
-    lastVia = "pooler";
-    return rows;
-  } catch (e) {
-    throw new IntakeDbError(`Direct database connection failed: ${e instanceof Error ? e.message : String(e)}`);
-  }
-}
-
-// GET rows. qs is a PostgREST query string that includes select=.
-async function select<T>(table: string, qs: string): Promise<T[]> {
-  const s = svc();
-  if (!s) {
-    if (pgConfigured()) return viaPooler(() => pgSelect<T>(table, qs));
-    throw new IntakeDbError("The customer database is not configured on this server.");
-  }
-  let r: Response;
-  try {
-    r = await fetch(`${s.url}/rest/v1/${table}?${qs}`, {
-      headers: { apikey: s.key, Authorization: `Bearer ${s.key}` },
-      cache: "no-store",
-    });
-  } catch (e) {
-    if (pgConfigured()) return viaPooler(() => pgSelect<T>(table, qs));
-    throw new IntakeDbError(`Could not reach the customer database: ${String(e)}`);
-  }
-  if (r.status === 402 && pgConfigured()) return viaPooler(() => pgSelect<T>(table, qs));
-  if (!r.ok) {
-    throw new IntakeDbError(sbFailureReason(r.status, await r.text().catch(() => ""), table));
-  }
-  lastVia = "rest";
-  return (await r.json()) as T[];
-}
-
-// INSERT one row and return it. Throws unless the database handed a row back.
-async function insert<T>(table: string, row: Record<string, unknown>): Promise<T> {
-  const s = svc();
-  let rows: T[];
-  if (!s) {
-    if (!pgConfigured()) throw new IntakeDbError("The customer database is not configured on this server.");
-    rows = await viaPooler(() => pgInsert<T>(table, row));
-  } else {
-    let r: Response | null = null;
-    try {
-      r = await fetch(`${s.url}/rest/v1/${table}`, {
-        method: "POST",
-        headers: {
-          apikey: s.key,
-          Authorization: `Bearer ${s.key}`,
-          "Content-Type": "application/json",
-          Prefer: "return=representation",
-        },
-        body: JSON.stringify(row),
-        cache: "no-store",
-      });
-    } catch (e) {
-      // A network failure before a response: the REST insert never happened,
-      // so replaying it over the pooler cannot double-write.
-      if (!pgConfigured()) throw new IntakeDbError(`Could not reach the customer database: ${String(e)}`);
-    }
-    if (!r || (r.status === 402 && pgConfigured())) {
-      rows = await viaPooler(() => pgInsert<T>(table, row));
-    } else if (!r.ok) {
-      throw new IntakeDbError(sbFailureReason(r.status, await r.text().catch(() => ""), table));
-    } else {
-      rows = (await r.json()) as T[];
-      lastVia = "rest";
-    }
-  }
-  if (!rows?.[0]) throw new IntakeDbError(`The database did not confirm the new ${table} row.`);
-  return rows[0];
-}
-
-// PATCH rows matching a filter. Throws on failure.
-async function patch<T>(table: string, filter: string, body: Record<string, unknown>): Promise<T[]> {
-  const s = svc();
-  if (!s) {
-    if (!pgConfigured()) throw new IntakeDbError("The customer database is not configured on this server.");
-    return viaPooler(() => pgPatch<T>(table, filter, body));
-  }
-  let r: Response | null = null;
-  try {
-    r = await fetch(`${s.url}/rest/v1/${table}?${filter}`, {
-      method: "PATCH",
-      headers: {
-        apikey: s.key,
-        Authorization: `Bearer ${s.key}`,
-        "Content-Type": "application/json",
-        Prefer: "return=representation",
-      },
-      body: JSON.stringify(body),
-      cache: "no-store",
-    });
-  } catch (e) {
-    if (!pgConfigured()) throw new IntakeDbError(`Could not reach the customer database: ${String(e)}`);
-  }
-  if (!r || (r.status === 402 && pgConfigured())) return viaPooler(() => pgPatch<T>(table, filter, body));
-  if (!r.ok) throw new IntakeDbError(sbFailureReason(r.status, await r.text().catch(() => ""), table));
-  lastVia = "rest";
-  return (await r.json()) as T[];
-}
+const select = dbSelect;
+const insert = dbInsert;
+const patch = dbPatch;
 
 const enc = encodeURIComponent;
 
@@ -216,7 +97,7 @@ export async function insertContact(row: Record<string, unknown>): Promise<Conta
 
 export async function updateContact(id: number, body: Record<string, unknown>): Promise<void> {
   const rows = await patch<ContactRow>("crm_contacts", `id=eq.${id}`, body);
-  if (!rows.length) throw new IntakeDbError("The database did not confirm the customer update.");
+  if (!rows.length) throw new DbError("The database did not confirm the customer update.");
 }
 
 // The last few customers this client added through the form: name + date only.
@@ -254,4 +135,28 @@ export async function queueReview(row: {
   notes: string | null;
 }): Promise<{ id: number }> {
   return insert<{ id: number }>("reviews", { ...row, status: "queued" });
+}
+
+// ── Consent paper trail ────────────────────────────────────────────────────
+// When the client ticks "OK to ask for a review" they are attesting, on the
+// customer's behalf, that the customer agreed to hear from them about this
+// job. That attestation is the only consent evidence we have, so it is written
+// to public.consent (the A2P paper trail) as a GRANT, one row per address,
+// with method 'client-attested'. It never overrides a revocation: the send
+// routes block on any revoked row regardless of later grants.
+export async function recordAttestedConsent(row: {
+  contact_id: number;
+  client_slug: string;
+  phone: string | null;
+  email: string | null;
+  job_date: string;
+}): Promise<void> {
+  const now = new Date().toISOString();
+  const proof =
+    `Client ${row.client_slug} attested via /add form on ${now.slice(0, 10)} ` +
+    `(job ${row.job_date}) that the customer agreed to be contacted by text or email about this job, including a review request.`;
+  const writes: Record<string, unknown>[] = [];
+  if (row.phone) writes.push({ contact_id: row.contact_id, address: row.phone, channel: "sms", granted_at: now, method: "client-attested", proof });
+  if (row.email) writes.push({ contact_id: row.contact_id, address: row.email, channel: "email", granted_at: now, method: "client-attested", proof });
+  for (const w of writes) await insert("consent", w);
 }

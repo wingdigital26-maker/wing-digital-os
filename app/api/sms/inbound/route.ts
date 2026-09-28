@@ -8,6 +8,8 @@ import {
 } from "@/lib/sms";
 import { emitEventAsync } from "@/lib/automations/emit";
 import { contactIdForPhone, numberOwner } from "../../voice/_lib";
+import { dbInsert, dbPatch, dbSelect } from "@/lib/restOrPooler";
+import { brandNameOrNull } from "@/lib/clientBrands";
 
 // ───────────────────────────────────────────────────────────────────────────
 // POST /api/sms/inbound — the Twilio incoming-message webhook.
@@ -30,15 +32,43 @@ export const dynamic = "force-dynamic";
 const STOP_WORDS = new Set(["stop", "stopall", "unsubscribe", "cancel", "end", "quit"]);
 const HELP_WORDS = new Set(["help", "info"]);
 
-const STOP_REPLY =
-  "You have been unsubscribed from Wing Digital messages and will receive no further texts. " +
-  "Reply START to resubscribe.";
-const HELP_REPLY =
-  "Wing Digital: reply STOP to unsubscribe. Msg & data rates may apply.";
+// One Wing number texts for several businesses, so the confirmation names the
+// business that last texted this person (from the messages ledger), falling
+// back to Wing Digital. A STOP here opts the number out of EVERY text from this
+// line, whichever business it was for, so the copy says "this number".
+function stopReply(brand: string | null): string {
+  return (
+    `${brand ?? "Wing Digital"}: you are unsubscribed and will get no more texts from this number. ` +
+    "Reply START to resubscribe."
+  );
+}
+function helpReply(brand: string | null): string {
+  return `${brand ?? "Wing Digital"}: reply STOP to unsubscribe. Msg & data rates may apply.`;
+}
+
+// The client whose message this person most recently received, if any.
+async function lastClientFor(phone: string): Promise<string | null> {
+  try {
+    const rows = await dbSelect<{ client_slug: string | null }>(
+      "messages",
+      `select=client_slug&direction=eq.outbound&channel=eq.sms&to_addr=eq.${encodeURIComponent(phone)}` +
+        `&client_slug=not.is.null&order=id.desc&limit=1`
+    );
+    return rows[0]?.client_slug ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// The HELP copy carries "&" and brand names carry apostrophes; a raw "&" makes
+// the TwiML invalid XML and Twilio drops the reply.
+function xmlEscape(s: string): string {
+  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[c] as string);
+}
 
 function twiml(message?: string): NextResponse {
   const xml = message
-    ? `<?xml version="1.0" encoding="UTF-8"?><Response><Message>${message}</Message></Response>`
+    ? `<?xml version="1.0" encoding="UTF-8"?><Response><Message>${xmlEscape(message)}</Message></Response>`
     : `<?xml version="1.0" encoding="UTF-8"?><Response></Response>`;
   return new NextResponse(xml, { headers: { "Content-Type": "text/xml" } });
 }
@@ -47,20 +77,32 @@ function twiml(message?: string): NextResponse {
 // client owns the To number) are shared with the voice webhooks in
 // app/api/voice/_lib.ts.
 
+// REST first, direct pooler on a 402 (lib/restOrPooler). A failed opt-out
+// write is logged loudly: the send routes read this row to honour STOP.
 async function writeConsent(row: Record<string, unknown>): Promise<void> {
-  const url = process.env.OS_SUPABASE_URL;
-  const key = process.env.OS_SUPABASE_SERVICE_KEY;
-  if (!url || !key) return;
-  await fetch(`${url}/rest/v1/consent`, {
-    method: "POST",
-    headers: {
-      apikey: key,
-      Authorization: `Bearer ${key}`,
-      "Content-Type": "application/json",
-      Prefer: "return=minimal",
-    },
-    body: JSON.stringify(row),
-  }).catch(() => undefined);
+  try {
+    await dbInsert("consent", row);
+  } catch (e) {
+    console.error("[sms/inbound] CONSENT WRITE FAILED:", e instanceof Error ? e.message : e, row);
+  }
+}
+
+// Mark every CRM row with this number do_not_contact (all clients: the STOP
+// covers the whole line). Matches the exact E.164 and any stored format that
+// ends in the same 10 digits, same rule as isPhoneSuppressed.
+async function markDoNotContact(phone: string): Promise<void> {
+  const last10 = phone.replace(/\D/g, "").slice(-10);
+  const parts = [`phone.eq.${phone}`];
+  if (last10.length === 10) parts.push(`phone.like.*${last10}`);
+  try {
+    await dbPatch(
+      "crm_contacts",
+      `or=(${encodeURIComponent(parts.join(","))})&do_not_contact=not.is.true`,
+      { do_not_contact: true }
+    );
+  } catch (e) {
+    console.error("[sms/inbound] do_not_contact update failed:", e instanceof Error ? e.message : e);
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -120,12 +162,15 @@ export async function POST(req: NextRequest) {
       method: "sms-stop",
       proof: sid ? `Twilio inbound ${sid}: "${body}"` : `inbound SMS: "${body}"`,
     });
+    if (from) await markDoNotContact(from);
+    const brand = brandNameOrNull(await lastClientFor(from));
+    const reply = stopReply(brand);
     await logMessage({
       contact_id: contactId, channel: "sms", direction: "outbound",
-      to_addr: from, from_addr: to, body: STOP_REPLY,
+      to_addr: from, from_addr: to, body: reply,
       status: "sent", provider_sid: null,
     });
-    return twiml(STOP_REPLY);
+    return twiml(reply);
   }
 
   if (word === "start" || word === "unstop" || word === "yes") {
@@ -141,12 +186,13 @@ export async function POST(req: NextRequest) {
   }
 
   if (HELP_WORDS.has(word)) {
+    const reply = helpReply(brandNameOrNull(await lastClientFor(from)));
     await logMessage({
       contact_id: contactId, channel: "sms", direction: "outbound",
-      to_addr: from, from_addr: to, body: HELP_REPLY,
+      to_addr: from, from_addr: to, body: reply,
       status: "sent", provider_sid: null,
     });
-    return twiml(HELP_REPLY);
+    return twiml(reply);
   }
 
   // A real reply: stored and left for a human in the Messages board. No auto

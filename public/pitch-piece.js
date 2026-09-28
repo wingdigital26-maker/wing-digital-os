@@ -382,7 +382,7 @@ const PITCH_MAX = THREE.MathUtils.degToRad(70);
 
 // ---------- autopilot: about half rest, half beats; the first beat follows the assemble directly ----------
 const beatOverride = options.beat || qs.get('beat'); // none|wave|ghost|ghostside|burst|expand, for testing
-const PROGRAM = [['wave',2600],['rest',3200],['ghost',4600],['rest',3400],['expand',5600],['rest',4200],['burst',1800],['rest',3000],['ghost',4600],['rest',2800]];
+const PROGRAM = options.program || [['wave',2600],['rest',3200],['ghost',4600],['rest',3400],['expand',5600],['rest',4200],['burst',1800],['rest',3000],['ghost',4600],['rest',2800]];
 let progIdx = -1, ghostCount = 0, ghostSide = false, ghostStart = 0;
 let autoMode = 'intro', autoModeStart = performance.now(), autoDur = 2700;
 let inView = true, burstCenter = null;
@@ -519,7 +519,7 @@ function nextBeat(now){
 }
 
 // intro: start out in the cloud and land in order, unless reduced motion or a test beat wants a stable frame
-const skipIntro = reducedMotion || !!beatOverride;
+const skipIntro = reducedMotion || !!beatOverride || options.intro===false;
 let seam = 0, leak = 0;
 if(!skipIntro){ prog.fill(1); seam = 1; }
 else if(beatOverride) nextBeat(performance.now());
@@ -757,6 +757,9 @@ if(stage){
   if(ok){
     const piece = initWingSculpture(stage, {
       fillH: 0.9, fillW: 0.9, backdropGlow: false,
+      // calm on the one-pager: steady sway + float, only the gentle beats (a ripple, a gliding highlight), no fly-apart
+      motion: 1.0, intro: false,
+      program: [['rest',4500],['wave',2600],['rest',6500],['ghost',4600]],
       onReveal(){ stage.classList.add('live'); }
     });
     window.__wingSculpture = piece;

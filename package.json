@@ -9,7 +9,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:outreach": "node --test tests/outreach/mappers.test.mjs tests/outreach/stats.test.mjs"
   },
   "dependencies": {
     "@types/nodemailer": "^8.0.1",

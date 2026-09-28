@@ -78,6 +78,11 @@ export const NAV_TREE: NavGroupDef[] = [
       // people that are potentially going to email" is one section, not two.
       // /calls stays a routed page -- caller-role users still land there.
       { id: "calls", label: "Call Room", keywords: "cold calling dialer" },
+      // Outreach (2026-09-28): the custom cold-email engine's review queue.
+      // Today's drafts to approve or reject, what Instantly did with them,
+      // who is due a re-touch round, and who is suppressed. Routed page (see
+      // EXTERNAL_SUB_LINKS).
+      { id: "outreach", label: "Outreach", keywords: "cold email drafts review approve queue instantly sync tracking retouch suppression" },
     ],
   },
   {
@@ -192,6 +197,8 @@ export const EXTERNAL_SUB_LINKS: Record<string, string> = {
   // this map 2026-09-22 when the Activity tab was deleted; the page still
   // exists, but "activity" now aliases to Email (see LEGACY_VIEW_ALIAS).
   dashboards: "/dashboards",
+  // 2026-09-28: the outreach review queue is a routed page.
+  outreach: "/outreach",
 };
 
 // ── Routed pages ─────────────────────────────────────────────────────────────
@@ -242,6 +249,7 @@ export const ROUTED_PAGES: RoutedPage[] = [
   // 2026-09-13 swarm: client dashboards inside the OS, and the messaging
   // activity board (what emails/texts are going out).
   { href: "/dashboards", label: "Client Dashboards", keywords: "reporting clients dashboard" },
+  { href: "/outreach", label: "Outreach Queue", keywords: "cold email drafts review approve instantly tracking replies retouch suppression mailbox health" },
   { href: "/activity", label: "Messaging Activity", keywords: "emails texts sent going out outbound queue instantly replies campaigns cold email" },
 ];
 

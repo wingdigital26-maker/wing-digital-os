@@ -1,0 +1,269 @@
+{
+  "schema": "custom-outreach-research/1",
+  "tenant": "wing",
+  "lead_id": 2622,
+  "researched_at": "2026-09-28T14:32:11+00:00",
+  "fresh": false,
+  "company": "Example Plumbing Co",
+  "email": "owner@example-plumbing.test",
+  "website": "https://example-plumbing.test",
+  "domain": "example-plumbing.test",
+  "city": "Arlington",
+  "trade": "commercial-plumbing",
+  "bucket": "plumbing",
+  "greeting_name": "Dana",
+  "greeting_basis": "owner_name on lead record, matches the email address",
+  "site_fetch": {
+    "ok": true,
+    "pages": [
+      "/"
+    ],
+    "fetched_at": "2026-09-28T14:30:28+00:00"
+  },
+  "search": {
+    "ok": true,
+    "query": "plumber Arlington TX",
+    "engine": "DuckDuckGo",
+    "searched_on": "2026-09-28",
+    "results": [
+      {
+        "pos": 1,
+        "host": "plumbersden.com",
+        "url": "https://plumbersden.com/plumber-directory/US/arlington-texas/",
+        "title": "91+ Plumbers in Arlington, TX | PlumbersDen"
+      },
+      {
+        "pos": 2,
+        "host": "angi.com",
+        "url": "https://www.angi.com/companylist/us/tx/arlington/plumbing.htm",
+        "title": "Top 10 Best Plumbers in Arlington, TX | Angi"
+      },
+      {
+        "pos": 3,
+        "host": "yelp.com",
+        "url": "https://www.yelp.com/search?find_desc=plumber&find_loc=Arlington%2C+TX",
+        "title": "TOP 10 BEST Plumber in Arlington, TX - (2026 Guide) - Quality ... - Yelp"
+      },
+      {
+        "pos": 4,
+        "host": "bestofplumbers.com",
+        "url": "https://bestofplumbers.com/plumber-arlington-tx/",
+        "title": "The 15 Best Plumbers in Arlington, TX"
+      },
+      {
+        "pos": 5,
+        "host": "thumbtack.com",
+        "url": "https://www.thumbtack.com/tx/arlington/plumbers",
+        "title": "The 10 Best Plumbers in Arlington, TX - Thumbtack"
+      },
+      {
+        "pos": 6,
+        "host": "bakerbrothersplumbing.com",
+        "url": "https://bakerbrothersplumbing.com/arlington-tx/",
+        "title": "Plumber Arlington TX | 24/7 Emergency Plumbing Services"
+      },
+      {
+        "pos": 7,
+        "host": "yellowpages.com",
+        "url": "https://www.yellowpages.com/arlington-tx/plumbers",
+        "title": "Plumbers in Arlington, TX - The Real Yellow Pages®"
+      },
+      {
+        "pos": 8,
+        "host": "allmastersplumbing.com",
+        "url": "https://allmastersplumbing.com/service-area/arlington/",
+        "title": "Plumbers in Arlington, TX: FREE Camera Inspection | Best Plumbing ..."
+      },
+      {
+        "pos": 9,
+        "host": "expertise.com",
+        "url": "https://www.expertise.com/home-improvement/plumbing/texas/arlington",
+        "title": "10 Best Arlington, TX Plumbers | Expertise.com"
+      },
+      {
+        "pos": 10,
+        "host": "benjaminfranklinplumbing.com",
+        "url": "https://www.benjaminfranklinplumbing.com/arlington/",
+        "title": "Arlington Plumbing Repair - Benjamin Franklin Plumbing® of Arlington"
+      }
+    ]
+  },
+  "facts": [
+    {
+      "id": "site_title",
+      "kind": "site",
+      "text": "Homepage title tag reads: \"Plumber Arlington TX | Example Plumbing Co\".",
+      "evidence": "Plumber Arlington TX | Example Plumbing Co",
+      "source": "https://example-plumbing.test/",
+      "anchors": [
+        "Plumber Arlington TX | Example Plumbing Co"
+      ],
+      "angle_hint": "title-tag"
+    },
+    {
+      "id": "site_h1",
+      "kind": "site",
+      "text": "Homepage main headline (H1) reads: \"Plumber Arlington TX: Expert Plumbing Services, Repair, and Installation\".",
+      "evidence": "Plumber Arlington TX: Expert Plumbing Services, Repair, and Installation",
+      "source": "https://example-plumbing.test/",
+      "anchors": [
+        "Plumber Arlington TX: Expert Plumbing Se"
+      ],
+      "angle_hint": "headline"
+    },
+    {
+      "id": "tel_link",
+      "kind": "conversion",
+      "text": "Homepage has a tap-to-call link to 8175729400.",
+      "evidence": "href=tel:8175729400",
+      "source": "https://example-plumbing.test/",
+      "anchors": [
+        "9400"
+      ],
+      "angle_hint": "tap-to-call"
+    },
+    {
+      "id": "no_chat",
+      "kind": "conversion",
+      "text": "No chat or text-us widget found on the fetched pages.",
+      "evidence": "no known chat vendor script",
+      "source": "https://example-plumbing.test/",
+      "anchors": [
+        "chat",
+        "text"
+      ],
+      "angle_hint": "chat"
+    },
+    {
+      "id": "review_widget",
+      "kind": "reviews",
+      "text": "Site embeds a review widget (Trustindex).",
+      "evidence": "Trustindex",
+      "source": "https://example-plumbing.test/",
+      "anchors": [
+        "Trustindex"
+      ],
+      "angle_hint": "reviews-on-site"
+    },
+    {
+      "id": "platform",
+      "kind": "site",
+      "text": "Site is built on WordPress.",
+      "evidence": "asset reference: WordPress",
+      "source": "https://example-plumbing.test/",
+      "anchors": [
+        "WordPress"
+      ],
+      "angle_hint": "platform"
+    },
+    {
+      "id": "since_year",
+      "kind": "company",
+      "text": "Site says the company has been operating since 1984 (\"serving Arlington communities since 1984\").",
+      "evidence": "serving Arlington communities since 1984",
+      "source": "https://example-plumbing.test/",
+      "anchors": [
+        "1984"
+      ],
+      "angle_hint": "history"
+    },
+    {
+      "id": "years_claim",
+      "kind": "company",
+      "text": "Site says \"Over 40 Years\" of experience.",
+      "evidence": "Over 40 Years",
+      "source": "https://example-plumbing.test/",
+      "anchors": [
+        "40 years"
+      ],
+      "angle_hint": "history"
+    },
+    {
+      "id": "financing",
+      "kind": "offer",
+      "text": "Site mentions financing. (\"Financing\")",
+      "evidence": "air Water Leak Repair Slab Leak Detection Sewer Line Repair Financing Specials About Us Meet Our Team Employment Contact Us Revie",
+      "source": "https://example-plumbing.test/",
+      "anchors": [
+        "Financing"
+      ],
+      "angle_hint": "financing"
+    },
+    {
+      "id": "free_estimate",
+      "kind": "offer",
+      "text": "Site offers free estimates or inspections. (\"Free Estimate\")",
+      "evidence": "mbing Specials $200 off Tankless Water Heater Installations Free Estimate on Water Line Replacement Considering a whole house water l",
+      "source": "https://example-plumbing.test/",
+      "anchors": [
+        "Free Estimate"
+      ],
+      "angle_hint": "free_estimate"
+    },
+    {
+      "id": "license",
+      "kind": "company",
+      "text": "Site shows license number License #37068.",
+      "evidence": "License #37068",
+      "source": "https://example-plumbing.test/",
+      "anchors": [
+        "License #37068"
+      ],
+      "angle_hint": "license"
+    },
+    {
+      "id": "services_listed",
+      "kind": "services",
+      "text": "Homepage section headings include: Your Trusted Plumber in Arlington; Water Heater Repair; Emergency Plumber; Water Heater Install; Clogged Drain; Tankless Water Heater.",
+      "evidence": "Your Trusted Plumber in Arlington | Water Heater Repair | Emergency Plumber | Water Heater Install | Clogged Drain | Tankless Water Heater",
+      "source": "https://example-plumbing.test/",
+      "anchors": [
+        "Your Trusted Plumber in Arlington",
+        "Water Heater Repair",
+        "Emergency Plumber"
+      ],
+      "angle_hint": "services"
+    },
+    {
+      "id": "serp_absent",
+      "kind": "search",
+      "angle_hint": "search-rank",
+      "text": "DuckDuckGo search \"plumber Arlington TX\" on 2026-09-28: example-plumbing.test did not appear in the 10 organic results. Top three were plumbersden.com, angi.com, yelp.com.",
+      "evidence": "[{\"pos\": 1, \"host\": \"plumbersden.com\", \"url\": \"https://plumbersden.com/plumber-directory/US/arlington-texas/\", \"title\": \"91+ Plumbers in Arlington, TX | PlumbersDen\"}, {\"pos\": 2, \"host\": \"angi.com\", \"url\": \"https://www.angi.com/companylist/us/tx/arlington/plumbing.htm\", \"title\": \"Top 10 Best Plumbers in Arlington, TX | Angi\"}, {\"pos\": 3, \"host\": \"yelp.com\", \"url\": \"https://www.yelp.com/search?find_desc=plumber&find_loc=Arlington%2C+TX\", \"title\": \"TOP 10 BEST Plumber in Arlington, TX - (2026 Guide) - Quality ... - Yelp\"}, {\"pos\": 4, \"host\": \"bestofplumbers.com\", \"url\": \"https://bestofplumbers.com/plumber-arlington-tx/\", \"title\": \"The 15 Best Plumbers in Arlington, TX\"}, {\"pos\": 5, \"host\": \"thumbtack.com\", \"url\": \"https://www.thumbtack.com/tx/arlington/plumbers\", \"title\": \"The 10 Best Plumbers in Arlington, TX - Thumbtack\"}]",
+      "source": "duckduckgo html",
+      "anchors": [
+        "plumber Arlington TX",
+        "plumbersden.com",
+        "angi.com",
+        "yelp.com"
+      ]
+    },
+    {
+      "id": "serp_directories",
+      "kind": "search",
+      "angle_hint": "directories",
+      "text": "5 of the 10 organic results for \"plumber Arlington TX\" were directories (angi.com, expertise.com, thumbtack.com, yellowpages.com, yelp.com).",
+      "evidence": "[\"angi.com\", \"yelp.com\", \"thumbtack.com\", \"yellowpages.com\", \"expertise.com\"]",
+      "source": "duckduckgo html",
+      "anchors": [
+        "plumber Arlington TX",
+        "5"
+      ]
+    },
+    {
+      "id": "db_google_rating_only",
+      "kind": "record",
+      "angle_hint": "db_google_rating_only",
+      "text": "Google Business Profile rating is 4.9 stars (per our lead record).",
+      "evidence": "{\"google_rating\": 4.9}",
+      "source": "lead record (updated 2026-08-30)",
+      "anchors": [
+        "4.9"
+      ]
+    }
+  ],
+  "warnings": [],
+  "context_notes_unverified": [
+    "Dana Example | Owner | 5 emp | very small team, owner does the marketing; flat headcount; contact is the actual decision maker"
+  ]
+}

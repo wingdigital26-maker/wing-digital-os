@@ -36,7 +36,7 @@ type FeedState =
 
 type Item = {
   key: string;
-  lane: "cold" | "ledger" | "approved";
+  lane: "cold" | "ledger" | "approved" | "outreach";
   laneLabel: string;
   direction: "out" | "in";
   to: string | null; from: string | null;
@@ -49,6 +49,10 @@ type Item = {
   at: string;
   opens: number | null; clicks: number | null; replies: number | null;
   error: string | null;
+  /** Earlier messages in the conversation, oldest first (outreach replies only). */
+  thread?: { at: string | null; direction: "out" | "in"; step: number | null; subject: string; text: string }[];
+  /** The draft this conversation belongs to on /outreach. */
+  link?: { href: string; label: string } | null;
 };
 
 type Lane = { id: string; label: string; available: boolean; reason: string | null; count: number };
@@ -552,6 +556,36 @@ export default function EmailFeed() {
               </div>
             )}
           </div>
+
+          {current.link && (
+            <a href={current.link.href} style={{ fontSize: 12.5, fontWeight: 600, color: "var(--accent)", textDecoration: "none", width: "fit-content" }}>
+              {current.link.label} →
+            </a>
+          )}
+
+          {/* The conversation this reply answers: each step as it actually went
+              out, oldest first. Only steps with a recorded send are shown. */}
+          {current.thread && current.thread.length > 0 && (
+            <div style={{ display: "grid", gap: 8 }}>
+              <div style={label}>Earlier in this thread</div>
+              {current.thread.map((m, i) => (
+                <details key={i} style={{
+                  border: "1px solid var(--border)", borderRadius: 11, background: "var(--bg-secondary)",
+                  padding: "9px 12px",
+                }}>
+                  <summary style={{ cursor: "pointer", fontSize: 12.5, color: "var(--text-secondary)", display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <span style={{ fontWeight: 700 }}>{m.direction === "out" ? `Step ${m.step ?? "?"} sent` : "Their reply"}</span>
+                    <span>{m.subject}</span>
+                    {m.at && <span style={{ marginLeft: "auto", color: "var(--text-muted)" }}>{fullWhen(m.at)}</span>}
+                  </summary>
+                  <pre style={{
+                    margin: "9px 0 2px", whiteSpace: "pre-wrap", wordBreak: "break-word", fontFamily: "inherit",
+                    fontSize: 12.5, lineHeight: 1.6, color: "var(--text-primary)",
+                  }}>{m.text}</pre>
+                </details>
+              ))}
+            </div>
+          )}
 
           {data.trackingNote && (
             <div style={{ fontSize: 11, color: "var(--text-muted)", lineHeight: 1.55 }}>{data.trackingNote}</div>

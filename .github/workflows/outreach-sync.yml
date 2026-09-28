@@ -1,0 +1,23 @@
+# Instantly -> OS outreach sync. Vercel Hobby caps crons at once a day, so
+# GitHub Actions drives it every 15 minutes (same pattern as automations.yml).
+# The route only READS Instantly (sends, replies, lead outcomes) and writes
+# outreach_events in the OS database. Anything but a 200 fails the job.
+name: outreach-sync
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Pull Instantly events into the OS
+        run: |
+          code=$(curl -s -o /tmp/out -w '%{http_code}' -m 120 \
+            -H "x-heartbeat-key: ${{ secrets.HEARTBEAT_KEY }}" \
+            https://wing-digital-os.vercel.app/api/cron/outreach-sync)
+          cat /tmp/out
+          echo
+          [ "$code" = "200" ] || { echo "outreach-sync returned $code"; exit 1; }

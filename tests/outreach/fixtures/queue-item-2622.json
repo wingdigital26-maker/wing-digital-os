@@ -1,0 +1,82 @@
+{
+  "schema": "custom-outreach-item/1",
+  "tenant": "wing",
+  "lead_id": 2622,
+  "round": 1,
+  "date": "2026-09-28",
+  "status": "qa-passed",
+  "stop_reason": null,
+  "lead": {
+    "company": "Example Plumbing Co",
+    "email": "owner@example-plumbing.test",
+    "website": "https://example-plumbing.test",
+    "city": "Arlington",
+    "trade": "commercial-plumbing",
+    "bucket": "plumbing",
+    "greeting_name": "Dana",
+    "greeting_basis": "owner_name on lead record, matches the email address"
+  },
+  "steps_required": 3,
+  "prior_rounds": [],
+  "research_path": "outreach_queue\\wing\\2026-09-28\\research\\2622.research.json",
+  "research_facts": 15,
+  "sequence": [
+    {
+      "step": 1,
+      "subject": "plumber arlington search",
+      "body": "Hi Dana,\n\nI searched \"plumber Arlington TX\" on DuckDuckGo today. Your site wasn't in any of the 10 organic results, even though your homepage title is written for that exact phrase.\n\nSo the intent is right and the page just isn't getting picked up. Often that comes down to how the page is built and linked rather than the words on it.\n\nI kept the full list of who ranked and in what order. Want me to send it?",
+      "fact_id": "serp_absent",
+      "angle": "search-rank"
+    },
+    {
+      "step": 2,
+      "subject": "texting from your site",
+      "body": "Hi Dana,\n\nFollowing up on the search note. I also noticed there's no chat or text-us option on your site.\n\nPlenty of people looking for a plumber are at work or standing next to a leak, and they'd rather send a text than make a call. A simple text button that lands on your phone catches those people without adding anything to your day.\n\nWant me to send a mockup of what that would look like on your homepage?",
+      "fact_id": "no_chat",
+      "angle": "chat"
+    },
+    {
+      "step": 3,
+      "subject": "since 1984",
+      "body": "Hi Dana,\n\nLast note from me. Your site says you've been serving Arlington communities since 1984. That's a lot of customers who already know and trust the Example name.\n\nA short text after each finished job asking for a review is the cheapest way I know to turn that history into new calls from people who have never heard of you.\n\nIf the timing's wrong, no problem at all. If not, want me to send over the exact message I'd use?",
+      "fact_id": "since_year",
+      "angle": "history"
+    }
+  ],
+  "written_by": "claude-session",
+  "drafted_at": "2026-09-28T14:35:51+00:00",
+  "qa": {
+    "passed": true,
+    "reasons": [],
+    "checked_at": "2026-09-28T14:36:02+00:00",
+    "checks_version": "qa/1",
+    "sequence_hash": "96a03f949bf77a07234ee62247627b34ca7d25a49320be0b503f8c3bd11792ac"
+  },
+  "approval": null,
+  "push": null,
+  "history": [
+    {
+      "ts": "2026-09-28T14:32:11+00:00",
+      "event": "researched",
+      "actor": "write_sequences.py",
+      "status": "researched"
+    },
+    {
+      "ts": "2026-09-28T14:35:51+00:00",
+      "event": "drafted",
+      "actor": "claude-session",
+      "status": "drafted"
+    },
+    {
+      "ts": "2026-09-28T14:36:02+00:00",
+      "event": "qa-passed",
+      "actor": "qa_gate.py",
+      "status": "qa-passed"
+    }
+  ],
+  "updated_at": "2026-09-28T14:41:39+00:00",
+  "last_dry_run": {
+    "ts": "2026-09-28T14:41:39+00:00",
+    "campaign_id": "868bea71-0f2b-4136-8103-fb545edcb0a6"
+  }
+}

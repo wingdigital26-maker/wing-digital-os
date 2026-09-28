@@ -4,6 +4,8 @@ import { recordInstantlyEvent } from "@/lib/instantlyEvents";
 import { REPLY_EVENT_TYPES } from "@/lib/instantlyReplies";
 import { invalidateInstantly } from "@/lib/instantly";
 import { pushToAll } from "@/lib/push";
+import { mapWebhookEvent } from "@/lib/outreach/mappers";
+import { outreachStore } from "@/lib/outreach/store";
 
 // ───────────────────────────────────────────────────────────────────────────
 // POST /api/webhooks/instantly — Instantly calls this the moment something
@@ -17,7 +19,9 @@ import { pushToAll } from "@/lib/push";
 // also accepted. Compared in constant time. If INSTANTLY_WEBHOOK_SECRET is not
 // set on the deployment, every call gets 503 and nothing is stored.
 //
-// WHAT IT DOES: stores the event (lib/instantlyEvents.ts), expires the cached
+// WHAT IT DOES: stores the event (lib/instantlyEvents.ts) and maps it into the
+// outreach event log (lib/outreach, which applies unsubscribe / bounce /
+// negative-reply stops), expires the cached
 // inbox read so the next look at the OS refetches, and for a real reply sends
 // Jack a phone push ("Reply from ..."). It never replies to anyone, never
 // touches a campaign, never calls Instantly back.
@@ -86,6 +90,21 @@ export async function POST(req: NextRequest) {
     payload: body,
   });
 
+  // Also into the outreach event log (sent / reply / bounce / unsubscribe /
+  // labels), where it moves the tracking numbers and applies stop reasons.
+  // Best effort and capped at 3s: the 15-minute poll records the same event
+  // under the same dedupe key if this write is lost.
+  let logged = false;
+  const mapped = mapWebhookEvent(body, new Date().toISOString());
+  const choice = mapped ? outreachStore() : null;
+  if (mapped && choice?.store) {
+    const store = choice.store;
+    logged = await Promise.race([
+      store.insertEvents([mapped]).then(() => true).catch(() => false),
+      new Promise<boolean>((r) => setTimeout(() => r(false), 3_000)),
+    ]);
+  }
+
   if (REPLY_EVENT_TYPES.includes(eventType)) {
     // Next read of the inbox / totals refetches instead of serving the cache.
     invalidateInstantly("GET /emails");
@@ -106,7 +125,7 @@ export async function POST(req: NextRequest) {
     ]);
   }
 
-  return NextResponse.json({ ok: true, stored: true, persisted });
+  return NextResponse.json({ ok: true, stored: true, persisted, logged });
 }
 
 export async function GET() {

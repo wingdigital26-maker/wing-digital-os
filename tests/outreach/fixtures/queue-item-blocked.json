@@ -1,0 +1,44 @@
+{
+  "schema": "custom-outreach-item/1",
+  "tenant": "wing",
+  "lead_id": 8,
+  "round": 1,
+  "date": "2026-09-28",
+  "status": "blocked",
+  "stop_reason": "skipped: site is for Cleburne/Johnson County not Grand Prairie; older notes say it already has booking, review feed and blog; poor fit",
+  "lead": {
+    "company": "Example Blocked LLC",
+    "email": "blocked@example-blocked.test",
+    "website": "https://example-blocked.test",
+    "city": "Grand Prairie",
+    "trade": "roofing",
+    "bucket": "roofing",
+    "greeting_name": "Sam",
+    "greeting_basis": "contact_name on lead record"
+  },
+  "steps_required": 3,
+  "prior_rounds": [],
+  "research_path": "outreach_queue\\wing\\2026-09-28\\research\\8.research.json",
+  "research_facts": 6,
+  "sequence": [],
+  "written_by": null,
+  "drafted_at": null,
+  "qa": null,
+  "approval": null,
+  "push": null,
+  "history": [
+    {
+      "ts": "2026-09-28T14:32:06+00:00",
+      "event": "researched",
+      "actor": "write_sequences.py",
+      "status": "researched"
+    },
+    {
+      "ts": "2026-09-28T14:33:15+00:00",
+      "event": "skipped",
+      "actor": "claude-session",
+      "status": "blocked"
+    }
+  ],
+  "updated_at": "2026-09-28T14:33:15+00:00"
+}

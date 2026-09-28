@@ -62,6 +62,13 @@ function isPublicPath(pathname: string): boolean {
     // Automation engine catch-up (GitHub Actions every 10 min, same key
     // contract as the watchdog: Bearer CRON_SECRET or x-heartbeat-key).
     pathname === "/api/cron/automations" ||
+    // Outreach: the 15-minute Instantly sync (GitHub Actions), and the two
+    // engine endpoints Jack's PC calls (queue ingest, approved read-back).
+    // All three check x-heartbeat-key / Bearer CRON_SECRET inside the route and
+    // fail closed; ingest + approved also accept a staff session, checked there.
+    pathname === "/api/cron/outreach-sync" ||
+    pathname === "/api/outreach/ingest" ||
+    pathname === "/api/outreach/approved" ||
     pathname === "/api/push/schedule" ||
     pathname === "/api/lecture/summarize" ||
     // Twilio webhooks: incoming SMS and delivery-status callbacks. Both verify

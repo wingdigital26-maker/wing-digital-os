@@ -1,5 +1,6 @@
 import { sbUrl, sbService } from "@/lib/osSupabase";
 import { instantlyKey, iRequest, iListAll, fetchLeads, type InstantlyEmail } from "@/lib/instantly";
+import { outreachStore, storeFailure } from "@/lib/outreach/store";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // The email feed loader — one normalized list of every email Wing sends.
@@ -66,9 +67,21 @@ export type FeedItem = {
   clicks: number | null;
   replies: number | null;
   error: string | null;
+  /** Earlier messages in the same conversation, oldest first (outreach replies). */
+  thread?: ThreadMessage[];
+  /** Where this conversation lives elsewhere in the OS, e.g. its draft on /outreach. */
+  link?: { href: string; label: string } | null;
 };
 
-export type LaneId = "cold" | "ledger" | "approved";
+export type ThreadMessage = {
+  at: string | null;
+  direction: "out" | "in";
+  step: number | null;
+  subject: string;
+  text: string;
+};
+
+export type LaneId = "cold" | "ledger" | "approved" | "outreach";
 
 export type Lane = {
   id: LaneId;
@@ -592,22 +605,133 @@ async function loadApproved(limit: number): Promise<{ lane: Lane; items: FeedIte
   }
 }
 
+// ── Outreach replies (the OS outreach queue + Instantly sync) ───────────────
+//
+// Replies recorded by /api/cron/outreach-sync and the Instantly webhook, each
+// tied to the lead and the draft it answers. The thread is the sequence as it
+// was approved (from outreach_drafts) with the times each step actually went
+// out (from outreach_events), then the reply. When the cold lane already shows
+// the same Instantly message, that row gains the thread and the draft link
+// instead of appearing twice.
+
+type OutreachThread = { instantlyId: string | null; item: FeedItem };
+
+// The SSE stream reloads the feed every tick; the outreach threads change only
+// when the 15-minute sync or a webhook lands, so 30s of reuse costs nothing.
+const OUTREACH_TTL_MS = 30_000;
+let outreachCache: { at: number; limit: number; value: { lane: Lane; threads: OutreachThread[] } } | null = null;
+
+async function loadOutreach(limit: number): Promise<{ lane: Lane; threads: OutreachThread[] }> {
+  if (outreachCache && outreachCache.limit >= limit && Date.now() - outreachCache.at < OUTREACH_TTL_MS) {
+    // Fresh copies: the merge below mutates cold rows, never these, but the
+    // SSE stream diffs items across ticks so they must not be shared objects.
+    return { lane: outreachCache.value.lane, threads: outreachCache.value.threads.map((t) => ({ ...t, item: { ...t.item } })) };
+  }
+  const value = await loadOutreachFresh(limit);
+  if (value.lane.available) outreachCache = { at: Date.now(), limit, value };
+  return { lane: value.lane, threads: value.threads.map((t) => ({ ...t, item: { ...t.item } })) };
+}
+
+async function loadOutreachFresh(limit: number): Promise<{ lane: Lane; threads: OutreachThread[] }> {
+  const label = "Outreach replies";
+  const choice = outreachStore();
+  if (!choice.store) {
+    return { lane: { id: "outreach", label, available: false, count: 0, reason: choice.reason }, threads: [] };
+  }
+  try {
+    const store = choice.store;
+    const replies = await store.listReplies(Math.min(limit, 200));
+    const oldest = replies.reduce((m, r) => Math.min(m, Date.parse(r.occurredAt)), Date.now());
+    const sends = replies.length ? await store.listEvents(new Date(oldest - 120 * 24 * 3600 * 1000).toISOString()) : [];
+    const draftCache = new Map<number, Awaited<ReturnType<typeof store.getDraft>>>();
+    const threads: OutreachThread[] = [];
+    for (const r of replies) {
+      let draft = null;
+      if (r.draftId != null) {
+        if (!draftCache.has(r.draftId)) draftCache.set(r.draftId, await store.getDraft(r.draftId));
+        draft = draftCache.get(r.draftId) ?? null;
+      }
+      const sentTimes = new Map<number, string>();
+      for (const e of sends) {
+        if (e.eventType === "sent" && e.contactEmail === r.contactEmail && e.step != null && Date.parse(e.occurredAt) <= Date.parse(r.occurredAt)) {
+          if (!sentTimes.has(e.step) || sentTimes.get(e.step)! < e.occurredAt) sentTimes.set(e.step, e.occurredAt);
+        }
+      }
+      const thread: ThreadMessage[] = (draft?.steps ?? [])
+        .filter((st) => sentTimes.has(st.step))
+        .map((st) => ({ at: sentTimes.get(st.step) ?? null, direction: "out" as const, step: st.step, subject: st.subject, text: st.body }));
+      const text = (r.bodyText ?? "").trim();
+      const who = draft?.contactName ?? null;
+      threads.push({
+        instantlyId: r.instantlyEmailId,
+        item: {
+          key: `outreach:${r.id}`,
+          lane: "outreach",
+          laneLabel: label,
+          direction: "in",
+          to: r.mailbox,
+          from: r.contactEmail,
+          name: who,
+          company: draft?.company ?? null,
+          subject: (r.subject ?? "").trim() || (thread.length ? `Re: ${thread[thread.length - 1].subject}` : "(no subject)"),
+          html: null,
+          text,
+          snippet: snippetOf(text),
+          state: "received",
+          stateNote: r.stopReason === "negative_reply" ? "Asked to be taken off the list. Suppressed for good."
+            : r.stopReason === "spam_complaint" ? "Complained. Suppressed for good."
+            : r.stopReason === "handoff" ? "A real reply: the sequence stops here and this one is yours."
+            : null,
+          campaign: r.interest ? `Custom outreach, labelled ${r.interest}` : "Custom outreach",
+          campaignId: r.campaignId,
+          step: r.round && r.round > 1 ? `Round ${r.round}` : null,
+          at: r.occurredAt,
+          opens: null, clicks: null, replies: null, error: null,
+          thread,
+          link: draft ? { href: `/outreach?date=${draft.batchDate}#draft-${draft.id}`, label: `Open ${draft.company ?? "the"} draft on Outreach` } : null,
+        },
+      });
+    }
+    return { lane: { id: "outreach", label, available: true, count: threads.length, reason: null }, threads };
+  } catch (e) {
+    return { lane: { id: "outreach", label, available: false, count: 0, reason: storeFailure(e).message }, threads: [] };
+  }
+}
+
 // ── The merge ───────────────────────────────────────────────────────────────
 
 export async function loadEmailFeed(opts: { limit?: number; forceContext?: boolean } = {}): Promise<FeedPayload> {
   const limit = Math.min(500, Math.max(10, opts.limit ?? 100));
 
   // The three lanes are independent; one being down must not delay the others.
-  const [cold, ledger, approved] = await Promise.all([
+  const [cold, ledger, approved, outreach] = await Promise.all([
     loadCold(limit, opts.forceContext ?? false),
     loadLedger(limit),
     loadApproved(limit),
+    loadOutreach(limit),
   ]);
 
-  const items = [...cold.items, ...ledger.items, ...approved.items]
+  // An outreach reply the cold lane already shows enriches that row instead of
+  // repeating it.
+  const coldByKey = new Map(cold.items.map((i) => [i.key, i]));
+  const extra: FeedItem[] = [];
+  for (const t of outreach.threads) {
+    const twin = t.instantlyId ? coldByKey.get(`cold:${t.instantlyId}`) : undefined;
+    if (twin) {
+      twin.thread = t.item.thread;
+      twin.link = t.item.link;
+      twin.stateNote = twin.stateNote ?? t.item.stateNote;
+      twin.name = twin.name ?? t.item.name;
+      twin.company = twin.company ?? t.item.company;
+    } else {
+      extra.push(t.item);
+    }
+  }
+
+  const items = [...cold.items, ...ledger.items, ...approved.items, ...extra]
     .sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
 
-  const lanes = [cold.lane, ledger.lane, approved.lane];
+  const lanes = [cold.lane, ledger.lane, approved.lane, outreach.lane];
   const anyAvailable = lanes.some((l) => l.available);
   const allAvailable = lanes.every((l) => l.available);
 

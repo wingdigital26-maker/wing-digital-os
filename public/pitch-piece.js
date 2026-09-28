@@ -445,7 +445,7 @@ function onPointerDown(e){
 function onPointerMove(e){
   const now = performance.now();
   const rect = container.getBoundingClientRect();
-  pointerOver = e.pointerType!=='touch' && e.clientX>=rect.left && e.clientX<=rect.right && e.clientY>=rect.top && e.clientY<=rect.bottom;
+  pointerOver = e.pointerType!=='touch' && (options.gazeAnywhere || (e.clientX>=rect.left && e.clientX<=rect.right && e.clientY>=rect.top && e.clientY<=rect.bottom));
   tiltTX = THREE.MathUtils.clamp(((e.clientX-rect.left)/rect.width)*2-1, -1, 1);
   tiltTY = THREE.MathUtils.clamp(((e.clientY-rect.top)/rect.height)*2-1, -1, 1);
   if(dragging){
@@ -475,7 +475,7 @@ function onPointerUp(e){
   if(now-lastMoveT > 90){ yawVel = pitchVel = 0; }             // he stopped before letting go: it stays put
   yawVel = THREE.MathUtils.clamp(yawVel, -14, 14); pitchVel = THREE.MathUtils.clamp(pitchVel, -8, 8);
   lastInteract = now;
-  if(e.type!=='pointercancel' && dt < 300 && dx < 6 && dy < 6) toggleExpand();
+  if(options.tapExpand!==false && e.type!=='pointercancel' && dt < 300 && dx < 6 && dy < 6) toggleExpand();
 }
 function onPointerLeave(){ scatterActive = Math.min(scatterActive, 0.5); }
 function onDocLeave(){ pointerOver = false; }
@@ -749,20 +749,49 @@ return {pause, resume, expand, reset, dispose, relayout:layout, state:()=>({mode
 }
 
 // ---------- one-pager mount (Wing Digital pitch page) ----------
-// v5 sculpture code above is ported verbatim from creative-tools/wing-logo-3d/sculpture.html (2026-09-18).
-// Here it sits small in the hero; the poster stays until the first live frame.
+// v5 sculpture code above is ported from creative-tools/wing-logo-3d/sculpture.html (2026-09-18); the only
+// additions are opt-in switches (program, intro, gazeAnywhere, tapExpand). Here it starts small in the hero,
+// then on wide screens glides to a small dock in the bottom-left corner and stays with you down the page.
 const stage = document.getElementById('pieceStage');
+const hit = document.getElementById('pieceHit');
 if(stage){
   const ok = (()=>{ try{ const c=document.createElement('canvas'); return !!(c.getContext('webgl2')||c.getContext('webgl')); }catch(e){ return false; } })();
   if(ok){
     const piece = initWingSculpture(stage, {
-      fillH: 0.38, fillW: 0.38, backdropGlow: false,   // big transparent stage, small logo: the motion never hits an edge
-      // calm on the one-pager: steady sway + float, only the gentle beats (a ripple, a gliding highlight), no fly-apart
-      motion: 1.0, intro: false,
+      fillH: 0.28, fillW: 0.28, backdropGlow: false,   // big transparent stage, small logo: the motion never hits an edge
+      motion: 1.0, intro: false, gazeAnywhere: true, tapExpand: false,
       program: [['rest',4500],['wave',2600],['rest',6500],['ghost',4600]],
       onReveal(){ stage.classList.add('live'); }
     });
     window.__wingSculpture = piece;
-    if(document.fonts && document.fonts.ready) document.fonts.ready.then(()=>piece.relayout());
+    // drag to spin: the stage ignores clicks so the page under it stays usable; a small grab spot over the logo forwards them
+    if(hit){
+      const cv = stage.querySelector('canvas');
+      hit.addEventListener('pointerdown', (e)=>{ e.preventDefault(); cv.dispatchEvent(new PointerEvent('pointerdown', e)); hit.classList.add('grab'); });
+      window.addEventListener('pointerup', ()=> hit.classList.remove('grab'));
+    }
+    // follow the page: hero spot -> bottom-left dock, eased by scroll (wide screens only)
+    const heroIn = document.querySelector('.hero-in');
+    const wide = window.matchMedia('(min-width: 1180px)');
+    const DOCK = 0.46, W = 460, H = 480;
+    let raf = 0;
+    const ease = (t)=> t*t*(3-2*t);
+    function place(){
+      raf = 0;
+      if(!wide.matches){ stage.classList.remove('follow'); stage.style.transform=''; return; }
+      stage.classList.add('follow');
+      const r = heroIn.getBoundingClientRect();
+      const hx = r.right - 150, hy = r.top + 250;            // hero spot, moves up with the hero
+      const dx = 64, dy = innerHeight - 66;                  // dock, bottom-left
+      const t = ease(Math.min(1, Math.max(0, scrollY/520)));
+      const s = 1 + (DOCK-1)*t;
+      const cx = hx + (dx-hx)*t, cy = hy + (dy-hy)*t;
+      stage.style.transform = `translate(${cx - W/2}px, ${cy - H/2}px) scale(${s})`;
+    }
+    const req = ()=>{ if(!raf) raf = requestAnimationFrame(place); };
+    addEventListener('scroll', req, {passive:true}); addEventListener('resize', req);
+    if(wide.addEventListener) wide.addEventListener('change', req);
+    place();
+    if(document.fonts && document.fonts.ready) document.fonts.ready.then(()=>{ piece.relayout(); place(); });
   }
 }

@@ -45,6 +45,9 @@ function isPublicPath(pathname: string): boolean {
     // here only so the OS login gate does not shadow that check.
     pathname.startsWith("/add/") ||
     pathname.startsWith("/api/intake/") ||
+    // Client logos for that form (lib/clientBrands.ts). Static copies of the
+    // logos already public on each client's own website; no secrets.
+    pathname.startsWith("/brands/") ||
     // Live dashboard data. Public by design: it is the client's own published
     // content, assembled from sources anyone can already read (their WordPress
     // REST feed, their public repo, their sitemap). No secret passes through it.

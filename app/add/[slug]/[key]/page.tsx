@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Fraunces, Inter } from "next/font/google";
 import { checkClientKey, clientName } from "@/lib/clientIntake";
-import { brandFor } from "../../brands";
+import { brandFor } from "@/lib/clientBrands";
 import AddCustomerForm from "./AddCustomerForm";
 import "../../add.css";
 
@@ -81,9 +81,25 @@ export default async function AddCustomerPage({
       {state === "ok" && (
         <main className="ac-wrap">
           <div className="ac-head">
-            <span className="ac-mark" aria-hidden="true">{brand.initials}</span>
+            {brand.logo ? (
+              <span
+                className={`ac-logo${brand.logo.wordmark ? " ac-logo-word" : ""}`}
+                style={{ background: brand.logo.bg }}
+              >
+                {/* Plain img: a small static file, no loader needed. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={brand.logo.src}
+                  width={brand.logo.width}
+                  height={brand.logo.height}
+                  alt={brand.logo.wordmark ? brand.logo.alt : ""}
+                />
+              </span>
+            ) : (
+              <span className="ac-mark" aria-hidden="true">{brand.initials}</span>
+            )}
             <div>
-              <div className="ac-brand">{brand.name}</div>
+              <div className={`ac-brand${brand.logo?.wordmark ? " ac-sr" : ""}`}>{brand.name}</div>
               <div className="ac-by">Customer list, kept by Wing Digital</div>
             </div>
           </div>

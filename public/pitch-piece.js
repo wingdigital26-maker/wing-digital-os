@@ -756,7 +756,7 @@ if(stage){
   const ok = (()=>{ try{ const c=document.createElement('canvas'); return !!(c.getContext('webgl2')||c.getContext('webgl')); }catch(e){ return false; } })();
   if(ok){
     const piece = initWingSculpture(stage, {
-      fillH: 0.9, fillW: 0.9, backdropGlow: false,
+      fillH: 0.38, fillW: 0.38, backdropGlow: false,   // big transparent stage, small logo: the motion never hits an edge
       // calm on the one-pager: steady sway + float, only the gentle beats (a ripple, a gliding highlight), no fly-apart
       motion: 1.0, intro: false,
       program: [['rest',4500],['wave',2600],['rest',6500],['ghost',4600]],

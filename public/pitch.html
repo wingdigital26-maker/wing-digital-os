@@ -182,12 +182,12 @@ details p{margin:0 0 18px;color:var(--t2);font-size:.95rem}
 .foot .brandline b{font-family:var(--display);color:var(--t1)}
 
 /* the Wing piece (v5 sculpture), small, in the hero */
-.piece{position:absolute;top:150px;right:110px;width:170px;height:185px;z-index:1;touch-action:pan-y}
-@media(max-width:1100px){.piece{right:40px}}
+.piece{position:absolute;top:2px;right:-35px;width:460px;height:480px;z-index:1;pointer-events:none}
 .piece canvas{position:absolute;inset:0;width:100%!important;height:100%!important}
-.piece-poster{position:absolute;inset:0;margin:auto;width:78%;height:auto;max-height:86%;object-fit:contain;transition:opacity .5s ease;pointer-events:none}
+.piece-poster{position:absolute;inset:0;margin:auto;width:34%;height:auto;object-fit:contain;transition:opacity .5s ease;pointer-events:none}
 .piece.live .piece-poster{opacity:0}
-@media(max-width:900px){.piece{position:relative;top:auto;right:auto;width:76px;height:80px;margin:-12px 0 10px -6px}}
+@media(max-width:1100px){.piece{right:-110px}}
+@media(max-width:900px){.hero-in{padding-top:136px}.piece{top:-24px;left:-38px;right:auto;width:200px;height:210px}.piece-poster{width:34%}}
 #wing-helper{position:fixed;right:18px;bottom:16px;z-index:40;opacity:0;pointer-events:none;transition:opacity .8s;cursor:pointer}
 #wing-helper.on{pointer-events:auto}
 #wing-helper.on{opacity:1}
@@ -402,7 +402,7 @@ details p{margin:0 0 18px;color:var(--t2);font-size:.95rem}
 
 
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js"}}</script>
-<script type="module" src="/pitch-piece.js?v=3"></script>
+<script type="module" src="/pitch-piece.js?v=4"></script>
 <div id="wing-helper" title="Nimbus, from Wing Digital"></div>
 <script src="/mascot/nimbus-kb.js?v=2"></script>
 <script src="/mascot/wing-mascot.js?v=13"></script>

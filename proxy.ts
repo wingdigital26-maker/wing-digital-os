@@ -29,6 +29,8 @@ function isPublicPath(pathname: string): boolean {
     // public so a client can open the link without an OS login.
     pathname === "/pitch.html" ||
     pathname === "/pitch" ||
+    pathname === "/pitch-piece.js" ||
+    pathname === "/pitch-piece-poster.webp" ||
     // Halo mascot assets (component JS, Lottie JSON, demo). Static, no secrets;
     // loaded by the public pitch page and client dashboards.
     pathname.startsWith("/mascot/") ||

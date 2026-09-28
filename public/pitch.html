@@ -182,14 +182,14 @@ details p{margin:0 0 18px;color:var(--t2);font-size:.95rem}
 .foot .brandline b{font-family:var(--display);color:var(--t1)}
 
 /* the Wing piece (v5 sculpture), small, in the hero */
-.piece{position:absolute;top:2px;right:-35px;width:460px;height:480px;z-index:1;pointer-events:none}
+.piece{position:absolute;top:-48px;right:-85px;width:560px;height:580px;z-index:1;pointer-events:none}
 .piece.follow{position:fixed;left:0;top:0;right:auto;z-index:25;transform-origin:50% 50%;will-change:transform}
 .piece canvas{position:absolute;inset:0;width:100%!important;height:100%!important}
 .piece-poster{position:absolute;inset:0;margin:auto;width:26%;height:auto;object-fit:contain;transition:opacity .5s ease;pointer-events:none}
 .piece.live .piece-poster{opacity:0}
-.piece-hit{position:absolute;left:50%;top:50%;width:150px;height:160px;margin:-80px 0 0 -75px;border-radius:28px;pointer-events:auto;cursor:grab;touch-action:none}
+.piece-hit{position:absolute;left:50%;top:50%;width:184px;height:194px;margin:-97px 0 0 -92px;border-radius:28px;pointer-events:auto;cursor:grab;touch-action:none}
 .piece-hit.grab{cursor:grabbing}
-@media(max-width:1100px){.piece{right:-110px}}
+@media(max-width:1100px){.piece{right:-160px}}
 @media(max-width:900px){.hero-in{padding-top:120px}.piece{top:-30px;left:-50px;right:auto;width:200px;height:210px}.piece-hit{width:70px;height:74px;margin:-37px 0 0 -35px}}
 #wing-helper{position:fixed;right:18px;bottom:16px;z-index:40;opacity:0;pointer-events:none;transition:opacity .8s;cursor:pointer}
 #wing-helper.on{pointer-events:auto}
@@ -405,7 +405,7 @@ details p{margin:0 0 18px;color:var(--t2);font-size:.95rem}
 
 
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js"}}</script>
-<script type="module" src="/pitch-piece.js?v=5"></script>
+<script type="module" src="/pitch-piece.js?v=6"></script>
 <div id="wing-helper" title="Nimbus, from Wing Digital"></div>
 <script src="/mascot/nimbus-kb.js?v=2"></script>
 <script src="/mascot/wing-mascot.js?v=13"></script>

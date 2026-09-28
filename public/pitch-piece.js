@@ -758,7 +758,7 @@ if(stage){
   const ok = (()=>{ try{ const c=document.createElement('canvas'); return !!(c.getContext('webgl2')||c.getContext('webgl')); }catch(e){ return false; } })();
   if(ok){
     const piece = initWingSculpture(stage, {
-      fillH: 0.28, fillW: 0.28, backdropGlow: false,   // big transparent stage, small logo: the motion never hits an edge
+      fillH: 0.304, fillW: 0.304, backdropGlow: false,   // big transparent stage, small logo: the motion never hits an edge
       motion: 1.0, intro: false, gazeAnywhere: true, tapExpand: false,
       program: [['rest',4500],['wave',2600],['rest',6500],['ghost',4600]],
       onReveal(){ stage.classList.add('live'); }
@@ -773,7 +773,7 @@ if(stage){
     // follow the page: hero spot -> bottom-left dock, eased by scroll (wide screens only)
     const heroIn = document.querySelector('.hero-in');
     const wide = window.matchMedia('(min-width: 1180px)');
-    const DOCK = 0.46, W = 460, H = 480;
+    const DOCK = 0.353, W = 560, H = 580;
     let raf = 0;
     const ease = (t)=> t*t*(3-2*t);
     function place(){

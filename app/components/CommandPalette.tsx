@@ -114,7 +114,7 @@ export default function CommandPalette() {
   // there. Every other route, phone widths included, is untouched.
   useEffect(() => {
     const p = window.location.pathname;
-    const inert = ["/login", "/portal", "/d", "/nimbus"].some(
+    const inert = ["/login", "/portal", "/d", "/add", "/nimbus"].some(
       prefix => p === prefix || p.startsWith(prefix + "/")
     );
     setEnabled(!inert);

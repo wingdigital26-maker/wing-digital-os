@@ -663,8 +663,9 @@ export default function JarvisButton() {
     };
   }, [stopAudio]);
 
-  // Hide on login page (after every hook so hook order never changes).
-  if (pathname === "/login") return null;
+  // Hide on login page and the client-facing add-a-customer form (after every
+  // hook so hook order never changes). A client has no OS account.
+  if (pathname === "/login" || pathname?.startsWith("/add/")) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

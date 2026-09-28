@@ -38,6 +38,13 @@ function isPublicPath(pathname: string): boolean {
     // it only 302-redirects to the dashboard page, and the /api/dashboard/ gate
     // still enforces the key. Without this the OS login shadows the link.
     pathname.startsWith("/d/") ||
+    // Client "add a customer" form /add/<slug>/<key> and its API
+    // /api/intake/<slug>. A client has no OS account. Both check the key
+    // against client_dashboard_keys themselves and fail closed (the page shows
+    // "link isn't valid", the API 401s and stores nothing); they are listed
+    // here only so the OS login gate does not shadow that check.
+    pathname.startsWith("/add/") ||
+    pathname.startsWith("/api/intake/") ||
     // Live dashboard data. Public by design: it is the client's own published
     // content, assembled from sources anyone can already read (their WordPress
     // REST feed, their public repo, their sitemap). No secret passes through it.

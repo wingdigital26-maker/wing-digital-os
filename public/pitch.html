@@ -138,7 +138,8 @@ h2{font-size:clamp(1.6rem,1.25rem+1.5vw,2.3rem);margin:0 0 .3em}
 .dash-side .row{display:flex;gap:11px;flex-wrap:wrap;margin-top:6px}
 
 /* proof */
-.clients{display:grid;grid-template-columns:1fr 1fr;gap:15px;margin-top:6px}
+.clients{display:grid;grid-template-columns:repeat(3,1fr);gap:15px;margin-top:6px}
+@media(max-width:980px){.clients{grid-template-columns:1fr 1fr}}
 @media(max-width:680px){.clients{grid-template-columns:1fr}}
 .client-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:22px;box-shadow:var(--shadow)}
 .client-card .who{display:flex;align-items:center;gap:11px;margin-bottom:13px}
@@ -331,28 +332,36 @@ details p{margin:0 0 18px;color:var(--t2);font-size:.95rem}
   <div class="wrap">
     <div class="sh">
       <div class="eyebrow">Proof, not promises</div>
-      <h2>Real DFW businesses we build for</h2>
+      <h2>Real businesses we build for</h2>
       <p>We would rather show you the work than talk about it. Here is what is running right now.</p>
     </div>
     <div class="clients">
       <div class="client-card">
         <div class="who"><span class="badge" style="background:#2f6db0">JR</span><div><div class="nm">Jackson Roofing</div><div class="tr">Roofing, DFW</div></div></div>
         <div class="cstats">
-          <div class="cs"><div class="n">25</div><div class="lbl">pages live on their rebuilt site</div></div>
-          <div class="cs"><div class="n">4 to 5</div><div class="lbl">new posts every week</div></div>
+          <div class="cs"><div class="n">4x</div><div class="lbl">lighter site on phones (5.5MB down to 1.2MB)</div></div>
+          <div class="cs"><div class="n">137</div><div class="lbl">real NOAA hail reports mapped</div></div>
         </div>
-        <p>New blog posts, service pages and city pages going up every week, all from the SEO content engine.</p>
+        <p>A rebuilt website that opens fast on a phone, plus real hail history for the five counties they serve, so they know where storms hit.</p>
       </div>
       <div class="client-card">
-        <div class="who"><span class="badge" style="background:#0a2342">HJ</span><div><div class="nm">Hero's Junk Removal</div><div class="tr">Junk removal, DFW</div></div></div>
+        <div class="who"><span class="badge" style="background:#5b7a5e">RH</span><div><div class="nm">Renewal Health</div><div class="tr">Wellness, with Lynette Wing</div></div></div>
         <div class="cstats">
-          <div class="cs"><div class="n">85</div><div class="lbl">pages live on their site</div></div>
-          <div class="cs"><div class="n">1,000s</div><div class="lbl">of local leads found across our clients</div></div>
+          <div class="cs"><div class="n">65</div><div class="lbl">articles published on her site</div></div>
+          <div class="cs"><div class="n">1</div><div class="lbl">free guide that turns readers into leads</div></div>
         </div>
-        <p>A full content and SEO program running on their site, tracked on a live dashboard they can open any time.</p>
+        <p>A full website with a book page, a free guide, a review page, and a content engine that keeps publishing for her.</p>
+      </div>
+      <div class="client-card">
+        <div class="who"><span class="badge" style="background:#e14a12">NC</span><div><div class="nm">Northcomm</div><div class="tr">Radio cable manufacturer</div></div></div>
+        <div class="cstats">
+          <div class="cs"><div class="n">1 scan</div><div class="lbl">from a cable's QR label to its test report</div></div>
+          <div class="cs"><div class="n">2</div><div class="lbl">custom tools: a phone app and a spec lookup site</div></div>
+        </div>
+        <p>We built ScanSpec, software that reads a cable's QR label and opens its RF test report, plus a site where anyone can look up a serial number. Northcomm owns the code and the data.</p>
       </div>
     </div>
-    <p class="proofnote">Across our clients, more than 100 blog posts and service pages are live right now. Figures shown are real client results, and we are glad to walk through the live dashboards on a call.</p>
+    <p class="proofnote">Figures shown are real client results, and we are glad to walk through the live dashboards on a call.</p>
   </div>
 </section>
 

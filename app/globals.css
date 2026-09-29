@@ -660,6 +660,12 @@ main > div:last-child > div > *:nth-child(6) { animation-delay: 0.27s; }
 .v2-pills > * { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; white-space: nowrap; min-height: 40px; padding: 0 16px; border-radius: 999px; font-size: 14px; font-weight: 500; color: var(--text-secondary); background: transparent; border: 0; cursor: pointer; transition: background-color .2s ease-out, color .2s ease-out; }
 .v2-pills > *:hover { color: var(--text-primary); background: var(--bg-hover); }
 .v2-pills > [aria-current="page"], .v2-pills > [aria-selected="true"], .v2-pills > .is-active { background: var(--accent); color: #ffffff; font-weight: 600; }
+/* Home primary action: same fill, shape and weight as the active Overview pill. */
+.home-primary { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 18px; border-radius: 999px; border: 0; background: var(--accent); color: #ffffff; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; box-shadow: var(--v2-shadow); transition: background-color .2s ease-out, transform .2s ease-out; }
+.home-primary:hover { background: color-mix(in srgb, var(--accent) 88%, #000000); }
+.home-primary:active { transform: translateY(1px); }
+.home-primary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+@media (max-width: 767px) { .home-primary { min-height: 44px; } }
 .v2-status { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
 .v2-status--ok { color: var(--green); background: var(--v2-tint-green); }
 .v2-status--warn { color: var(--orange); background: var(--v2-tint-amber); }

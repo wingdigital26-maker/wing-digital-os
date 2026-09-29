@@ -312,7 +312,19 @@ export function TodayStrip() {
 
   return (
     <section aria-label="Today">
-      <p style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Today</p>
+      {/* 2026-09-28 (FRONTIER 18): the home's ONE filled primary action. Same
+          look as the active Overview pill; opens the Call Room the same way the
+          Calls tile does. Rendered only when leads are waiting: no leads means
+          no button at all, never a disabled one. */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 8, minHeight: 20 }}>
+        <p style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em" }}>Today</p>
+        {waiting && waiting > 0 ? (
+          <button type="button" className="home-primary" onClick={() => goToView("calls")} title={`${waiting.toLocaleString()} leads waiting to be called`}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{TILE_ICONS.phone}</svg>
+            Call next lead
+          </button>
+        ) : null}
+      </div>
       <div className="today-grid">
         {tiles.map((t) => {
           const known = typeof t.value === "number";

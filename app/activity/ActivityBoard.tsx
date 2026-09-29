@@ -53,7 +53,9 @@ type Messaging = {
   byVertical: { trade: string; queued: number | null }[];
   sent: { available: boolean; reason: string | null; total: number | null; items: SentItem[] };
   guardrails: { qaFailed: number | null; badEmail: number | null; claimed: number | null; claimedNote: string | null; note: string };
-  texts: { exists: boolean; note: string };
+  // Optional: /api/messaging stopped returning `texts` when texting left the
+  // CRM (2026-09-22); reading it unguarded crashed this whole page.
+  texts?: { exists: boolean; note: string };
 };
 
 type LedgerItem = {
@@ -91,7 +93,7 @@ type InstantlyView = {
 };
 
 function when(iso: string | null): string {
-  if (!iso) return "—";
+  if (!iso) return "-";
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? String(iso) : d.toLocaleString();
 }
@@ -193,7 +195,7 @@ export default function ActivityBoard() {
   const smtpLane: { kind: LaneKind; state: string; detail: string } = {
     kind: "draft",
     state: "manual only",
-    detail: "1:1 SMTP send (/api/email/send) exists but nothing calls it automatically — it only fires when a person sends from the Email page. Returns 503 if SMTP env is unset.",
+    detail: "1:1 SMTP send (/api/email/send) exists but nothing calls it automatically, it only fires when a person sends from the Email page. Returns 503 if SMTP env is unset.",
   };
   const campaignLane: { kind: LaneKind; state: string; detail: string } = {
     kind: "draft",
@@ -203,19 +205,19 @@ export default function ActivityBoard() {
 
   // SMS: live truth from /api/sms/health + the "no automated lane" fact.
   const smsLane: { kind: LaneKind; state: string; detail: string } = (() => {
-    const noAuto = msg?.texts && !msg.texts.exists;
+    const noAuto = !!msg?.texts && !msg.texts.exists;
     if (!sms) {
       return { kind: noAuto ? "dead" : "unknown", state: noAuto ? "no auto lane" : "unknown",
-        detail: (msg?.texts.note ?? "Could not read /api/sms/health.") };
+        detail: (msg?.texts?.note ?? "Could not read /api/sms/health.") };
     }
-    const base = msg?.texts.note ?? "";
+    const base = msg?.texts?.note ?? "";
     if (!sms.configured) {
       return { kind: "dead", state: "not wired", detail: `Twilio is NOT configured on this deployment, and there is no automated SMS lane regardless. ${base}` };
     }
     // Twilio configured = manual 1:1 texting possible, but still no automation.
     const acct = sms.account?.detail ?? "";
     return { kind: "draft", state: "manual only",
-      detail: `Twilio is configured (manual 1:1 texting via /api/sms/send only — no automated SMS lane exists). ${acct}` };
+      detail: `Twilio is configured (manual 1:1 texting via /api/sms/send only, no automated SMS lane exists). ${acct}` };
   })();
 
   const emailSent = (ledger?.items ?? []).filter((m) => m.channel === "email" && m.direction === "outbound");
@@ -226,7 +228,7 @@ export default function ActivityBoard() {
         <button className="act-refresh" onClick={load} disabled={loading}>{loading ? "Loading…" : "Refresh"}</button>
         <h1>Messaging Activity</h1>
         <p>
-          Everything Wing is sending — or would send — in one place: what has actually gone out, what is queued next
+          Everything Wing is sending (or would send) in one place: what has actually gone out, what is queued next
           with a word-for-word preview, and which lanes are live versus dead. This view sends nothing and only reads.
         </p>
       </div>
@@ -237,7 +239,7 @@ export default function ActivityBoard() {
           The one lane that is actually sending real email right now.
           Gets top placement, above the dead/draft lane strip. ────────── */}
       <section className="act-section act-instantly">
-        <h2>Instantly — live sending</h2>
+        <h2>Instantly: live sending</h2>
         <p className="sub">The cold-email lane that is actually sending, straight from Instantly.ai. Everything below is real, not a preview.</p>
 
         {instantlyLoading && !instantly && <div className="act-loading">Loading Instantly…</div>}
@@ -353,7 +355,7 @@ export default function ActivityBoard() {
           {/* Sent */}
           <section className="act-section">
             <h2>Sent</h2>
-            <p className="sub">Email that has actually left the building, newest first — from the unified message ledger and the cold-engine sent rows.</p>
+            <p className="sub">Email that has actually left the building, newest first, from the unified message ledger and the cold-engine sent rows.</p>
 
             {msg?.lane.deliveryWarning && (
               <div className="act-note dead">
@@ -382,8 +384,8 @@ export default function ActivityBoard() {
                     {emailSent.map((m) => (
                       <tr key={m.id}>
                         <td>{when(m.created_at)}</td>
-                        <td>{m.to_addr ?? "—"}</td>
-                        <td>{m.contact_company ? <span className="co">{m.contact_company}</span> : (m.contact_name ?? "—")}</td>
+                        <td>{m.to_addr ?? "-"}</td>
+                        <td>{m.contact_company ? <span className="co">{m.contact_company}</span> : (m.contact_name ?? "-")}</td>
                         <td>{m.error ? <span style={{ color: "var(--red)" }}>{m.status}: {m.error}</span> : <span className="act-badge">{m.status}</span>}</td>
                       </tr>
                     ))}
@@ -393,7 +395,7 @@ export default function ActivityBoard() {
             )}
             {ledger?.available && emailSent.length === 0 && !ledger.tableMissing && (
               <div className="act-note dead">
-                Nothing is sending. The ledger holds no outbound email — with the automated cold lane not wired (delivery step removed in the GHL retirement), this is empty because no pipe is running, not because it is a quiet day.
+                Nothing is sending. The ledger holds no outbound email, with the automated cold lane not wired (delivery step removed in the GHL retirement), this is empty because no pipe is running, not because it is a quiet day.
                 {ledger.emptyNote ? ` ${ledger.emptyNote}` : ""}
               </div>
             )}
@@ -409,10 +411,10 @@ export default function ActivityBoard() {
                       {msg.sent.items.map((s) => (
                         <tr key={s.id}>
                           <td>{when(s.emailedAt)}</td>
-                          <td><span className="co">{s.company ?? "—"}</span></td>
-                          <td>{s.email ?? "—"}</td>
-                          <td>{s.trade ?? "—"}</td>
-                          <td><span className="act-badge">{s.status ?? "—"}</span></td>
+                          <td><span className="co">{s.company ?? "-"}</span></td>
+                          <td>{s.email ?? "-"}</td>
+                          <td>{s.trade ?? "-"}</td>
+                          <td><span className="act-badge">{s.status ?? "-"}</span></td>
                         </tr>
                       ))}
                     </tbody>
@@ -435,7 +437,7 @@ export default function ActivityBoard() {
 
             {msg && (
               <div className="act-note warn" style={{ marginBottom: 14 }}>
-                {msg.lane.deliveryWarning} Treat this as a pre-flight QA queue, not an outbox — nothing below is actually going out today.
+                {msg.lane.deliveryWarning} Treat this as a pre-flight QA queue, not an outbox, nothing below is actually going out today.
               </div>
             )}
 
@@ -453,7 +455,7 @@ export default function ActivityBoard() {
             {msg?.queue.droppedNote && <div className="act-note warn" style={{ marginBottom: 12 }}>{msg.queue.droppedNote}</div>}
 
             {msg?.queue.available && msg.queue.items.length === 0 && (
-              <div className="act-note">The eligible queue is empty right now — no rows match the sender&apos;s filter.</div>
+              <div className="act-note">The eligible queue is empty right now, no rows match the sender&apos;s filter.</div>
             )}
 
             {(msg?.queue.items ?? []).map((q) => (
@@ -461,22 +463,22 @@ export default function ActivityBoard() {
                 <div className="qhead">
                   <span className="co">{q.company ?? "(no company name)"}</span>
                   <span className="meta">{q.person ? `${q.person} · ` : ""}{q.email} · {q.trade ?? "?"}{q.city ? ` · ${q.city}` : ""}</span>
-                  <span className="act-badge">{q.status ?? "—"}</span>
+                  <span className="act-badge">{q.status ?? "-"}</span>
                 </div>
                 {q.statusNote && <span className="lane-detail" style={{ display: "block" }}>{q.statusNote}</span>}
                 {q.flags.map((f) => (
-                  <span className="act-flag" key={f.code}>⚠ {f.label} — {f.detail}</span>
+                  <span className="act-flag" key={f.code}>⚠ {f.label}: {f.detail}</span>
                 ))}
                 {q.message.bodies ? (
                   <details className="act-preview">
                     <summary>Preview the 3 emails this row would receive</summary>
                     {q.message.subjects && (
                       <>
-                        <div className="subj">Day 1 — {q.message.subjects[0]}</div>
+                        <div className="subj">Day 1: {q.message.subjects[0]}</div>
                         <pre>{q.message.bodies.d1}</pre>
-                        <div className="subj">Day 3 — {q.message.subjects[1]}</div>
+                        <div className="subj">Day 3: {q.message.subjects[1]}</div>
                         <pre>{q.message.bodies.d3}</pre>
-                        <div className="subj">Day 7 — {q.message.subjects[2]}</div>
+                        <div className="subj">Day 7: {q.message.subjects[2]}</div>
                         <pre>{q.message.bodies.d7}</pre>
                       </>
                     )}
@@ -510,7 +512,7 @@ export default function ActivityBoard() {
           <h2>Text (SMS)</h2>
           <p className="sub">The honest state of texting at Wing.</p>
 
-          {msg && !msg.texts.exists && (
+          {msg?.texts && !msg.texts.exists && (
             <div className="act-note dead">
               {msg.texts.note}
             </div>
@@ -521,8 +523,8 @@ export default function ActivityBoard() {
 
           {/* Live Twilio pipe status (manual 1:1 only) */}
           <h2 style={{ marginTop: 22 }}>Twilio pipe (manual 1:1 only)</h2>
-          <p className="sub">Whether the manual send/receive pipe is even configured — this is NOT an automated lane. Live from /api/sms/health.</p>
-          {!sms && <div className="act-note warn">/api/sms/health did not return — Twilio status unknown.</div>}
+          <p className="sub">Whether the manual send/receive pipe is even configured, this is NOT an automated lane. Live from /api/sms/health.</p>
+          {!sms && <div className="act-note warn">/api/sms/health did not return, Twilio status unknown.</div>}
           {sms && !sms.configured && <div className="act-note dead">{sms.note}</div>}
           {sms && sms.configured && (
             <>
@@ -566,12 +568,12 @@ function SmsLedger() {
     })();
   }, []);
 
-  if (failed) return <div className="act-note warn">Could not read the SMS ledger — status unknown.</div>;
+  if (failed) return <div className="act-note warn">Could not read the SMS ledger, status unknown.</div>;
   if (!state) return <div className="act-loading">Loading…</div>;
   if (state.tableMissing) return <div className="act-note dead">{state.reason}</div>;
   if (!state.available) return <div className="act-note warn">SMS ledger unavailable: {state.reason ?? "unknown reason"}.</div>;
   if (!rows || rows.length === 0) {
-    return <div className="act-note dead">No text has ever been logged. With no automated SMS lane and manual texting only, an empty list here means nothing has been sent or received — not a quiet inbox.</div>;
+    return <div className="act-note dead">No text has ever been logged. With no automated SMS lane and manual texting only, an empty list here means nothing has been sent or received, not a quiet inbox.</div>;
   }
   return (
     <div className="act-tablewrap">
@@ -582,8 +584,8 @@ function SmsLedger() {
             <tr key={m.id}>
               <td>{when(m.created_at)}</td>
               <td>{m.direction}</td>
-              <td>{m.contact_company ?? m.contact_name ?? (m.direction === "inbound" ? m.from_addr : m.to_addr) ?? "—"}</td>
-              <td>{m.body ?? "—"}</td>
+              <td>{m.contact_company ?? m.contact_name ?? (m.direction === "inbound" ? m.from_addr : m.to_addr) ?? "-"}</td>
+              <td>{m.body ?? "-"}</td>
               <td>{m.error ? <span style={{ color: "var(--red)" }}>{m.status}: {m.error}</span> : <span className="act-badge">{m.status}</span>}</td>
             </tr>
           ))}

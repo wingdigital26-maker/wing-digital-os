@@ -286,7 +286,7 @@ export default function CompetitorIntel({ onSendToAI }: { onSendToAI?: (ctx: str
               style={{
                 ...actionBtn,
                 borderColor: "var(--accent)",
-                color: "var(--accent)",
+                color: "var(--accent-text)",
                 opacity: items.length ? 1 : 0.45,
                 cursor: items.length ? "pointer" : "not-allowed",
               }}
@@ -377,7 +377,7 @@ export default function CompetitorIntel({ onSendToAI }: { onSendToAI?: (ctx: str
                       aria-pressed={selected}
                       style={{
                         background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left",
-                        fontSize: 17, fontWeight: 700, color: selected ? "var(--accent)" : "var(--text-primary)", lineHeight: 1.3,
+                        fontSize: 17, fontWeight: 700, color: selected ? "var(--accent-text)" : "var(--text-primary)", lineHeight: 1.3,
                       }}
                     >
                       {s.name || s.handle}
@@ -410,7 +410,7 @@ export default function CompetitorIntel({ onSendToAI }: { onSendToAI?: (ctx: str
                     </div>
                     <div>
                       <dt style={label}>Waiting on you</dt>
-                      <dd style={{ margin: "3px 0 0", fontSize: 16, fontWeight: 700, color: f?.waiting ? "var(--accent)" : "var(--text-primary)" }}>
+                      <dd style={{ margin: "3px 0 0", fontSize: 16, fontWeight: 700, color: f?.waiting ? "var(--accent-text)" : "var(--text-primary)" }}>
                         {f?.waiting ?? 0}
                       </dd>
                     </div>
@@ -424,7 +424,7 @@ export default function CompetitorIntel({ onSendToAI }: { onSendToAI?: (ctx: str
                     {s.channel_url && (
                       <>
                         {" "}
-                        <a href={s.channel_url} target="_blank" rel="noreferrer" style={{ color: "var(--accent)", fontWeight: 600, textDecoration: "none" }}>
+                        <a href={s.channel_url} target="_blank" rel="noreferrer" style={{ color: "var(--accent-text)", fontWeight: 600, textDecoration: "none" }}>
                           Open channel
                         </a>
                       </>
@@ -566,7 +566,7 @@ export default function CompetitorIntel({ onSendToAI }: { onSendToAI?: (ctx: str
                           <button
                             onClick={() => setExpanded(open ? null : it.id)}
                             aria-expanded={open}
-                            style={{ ...actionBtn, border: "none", padding: "4px 0", color: "var(--accent)", fontSize: 13.5 }}
+                            style={{ ...actionBtn, border: "none", padding: "4px 0", color: "var(--accent-text)", fontSize: 13.5 }}
                           >
                             {open ? "Less" : "More"}
                           </button>
@@ -586,7 +586,7 @@ export default function CompetitorIntel({ onSendToAI }: { onSendToAI?: (ctx: str
 
                     <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
                       <a href={it.url} target="_blank" rel="noreferrer"
-                         style={{ ...actionBtn, borderColor: "var(--accent)", color: "var(--accent)", textDecoration: "none" }}>
+                         style={{ ...actionBtn, borderColor: "var(--accent)", color: "var(--accent-text)", textDecoration: "none" }}>
                         Watch
                       </a>
                       <button disabled={busy === it.id} onClick={() => void mark(it.id, "reviewed")} style={actionBtn}>

@@ -64,7 +64,7 @@ export default function NewIntelBanner() {
         type="button"
         onClick={() => goToView("competitors")}
         style={{
-          border: "1px solid var(--accent)", background: "none", color: "var(--accent)",
+          border: "1px solid var(--accent)", background: "none", color: "var(--accent-text)",
           borderRadius: 8, padding: "5px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer",
         }}
       >

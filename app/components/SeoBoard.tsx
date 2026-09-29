@@ -98,7 +98,7 @@ export default function SeoBoard() {
   const chip = (on: boolean): React.CSSProperties => ({
     padding: "5px 12px", borderRadius: 999, fontSize: 12, fontWeight: 600, cursor: "pointer",
     border: `1px solid ${on ? "var(--accent)" : "var(--border)"}`,
-    color: on ? "var(--accent)" : "var(--text-muted)",
+    color: on ? "var(--accent-text)" : "var(--text-muted)",
     background: on ? "color-mix(in srgb, var(--accent) 10%, transparent)" : "transparent",
     minHeight: 32,
   });

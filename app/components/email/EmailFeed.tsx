@@ -114,7 +114,7 @@ const FLASH_CSS = `
 }
 .wing-mail-row-new { animation: wingMailArrive 1.4s ease-out 1; }
 @media (prefers-reduced-motion: reduce) { .wing-mail-row-new { animation: none; } }
-.wing-mail-body a { color: var(--accent); }
+.wing-mail-body a { color: var(--accent-text); }
 .wing-mail-body img { max-width: 100%; height: auto; }
 .wing-mail-body table { border-collapse: collapse; max-width: 100%; }
 .wing-mail-body td, .wing-mail-body th { padding: 4px 8px; border: 1px solid var(--border); }

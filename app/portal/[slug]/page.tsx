@@ -67,7 +67,7 @@ function NotAuthorized({ reason }: { reason: string }) {
         <div style={{ fontSize: 40, marginBottom: 12 }}>🔒</div>
         <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Not authorized</h1>
         <p style={{ fontSize: 13.5, color: "var(--text-secondary)", lineHeight: 1.5 }}>{reason}</p>
-        <a href="/login" style={{ display: "inline-block", marginTop: 20, color: "var(--accent)", fontSize: 13, textDecoration: "none" }}>Go to login →</a>
+        <a href="/login" style={{ display: "inline-block", marginTop: 20, color: "var(--accent-text)", fontSize: 13, textDecoration: "none" }}>Go to login →</a>
       </div>
     </div>
   );
@@ -204,7 +204,7 @@ export default async function PortalPage({ params }: { params: Promise<{ slug: s
                     <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
                       {d.status && <span style={{ fontSize: 11, color: "var(--accent-2)" }}>{statusLabel(d.status)}</span>}
                       {(d.url ?? d.link) && (
-                        <a href={d.url ?? d.link} target="_blank" rel="noreferrer" style={{ fontSize: 11.5, color: "var(--accent)", textDecoration: "none" }}>View →</a>
+                        <a href={d.url ?? d.link} target="_blank" rel="noreferrer" style={{ fontSize: 11.5, color: "var(--accent-text)", textDecoration: "none" }}>View →</a>
                       )}
                     </div>
                   </div>

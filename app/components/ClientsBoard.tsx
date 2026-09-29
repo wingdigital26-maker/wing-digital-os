@@ -18,7 +18,7 @@ function ClientAvatar({ industry, size = 40 }: { industry?: string; size?: numbe
   return (
     <span className="v2-icon-chip" aria-hidden="true" style={{
       // On a white card the plain chip vanished, so it takes a light brand tint.
-      background: "color-mix(in srgb, var(--accent) 10%, var(--bg-card))", color: "var(--accent)",
+      background: "color-mix(in srgb, var(--accent) 10%, var(--bg-card))", color: "var(--accent-text)",
       ...(size === 40 ? {} : { width: size, height: size }),
     }}>
       <Icon size={Math.round(size * 0.45)} />
@@ -140,7 +140,7 @@ export default function ClientsBoard() {
               </div>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
                 {c.industry && (
-                  <span style={{ fontSize: 10, fontWeight: 600, color: "var(--accent)", background: "rgba(96,165,250,0.1)", padding: "2px 9px", borderRadius: 999 }}>{c.industry}</span>
+                  <span style={{ fontSize: 10, fontWeight: 600, color: "var(--accent-text)", background: "rgba(96,165,250,0.1)", padding: "2px 9px", borderRadius: 999 }}>{c.industry}</span>
                 )}
                 {c.location && (
                   <span style={{ fontSize: 10, fontWeight: 600, color: "var(--text-muted)", background: "rgba(255,255,255,0.05)", padding: "2px 9px", borderRadius: 999 }}>{c.location}</span>
@@ -175,7 +175,7 @@ export default function ClientsBoard() {
                 </button>
                 <button type="button"
                   onClick={(e) => { e.stopPropagation(); sfx.play("nav"); window.dispatchEvent(new CustomEvent("os:navigate", { detail: "crm" })); }}
-                  style={{ background: "none", border: "none", padding: 0, minHeight: 0, cursor: "pointer", fontSize: 11, color: "var(--accent)", textDecoration: "underline" }}>
+                  style={{ background: "none", border: "none", padding: 0, minHeight: 0, cursor: "pointer", fontSize: 11, color: "var(--accent-text)", textDecoration: "underline" }}>
                   Contacts and deals live in the CRM
                 </button>
               </div>

@@ -66,7 +66,7 @@ function ViewLink({ view, children }: { view: string; children: React.ReactNode 
       onClick={() => goToView(view)}
       style={{
         background: "none", border: "none", padding: 0, minHeight: 0, cursor: "pointer",
-        font: "inherit", fontWeight: 700, color: "var(--accent)", textDecoration: "underline",
+        font: "inherit", fontWeight: 700, color: "var(--accent-text)", textDecoration: "underline",
       }}
     >
       {children}
@@ -118,7 +118,7 @@ function HowItWorks() {
                 {g.view ? (
                   <ViewLink view={g.view}>{g.name}</ViewLink>
                 ) : (
-                  <a href={g.href} style={{ fontWeight: 700, color: "var(--accent)", textDecoration: "underline" }}>{g.name}</a>
+                  <a href={g.href} style={{ fontWeight: 700, color: "var(--accent-text)", textDecoration: "underline" }}>{g.name}</a>
                 )}
                 : {g.blurb}
               </li>
@@ -193,7 +193,7 @@ export default function StartHere() {
         {TILES.map((t) => {
           const inner = (
             <>
-              <span style={{ display: "inline-flex", color: "var(--accent)", flexShrink: 0, marginTop: 1 }}>
+              <span style={{ display: "inline-flex", color: "var(--accent-text)", flexShrink: 0, marginTop: 1 }}>
                 <t.icon size={18} />
               </span>
               <span style={{ minWidth: 0 }}>
@@ -334,7 +334,7 @@ export function TodayStrip() {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{TILE_ICONS[t.icon]}</svg>
               </div>
               <span className="v2-tile__num" style={{
-                fontSize: known ? 24 : 13, color: known ? "var(--text-primary)" : "var(--text-muted)",
+                fontSize: known ? 24 : 13, color: known ? "var(--text-primary)" : "var(--text-secondary)",
               }}>
                 {known ? t.value!.toLocaleString() : "not available"}
               </span>

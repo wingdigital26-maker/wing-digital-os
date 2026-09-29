@@ -138,7 +138,7 @@ export default function BrainPage() {
           <button onClick={newChat} style={{
             width: "100%", padding: "10px 14px", borderRadius: 10,
             border: "1px solid var(--accent)", background: "var(--accent-glow)",
-            color: "var(--accent)", fontWeight: 600, fontSize: 13, cursor: "pointer",
+            color: "var(--accent-text)", fontWeight: 600, fontSize: 13, cursor: "pointer",
           }}>+ New chat</button>
         </div>
         <div style={{ flex: 1, overflow: "auto", padding: "0 8px 8px" }}>

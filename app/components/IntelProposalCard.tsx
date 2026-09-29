@@ -247,7 +247,7 @@ export default function IntelProposalCard({
                   target="_blank"
                   rel="noreferrer"
                   style={{
-                    fontSize: 12, fontWeight: 700, color: "var(--accent)", textDecoration: "none",
+                    fontSize: 12, fontWeight: 700, color: "var(--accent-text)", textDecoration: "none",
                     border: "1px solid var(--accent)", borderRadius: 6, padding: "3px 9px",
                   }}
                 >
@@ -263,7 +263,7 @@ export default function IntelProposalCard({
             {link && (
               <>
                 {" "}
-                <a href={link} target="_blank" rel="noreferrer" style={{ color: "var(--accent)", fontWeight: 700 }}>
+                <a href={link} target="_blank" rel="noreferrer" style={{ color: "var(--accent-text)", fontWeight: 700 }}>
                   Open the video
                 </a>
               </>

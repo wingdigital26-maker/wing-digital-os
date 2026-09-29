@@ -1062,7 +1062,7 @@ export function RecheckButton({ onRechecked, compact }: { onRechecked?: () => vo
           disabled={!!busy}
           onClick={() => (busy ? undefined : run("all"))}
           style={{
-            background: "none", border: "1px solid var(--accent, #3D6BF0)55", color: "var(--accent, #3D6BF0)",
+            background: "none", border: "1px solid var(--accent, #3D6BF0)55", color: "var(--accent-text, #3D6BF0)",
             borderRadius: 6, padding: compact ? "2px 8px" : "3px 10px", cursor: busy ? "wait" : "pointer",
             fontSize: 10, display: "inline-flex", alignItems: "center", gap: 5, fontFamily: mono, flexShrink: 0,
           }}>
@@ -1079,7 +1079,7 @@ export function RecheckButton({ onRechecked, compact }: { onRechecked?: () => vo
           disabled={!!busy}
           onClick={() => setOpen((o) => !o)}
           style={{
-            background: "none", border: "1px solid var(--accent, #3D6BF0)55", color: "var(--accent, #3D6BF0)",
+            background: "none", border: "1px solid var(--accent, #3D6BF0)55", color: "var(--accent-text, #3D6BF0)",
             borderRadius: 6, padding: "3px 6px", cursor: busy ? "wait" : "pointer", fontSize: 10, fontFamily: mono, flexShrink: 0,
           }}>
           &#9662;
@@ -1168,7 +1168,7 @@ export function RunDaBossButton({ onRechecked, block, small }: { onRechecked?: (
           borderRadius: small ? 999 : 12, cursor: busy ? "wait" : "pointer",
           border: "1px solid var(--accent, #3D6BF0)",
           background: busy || small ? "rgba(61, 107, 240,0.10)" : "linear-gradient(135deg, rgba(61, 107, 240,0.22), rgba(167,139,250,0.18))",
-          color: "var(--accent, #3D6BF0)", fontFamily: small ? "inherit" : mono, fontSize: small ? 12 : 13, fontWeight: 700, letterSpacing: small ? 0 : "0.06em",
+          color: "var(--accent-text, #3D6BF0)", fontFamily: small ? "inherit" : mono, fontSize: small ? 12 : 13, fontWeight: 700, letterSpacing: small ? 0 : "0.06em",
           boxShadow: busy || small ? "none" : "0 4px 18px rgba(61, 107, 240,0.18)",
         }}>
         <svg width={small ? 14 : 18} height={small ? 14 : 18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
@@ -1486,7 +1486,7 @@ export function NextUpStrip({ agents, onSelect }: { agents: AgentCard[]; onSelec
           style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", color: "var(--text-secondary)", border: "1px solid var(--border, var(--border))", borderRadius: 99, padding: "3px 10px" }}>
           <Dot color="var(--accent)" />
           {a.name}
-          <span style={{ color: "var(--accent, #3D6BF0)" }}>{fmtCountdown(a.nextRunAt as string)}</span>
+          <span style={{ color: "var(--accent-text, #3D6BF0)" }}>{fmtCountdown(a.nextRunAt as string)}</span>
         </span>
       ))}
     </div>
@@ -1509,7 +1509,7 @@ export function linkify(text: string): React.ReactNode {
         <span key={i}>
           <a href={url} target="_blank" rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
-            style={{ color: "var(--accent)", textDecoration: "none", borderBottom: "1px dotted var(--accent)", wordBreak: "break-all" }}>
+            style={{ color: "var(--accent-text)", textDecoration: "none", borderBottom: "1px dotted var(--accent)", wordBreak: "break-all" }}>
             {url}
           </a>
           {trail}
@@ -1571,7 +1571,7 @@ export function FeedTicker({ feed, initial = 6 }: { feed: FeedEntry[]; initial?:
     return (
       <div>
         <button onClick={() => setAll(false)} style={{
-          background: "none", border: "none", color: "var(--accent, #3D6BF0)",
+          background: "none", border: "none", color: "var(--accent-text, #3D6BF0)",
           cursor: "pointer", fontSize: 11, padding: 0, marginBottom: 8,
         }}>collapse ticker</button>
         <FeedList feed={feed} limit={40} />
@@ -1596,7 +1596,7 @@ export function FeedTicker({ feed, initial = 6 }: { feed: FeedEntry[]; initial?:
       ))}
       {feed.length > initial && (
         <button onClick={() => setAll(true)} style={{
-          background: "none", border: "none", color: "var(--accent, #3D6BF0)",
+          background: "none", border: "none", color: "var(--accent-text, #3D6BF0)",
           cursor: "pointer", fontSize: 11, padding: 0,
         }}>view all ({feed.length})</button>
       )}
@@ -1640,10 +1640,10 @@ export function AgentFeed({ entries }: { entries: AgentFeedEntry[] }) {
             }}
           >
             <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", fontFamily: "'JetBrains Mono', monospace" }}>
-              <span style={{ fontSize: 10, letterSpacing: "0.1em", color: push ? "var(--accent, #3D6BF0)" : "var(--accent-2, #a78bfa)" }}>
+              <span style={{ fontSize: 10, letterSpacing: "0.1em", color: push ? "var(--accent-text, #3D6BF0)" : "var(--accent-2, #a78bfa)" }}>
                 {e.agent.toUpperCase()}
               </span>
-              {push && <span style={{ fontSize: 9, letterSpacing: "0.1em", color: "var(--accent, #3D6BF0)" }}>PUSHED</span>}
+              {push && <span style={{ fontSize: 9, letterSpacing: "0.1em", color: "var(--accent-text, #3D6BF0)" }}>PUSHED</span>}
               {typeof e.filesChanged === "number" && (
                 <span style={{ fontSize: 10, color: "var(--accent-2)" }}>
                   {e.filesChanged} file{e.filesChanged === 1 ? "" : "s"} updated
@@ -1675,7 +1675,7 @@ export function AgentFeed({ entries }: { entries: AgentFeedEntry[] }) {
       })}
       {entries.length > 6 && (
         <button onClick={() => setAll(!all)} style={{
-          background: "none", border: "none", color: "var(--accent, #3D6BF0)",
+          background: "none", border: "none", color: "var(--accent-text, #3D6BF0)",
           cursor: "pointer", fontSize: 11, padding: 0,
         }}>{all ? "collapse" : `view all (${entries.length})`}</button>
       )}
@@ -1793,7 +1793,7 @@ function DistilledExcerpt({ distilled, raw, accent }: { distilled: string[]; raw
       </div>
       {raw.length > 0 && (
         <button onClick={() => setShowRaw(r => !r)} style={{
-          background: "none", border: "none", color: "var(--accent, #3D6BF0)",
+          background: "none", border: "none", color: "var(--accent-text, #3D6BF0)",
           cursor: "pointer", fontSize: 11, padding: 0, marginTop: 8,
         }}>{showRaw ? "hide raw" : "view raw"}</button>
       )}
@@ -1931,7 +1931,7 @@ function AgentPanel({ agentKey, onClose, onSelect }: {
             <FeedList feed={shownActivity} />
             {activity.length > 8 && !moreActivity && (
               <button onClick={() => setMoreActivity(true)} style={{
-                background: "none", border: "none", color: "var(--accent, #3D6BF0)",
+                background: "none", border: "none", color: "var(--accent-text, #3D6BF0)",
                 cursor: "pointer", fontSize: 11, padding: 0,
               }}>show more ({activity.length - 8})</button>
             )}
@@ -1952,7 +1952,7 @@ function AgentPanel({ agentKey, onClose, onSelect }: {
             {RUN_PHRASE[detail.key] && (
               <div style={{ marginTop: 10, fontSize: 12, color: "var(--text-secondary)", background: "var(--bg-card, #0d1117)", border: "1px solid var(--border, var(--border))", borderRadius: 8, padding: "8px 10px", lineHeight: 1.5 }}>
                 Run it now: the OS is read-only, so tell Claude{" "}
-                <span style={{ fontFamily: "'JetBrains Mono', monospace", color: "var(--accent, #3D6BF0)" }}>&quot;{RUN_PHRASE[detail.key]}&quot;</span>
+                <span style={{ fontFamily: "'JetBrains Mono', monospace", color: "var(--accent-text, #3D6BF0)" }}>&quot;{RUN_PHRASE[detail.key]}&quot;</span>
               </div>
             )}
           </Section>
@@ -1973,7 +1973,7 @@ function AgentPanel({ agentKey, onClose, onSelect }: {
               <div key={a.id} className="mo-click" style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, marginBottom: 5 }}
                 onClick={() => onSelect({ type: "artifact", id: a.id })}>
                 <span style={{ color: "var(--text-muted)", fontSize: 11 }}>produces</span>
-                <span style={{ fontFamily: "'JetBrains Mono', monospace", color: "var(--accent, #3D6BF0)" }}>{a.label}</span>
+                <span style={{ fontFamily: "'JetBrains Mono', monospace", color: "var(--accent-text, #3D6BF0)" }}>{a.label}</span>
               </div>
             ))}
           </Section>
@@ -2312,7 +2312,7 @@ export function SchedulerCalendar({ agents, content = [], onSelect }: {
           <div style={{ display: "inline-flex", border: "1px solid var(--border, var(--border))", borderRadius: 8, overflow: "hidden" }}>
             {(["week", "month"] as const).map(v => (
               <button key={v} className="mo-click" onClick={() => switchView(v)}
-                style={{ background: view === v ? "var(--accent, #3D6BF0)22" : "none", border: "none", color: view === v ? "var(--accent, #3D6BF0)" : "var(--text-muted)", padding: big ? "5px 14px" : "4px 11px", cursor: "pointer", fontSize: 10.5, fontFamily: "'JetBrains Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em" }}>{v}</button>
+                style={{ background: view === v ? "var(--accent, #3D6BF0)22" : "none", border: "none", color: view === v ? "var(--accent-text, #3D6BF0)" : "var(--text-muted)", padding: big ? "5px 14px" : "4px 11px", cursor: "pointer", fontSize: 10.5, fontFamily: "'JetBrains Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em" }}>{v}</button>
             ))}
           </div>
           <button className="mo-click" onClick={big ? closeFull : openFull} aria-label={big ? "exit full screen" : "full screen"}
@@ -2749,7 +2749,7 @@ export function ClientPanel({ name, data, onClose }: { name: string; data: Missi
             {f.link && (
               <>
                 {" "}
-                <a href={f.link} target="_blank" rel="noreferrer" style={{ color: "var(--accent)" }}>open &#8599;</a>
+                <a href={f.link} target="_blank" rel="noreferrer" style={{ color: "var(--accent-text)" }}>open &#8599;</a>
               </>
             )}
           </div>

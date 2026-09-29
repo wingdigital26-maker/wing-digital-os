@@ -156,7 +156,7 @@ export default function SonarBoard() {
             style={{
               padding: "7px 14px", borderRadius: 9, cursor: "pointer",
               border: "1px solid var(--accent)", background: "transparent",
-              color: "var(--accent)", fontSize: 13, fontWeight: 600,
+              color: "var(--accent-text)", fontSize: 13, fontWeight: 600,
             }}
           >
             Retry
@@ -318,7 +318,7 @@ export default function SonarBoard() {
                 <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginTop: 2 }}>
                   {(l.website || l.url) && (
                     <a href={l.website || l.url || "#"} target="_blank" rel="noopener"
-                      style={{ fontSize: 11.5, color: "var(--accent)", textDecoration: "none" }}>
+                      style={{ fontSize: 11.5, color: "var(--accent-text)", textDecoration: "none" }}>
                       open ↗
                     </a>
                   )}

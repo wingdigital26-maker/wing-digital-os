@@ -101,7 +101,7 @@ export default function Search({ onOpenNote }: { onOpenNote: (path: string) => v
                       <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>{c.name || "-"}</span>
                       <div style={{ display: "flex", gap: 4 }}>
                         {c.tags.slice(0, 2).map(t => (
-                          <span key={t} style={{ fontSize: 10, background: "var(--accent-glow)", color: "var(--accent)", padding: "2px 7px", borderRadius: 20 }}>{t}</span>
+                          <span key={t} style={{ fontSize: 10, background: "var(--accent-glow)", color: "var(--accent-text)", padding: "2px 7px", borderRadius: 20 }}>{t}</span>
                         ))}
                       </div>
                     </div>

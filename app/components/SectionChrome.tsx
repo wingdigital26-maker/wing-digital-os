@@ -148,7 +148,7 @@ export default function SectionChrome({ title, tabs, isTabActive, extras, childr
         }
         .sc-pill:hover { color: var(--text-primary); background: var(--bg-hover); }
         .sc-pill[aria-current="page"] {
-          color: var(--accent); border-color: var(--accent);
+          color: var(--accent-text); border-color: var(--accent);
           background: color-mix(in srgb, var(--accent) 10%, transparent);
         }
         .sc-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -157,7 +157,7 @@ export default function SectionChrome({ title, tabs, isTabActive, extras, childr
           background: var(--bg-hover); color: var(--text-primary);
           font-size: 12.5px; font-weight: 600; text-decoration: none; white-space: nowrap;
         }
-        .sc-btn:hover { border-color: var(--accent); color: var(--accent); }
+        .sc-btn:hover { border-color: var(--accent); color: var(--accent-text); }
         .sc-menu-root { position: relative; }
         .sc-menu-btn { cursor: pointer; display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: 12.5px; font-weight: 600; }
         .sc-menu {
@@ -170,7 +170,7 @@ export default function SectionChrome({ title, tabs, isTabActive, extras, childr
         }
         .sc-menu-home {
           display: block; padding: 8px 10px; margin-bottom: 4px; border-radius: 8px;
-          font-size: 12.5px; font-weight: 700; text-decoration: none; color: var(--accent);
+          font-size: 12.5px; font-weight: 700; text-decoration: none; color: var(--accent-text);
         }
         .sc-menu-home:hover { background: var(--bg-hover); }
         .sc-menu-group { padding: 4px 0; border-top: 1px solid var(--border); }
@@ -182,7 +182,7 @@ export default function SectionChrome({ title, tabs, isTabActive, extras, childr
           display: block; padding: 7px 10px; border-radius: 8px;
           font-size: 13px; font-weight: 500; text-decoration: none; color: var(--text-primary);
         }
-        .sc-menu-item:hover { background: var(--bg-hover); color: var(--accent); }
+        .sc-menu-item:hover { background: var(--bg-hover); color: var(--accent-text); }
         .sc-email { font-size: 12px; color: var(--text-muted); max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .sc-tabs-wrap { position: relative; }
         .sc-tabs {

@@ -385,12 +385,12 @@ export function ContactDetail({
                 </div>
                 <div style={{ fontSize: 13, marginTop: 2 }}>
                   {c.phone
-                    ? <a href={`tel:${c.phone.replace(/[^\d+]/g, "")}`} style={{ color: "var(--accent)" }}>{c.phone}</a>
+                    ? <a href={`tel:${c.phone.replace(/[^\d+]/g, "")}`} style={{ color: "var(--accent-text)" }}>{c.phone}</a>
                     : <span style={{ color: "var(--text-muted)" }}>{UNKNOWN_PHONE}</span>}
                 </div>
                 <div style={{ fontSize: 13, overflowWrap: "anywhere" }}>
                   {c.email
-                    ? <a href={`mailto:${c.email}`} style={{ color: "var(--accent)" }}>{c.email}</a>
+                    ? <a href={`mailto:${c.email}`} style={{ color: "var(--accent-text)" }}>{c.email}</a>
                     : <span style={{ color: "var(--text-muted)" }}>{UNKNOWN_EMAIL}</span>}
                 </div>
                 <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
@@ -441,7 +441,7 @@ export function ContactDetail({
                   {data.tags.map((t) => (
                     <span key={t.tag} style={{
                       display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12,
-                      border: "1px solid var(--accent)", color: "var(--accent)", borderRadius: 999,
+                      border: "1px solid var(--accent)", color: "var(--accent-text)", borderRadius: 999,
                       padding: "3px 4px 3px 10px",
                     }}>
                       {t.tag}
@@ -451,7 +451,7 @@ export function ContactDetail({
                         disabled={busy === `tag:${t.tag}`}
                         onClick={() => { void removeTag(t.tag); }}
                         style={{
-                          border: "none", background: "transparent", color: "var(--accent)",
+                          border: "none", background: "transparent", color: "var(--accent-text)",
                           cursor: "pointer", fontSize: 13, lineHeight: 1, padding: "0 5px",
                         }}
                       >
@@ -591,7 +591,7 @@ export function ContactDetail({
                     style={{
                       padding: "9px 16px", borderRadius: 8, fontSize: 14, fontWeight: 600,
                       cursor: busy === "deal" ? "default" : "pointer", background: "transparent",
-                      border: "1px solid var(--accent)", color: "var(--accent)", opacity: busy === "deal" ? 0.6 : 1,
+                      border: "1px solid var(--accent)", color: "var(--accent-text)", opacity: busy === "deal" ? 0.6 : 1,
                     }}
                   >
                     {busy === "deal" ? "Creating" : "Create deal"}

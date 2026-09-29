@@ -472,7 +472,7 @@ function Select({
           padding: "7px 10px", borderRadius: 9, fontSize: 12.5, cursor: "pointer",
           maxWidth: "100%", minWidth: wide ? 210 : 150,
           border: `1px solid ${on ? "var(--accent)" : "var(--border)"}`,
-          color: on ? "var(--accent)" : "var(--text-secondary)",
+          color: on ? "var(--accent-text)" : "var(--text-secondary)",
           fontWeight: on ? 700 : 500,
           background: "var(--bg-secondary)",
         }}
@@ -677,7 +677,7 @@ function PipelineDetail({ row, onClose, onViewContact }: {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
         <span style={{
           fontSize: 10.5, textTransform: "uppercase", letterSpacing: ".1em",
-          fontWeight: 700, color: "var(--accent)",
+          fontWeight: 700, color: "var(--accent-text)",
         }}>
           {c ? `Pipeline contact · #${c.id}` : `Deal · #${d?.id}`}
         </span>
@@ -688,7 +688,7 @@ function PipelineDetail({ row, onClose, onViewContact }: {
               onClick={() => onViewContact(contactId)}
               style={{
                 fontSize: 11.5, padding: "3px 10px", borderRadius: 8, cursor: "pointer",
-                border: "1px solid var(--accent)", background: "transparent", color: "var(--accent)",
+                border: "1px solid var(--accent)", background: "transparent", color: "var(--accent-text)",
               }}
             >
               {c ? "Open full contact view" : "View contact"}
@@ -1426,7 +1426,7 @@ export default function CrmWorkspace({
           style={{
             padding: "7px 15px", borderRadius: 9, fontSize: 12.5, fontWeight: 700, cursor: "pointer",
             border: "1px solid var(--accent)", background: addOpen ? "var(--accent-glow)" : "transparent",
-            color: "var(--accent)", whiteSpace: "nowrap",
+            color: "var(--accent-text)", whiteSpace: "nowrap",
           }}
         >
           {addOpen ? "Close" : "Add contact"}
@@ -1513,7 +1513,7 @@ export default function CrmWorkspace({
           style={{
             marginLeft: "auto", padding: "7px 13px", borderRadius: 9, fontSize: 12.5, cursor: "pointer",
             border: `1px solid ${hiddenFacets > 0 ? "var(--accent)" : "var(--border)"}`,
-            color: hiddenFacets > 0 ? "var(--accent)" : "var(--text-muted)",
+            color: hiddenFacets > 0 ? "var(--accent-text)" : "var(--text-muted)",
             fontWeight: hiddenFacets > 0 ? 700 : 500,
             background: "var(--bg-secondary)", whiteSpace: "nowrap",
           }}
@@ -1544,7 +1544,7 @@ export default function CrmWorkspace({
                 onClick={clearAll}
                 style={{
                   padding: "7px 13px", borderRadius: 9, fontSize: 12.5, cursor: "pointer",
-                  border: "1px solid var(--accent)", color: "var(--accent)",
+                  border: "1px solid var(--accent)", color: "var(--accent-text)",
                   fontWeight: 700, background: "var(--bg-secondary)", whiteSpace: "nowrap",
                 }}
               >
@@ -1556,7 +1556,7 @@ export default function CrmWorkspace({
       )}
 
       {active.length > 0 && (
-        <div style={{ fontSize: 12, color: "var(--accent)", fontWeight: 600 }}>
+        <div style={{ fontSize: 12, color: "var(--accent-text)", fontWeight: 600 }}>
           Showing: {active.join(" · ")}
           <span style={{ color: "var(--text-muted)", fontWeight: 500 }}>
             {"  "}({filtered.length} of {paneTotal} {pane === "deals" ? "deals" : pane === "contacts" ? "contacts" : "drafts"})
@@ -1613,7 +1613,7 @@ export default function CrmWorkspace({
                 style={{
                   padding: "6px 12px", borderRadius: 8, cursor: "pointer",
                   border: "1px solid var(--accent)", background: "transparent",
-                  color: "var(--accent)", fontSize: 12.5, fontWeight: 600,
+                  color: "var(--accent-text)", fontSize: 12.5, fontWeight: 600,
                 }}
               >
                 Show every draft
@@ -1631,7 +1631,7 @@ export default function CrmWorkspace({
                 style={{
                   padding: "6px 12px", borderRadius: 8, cursor: "pointer",
                   border: "1px solid var(--accent)", background: "transparent",
-                  color: "var(--accent)", fontSize: 12.5, fontWeight: 600,
+                  color: "var(--accent-text)", fontSize: 12.5, fontWeight: 600,
                 }}
               >
                 Clear filters

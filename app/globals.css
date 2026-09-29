@@ -11,6 +11,7 @@
   --accent: #1E44B8;
   --accent-2: #6d4aff;
   --accent-dim: #2757E6;
+  --accent-text: var(--accent);
   --accent-glow: rgba(39, 87, 230, 0.10);
   --text-primary: #10141f;
   --text-secondary: #4a5673;
@@ -40,6 +41,7 @@
   --accent: #3D6BF0;
   --accent-2: #a78bfa;
   --accent-dim: #2757E6;
+  --accent-text: #7B9AF7;
   --accent-glow: rgba(61, 107, 240, 0.14);
   --text-primary: #eef1f8;
   --text-secondary: #9aa3c0;
@@ -477,7 +479,7 @@ main > div:last-child > div > *:nth-child(6) { animation-delay: 0.27s; }
     padding: 4px 2px; min-height: 48px; border-radius: 10px;
     -webkit-tap-highlight-color: transparent;
   }
-  .mobile-nav-btn.on { color: var(--accent); }
+  .mobile-nav-btn.on { color: var(--accent-text); }
   .mobile-nav-btn.on .mobile-nav-ico { filter: drop-shadow(0 0 6px var(--accent-glow)); }
   .mobile-nav-btn.jarvis { color: var(--accent-2); }
   .mobile-nav-btn:active { transform: scale(0.9); }
@@ -516,7 +518,7 @@ main > div:last-child > div > *:nth-child(6) { animation-delay: 0.27s; }
     -webkit-tap-highlight-color: transparent;
   }
   .mobile-sheet-item:active { background: var(--bg-hover); }
-  .mobile-sheet-ico { display: inline-flex; color: var(--accent); flex-shrink: 0; }
+  .mobile-sheet-ico { display: inline-flex; color: var(--accent-text); flex-shrink: 0; }
   .mobile-sheet-label { display: block; font-size: 14px; font-weight: 700; }
   .mobile-sheet-hint { display: block; font-size: 11.5px; color: var(--text-muted); margin-top: 1px; }
 
@@ -564,7 +566,7 @@ main > div:last-child > div > *:nth-child(6) { animation-delay: 0.27s; }
 .markdown-body li { margin-bottom: 0.3em; }
 .markdown-body code {
   background: var(--bg-card); border: 1px solid var(--border); border-radius: 4px;
-  padding: 2px 6px; font-size: 0.85em; color: var(--accent);
+  padding: 2px 6px; font-size: 0.85em; color: var(--accent-text);
 }
 .markdown-body pre {
   background: var(--bg-secondary);
@@ -670,7 +672,7 @@ main > div:last-child > div > *:nth-child(6) { animation-delay: 0.27s; }
 .v2-status--ok { color: var(--green); background: var(--v2-tint-green); }
 .v2-status--warn { color: var(--orange); background: var(--v2-tint-amber); }
 .v2-status--bad { color: var(--red); background: color-mix(in srgb, var(--red) 12%, var(--bg-card)); }
-.v2-status--info { color: var(--accent); background: var(--v2-tint-blue); }
+.v2-status--info { color: var(--accent-text); background: var(--v2-tint-blue); }
 .v2-h { font-family: 'Space Grotesk', 'Inter', sans-serif; font-weight: 700; letter-spacing: -0.02em; color: var(--text-primary); }
 @media (max-width: 767px) { .v2-pills > * { min-height: 44px; } }
 /* Phone: a pill group is ONE scrollable row, never a wrapped rounded blob

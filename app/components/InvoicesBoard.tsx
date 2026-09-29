@@ -588,7 +588,7 @@ export default function InvoicesBoard() {
           .day-count-badge:not(:empty) {
             display: inline-flex; align-items: center; justify-content: center;
             min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px;
-            background: var(--accent-glow); color: var(--accent); font-size: 9px; font-weight: 700;
+            background: var(--accent-glow); color: var(--accent-text); font-size: 9px; font-weight: 700;
           }
         }
       `}</style>
@@ -964,7 +964,7 @@ export default function InvoicesBoard() {
                       {overdue ? "overdue" : it.status}
                     </span>
                     {it.recurring ? (
-                      <span style={{ fontSize: 11, color: "var(--accent)" }}>
+                      <span style={{ fontSize: 11, color: "var(--accent-text)" }}>
                         {RECURRING_LABEL[it.recurring]}
                       </span>
                     ) : null}
@@ -1109,7 +1109,7 @@ function DayPanel(props: {
                 {it.status}
               </span>
               {it.recurring ? (
-                <span style={{ fontSize: 10, color: "var(--accent)" }}>{RECURRING_LABEL[it.recurring]}</span>
+                <span style={{ fontSize: 10, color: "var(--accent-text)" }}>{RECURRING_LABEL[it.recurring]}</span>
               ) : null}
               <span style={{ ...num, marginLeft: "auto", fontSize: 12, fontWeight: 600, color: "var(--text-primary)" }}>
                 {money(it.amount_cents, it.currency || "USD")}
@@ -1257,7 +1257,7 @@ const btn: React.CSSProperties = {
 const btnPrimary: React.CSSProperties = {
   ...btn,
   borderColor: "var(--accent)",
-  color: "var(--accent)",
+  color: "var(--accent-text)",
 };
 
 // The month stepper. Square so the two arrows read as a pair; "Today" widens

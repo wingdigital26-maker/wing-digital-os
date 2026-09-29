@@ -381,7 +381,7 @@ export default function WeekCalendar({
 const accentBtn: React.CSSProperties = {
   font: "inherit",
   fontSize: 12,
-  color: "var(--accent)",
+  color: "var(--accent-text)",
   background: "var(--accent-glow)",
   border: "1px solid var(--accent)",
   borderRadius: 8,

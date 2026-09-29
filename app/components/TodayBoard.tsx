@@ -273,7 +273,7 @@ function Section({
             background: "transparent",
             border: "1px solid var(--border)",
             borderRadius: 8,
-            color: "var(--accent)",
+            color: "var(--accent-text)",
             padding: "3px 10px",
             fontSize: 12,
             cursor: "pointer",
@@ -567,7 +567,7 @@ export default function TodayBoard() {
                 }}
                 title={e.url ? "Open this item" : "Open the calendar"}
               >
-                <span style={{ color: "var(--accent)", fontSize: 12, whiteSpace: "nowrap" }}>{fmtTime(e.start)}</span>
+                <span style={{ color: "var(--accent-text)", fontSize: 12, whiteSpace: "nowrap" }}>{fmtTime(e.start)}</span>
                 <span style={{ fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                   {e.title}
                 </span>

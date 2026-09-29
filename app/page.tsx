@@ -578,7 +578,7 @@ function DesktopMore({ groups, activeId, onPick }: {
           padding: "11px 16px", borderRadius: 999, cursor: "pointer",
           border: `1px solid ${activeHere || open ? "var(--accent)" : "var(--border)"}`,
           background: activeHere || open ? "var(--accent-glow)" : "var(--bg-secondary)",
-          color: activeHere || open ? "var(--accent)" : "var(--text-secondary)",
+          color: activeHere || open ? "var(--accent-text)" : "var(--text-secondary)",
           fontSize: 13, fontWeight: 700, boxShadow: "0 8px 24px rgba(0,0,0,0.28)",
         }}
       >
@@ -993,7 +993,7 @@ function renderInline(text: string, keyBase: string): React.ReactNode[] {
     const k = `${keyBase}-${i}`;
     let m: RegExpMatchArray | null;
     if ((m = p.match(/^\[([^\]]+)\]\(([^)]+)\)$/))) {
-      out.push(<a key={k} href={m[2]} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)", textDecoration: "underline" }}>{m[1]}</a>);
+      out.push(<a key={k} href={m[2]} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent-text)", textDecoration: "underline" }}>{m[1]}</a>);
     } else if ((m = p.match(/^\*\*([^*]+)\*\*$/))) {
       out.push(<strong key={k}>{m[1]}</strong>);
     } else if ((m = p.match(/^`([^`]+)`$/))) {
@@ -1156,7 +1156,7 @@ function KnowledgeBase({ initialPath, onSendToAI }: { initialPath?: string; onSe
                   textTransform: "uppercase", letterSpacing: "0.06em",
                 }}>
                   <span style={{
-                    display: "inline-block", fontSize: 9, color: "var(--accent)",
+                    display: "inline-block", fontSize: 9, color: "var(--accent-text)",
                     transform: expanded.has(node.path) ? "rotate(90deg)" : "none",
                     transition: "transform 0.15s ease",
                   }}>▶</span>
@@ -1241,7 +1241,7 @@ function KnowledgeBase({ initialPath, onSendToAI }: { initialPath?: string; onSe
           position: "absolute", top: "50%", left: 0, transform: "translateY(-50%)", zIndex: 5,
           width: 26, height: 92, borderRadius: "0 10px 10px 0", border: "1px solid var(--accent)",
           borderLeft: "none", background: "var(--bg-card)", backdropFilter: "blur(6px)",
-          color: "var(--accent)", boxShadow: "0 0 12px rgba(96,165,250,0.35)",
+          color: "var(--accent-text)", boxShadow: "0 0 12px rgba(96,165,250,0.35)",
           cursor: "pointer", fontSize: 13, lineHeight: 1.15, display: "flex",
           flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4,
         }}>

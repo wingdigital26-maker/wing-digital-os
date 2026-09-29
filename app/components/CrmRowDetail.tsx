@@ -143,7 +143,7 @@ export function NoSourceLink({ what, compact }: { what: string; compact?: boolea
 
 const heading: React.CSSProperties = {
   fontSize: 10.5, textTransform: "uppercase", letterSpacing: ".1em",
-  fontWeight: 700, color: "var(--accent)",
+  fontWeight: 700, color: "var(--accent-text)",
 };
 
 const label: React.CSSProperties = {

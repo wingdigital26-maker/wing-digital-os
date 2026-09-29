@@ -213,7 +213,7 @@ export default function Team() {
                 <span
                   style={{
                     ...btnGhost,
-                    color: "var(--accent)",
+                    color: "var(--accent-text)",
                     borderColor: "rgba(56,189,248,0.4)",
                     flexShrink: 0,
                   }}

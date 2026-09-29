@@ -198,7 +198,7 @@ table.act-table {
   font-weight: 600;
   padding: 4px 10px;
   border-radius: 999px;
-  color: var(--accent);
+  color: var(--accent-text);
   background: var(--v2-tint-blue);
   white-space: nowrap;
 }
@@ -236,7 +236,7 @@ table.act-table {
 .act-preview summary {
   cursor: pointer;
   font-size: 12px;
-  color: var(--accent);
+  color: var(--accent-text);
   font-weight: 600;
 }
 .act-preview .subj { font-size: 12px; font-weight: 600; margin: 8px 0 2px; color: var(--text-primary); }

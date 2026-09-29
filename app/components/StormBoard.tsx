@@ -130,7 +130,7 @@ function CopyButton({ text }: { text: string }) {
         fontWeight: 600,
         cursor: "pointer",
         border: "1px solid var(--accent)",
-        color: copied ? "var(--green)" : "var(--accent)",
+        color: copied ? "var(--green)" : "var(--accent-text)",
         background: "transparent",
       }}
     >
@@ -360,7 +360,7 @@ function EventCard({
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{centralTime(ev.event_time)}</span>
-          <span style={{ fontSize: 11, color: "var(--accent)", fontWeight: 600, whiteSpace: "nowrap" }}>
+          <span style={{ fontSize: 11, color: "var(--accent-text)", fontWeight: 600, whiteSpace: "nowrap" }}>
             {open ? "Hide drafts ▲" : "Show drafts ▼"}
           </span>
         </div>

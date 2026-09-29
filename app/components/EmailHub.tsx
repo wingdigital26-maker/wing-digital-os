@@ -82,7 +82,7 @@ export default function EmailHub() {
       <div style={{ marginBottom: 16, paddingBottom: 14, borderBottom: "1px solid var(--border)" }}>
         <div style={{
           fontSize: 12, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase",
-          color: "var(--accent)", marginBottom: 6,
+          color: "var(--accent-text)", marginBottom: 6,
         }}>
           CRM
         </div>

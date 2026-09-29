@@ -205,7 +205,7 @@ export default function Timeline({
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "baseline" }}>
             <span style={{
               fontSize: 12, fontWeight: 700, textTransform: "capitalize",
-              color: "var(--accent)",
+              color: "var(--accent-text)",
             }}>
               {a.kind}
             </span>

@@ -63,7 +63,7 @@ function Meta({ label, value, accent }: { label: string; value: string; accent?:
       </div>
       <div style={{
         fontSize: 12, fontFamily: MONO, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-        color: accent ? "var(--accent)" : "var(--text-secondary)",
+        color: accent ? "var(--accent-text)" : "var(--text-secondary)",
       }}>
         {value}
       </div>
@@ -183,7 +183,7 @@ function RosterSection({ title, note, empty, agents, onSelect }: {
           style={{
             width: "100%", background: "none", border: "none", borderTop: "1px solid var(--border)",
             padding: "10px 18px", textAlign: "left", cursor: "pointer",
-            fontSize: 11, fontFamily: MONO, color: "var(--accent)",
+            fontSize: 11, fontFamily: MONO, color: "var(--accent-text)",
           }}
         >
           {expanded ? "show fewer" : `show ${hidden} more`}
@@ -266,7 +266,7 @@ export function AgentUplinkState({ error, timedOut, lastHeartbeat, onRetry }: {
           style={{
             padding: "7px 14px", borderRadius: 9, cursor: "pointer",
             border: "1px solid var(--accent)", background: "transparent",
-            color: "var(--accent)", fontSize: 13, fontWeight: 600,
+            color: "var(--accent-text)", fontSize: 13, fontWeight: 600,
           }}
         >
           Retry
@@ -391,7 +391,7 @@ export default function MissionOps() {
             </span>
           )}
           <a href="/mission" target="_blank" rel="noreferrer" style={{
-            fontSize: 12, color: "var(--accent)", textDecoration: "none",
+            fontSize: 12, color: "var(--accent-text)", textDecoration: "none",
             border: "1px solid var(--accent)", borderRadius: 99, padding: "5px 13px", fontWeight: 600,
           }}>
             Full Mission Control

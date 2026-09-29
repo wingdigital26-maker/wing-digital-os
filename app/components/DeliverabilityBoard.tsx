@@ -147,7 +147,7 @@ function CheckRow({ check }: { check: Check }) {
               href={check.link}
               target={check.link.startsWith("http") ? "_blank" : undefined}
               rel="noreferrer"
-              style={{ fontSize: 12.5, color: "var(--accent)", textDecoration: "none" }}
+              style={{ fontSize: 12.5, color: "var(--accent-text)", textDecoration: "none" }}
             >
               Open the thing to fix →
             </a>

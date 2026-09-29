@@ -131,7 +131,7 @@ export default function LogActivity({
           style={{
             padding: "9px 16px", borderRadius: 8, fontSize: 14, fontWeight: 600,
             cursor: busy ? "default" : "pointer",
-            border: "1px solid var(--accent)", color: "var(--accent)",
+            border: "1px solid var(--accent)", color: "var(--accent-text)",
             background: "transparent", opacity: busy ? 0.6 : 1,
           }}
         >

@@ -415,7 +415,7 @@ function Card({ row: r, busy, err, highlighted, onAct, onSave, onRemove }: {
       {socials.length > 0 && (
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", fontSize: 11.5 }}>
           {socials.map(([k, href]) => (
-            <a key={k} href={href} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)", textDecoration: "none" }}>
+            <a key={k} href={href} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent-text)", textDecoration: "none" }}>
               {SOCIAL_LABEL[k] || k}
             </a>
           ))}
@@ -429,7 +429,7 @@ function Card({ row: r, busy, err, highlighted, onAct, onSave, onRemove }: {
             <span key={sv} style={{ fontSize: 10.5, color: "var(--text-secondary)", background: "var(--bg-secondary)", padding: "2px 8px", borderRadius: 999 }}>{sv}</span>
           ))}
           {!showAll && services.length > 6 && (
-            <button type="button" onClick={() => setShowAll(true)} style={{ ...btn, padding: "1px 8px", fontSize: 10.5, borderRadius: 999, color: "var(--accent)" }}>
+            <button type="button" onClick={() => setShowAll(true)} style={{ ...btn, padding: "1px 8px", fontSize: 10.5, borderRadius: 999, color: "var(--accent-text)" }}>
               +{services.length - 6} more
             </button>
           )}

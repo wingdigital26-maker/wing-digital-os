@@ -17,7 +17,7 @@ export default function EmailPage() {
     <div style={{ maxWidth: 760, margin: "0 auto", padding: "28px 20px 60px" }}>
       <EmailComposer />
       <p style={{ margin: "18px 0 0", fontSize: 12.5, color: "var(--text-muted)", lineHeight: 1.55 }}>
-        Sent mail &amp; health live in <a href="/#view=email" style={{ color: "var(--accent)" }}>CRM &gt; Email</a>.
+        Sent mail &amp; health live in <a href="/#view=email" style={{ color: "var(--accent-text)" }}>CRM &gt; Email</a>.
       </p>
     </div>
   );

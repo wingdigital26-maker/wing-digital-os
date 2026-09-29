@@ -97,7 +97,7 @@ export default function MissionControl() {
           <BackToOs />
           <Dot color={overallColor} pulse />
           <h1 style={{ fontSize: 22, letterSpacing: "0.14em", fontWeight: 700 }}>
-            WING OS <span style={{ color: "var(--accent)" }}>MISSION CONTROL</span>
+            WING OS <span style={{ color: "var(--accent-text)" }}>MISSION CONTROL</span>
           </h1>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
@@ -105,7 +105,7 @@ export default function MissionControl() {
           <SfxMuteButton />
           {data?.cloud && <Pill text="CLOUD MODE" color="var(--accent-2)" />}
           {error && <Pill text={`FEED ERROR ${error}`} color="var(--red)" />}
-          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 18, color: "var(--accent)", letterSpacing: "0.1em" }}>
+          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 18, color: "var(--accent-text)", letterSpacing: "0.1em" }}>
             {now ? fmtTime(now) : "--:--:--"}
           </span>
         </div>

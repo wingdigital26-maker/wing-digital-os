@@ -466,7 +466,7 @@ function Row({ row: r, busy, err, onSave, onRemove }: {
                   style={{
                     ...btn, padding: "4px 11px",
                     border: `1px solid ${on ? "var(--accent)" : "var(--border)"}`,
-                    color: on ? "var(--accent)" : "var(--text-secondary)",
+                    color: on ? "var(--accent-text)" : "var(--text-secondary)",
                   }}
                 >
                   {PLATFORM_LABEL[p]}

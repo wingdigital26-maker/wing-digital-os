@@ -79,6 +79,7 @@ export function FilterPill({ text, count, active, tone, onClick, title }: {
   onClick: () => void; title?: string;
 }) {
   const accent = tone ?? "var(--accent)";
+  const accentText = tone ?? "var(--accent-text)";
   return (
     <button
       type="button" onClick={onClick} title={title}
@@ -87,7 +88,7 @@ export function FilterPill({ text, count, active, tone, onClick, title }: {
         padding: "4px 12px", borderRadius: 999, fontSize: 11.5, fontWeight: 600,
         cursor: "pointer", fontFamily: "inherit",
         border: `1px solid ${active ? accent : "var(--border)"}`,
-        color: active ? accent : "var(--text-secondary)",
+        color: active ? accentText : "var(--text-secondary)",
         background: active ? "var(--accent-glow)" : "transparent",
         transition: "border-color .12s, color .12s, background .12s",
       }}
@@ -96,7 +97,7 @@ export function FilterPill({ text, count, active, tone, onClick, title }: {
       {count != null && (
         <span style={{
           fontSize: 10.5, fontWeight: 700, fontVariantNumeric: "tabular-nums",
-          color: active ? accent : "var(--text-muted)",
+          color: active ? accentText : "var(--text-muted)",
         }}>
           {count}
         </span>
@@ -180,7 +181,7 @@ export function Avatar({ seedA, seedB, size = 30 }: {
         width: size, height: size, borderRadius: "50%", flexShrink: 0,
         display: "inline-flex", alignItems: "center", justifyContent: "center",
         background: "var(--accent-glow)", border: "1px solid var(--border)",
-        color: "var(--accent)", fontSize: size * 0.42, fontWeight: 700,
+        color: "var(--accent-text)", fontSize: size * 0.42, fontWeight: 700,
       }}
     >
       {initial(seedA, seedB)}

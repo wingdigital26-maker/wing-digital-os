@@ -211,7 +211,7 @@ export default function PeopleBoard() {
                     </p>
                   </div>
                   <div style={{ minWidth: 0 }}>
-                    <a href={`mailto:${p.email}`} style={{ fontSize: 12.5, color: "var(--accent)", textDecoration: "none", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <a href={`mailto:${p.email}`} style={{ fontSize: 12.5, color: "var(--accent-text)", textDecoration: "none", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {p.email}
                     </a>
                     <p style={{ fontSize: 11, color: "var(--text-muted)", display: "flex", gap: 7, alignItems: "center" }}>

@@ -138,7 +138,7 @@ const readTier = (v: unknown): "A" | "B" | "C" | null => {
 
 const TIER_META: Record<string, { label: string; tone: string }> = {
   A: { label: "A", tone: "var(--green)" },
-  B: { label: "B", tone: "var(--accent)" },
+  B: { label: "B", tone: "var(--accent-text)" },
   C: { label: "C", tone: "var(--text-muted)" },
 };
 
@@ -874,7 +874,7 @@ export default function CallRoom() {
                     border: "1px solid color-mix(in srgb, var(--accent) 24%, transparent)",
                     borderRadius: 10, padding: "9px 11px",
                   }}>
-                    <span style={{ display: "block", fontSize: 10.5, textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 800, color: "var(--accent)", marginBottom: 3 }}>Say this</span>
+                    <span style={{ display: "block", fontSize: 10.5, textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 800, color: "var(--accent-text)", marginBottom: 3 }}>Say this</span>
                     {angle}
                   </div>
                 )}
@@ -1074,7 +1074,7 @@ export default function CallRoom() {
                 background: "linear-gradient(135deg,rgba(61,107,240,0.16),rgba(30,68,184,0.10))",
                 border: "1px solid rgba(61,107,240,0.45)",
               }}>
-                <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: "var(--accent)", fontWeight: 700 }}>
+                <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: "var(--accent-text)", fontWeight: 700 }}>
                   Say this
                 </p>
                 <p style={{ fontSize: 15.5, lineHeight: 1.5, marginTop: 6, fontWeight: 600 }}>
@@ -1142,7 +1142,7 @@ export default function CallRoom() {
                 marginTop: 14, padding: 12, borderRadius: 10,
                 background: "rgba(56,189,248,0.08)", border: "1px solid rgba(56,189,248,0.25)",
               }}>
-                <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: "var(--accent)", fontWeight: 700 }}>
+                <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: "var(--accent-text)", fontWeight: 700 }}>
                   Why they are worth calling
                 </p>
                 <p style={{ fontSize: 13, marginTop: 5, lineHeight: 1.5 }}>

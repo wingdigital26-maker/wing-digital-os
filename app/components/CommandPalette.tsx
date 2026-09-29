@@ -229,7 +229,7 @@ export default function CommandPalette() {
         }
         .cp-item[data-active="1"] { background: var(--bg-hover); }
         .cp-item .cp-group { margin-left: auto; color: var(--text-muted); font-size: 12px; }
-        .cp-item[data-active="1"] .cp-label { color: var(--accent); }
+        .cp-item[data-active="1"] .cp-label { color: var(--accent-text); }
         .cp-section {
           padding: 8px 10px 2px; font-size: 11px; letter-spacing: 0.06em;
           text-transform: uppercase; color: var(--text-muted);
@@ -243,7 +243,7 @@ export default function CommandPalette() {
         .cp-fab {
           position: fixed; right: 16px; bottom: 16px; z-index: 890;
           width: 44px; height: 44px; border-radius: 50%;
-          background: var(--bg-card); color: var(--accent);
+          background: var(--bg-card); color: var(--accent-text);
           border: 1px solid var(--border);
           box-shadow: 0 4px 16px rgba(0,0,0,0.25);
           font-size: 16px; cursor: pointer;

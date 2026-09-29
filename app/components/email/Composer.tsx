@@ -202,7 +202,7 @@ export default function Composer() {
     padding: "7px 16px", borderRadius: 999, fontSize: 12.5, fontWeight: 600,
     cursor: "pointer", fontFamily: "inherit",
     border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`,
-    color: active ? "var(--accent)" : "var(--text-secondary)",
+    color: active ? "var(--accent-text)" : "var(--text-secondary)",
     background: active ? "var(--accent-glow)" : "transparent",
   });
 
@@ -268,7 +268,7 @@ export default function Composer() {
                 padding: "9px 20px", borderRadius: 999, fontSize: 13, fontWeight: 700,
                 cursor: canSend ? "pointer" : "default", fontFamily: "inherit",
                 border: "1px solid var(--accent)",
-                color: canSend ? "var(--accent)" : "var(--text-muted)",
+                color: canSend ? "var(--accent-text)" : "var(--text-muted)",
                 background: "transparent", opacity: canSend ? 1 : 0.55,
               }}
             >
@@ -302,7 +302,7 @@ export default function Composer() {
               justifySelf: "start", padding: "9px 20px", borderRadius: 999, fontSize: 13, fontWeight: 700,
               cursor: canEnrol ? "pointer" : "default", fontFamily: "inherit",
               border: "1px solid var(--accent)",
-              color: canEnrol ? "var(--accent)" : "var(--text-muted)",
+              color: canEnrol ? "var(--accent-text)" : "var(--text-muted)",
               background: "transparent", opacity: canEnrol ? 1 : 0.55,
             }}
           >

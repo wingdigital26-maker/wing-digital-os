@@ -179,8 +179,10 @@ export default function Home() {
   const moreNav = nav.filter(g => MORE_GROUP_IDS.has(g.id));
   // If the active view just became hidden (role resolved to staff while a
   // personal view was open via deep link), land on Command instead.
+  // Waits for /api/me: before the role resolves every Jack-only view reads as
+  // hidden, which bounced a /#view=personal deep link to Command on load.
   useEffect(() => {
-    if (hiddenViews.has(active)) setActive("command");
+    if (role !== null && hiddenViews.has(active)) setActive("command");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [role, active]);
 

@@ -73,8 +73,11 @@ import requests
 ROOT = Path(__file__).resolve().parent.parent
 ENV_LOCAL_PATH = ROOT / ".env.local"
 GHL_ENV_PATH = ROOT.parent / "ghl-cli" / ".env"
-PROJECT_REF = "klzmpjregrcxumaxfsug"
-MGMT_QUERY_URL = f"https://api.supabase.com/v1/projects/{PROJECT_REF}/database/query"
+# Derived from SONAR_SUPABASE_URL in main(). It used to be hardcoded to the
+# Sonar project, which was deleted on 2026-09-28; since the rebuild Sonar and
+# the OS share one project, so reading the env keeps this pointed at it.
+PROJECT_REF = ""
+MGMT_QUERY_URL = ""
 
 OUTBOUND_MAIL_TABLES = ["outbound", "suppression", "client_send_policy", "crm_clients"]
 OUTBOUND_MAIL_VIEWS = ["outbound_sendable"]
@@ -317,7 +320,7 @@ def check_view_integrity(sendable: list[dict], outbound_source_rows: list[dict] 
 
 
 def main() -> int:
-    global GHL_ENV
+    global GHL_ENV, PROJECT_REF, MGMT_QUERY_URL
     env = load_env(ENV_LOCAL_PATH)
     GHL_ENV = load_env(GHL_ENV_PATH)
 
@@ -326,6 +329,12 @@ def main() -> int:
     if not sonar_url or not sonar_key:
         print("[FATAL] SONAR_SUPABASE_URL / SONAR_SUPABASE_SERVICE_KEY missing from .env.local")
         return 1
+    m = re.search(r"https://([a-z0-9]{20})\.supabase\.co", sonar_url)
+    if not m:
+        print("[FATAL] SONAR_SUPABASE_URL is not a https://<ref>.supabase.co URL")
+        return 1
+    PROJECT_REF = m.group(1)
+    MGMT_QUERY_URL = f"https://api.supabase.com/v1/projects/{PROJECT_REF}/database/query"
 
     print("=== send_safety_check.py ===")
     print("Re-verifying the invariants behind the 2026-08-27 outbound RLS/grants finding (fixed by migration 0008).")

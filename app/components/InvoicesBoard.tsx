@@ -43,7 +43,7 @@ type Upcoming = {
 type Chip = {
   id: number;
   key: string;
-  label: "Paid" | "Due" | "Overdue" | "Upcoming";
+  label: "Paid" | "Due" | "Overdue" | "Upcoming" | "Draft";
   edge: string;
   amount_cents: number;
   currency: string;
@@ -105,6 +105,45 @@ function money(cents: number, currency = "USD"): string {
   return `${neg ? "-" : ""}${sym}${whole.toLocaleString("en-US")}.${String(frac).padStart(2, "0")}`;
 }
 
+// Chip box: a solid status edge for real money events, a dashed muted outline
+// for drafts so an unsent invoice never looks like money on its way in.
+function chipBox(chip: Chip): React.CSSProperties {
+  if (chip.label === "Draft") {
+    return {
+      borderRadius: 6,
+      border: "1px dashed var(--text-muted)",
+      background: "transparent",
+    };
+  }
+  return {
+    borderRadius: 6,
+    borderLeft: `3px solid ${chip.edge}`,
+    background: `color-mix(in srgb, ${chip.edge} 12%, var(--bg-card))`,
+  };
+}
+
+// Header line for the visible window, split by status in words. Green only when
+// money has actually been paid; drafts are named as drafts.
+function summarizeChips(chips: Chip[], span: string): { text: string; tone: string } {
+  if (!chips.length) return { text: `nothing scheduled ${span}`, tone: "var(--text-muted)" };
+  const sum = (labels: Chip["label"][]) =>
+    chips.filter((c) => labels.includes(c.label)).reduce((s, c) => s + c.amount_cents, 0);
+  const paid = sum(["Paid"]);
+  const sent = sum(["Due", "Overdue"]);
+  const draft = sum(["Draft"]);
+  const upcoming = sum(["Upcoming"]);
+  const total = paid + sent + draft + upcoming;
+  if (draft === total) {
+    return { text: `${money(draft)} invoiced ${span}, all drafts (not sent)`, tone: "var(--text-secondary)" };
+  }
+  const parts: string[] = [];
+  if (paid) parts.push(`${money(paid)} paid`);
+  if (sent) parts.push(`${money(sent)} sent`);
+  if (upcoming) parts.push(`${money(upcoming)} upcoming`);
+  if (draft) parts.push(`${money(draft)} drafts`);
+  return { text: `${parts.join(" / ")} ${span}`, tone: paid ? "var(--green)" : "var(--text-secondary)" };
+}
+
 function todayISO(): string {
   const n = new Date();
   return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(
@@ -128,7 +167,7 @@ const todayCircle: React.CSSProperties = {
 // Pretty date from a plain YYYY-MM-DD, without going through Date (which would
 // reinterpret it as UTC and can render the day before).
 function shortDate(iso: string | null): string {
-  if (!iso) return "—";
+  if (!iso) return "no date";
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
   if (!m) return iso;
   return `${MONTHS[Number(m[2]) - 1].slice(0, 3)} ${Number(m[3])}, ${m[1]}`;
@@ -328,9 +367,17 @@ export default function InvoicesBoard() {
           amount_cents: it.amount_cents, currency: it.currency || "USD",
           client: it.client, invoice_no: it.invoice_no, status: it.status,
         });
+      } else if (it.status === "draft" && it.due_on) {
+        // A draft has not been sent, so nobody owes it yet and it can never be
+        // overdue. It draws as a dashed, muted "Draft" chip, never red.
+        add(it.due_on.slice(0, 10), {
+          id: it.id, label: "Draft", edge: "var(--text-muted)",
+          amount_cents: it.amount_cents, currency: it.currency || "USD",
+          client: it.client, invoice_no: it.invoice_no, status: it.status,
+        });
       } else if (it.due_on) {
         const date = it.due_on.slice(0, 10);
-        const overdue = date < today;
+        const overdue = it.status === "overdue" || date < today;
         add(date, {
           id: it.id, label: overdue ? "Overdue" : "Due", edge: overdue ? "var(--red)" : "var(--accent)",
           amount_cents: it.amount_cents, currency: it.currency || "USD",
@@ -428,13 +475,9 @@ export default function InvoicesBoard() {
     for (let d = 1; d <= daysInThis; d++) cells.push({ day: d, date: iso(y, m1, d), inMonth: true });
     for (let i = 1; i <= trailing; i++) cells.push({ day: i, date: iso(ny, nm1, i), inMonth: false });
 
-    const monthTotal = cells.reduce((sum, c) => {
-      if (!c.inMonth) return sum;
-      const chips = dayChips[c.date] || [];
-      return sum + chips.reduce((s, p) => s + p.amount_cents, 0);
-    }, 0);
+    const monthChips = cells.flatMap((c) => (c.inMonth ? dayChips[c.date] || [] : []));
 
-    return { y, m1, cells, monthTotal, current: monthOffset === 0 };
+    return { y, m1, cells, monthChips, current: monthOffset === 0 };
   }, [dayChips, today, monthOffset]);
 
   // The single week shown in week view: 7 days starting Sunday, stepped by
@@ -486,11 +529,18 @@ export default function InvoicesBoard() {
   const t = data.totals;
   const next = t.next_payment;
 
-  const weekTotal = weekCells.reduce(
-    (s, c) => s + (dayChips[c.date] || []).reduce((ss, p) => ss + p.amount_cents, 0),
-    0
-  );
-  const headerTotal = view === "month" ? month.monthTotal : weekTotal;
+  // The header used to print one green sum of every chip in view, drafts
+  // included, which read as money coming in while the tiles below said $0
+  // outstanding. It now splits the window by status, in words, so it agrees
+  // with the tiles: drafts are not sent, so they are not owed.
+  const weekChips = weekCells.flatMap((c) => dayChips[c.date] || []);
+  const header = summarizeChips(view === "month" ? month.monthChips : weekChips, view === "month" ? "this month" : "this week");
+
+  // Draft count + value across the whole book, for the Outstanding tile sub-line.
+  const drafts = (data.items || []).filter((i) => i.status === "draft");
+  const draftCents = drafts.reduce((s, i) => s + i.amount_cents, 0);
+  // An unreadable or unconfigured book has no known totals. Say so instead of $0.00.
+  const known = data.configured && !data.unavailable;
 
   let headerTitle: string;
   if (view === "month") {
@@ -525,11 +575,17 @@ export default function InvoicesBoard() {
         .day-cell:hover {
           background: var(--bg-hover) !important;
         }
+        /* Columns live in a class, not inline: the phone rule in globals.css
+           collapses any inline grid-template-columns to one column, which
+           stacked Sun..Sat vertically. A calendar is always 7 across. */
+        .inv-cal-7 { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
         .day-chips { display: grid; gap: 3px; }
         .day-count-badge { display: none; }
         @media (max-width: 600px) {
           .day-chips { display: none; }
-          .day-count-badge {
+          .inv-cal-7 > .day-cell, .inv-cal-7 > .day-out { min-height: 56px !important; padding: 4px !important; }
+          .day-count-badge:empty { display: none; }
+          .day-count-badge:not(:empty) {
             display: inline-flex; align-items: center; justify-content: center;
             min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px;
             background: var(--accent-glow); color: var(--accent); font-size: 9px; font-weight: 700;
@@ -548,8 +604,8 @@ export default function InvoicesBoard() {
       <section className="v2-card" style={card}>
         <header style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
           <h3 className="v2-h" style={{ margin: 0, fontSize: 22 }}>{headerTitle}</h3>
-          <span style={{ ...num, fontSize: 13, fontWeight: 700, color: headerTotal ? "var(--green)" : "var(--text-muted)" }}>
-            {headerTotal ? money(headerTotal) : "nothing expected"}
+          <span style={{ ...num, fontSize: 13, fontWeight: 600, color: header.tone }}>
+            {known ? header.text : "totals unknown"}
           </span>
           <div style={{ marginLeft: "auto", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
             <div className="v2-pills" role="tablist" aria-label="Calendar view">
@@ -596,21 +652,21 @@ export default function InvoicesBoard() {
 
         {view === "month" ? (
           <div style={{ border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 1, background: "var(--border)" }}>
+            <div className="inv-cal-7" style={{ gap: 1, background: "var(--border)" }}>
               {DOW_ABBR.map((d) => (
                 <div key={d} style={{ background: "var(--bg-card)", padding: "6px 4px", fontSize: 11, fontWeight: 700, textAlign: "center", color: "var(--text-muted)" }}>
                   {d}
                 </div>
               ))}
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 1, background: "var(--border)" }}>
+            <div className="inv-cal-7" style={{ gap: 1, background: "var(--border)" }}>
               {month.cells.map((c, i) => {
                 const chips = dayChips[c.date] || [];
                 const isToday = c.inMonth && c.date === today;
                 const isOpen = c.inMonth && openDay === c.date;
                 if (!c.inMonth) {
                   return (
-                    <div key={i} style={{ background: "var(--bg-card)", minHeight: 116, padding: 6, opacity: 0.45 }}>
+                    <div key={i} className="day-out" style={{ background: "var(--bg-card)", minHeight: 116, padding: 6, opacity: 0.45 }}>
                       <span style={{ ...num, fontSize: 12, color: "var(--text-muted)" }}>{c.day}</span>
                     </div>
                   );
@@ -642,7 +698,16 @@ export default function InvoicesBoard() {
                       ) : (
                         <span style={{ ...num, fontSize: 12, fontWeight: 600, color: "var(--text-primary)" }}>{c.day}</span>
                       )}
-                      <span className="day-count-badge">{chips.length || ""}</span>
+                      {/* Phone grid shows only a count; a day holding nothing but
+                          drafts gets a dashed outline so it does not read as money due. */}
+                      <span
+                        className="day-count-badge"
+                        style={chips.length && chips.every((ch) => ch.label === "Draft")
+                          ? { background: "transparent", color: "var(--text-muted)", border: "1px dashed var(--text-muted)" }
+                          : undefined}
+                      >
+                        {chips.length || ""}
+                      </span>
                     </div>
                     <div className="day-chips">
                       {shown.map((chip) => (
@@ -651,12 +716,13 @@ export default function InvoicesBoard() {
                           title={`${chip.label}: ${money(chip.amount_cents, chip.currency)} ${chip.client}`}
                           aria-label={`${chip.label}, ${money(chip.amount_cents, chip.currency)}, ${chip.client}`}
                           style={{
-                            borderRadius: 6, padding: "2px 5px", borderLeft: `3px solid ${chip.edge}`,
-                            background: `color-mix(in srgb, ${chip.edge} 12%, var(--bg-card))`,
+                            ...chipBox(chip), padding: "2px 5px",
                             fontSize: 10, lineHeight: 1.3, color: "var(--text-primary)",
                             overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                           }}
                         >
+                          {/* The status word leads every chip: colour is never the only signal. */}
+                          <span style={{ fontSize: 8.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: chip.label === "Draft" ? "var(--text-muted)" : chip.edge }}>{chip.label}</span>{" "}
                           <span style={{ ...num, fontWeight: 700 }}>{money(chip.amount_cents, chip.currency)}</span> {chip.client}
                         </div>
                       ))}
@@ -670,7 +736,7 @@ export default function InvoicesBoard() {
             </div>
           </div>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 1, background: "var(--border)", border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden" }}>
+          <div className="inv-cal-7" style={{ gap: 1, background: "var(--border)", border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden" }}>
             {weekCells.map((c, wi) => {
               const chips = dayChips[c.date] || [];
               const isToday = c.date === today;
@@ -711,8 +777,7 @@ export default function InvoicesBoard() {
                         key={chip.key}
                         title={`${chip.label}: ${money(chip.amount_cents, chip.currency)} ${chip.client}`}
                         style={{
-                          borderRadius: 6, padding: "4px 6px", borderLeft: `3px solid ${chip.edge}`,
-                          background: `color-mix(in srgb, ${chip.edge} 12%, var(--bg-card))`,
+                          ...chipBox(chip), padding: "4px 6px",
                           display: "grid", gap: 3, overflow: "hidden",
                         }}
                       >
@@ -773,17 +838,28 @@ export default function InvoicesBoard() {
           gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
         }}
       >
-        <Tile label="Outstanding" value={money(t.outstanding_cents)} tone="var(--text-primary)" />
-        <Tile label="Paid this month" value={money(t.paid_this_month_cents)} tone="var(--green)" />
+        <Tile
+          label="Outstanding"
+          value={known ? money(t.outstanding_cents) : "unknown"}
+          sub={
+            !known
+              ? "invoice book did not answer"
+              : drafts.length
+              ? `sent, not paid. Not counted: ${drafts.length} draft${drafts.length === 1 ? "" : "s"} (${money(draftCents)}) across all months`
+              : "sent, not paid"
+          }
+          tone={known ? "var(--text-primary)" : "var(--text-muted)"}
+        />
+        <Tile label="Paid this month" value={known ? money(t.paid_this_month_cents) : "unknown"} tone={known ? "var(--green)" : "var(--text-muted)"} />
         <Tile
           label="Overdue"
-          value={String(t.overdue_count)}
+          value={known ? String(t.overdue_count) : "unknown"}
           sub={t.overdue_count === 1 ? "invoice past due" : "invoices past due"}
           tone={t.overdue_count ? "var(--red)" : "var(--text-primary)"}
         />
         <Tile
           label="Next payment due"
-          value={next ? shortDate(next.due_on) : "none"}
+          value={next ? shortDate(next.due_on) : known ? "none" : "unknown"}
           sub={next ? `${next.client} · ${money(next.amount_cents, next.currency)}` : "no recurring schedule"}
           tone={next ? "var(--accent)" : "var(--text-muted)"}
         />

@@ -31,7 +31,10 @@ function fmtTime(d: Date): string {
 export default function MissionControl() {
   const [data, setData] = useState<MissionData | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [now, setNow] = useState<Date>(new Date());
+  // Null on the server and on the first client render so hydration matches;
+  // the live clock only starts after mount (server and browser clocks and
+  // timezones differ, which made the first frame mismatch).
+  const [now, setNow] = useState<Date | null>(null);
   const [selection, setSelection] = useState<Selection>(null);
   const [timedOut, setTimedOut] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -52,6 +55,7 @@ export default function MissionControl() {
     aliveRef.current = true;
     load();
     const poll = setInterval(load, 30_000);
+    setNow(new Date());
     const clock = setInterval(() => setNow(new Date()), 1000);
     return () => { aliveRef.current = false; clearInterval(poll); clearInterval(clock); };
   }, [load]);
@@ -102,7 +106,7 @@ export default function MissionControl() {
           {data?.cloud && <Pill text="CLOUD MODE" color="var(--accent-2)" />}
           {error && <Pill text={`FEED ERROR ${error}`} color="var(--red)" />}
           <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 18, color: "var(--accent)", letterSpacing: "0.1em" }}>
-            {fmtTime(now)}
+            {now ? fmtTime(now) : "--:--:--"}
           </span>
         </div>
       </header>

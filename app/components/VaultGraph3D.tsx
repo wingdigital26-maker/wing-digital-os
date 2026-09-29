@@ -82,6 +82,15 @@ export default function VaultGraph3D(props: {
   // again (the "zips back" bug), until an explicit Recenter.
   const hasUserInteracted = useRef(false);
 
+  // True once the library has digested graphData and built its internal layout
+  // (the first onEngineTick/onEngineStop). three-forcegraph applies props on a
+  // debounced digest, so on a cold mount this effect can run BEFORE the layout
+  // exists. d3ReheatSimulation() flips engineRunning on, and the very next
+  // animation frame then calls layout.tick() on undefined ("Cannot read
+  // properties of undefined (reading 'tick')"). Setting forces early is safe;
+  // only the reheat must wait. The first digest reheats on its own anyway.
+  const engineReady = useRef(false);
+
   // ── Force tuning: wide spacing + warm settling ──
   useEffect(() => {
     const fg = fgRef.current;
@@ -97,7 +106,7 @@ export default function VaultGraph3D(props: {
     fg.d3Force("charge")?.strength(mobile ? -140 : -190).distanceMax(700);
     fg.d3Force("link")?.distance(mobile ? 62 : 88).strength(0.09);
     if (fg.d3Force("center")) fg.d3Force("center").strength(0.06);
-    fg.d3ReheatSimulation?.();
+    if (engineReady.current) fg.d3ReheatSimulation?.();
   }, [graph, mobile]);
 
   // ── Node object: bright sphere (or octahedron for hubs) so bloom glows ──
@@ -504,7 +513,9 @@ export default function VaultGraph3D(props: {
       onNodeHover={onNodeHover}
       onNodeClick={handleClick}
       onBackgroundClick={handleBg}
+      onEngineTick={() => { engineReady.current = true; }}
       onEngineStop={() => {
+        engineReady.current = true;
         if (!didFit.current) { didFit.current = true; fitToView(); }
         onFramed?.(); // engine settled = scene is live; keep us in 3D
         if (!restored) sfx.playWhenReady("graph-arrive");

@@ -618,7 +618,6 @@ export function OpsMap({ agents, volumes, watchdog, onSelect, hero }: {
             {wdProblems && <circle cx={wdX} cy={wdY} r={wdR * 1.9} fill="url(#mo-glow)" />}
             <circle cx={wdX} cy={wdY} r={wdR} fill="var(--bg-card)" stroke={wdColor}
               strokeWidth={3} className={wdProblems ? "mo-node-pulse" : undefined} />
-            <circle cx={wdX} cy={wdY - wdR - 7} r={5} fill={wdColor} className={wdProblems ? "mo-pulse" : undefined} />
             <text x={wdX} y={wdY + 4} textAnchor="middle" fill={wdColor} fontSize="11"
               fontFamily="'JetBrains Mono', monospace" letterSpacing="0.06em" fontWeight="700" style={{ pointerEvents: "none" }}>
               DA BOSS
@@ -650,16 +649,23 @@ export function OpsMap({ agents, volumes, watchdog, onSelect, hero }: {
                 strokeWidth={highlighted ? 2.2 : 1.5}
                 strokeDasharray={trial ? "3 3" : undefined}
                 className={active ? "mo-node-pulse" : undefined} />
-              <circle cx={x} cy={y - 28} r={3.5}
-                fill={a.watchdogState === "SILENT" ? "var(--red)" : a.watchdogState === "LATE" ? "var(--orange)" : trial ? "var(--orange)" : active ? "var(--green)" : "var(--map-idle)"}
-                className={active || (a.watchdogState && a.watchdogState !== "OK") ? "mo-pulse" : undefined} />
+              {/* No status dot above the node (2026-09-28): the ring style
+                  (Active / Idle / Trial / Flagged, per the legend) carries state. */}
+              <title>{a.name}</title>
               {/* Labels are legible AT REST: at-rest ink is --text-secondary,
                   not a hover-only reveal. */}
               <text x={x} y={y + 4} textAnchor="middle" fill={trial ? "var(--orange)" : active || highlighted ? "var(--map-ink)" : "var(--map-ink-dim)"}
                 fontSize="9.5" fontWeight="600" fontFamily="'JetBrains Mono', monospace" style={{ pointerEvents: "none" }}>
-                {a.name.split(" ")[0].slice(0, 9).toUpperCase()}
+                {a.name.replace(/[^A-Za-z]/g, "").slice(0, 2).toUpperCase()}
               </text>
-              <text x={x} y={y + 40} textAnchor="middle" className="mo-map-label"
+              {/* Full name BELOW the ring: a 9-char slice inside a 21px ring
+                  clipped ("PROSPECTO", "REPLY-TRI"). */}
+              <text x={x} y={y + 35} textAnchor="middle" className="mo-map-label"
+                fill={trial ? "var(--orange)" : active || highlighted ? "var(--map-ink)" : "var(--map-ink-dim)"}
+                fontSize="9.5" fontWeight="600" fontFamily="'JetBrains Mono', monospace" style={{ pointerEvents: "none" }}>
+                {a.name.toUpperCase()}
+              </text>
+              <text x={x} y={y + 48} textAnchor="middle" className="mo-map-label"
                 fill={trial ? "var(--orange)" : "var(--map-ink-dim)"} fontSize="9"
                 fontFamily="'JetBrains Mono', monospace" style={{ pointerEvents: "none" }}>
                 {trial ? "TRIAL" : a.nextRunAt ? fmtCountdown(a.nextRunAt) : a.lastLogDate ?? ""}
@@ -680,7 +686,7 @@ export function OpsMap({ agents, volumes, watchdog, onSelect, hero }: {
               <rect x={x - 54} y={y - 20} width={108} height={40} rx={10}
                 fill="var(--bg-card)" stroke={s.color}
                 strokeOpacity={highlighted ? 1 : 0.75} strokeWidth={highlighted ? 2 : 1.4} />
-              <circle cx={x - 42} cy={y} r={4} fill={s.color} className="mo-pulse" />
+              <circle cx={x - 42} cy={y} r={4} fill={s.color} />
               <text x={x + 5} y={y + 4} textAnchor="middle" fill={s.color} fontSize="10"
                 fontFamily="'JetBrains Mono', monospace" letterSpacing="0.08em" style={{ pointerEvents: "none" }}>
                 {s.label}

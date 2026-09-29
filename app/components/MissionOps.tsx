@@ -14,7 +14,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  MissionData, Selection, Dot, MissionStyles, OpsMap, FeedTicker,
+  MissionData, Selection, MissionStyles, OpsMap, FeedTicker,
   MissionPanels, NextUpStrip, WatchdogBanner, AgentCard, FilesChangedChip,
   isInternalAgent, fmtCountdown, fmtAge, shortDate, tightLine,
 } from "./MissionControlCore";
@@ -43,7 +43,6 @@ function StatusPill({ s }: { s: AgentStatus }) {
       border: `1px solid ${s.color}`, color: s.color, whiteSpace: "nowrap",
       background: "var(--bg-secondary)",
     }}>
-      <Dot color={s.color} pulse={s.pulse} />
       {s.label}
     </span>
   );
@@ -325,8 +324,21 @@ export default function MissionOps() {
     [internal],
   );
 
-  const overallColor = data?.overall === "red" ? "var(--red)" : data?.overall === "yellow" ? "var(--orange)" : "var(--green)";
-  const overallText = data?.overall === "red" ? "Problems" : data?.overall === "yellow" ? "Degraded" : "All systems nominal";
+  // Header status line. It must agree with the watchdog banner above it, so it
+  // reads the same count the banner and the Da Boss orb use. Plain text only:
+  // no status dot, and never green.
+  const wd = data?.watchdog;
+  const problemCount = wd ? Math.max(wd.problemCount ?? 0, wd.problems?.length ?? 0) : 0;
+  const overallColor = problemCount > 0 || data?.overall === "red"
+    ? "var(--red)"
+    : data?.overall === "yellow" ? "var(--orange)" : "var(--text-muted)";
+  const overallText = !data
+    ? ""
+    : problemCount > 0
+      ? `${problemCount} problem${problemCount === 1 ? "" : "s"}, see above`
+      : data.overall === "red" ? "Problems reported"
+      : data.overall === "yellow" ? "Degraded"
+      : "No problems reported";
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -360,8 +372,7 @@ export default function MissionOps() {
           </p>
         </div>
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 12, color: "var(--text-secondary)" }}>
-            <Dot color={overallColor} pulse />
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 12, color: overallColor }}>
             {overallText}
             {attention > 0 && (
               <span style={{ color: "var(--orange)", fontFamily: MONO, fontSize: 11 }}>
@@ -448,7 +459,7 @@ export default function MissionOps() {
             {/* Compact activity ticker */}
             <section className="v2-card" style={{ padding: "14px 16px" }}>
               <h2 style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--text-primary)", margin: "0 0 12px", display: "flex", alignItems: "center", gap: 8 }}>
-                <Dot color="var(--green)" pulse /> Activity
+                Activity
                 <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 10, fontWeight: 400, color: "var(--text-muted)", letterSpacing: 0 }}>
                   refresh 30s
                 </span>

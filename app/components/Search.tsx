@@ -48,7 +48,7 @@ export default function Search({ onOpenNote }: { onOpenNote: (path: string) => v
       borderRadius: 8, padding: "8px 14px", display: "flex", alignItems: "center", gap: 8,
       color: "var(--text-muted)", fontSize: 13, cursor: "pointer",
     }}>
-      <span>🔍</span><span>Search...</span>
+      <span style={{ display: "inline-flex" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg></span><span>Search...</span>
     </button>
   );
 
@@ -68,7 +68,7 @@ export default function Search({ onOpenNote }: { onOpenNote: (path: string) => v
       }}>
         {/* Input */}
         <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", borderBottom: "1px solid var(--border)" }}>
-          <span style={{ color: "var(--text-muted)", fontSize: 18 }}>🔍</span>
+          <span style={{ color: "var(--text-muted)", display: "inline-flex" }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg></span>
           <input
             ref={inputRef}
             value={query}
@@ -122,7 +122,7 @@ export default function Search({ onOpenNote }: { onOpenNote: (path: string) => v
                     onMouseEnter={e => (e.currentTarget.style.background = "var(--bg-hover)")}
                     onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
                   >
-                    <p style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>📄 {n.name}</p>
+                    <p style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>{n.name}</p>
                     <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>{n.excerpt}</p>
                   </div>
                 ))}

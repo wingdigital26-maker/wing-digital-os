@@ -3,10 +3,28 @@ import { useEffect, useState } from "react";
 import { ClientHealthSlideOver, MissionStyles } from "./MissionControlCore";
 import { sfx } from "../lib/sounds";
 
-const INDUSTRY_ICON: Record<string, string> = {
-  roofing: "🏠", "roofing / exteriors": "🏠", paving: "🛣️", electrical: "⚡",
-  "home improvement": "🔨", "food & beverage": "🍽️", "pool service": "🏊", cafe: "☕",
+import { Building, Home, Shop, Envelope, Call } from "reicon-react";
+
+// Client avatar: the same white round line-icon chip as the V2 KPI tiles
+// (v2-icon-chip), never an emoji. Home-service trades get a house, food and
+// retail a storefront, everyone else a building.
+type IconType = React.ComponentType<{ size?: number; color?: string }>;
+const INDUSTRY_ICON: Record<string, IconType> = {
+  roofing: Home, "roofing / exteriors": Home, "home improvement": Home, "pool service": Home,
+  "food & beverage": Shop, cafe: Shop,
 };
+function ClientAvatar({ industry, size = 40 }: { industry?: string; size?: number }) {
+  const Icon = INDUSTRY_ICON[(industry || "").toLowerCase()] ?? Building;
+  return (
+    <span className="v2-icon-chip" aria-hidden="true" style={{
+      // On a white card the plain chip vanished, so it takes a light brand tint.
+      background: "color-mix(in srgb, var(--accent) 10%, var(--bg-card))", color: "var(--accent)",
+      ...(size === 40 ? {} : { width: size, height: size }),
+    }}>
+      <Icon size={Math.round(size * 0.45)} />
+    </span>
+  );
+}
 
 export default function ClientsBoard() {
   const [data, setData] = useState<any>(null);
@@ -85,7 +103,6 @@ export default function ClientsBoard() {
       )}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
         {paying.map((c: any) => {
-          const icon = INDUSTRY_ICON[(c.industry || "").toLowerCase()] ?? "🏢";
           return (
             <div key={c.file}
               // The whole card opens the client's live dashboard in a new tab
@@ -100,7 +117,7 @@ export default function ClientsBoard() {
               style={{ padding: "16px 18px", cursor: c.dashboardUrl ? "pointer" : "default" }}>
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
                 <div style={{ display: "flex", gap: 10, alignItems: "center", minWidth: 0 }}>
-                  <span style={{ fontSize: 20 }}>{icon}</span>
+                  <ClientAvatar industry={c.industry} />
                   <div style={{ minWidth: 0 }}>
                     {/* Wraps rather than truncating: the term note beside it
                         squeezed "Hero's Junk Removal" down to "Hero's ...". */}
@@ -164,8 +181,8 @@ export default function ClientsBoard() {
               </div>
               {(c.email || c.phone) && (
                 <div style={{ borderTop: "1px solid var(--border)", marginTop: 12, paddingTop: 10, display: "flex", flexDirection: "column", gap: 4 }}>
-                  {c.email && <a href={`mailto:${c.email}`} onClick={(e) => e.stopPropagation()} style={{ fontSize: 11.5, color: "var(--text-secondary)", textDecoration: "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>✉ {c.email}</a>}
-                  {c.phone && <a href={`tel:${c.phone.replace(/\D/g, "")}`} onClick={(e) => e.stopPropagation()} style={{ fontSize: 11.5, color: "var(--text-secondary)", textDecoration: "none" }}>☎ {c.phone}</a>}
+                  {c.email && <a href={`mailto:${c.email}`} onClick={(e) => e.stopPropagation()} style={{ fontSize: 11.5, color: "var(--text-secondary)", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6, minWidth: 0 }}><Envelope size={13} /><span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.email}</span></a>}
+                  {c.phone && <a href={`tel:${c.phone.replace(/\D/g, "")}`} onClick={(e) => e.stopPropagation()} style={{ fontSize: 11.5, color: "var(--text-secondary)", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6 }}><Call size={13} /><span>{c.phone}</span></a>}
                 </div>
               )}
             </div>
@@ -185,7 +202,6 @@ export default function ClientsBoard() {
           {showPipeline && (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10, marginTop: 12, opacity: 0.75 }}>
               {notPaying.map((c: any) => {
-                const icon = INDUSTRY_ICON[(c.industry || "").toLowerCase()] ?? "🏢";
                 return (
                   <div key={c.file}
                     onClick={() => { sfx.play("blip"); setHealthClient(c.name); }}
@@ -193,7 +209,7 @@ export default function ClientsBoard() {
                     className="v2-card v2-lift"
                     style={{ padding: "12px 14px", cursor: "pointer" }}>
                     <div style={{ display: "flex", gap: 9, alignItems: "center", minWidth: 0 }}>
-                      <span style={{ fontSize: 16 }}>{icon}</span>
+                      <ClientAvatar industry={c.industry} size={32} />
                       <div style={{ minWidth: 0 }}>
                         <p style={{ fontSize: 13, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</p>
                         <p style={{ fontSize: 11, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.owner || c.industry}</p>

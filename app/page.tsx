@@ -931,7 +931,6 @@ function CompetitorAskBtn({ section, onSendToAI }: { section: { title: string; b
 }
 
 const INTEL_COLORS = ["var(--accent)", "var(--orange)", "var(--accent)", "var(--green)", "#f472b6", "var(--green)", "#facc15", "#38bdf8"];
-const INTEL_ICONS = ["🏢", "💰", "📦", "📣", "🎯", "⚡", "🔧", "📊"];
 
 function parseCompetitorSections(content: string): { title: string; bullets: string[] }[] {
   if (!content) return [];
@@ -1368,7 +1367,7 @@ function PersonalSection() {
 
         {/* Daily Tasks */}
         <div style={{ background: "linear-gradient(180deg, var(--bg-card), var(--bg-card))", border: "1px solid var(--border)", borderRadius: 16, padding: 20, boxShadow: "0 8px 24px var(--bg-hover), inset 0 1px 0 var(--border)" }}>
-          <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 14 }}>📋 Today's Tasks</p>
+          <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 14 }}>Today's Tasks</p>
           <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
             <input value={newTask} onChange={e => setNewTask(e.target.value)}
               onKeyDown={e => e.key === "Enter" && addTask()}
@@ -1395,7 +1394,7 @@ function PersonalSection() {
 
         {/* Goals */}
         <div style={{ background: "linear-gradient(180deg, var(--bg-card), var(--bg-card))", border: "1px solid var(--border)", borderRadius: 16, padding: 20, boxShadow: "0 8px 24px var(--bg-hover), inset 0 1px 0 var(--border)" }}>
-          <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 14 }}>🎯 Goals</p>
+          <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 14 }}>Goals</p>
           <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
             <input value={newGoal} onChange={e => setNewGoal(e.target.value)}
               onKeyDown={e => e.key === "Enter" && addGoal()}

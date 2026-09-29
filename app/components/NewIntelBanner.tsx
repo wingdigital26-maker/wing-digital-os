@@ -51,7 +51,7 @@ export default function NewIntelBanner() {
         padding: "10px 14px", marginBottom: 14,
       }}
     >
-      <span aria-hidden style={{ fontSize: 16 }}>📺</span>
+      <span aria-hidden style={{ display: "inline-flex" }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="3" /><path d="m10 9 5 3-5 3z" /></svg></span>
       <div style={{ flex: 1, minWidth: 200 }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>
           {items.length} new video{items.length === 1 ? "" : "s"} from your watched creators

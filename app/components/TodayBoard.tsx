@@ -526,7 +526,7 @@ export default function TodayBoard() {
           ) : socialNeedsAction === null ? (
             <SourceDown
               name="Social queue (/api/social)"
-              reason={social.state === "ok" ? (social.data.reason ?? "table missing — run migration 0028") : social.state === "error" ? social.reason : "unavailable"}
+              reason={social.state === "ok" ? (social.data.reason ?? "table missing (run migration 0028)") : social.state === "error" ? social.reason : "unavailable"}
             />
           ) : (
             <button style={rowBtn} onClick={() => goView("social")}>
@@ -580,10 +580,12 @@ export default function TodayBoard() {
             ))}
           {calendar.state === "ok" &&
             calendar.data.lanes
-              .filter((l) => !l.configured || l.error)
+              // Only a CONNECTED lane that errored is worth a line. Lanes that
+              // were never set up are not listed (dashboards show what works).
+              .filter((l) => l.configured && l.error)
               .map((l) => (
                 <div key={l.source} style={{ color: "var(--text-muted)", fontSize: 12 }}>
-                  {l.label}: {l.error ?? (l.missing ? `not configured (${l.missing})` : "not configured")}
+                  {l.label}: {l.error}
                 </div>
               ))}
         </Section>
@@ -711,11 +713,9 @@ export default function TodayBoard() {
                   </span>
                 </button>
               )}
-              {messaging.data.lane?.deliveryWarning && (
-                <div style={{ color: "var(--orange)", fontSize: 12 }}>
-                  {trunc(messaging.data.lane.deliveryWarning, 160)}
-                </div>
-              )}
+              {/* The old "NO live delivery step" warning was dropped 2026-09-28:
+                  Instantly sends this queue now, and a dashboard lists what
+                  works, not what is unconnected. */}
             </>
           )}
         </Section>

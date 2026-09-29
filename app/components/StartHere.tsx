@@ -237,8 +237,21 @@ type TodayTile = { label: string; value: number | null; hint?: string | null } &
   | { view: string; href?: undefined }
 );
 
+type IconKey = "phone" | "inbox" | "check" | "zap";
+// Line icons (same stroke style as the rail), one per tile so the four tiles
+// are not four identical clocks.
+const TILE_ICONS: Record<IconKey, React.ReactNode> = {
+  phone: <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z" />,
+  inbox: <><path d="M22 12h-6l-2 3h-4l-2-3H2" /><path d="M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1z" /></>,
+  check: <><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></>,
+  zap: <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />,
+};
+
 export function TodayStrip() {
   const [s, setS] = useState<Summary | null | undefined>(undefined);
+  // Calls logged today (Central), from the same endpoint the Call Room strip
+  // reads. null = the endpoint did not answer (shown as "not available").
+  const [callsToday, setCallsToday] = useState<number | null>(null);
   useEffect(() => {
     let alive = true;
     const load = () => {
@@ -246,6 +259,13 @@ export function TodayStrip() {
         .then((r) => (r.ok ? r.json() : null))
         .then((d) => { if (alive) setS(d ?? null); })
         .catch(() => { if (alive) setS(null); });
+      fetch("/api/calls/stats", { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          const n = Number(d?.today?.calls);
+          if (alive) setCallsToday(d && Number.isFinite(n) ? n : null);
+        })
+        .catch(() => { if (alive) setCallsToday(null); });
     };
     load();
     const id = setInterval(load, 5 * 60 * 1000);
@@ -257,7 +277,7 @@ export function TodayStrip() {
   if (s === undefined) {
     return (
       <div className="today-grid" aria-label="Loading today">
-        {[0, 1, 2, 3, 4, 5].map((i) => <div key={i} className="skel" style={{ height: 66, borderRadius: 12 }} />)}
+        {[0, 1, 2, 3].map((i) => <div key={i} className="skel" style={{ height: 66, borderRadius: 12 }} />)}
       </div>
     );
   }
@@ -270,10 +290,14 @@ export function TodayStrip() {
   }
 
   const overdue = s.tasks_overdue;
-  const tiles: (TodayTile & { variant: "amber" | "blue" | "violet" })[] = [
-    { label: "Tasks due today", value: s.tasks_due_today, hint: overdue ? `${overdue} overdue` : null, href: "/automations/tasks", variant: "amber" },
-    { label: "New leads this week", value: s.new_leads_7d, href: "/automations/runs", variant: "blue" },
-    { label: "Automations running", value: s.automations_active, href: "/automations", variant: "violet" },
+  // 2026-09-28: calls + leads lead the strip (the home's job is "today's
+  // leads, calls and money at a glance, one click to act"); each tile opens
+  // the screen where you act on it.
+  const tiles: (TodayTile & { variant: "amber" | "blue" | "violet" | "green"; icon: IconKey })[] = [
+    { label: "Calls today", value: callsToday, view: "calls", variant: "green", icon: "phone" },
+    { label: "New leads this week", value: s.new_leads_7d, href: "/automations/runs", variant: "blue", icon: "inbox" },
+    { label: "Tasks due today", value: s.tasks_due_today, hint: overdue ? `${overdue} overdue` : null, href: "/automations/tasks", variant: "amber", icon: "check" },
+    { label: "Automations running", value: s.automations_active, href: "/automations", variant: "violet", icon: "zap" },
     // 2026-09-22: "Calls booked, next 7 days", "Open deals" and "Unread texts"
     // were removed. Each pointed at a surface deleted the same day -- the
     // booking calendar, the deals grid inside Contacts, and the texting tab.
@@ -290,7 +314,7 @@ export function TodayStrip() {
           const inner = (
             <>
               <div className="v2-icon-chip" aria-hidden="true" style={{ width: 32, height: 32 }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" /></svg>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{TILE_ICONS[t.icon]}</svg>
               </div>
               <span className="v2-tile__num" style={{
                 fontSize: known ? 24 : 13, color: known ? "var(--text-primary)" : "var(--text-muted)",

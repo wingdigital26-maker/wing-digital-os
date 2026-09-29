@@ -81,15 +81,25 @@ async function fromWpApi(src: ContentSource): Promise<Item[]> {
  * back to the oldest commit touching the path, which is what we want -- a later
  * edit must never masquerade as a new publish.
  */
-async function fromGithub(src: ContentSource): Promise<{ items: Item[]; missed: number }> {
+async function fromGithub(
+  src: ContentSource
+): Promise<{ items: Item[]; pending: Item[]; failedDirs: string[] }> {
   const out: Item[] = [];
-  let missed = 0;
+  // Pages seen in the repo whose commit lookup failed (rate limit, 5xx). Kept
+  // with an empty date so the caller can try the sitemap before counting them
+  // as undated -- never silently dropped.
+  const pending: Item[] = [];
+  // Directories whose listing failed. A rate-limited listing used to `continue`
+  // and return an empty list with no failure recorded, which rendered as a
+  // confident "nothing shipped". The caller now falls back to the sitemap.
+  const failedDirs: string[] = [];
   const H = { ...UA, ...GH_AUTH };
   for (const g of src.globs || []) {
     const listUrl = `https://api.github.com/repos/${src.repo}/contents/${g.dir}`;
     const r = await fetch(listUrl, { headers: H, next: { revalidate } });
-    if (!r.ok) continue;
+    if (!r.ok) { failedDirs.push(g.dir); continue; }
     const files = (await r.json()) as Array<{ name: string; path: string }>;
+    if (!Array.isArray(files)) { failedDirs.push(g.dir); continue; }
     const wanted = files.filter(
       (f) => f.name.endsWith(".html") && !(g.skip || []).includes(f.name)
     );
@@ -105,26 +115,47 @@ async function fromGithub(src: ContentSource): Promise<{ items: Item[]; missed: 
           `https://api.github.com/repos/${src.repo}/commits?path=${encodeURIComponent(f.path)}&per_page=100`,
           { headers: H, next: { revalidate } }
         );
-        if (!cr.ok) return null;
-        const commits = (await cr.json()) as Array<{ commit: { author: { date: string } } }>;
-        if (!Array.isArray(commits) || !commits.length) return null;
-        const added = commits[commits.length - 1].commit.author.date.slice(0, 10);
         void cUrl;
-        return {
-          date: added,
+        const base: Item = {
+          date: "",
           type: g.type,
           title: titleFromSlug(f.name),
           status: "published",
           url: `${src.site!.replace(/\/$/, "")}/${f.path}`,
-        } as Item;
+        };
+        if (!cr.ok) return base;
+        const commits = (await cr.json()) as Array<{ commit: { author: { date: string } } }>;
+        if (!Array.isArray(commits) || !commits.length) return base;
+        return { ...base, date: commits[commits.length - 1].commit.author.date.slice(0, 10) };
       })
     );
     for (const it of results) {
-      if (it) out.push(it);
-      else missed++;   // found on the site, could not be dated -- never silently dropped
+      if (it.date) out.push(it);
+      else pending.push(it);   // found on the site, not dated yet -- never silently dropped
     }
   }
-  return { items: out, missed };
+  return { items: out, pending, failedDirs };
+}
+
+/** URL key that matches a repo path (x.html) to a clean-URL sitemap entry (x). */
+function urlKey(u: string): string {
+  return u.trim().toLowerCase().replace(/\/index\.html$/, "/").replace(/\.html$/, "").replace(/\/$/, "");
+}
+
+/**
+ * A page's own structured data: the first JSON-LD datePublished on it. Used
+ * only when the sitemap carries no lastmod. Returns "" when the page does not
+ * state a date -- a date is never invented.
+ */
+async function pagePublished(url: string): Promise<string> {
+  try {
+    const r = await fetch(url, { headers: UA, next: { revalidate } });
+    if (!r.ok) return "";
+    const m = /"datePublished"\s*:\s*"(\d{4}-\d{2}-\d{2})/.exec(await r.text());
+    return m ? m[1] : "";
+  } catch {
+    return "";
+  }
 }
 
 function titleFromSlug(name: string): string {
@@ -143,14 +174,19 @@ async function fromSitemap(src: ContentSource): Promise<Item[]> {
   if (!r.ok) return [];
   const xml = await r.text();
   const out: Item[] = [];
+  const seen = new Set<string>();
   const rx = /<url>\s*<loc>([^<]+)<\/loc>\s*(?:<lastmod>([^<]+)<\/lastmod>)?/g;
   let m: RegExpExecArray | null;
   while ((m = rx.exec(xml))) {
     const loc = m[1];
     const g = (src.globs || []).find((x) => loc.includes(`/${x.dir}/`));
     if (!g) continue;
+    if (seen.has(loc)) continue; // sitemaps can list a page twice
+    seen.add(loc);
     const file = loc.split("/").pop() || "";
-    if ((g.skip || []).includes(file)) continue;
+    if (!file) continue; // a directory index like /blog/
+    const skip = g.skip || [];
+    if (skip.includes(file) || skip.includes(`${file}.html`)) continue;
     out.push({
       date: (m[2] || "").slice(0, 10),
       type: g.type,
@@ -159,6 +195,10 @@ async function fromSitemap(src: ContentSource): Promise<Item[]> {
       url: loc,
     });
   }
+  // No lastmod: read the date the page itself publishes, if it states one.
+  await Promise.all(
+    out.filter((it) => !it.date).map(async (it) => { it.date = await pagePublished(it.url); })
+  );
   return out;
 }
 
@@ -327,9 +367,33 @@ async function collect(cfg: ClientConfig) {
       else if (src.kind === "github_repo") {
         const gh = await fromGithub(src);
         got = gh.items;
-        missed += gh.missed;
+        let undatedHere: Item[] = gh.pending;
+        if (gh.failedDirs.length || gh.pending.length) {
+          // GitHub throttled or errored. The site's own sitemap is the fallback:
+          // lastmod is last-modified rather than first publish, but it is a real
+          // date from the live site, not a guess.
+          const sm = await fromSitemap(src);
+          const byUrl = new Map(sm.map((it) => [urlKey(it.url), it]));
+          undatedHere = [];
+          for (const it of gh.pending) {
+            const hit = byUrl.get(urlKey(it.url));
+            if (hit?.date) got.push({ ...it, date: hit.date });
+            else undatedHere.push(it);
+          }
+          if (gh.failedDirs.length) {
+            const fallback = sm.filter((it) => gh.failedDirs.some((d) => it.url.includes(`/${d}/`)));
+            // Listing failed AND the sitemap has nothing for it: say so.
+            if (!fallback.length) failed.push(src.kind);
+            for (const it of fallback) (it.date ? got : undatedHere).push(it);
+          }
+        }
+        missed += undatedHere.length;
       }
-      else if (src.kind === "sitemap") got = await fromSitemap(src);
+      else if (src.kind === "sitemap") {
+        const sm = await fromSitemap(src);
+        got = sm.filter((it) => it.date);
+        missed += sm.length - got.length;
+      }
       items.push(...got);
     } catch {
       // A dead source must never fabricate an empty-but-confident dashboard.

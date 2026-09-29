@@ -25,6 +25,7 @@ type ClientFeed = {
   reason?: string;
   items: Item[];
   failedSources: number;
+  undated: number;
 };
 
 const TYPE_COLORS: Record<string, string> = {
@@ -42,7 +43,7 @@ function fmtDate(d: string): string {
 
 export default function SeoBoard() {
   const [feeds, setFeeds] = useState<ClientFeed[]>(
-    CLIENT_SLUGS.map(slug => ({ slug, name: slug, site: "", state: "loading", items: [], failedSources: 0 })),
+    CLIENT_SLUGS.map(slug => ({ slug, name: slug, site: "", state: "loading", items: [], failedSources: 0, undated: 0 })),
   );
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
   const [clientFilter, setClientFilter] = useState<string | null>(null);
@@ -50,7 +51,7 @@ export default function SeoBoard() {
   const load = useCallback(() => {
     // Reset to the loading skeleton so Refresh gives feedback and stale
     // error/failure banners never outlive the run that produced them.
-    setFeeds(CLIENT_SLUGS.map(slug => ({ slug, name: slug, site: "", state: "loading", items: [], failedSources: 0 })));
+    setFeeds(CLIENT_SLUGS.map(slug => ({ slug, name: slug, site: "", state: "loading", items: [], failedSources: 0, undated: 0 })));
     CLIENT_SLUGS.forEach(async slug => {
       try {
         const r = await fetch(`/api/dashboard/${slug}`, { cache: "no-store" });
@@ -67,8 +68,11 @@ export default function SeoBoard() {
               name: j?.brand?.name || slug,
               site: j?.brand?.site || "",
               items: Array.isArray(j?.items) ? j.items : [],
-              failedSources: (typeof j?.sourcesFailed === "number" ? j.sourcesFailed : 0)
-                + (typeof j?.undated === "number" ? j.undated : 0),
+              // The route sends sourcesFailed as an array of failed source kinds;
+              // older builds sent a number. Either way a failure is counted.
+              failedSources: Array.isArray(j?.sourcesFailed) ? j.sourcesFailed.length
+                : typeof j?.sourcesFailed === "number" ? j.sourcesFailed : 0,
+              undated: typeof j?.undated === "number" ? j.undated : 0,
             }
           : c));
       } catch {
@@ -111,7 +115,7 @@ export default function SeoBoard() {
       </div>
 
       {/* Per-client source states — a down source is said out loud. */}
-      {feeds.some(f => f.state !== "ok" || f.failedSources > 0) && (
+      {feeds.some(f => f.state !== "ok" || (f.failedSources > 0 || f.undated > 0)) && (
         <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 4 }}>
           {feeds.filter(f => f.state === "loading").map(f => (
             <div key={f.slug} style={{ fontSize: 12.5, color: "var(--text-muted)" }}>{f.slug}: loading…</div>
@@ -121,9 +125,10 @@ export default function SeoBoard() {
               {f.slug} (/api/dashboard/{f.slug}): {f.reason}. Its posts are missing from this list.
             </div>
           ))}
-          {feeds.filter(f => f.state === "ok" && f.failedSources > 0).map(f => (
+          {feeds.filter(f => f.state === "ok" && (f.failedSources > 0 || f.undated > 0)).map(f => (
             <div key={f.slug} style={{ fontSize: 12.5, color: "var(--orange)" }}>
-              {f.name}: {f.failedSources} source(s) failed or pages could not be dated this run, so this list may be short.
+              {f.name}:{f.failedSources > 0 && ` ${f.failedSources} content source(s) did not answer this run.`}
+              {f.undated > 0 && ` ${f.undated} live page(s) could not be dated and are left off.`} This list may be short.
             </div>
           ))}
         </div>

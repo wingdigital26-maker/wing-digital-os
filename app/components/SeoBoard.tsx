@@ -104,7 +104,7 @@ export default function SeoBoard() {
   });
 
   return (
-    <div style={{ maxWidth: 900, margin: "0 auto" }}>
+    <div style={{ maxWidth: 1180, margin: 0 }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
         <h2 style={{ fontSize: 18, fontWeight: 800 }}>SEO content shipped</h2>
         <span style={{ fontSize: 12.5, color: "var(--text-muted)" }}>

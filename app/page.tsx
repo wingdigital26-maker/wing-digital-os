@@ -466,10 +466,10 @@ export default function Home() {
           {visited.has("competitors") && <div className="app-view" style={{ display: active === "competitors" ? "block" : "none" }}><CompetitorIntel onSendToAI={sendToAI} /></div>}
           {visited.has("knowledge") && <div className="app-view" style={{ display: active === "knowledge" ? "block" : "none" }}><KnowledgeBase initialPath={openNotePath} onSendToAI={sendToAI} /></div>}
           {visited.has("agent") && <div className="app-view" style={{ display: active === "agent" ? "block" : "none" }}><MissionOps /></div>}
-          {visited.has("automations") && <div className="app-view" style={{ display: active === "automations" ? "block" : "none" }}><div style={{ maxWidth: 1080, margin: "0 auto", padding: "8px 4px" }}><SectionSubTabs prefix="/automations" /><AutomationsList /></div></div>}
-          {visited.has("sequences") && <div className="app-view" style={{ display: active === "sequences" ? "block" : "none" }}><div style={{ maxWidth: 1080, margin: "0 auto", padding: "8px 4px" }}><SectionSubTabs prefix="/sequences" /><SequencesList /></div></div>}
+          {visited.has("automations") && <div className="app-view" style={{ display: active === "automations" ? "block" : "none" }}><div style={{ maxWidth: 1180, margin: 0, padding: "8px 0" }}><SectionSubTabs prefix="/automations" /><AutomationsList /></div></div>}
+          {visited.has("sequences") && <div className="app-view" style={{ display: active === "sequences" ? "block" : "none" }}><div style={{ maxWidth: 1180, margin: 0, padding: "8px 0" }}><SectionSubTabs prefix="/sequences" /><SequencesList /></div></div>}
           {visited.has("seo") && <div className="app-view" style={{ display: active === "seo" ? "block" : "none" }}><SeoBoard /></div>}
-          {visited.has("calls") && <div className="app-view" style={{ display: active === "calls" ? "block" : "none" }}><div style={{ maxWidth: 1080, margin: "0 auto", padding: "8px 4px" }}><CallsToday /></div></div>}
+          {visited.has("calls") && <div className="app-view" style={{ display: active === "calls" ? "block" : "none" }}><div style={{ maxWidth: 1180, margin: 0, padding: "8px 0" }}><CallsToday /></div></div>}
           {/* Jack-only views never mount for a restricted session, even when a
               stale `visited` entry exists from before the role resolved. */}
           {fullAccess && visited.has("personal") && <div className="app-view" style={{ display: active === "personal" ? "block" : "none" }}><PersonalSection /></div>}
@@ -884,11 +884,15 @@ function CommandCenter({ data, loading }: { data: any; loading: boolean }) {
       </motion.div>
       {/* Start here + Today: the map and the numbers that change what you do
           next, before anything else. Built for someone who is not Jack. */}
+      {/* Today's calls + leads sit right under the money (2026-09-28): the
+          home's one job is today's leads, calls and money at a glance, one
+          click to act. It used to render below the Start here card, off the
+          first screen. */}
+      <TodayStrip />
       <StartHere />
       {/* New-video notification: shows once per new batch of creator intel,
           dismiss remembers the newest id so it only returns for newer videos. */}
       <NewIntelBanner />
-      <TodayStrip />
 
       {/* Watchdog banner: compact when all clear, loud when something is wrong.
           onRechecked broadcasts so the banner, chip and copy all re-pull together. */}

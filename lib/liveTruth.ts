@@ -4,8 +4,9 @@
 // the real source right now) or clearly carries the real age of the snapshot it
 // came from, so a stale value can NEVER masquerade as current.
 //
-// The TRUE source of outreach truth is now the CLOUD: Supabase project
-// ikgnhieorzjaxtjoneye (the sender moved off Jack's PC). readOutreachLive()
+// The TRUE source of outreach truth is now the CLOUD: the OS Supabase project
+// named by OS_SUPABASE_URL (ntgutipydukbxfbctmgr since the 2026-09 rebuild;
+// the sender moved off Jack's PC). readOutreachLive()
 // reads Supabase first (source "live-cloud"), falls back to the LOCAL
 // prospects.db (source "live-db") only if the cloud is unreachable, and finally
 // to the vault snapshot BUT must compute staleness from the snapshot's real
@@ -114,7 +115,7 @@ export async function readProspectsLive(): Promise<LiveOutreach | null> {
 
 // ── Cloud (Supabase) outreach truth ────────────────────────────────────────
 //
-// Outreach now SENDS from the cloud (Supabase project ikgnhieorzjaxtjoneye),
+// Outreach now SENDS from the cloud (the OS Supabase project, OS_SUPABASE_URL),
 // so the LOCAL prospects.db is no longer written to and would report a false
 // "0 sent" / wrong pool. Supabase is the source of truth. On Vercel the
 // OS_SUPABASE_* env is set, so the deployed app queries it directly over the

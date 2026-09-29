@@ -1116,7 +1116,9 @@ export async function GET(req: Request) {
   // The item list used to be hard-capped at 200 with nothing said about it, so
   // "everything ever drafted" silently meant "the newest 200". The cap is now a
   // parameter AND is reported back, so a truncated list can say it is truncated.
-  const rawLimit = Number(searchParams.get("limit"));
+  // No ?limit= must mean the default, not Number(null) === 0 clamped to 1 row.
+  const limitParam = searchParams.get("limit");
+  const rawLimit = limitParam ? Number(limitParam) : NaN;
   const itemLimit = Number.isFinite(rawLimit)
     ? Math.min(2000, Math.max(1, Math.trunc(rawLimit)))
     : 200;

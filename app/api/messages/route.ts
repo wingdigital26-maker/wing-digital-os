@@ -67,7 +67,9 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const client = (searchParams.get("client") ?? "").trim();
   const channel = (searchParams.get("channel") ?? "").trim();
-  const rawLimit = Number(searchParams.get("limit"));
+  // No ?limit= must mean LIMIT_DEFAULT, not Number(null) === 0 clamped to 1 row.
+  const limitParam = searchParams.get("limit");
+  const rawLimit = limitParam ? Number(limitParam) : NaN;
   const limit = Number.isFinite(rawLimit) ? Math.min(2000, Math.max(1, Math.trunc(rawLimit))) : LIMIT_DEFAULT;
 
   const filters = [

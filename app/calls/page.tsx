@@ -750,8 +750,17 @@ export default function CallRoom() {
               // An overdue callback overrides all of that — same red urgency
               // treatment as the Callbacks board (color-mix border/background),
               // because a missed follow-up matters more than the name-rail cue.
-              borderLeft: `3px solid ${overdue ? "var(--red)" : named ? "var(--accent)" : "var(--border)"}`,
-              borderColor: overdue ? "color-mix(in srgb, var(--red) 55%, transparent)" : undefined,
+              // Longhands only (2026-09-28): mixing the borderLeft shorthand with
+              // an undefined borderColor made React drop border-color, so every
+              // card rendered a near-black 1px outline instead of the soft V2 card.
+              border: undefined,
+              borderStyle: "solid",
+              borderWidth: "1px 1px 1px 3px",
+              borderColor: (() => {
+                const rail = overdue ? "var(--red)" : named ? "var(--accent)" : "var(--border)";
+                const edge = overdue ? "color-mix(in srgb, var(--red) 55%, transparent)" : "transparent";
+                return `${edge} ${edge} ${edge} ${rail}`;
+              })(),
               // Explicit base (not undefined): this key overrides card.background
               // in the same literal, so a non-overdue card must restate it or it
               // loses its background entirely.

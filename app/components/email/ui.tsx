@@ -144,7 +144,7 @@ export function ListShell({ children, height = "min(64vh, 620px)" }: {
   return (
     <div style={{
       border: "1px solid var(--border)", borderRadius: 14, background: "var(--bg-card)",
-      overflow: "hidden", display: "grid",
+      overflow: "hidden", display: "grid", gridTemplateColumns: "minmax(0, 1fr)", minWidth: 0,
     }}>
       <div style={{ maxHeight: height, overflowY: "auto", overscrollBehavior: "contain" }}>
         {children}

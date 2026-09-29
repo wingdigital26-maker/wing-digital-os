@@ -368,7 +368,7 @@ export default function EmailFeed() {
 
   // ── List ─────────────────────────────────────────────────────────────────
   const list = (
-    <div ref={listRef} style={{ display: "grid", gap: 8, minWidth: 0 }}>
+    <div ref={listRef} style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 8, minWidth: 0 }}>
       <ListShell>
         {visible.length === 0 ? (
           <div style={{ padding: "18px 16px", fontSize: 12.5, color: "var(--text-muted)", lineHeight: 1.6 }}>
@@ -394,7 +394,7 @@ export default function EmailFeed() {
               }}
             >
               <Avatar seedA={i.name} seedB={i.company ?? (i.direction === "in" ? i.from : i.to)} />
-              <div style={{ display: "grid", gap: 2, minWidth: 0, flex: 1 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 2, minWidth: 0, flex: 1 }}>
                 <div style={{ display: "flex", gap: 8, alignItems: "baseline", minWidth: 0 }}>
                   <span style={{
                     fontSize: 12.5, fontWeight: 700, color: "var(--text-primary)", flex: 1,
@@ -456,7 +456,7 @@ export default function EmailFeed() {
 
   // ── Reading pane ─────────────────────────────────────────────────────────
   const reader = (
-    <div id="wing-mail-reader" style={{ display: "grid", gap: 14, alignContent: "start", minWidth: 0 }}>
+    <div id="wing-mail-reader" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 14, alignContent: "start", minWidth: 0 }}>
       {!current ? (
         <div style={{ fontSize: 12.5, color: "var(--text-muted)", lineHeight: 1.6 }}>
           Pick an email on the left to read it exactly as it landed in their inbox.
@@ -493,7 +493,7 @@ export default function EmailFeed() {
             <HeaderLine name="From" value={current.from ?? "not recorded on this row"} />
             <HeaderLine name="To" value={
               current.name || current.company
-                ? `${[current.name, current.company].filter(Boolean).join(" · ")} — ${current.to ?? "no address"}`
+                ? `${[current.name, current.company].filter(Boolean).join(" · ")}, ${current.to ?? "no address"}`
                 : current.to ?? "no address"
             } />
             <HeaderLine name="Campaign" value={current.campaign ?? "not part of a campaign"} />
@@ -562,7 +562,7 @@ export default function EmailFeed() {
   );
 
   return (
-    <div style={{ display: "grid", gap: 13, minWidth: 0 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 13, minWidth: 0 }}>
       <style>{FLASH_CSS}</style>
 
       {/* Lane honesty, before anything else. A broken lane is the reason the
@@ -593,11 +593,11 @@ export default function EmailFeed() {
           placeholder="Search recipient, subject, or body"
           style={{ ...inputStyle, flex: "1 1 240px" }}
         />
-        <select value={campaign} onChange={(e) => setCampaign(e.target.value)} style={selectStyle} aria-label="Campaign">
+        <select value={campaign} onChange={(e) => setCampaign(e.target.value)} style={{ ...selectStyle, maxWidth: "100%" }} aria-label="Campaign">
           <option value="all">All campaigns</option>
           {campaignOptions.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
-        <select value={range} onChange={(e) => setRange(e.target.value)} style={selectStyle} aria-label="Date range">
+        <select value={range} onChange={(e) => setRange(e.target.value)} style={{ ...selectStyle, maxWidth: "100%" }} aria-label="Date range">
           {RANGES.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
         </select>
         <button
@@ -621,7 +621,7 @@ export default function EmailFeed() {
           />
         ))}
         {liveLanes.length > 0 && (
-          <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-muted)" }}>
+          <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-muted)", minWidth: 0, maxWidth: "100%", overflowWrap: "anywhere" }}>
             reading {liveLanes.map((l) => l.label.toLowerCase()).join(", ")}
           </span>
         )}

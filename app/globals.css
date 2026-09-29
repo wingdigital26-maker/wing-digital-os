@@ -321,9 +321,9 @@ main > div:last-child > div > *:nth-child(6) { animation-delay: 0.27s; }
   .app-main > div:nth-of-type(1) { }
   .app-main > div { }
 
-  /* Content padding + room for the bottom tab bar */
+  /* Content padding + room for the bottom tab bar and the floating chips above it */
   .app-scroll {
-    padding: 16px 14px calc(84px + env(safe-area-inset-bottom, 0px)) !important;
+    padding: 16px 14px calc(136px + env(safe-area-inset-bottom, 0px)) !important;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior-y: contain;
   }

@@ -126,7 +126,9 @@ export default function SectionChrome({ title, tabs, isTabActive, extras, childr
   return (
     // page-scroll must stay on this root: a body scroll-lock once froze every
     // standalone page and this class is what exempts them.
-    <div className="page-scroll" style={{ minHeight: "100vh", background: "var(--bg-primary)", color: "var(--text-primary)" }}>
+    // paddingBottom keeps the last row clear of the floating Nimbus orb and
+    // the phone command button (FRONTIER 19).
+    <div className="page-scroll" style={{ minHeight: "100vh", background: "var(--bg-primary)", color: "var(--text-primary)", paddingBottom: 120 }}>
       <style>{`
         .sc-top {
           max-width: 1180px; margin: 0 auto; padding: 12px 20px 0;

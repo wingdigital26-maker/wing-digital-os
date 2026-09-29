@@ -436,7 +436,10 @@ export default function Home() {
         <div
           ref={scrollRef}
           className="app-scroll"
-          style={{ flex: 1, overflow: "auto", padding: "24px 28px 32px" }}
+          // Bottom padding reserves the band the floating chips sit in (More +
+          // Da Boss bottom-left, Nimbus orb bottom-right, 18px + 84px) so the
+          // last row of any board can scroll clear of them. FRONTIER 19.
+          style={{ flex: 1, overflow: "auto", padding: "24px 28px 120px" }}
           onTouchStart={onTouchStart}
           onTouchMove={onTouchMove}
           onTouchEnd={onTouchEnd}
@@ -789,9 +792,9 @@ function GlobalDaBoss() {
       </button>
       )}
       <style>{`
-        /* Desktop: bottom-left, sitting flush to the RIGHT of the More pill
-           (More owns left:22 with a stable width; the chip starts past it). */
-        .daboss-chip { bottom: 22px; left: 118px; }
+        /* Desktop: bottom-left, stacked directly ABOVE the More pill so both
+           stay in the rail corner instead of reaching across page content. */
+        .daboss-chip { bottom: 76px; left: 22px; }
         .daboss-chip.alert { animation: dabossPulse 1.8s ease-in-out infinite; }
         @keyframes dabossPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(248,113,113,0.5); } 50% { box-shadow: 0 0 0 8px rgba(248,113,113,0); } }
         /* Phone: dock at bottom-LEFT, above the tab bar and opposite the

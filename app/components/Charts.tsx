@@ -64,7 +64,7 @@ export function Delta({ value, label }: { value: number | null; label?: string }
       background: `${c}14`, border: `1px solid ${c}33`,
       padding: "2px 8px", borderRadius: 999, whiteSpace: "nowrap",
     }}>
-      {flat ? "—" : up ? "▲" : "▼"} {flat ? "0" : Math.abs(value).toLocaleString()}
+      {flat ? "-" : up ? "▲" : "▼"} {flat ? "0" : Math.abs(value).toLocaleString()}
       {label && <span style={{ color: "var(--text-muted)", fontWeight: 600 }}>{label}</span>}
     </span>
   );

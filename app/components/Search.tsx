@@ -98,7 +98,7 @@ export default function Search({ onOpenNote }: { onOpenNote: (path: string) => v
                     onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
                   >
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>{c.name || "—"}</span>
+                      <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>{c.name || "-"}</span>
                       <div style={{ display: "flex", gap: 4 }}>
                         {c.tags.slice(0, 2).map(t => (
                           <span key={t} style={{ fontSize: 10, background: "var(--accent-glow)", color: "var(--accent)", padding: "2px 7px", borderRadius: 20 }}>{t}</span>

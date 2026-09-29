@@ -578,12 +578,12 @@ export default function CallRoom() {
             that jumps the list straight to the callback filter. */}
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 16, alignItems: "stretch" }}>
           <div style={miniStat}>
-            <span style={miniStatNum}>{today ? today.calls : "—"}</span>
+            <span style={miniStatNum}>{today ? today.calls : "-"}</span>
             <span style={miniStatLabel}>calls today</span>
           </div>
           <div style={miniStat}>
             <span style={{ ...miniStatNum, color: today && today.booked > 0 ? "var(--green)" : "var(--text-primary)" }}>
-              {today ? today.booked : "—"}
+              {today ? today.booked : "-"}
             </span>
             <span style={miniStatLabel}>booked today</span>
           </div>

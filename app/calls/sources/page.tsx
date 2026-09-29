@@ -345,7 +345,7 @@ function MiniStat({ label, value, tone }: { label: string; value: number | null;
   return (
     <div>
       <div style={{ fontSize: 17, fontWeight: 800, color: tone ?? "var(--text-primary)", fontVariantNumeric: "tabular-nums" }}>
-        {value === null || value === undefined ? "—" : value}
+        {value === null || value === undefined ? "-" : value}
       </div>
       <div style={{ fontSize: 10.5, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: 0.4 }}>
         {label}

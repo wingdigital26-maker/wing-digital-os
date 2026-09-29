@@ -165,7 +165,7 @@ export default async function PortalPage({ params }: { params: Promise<{ slug: s
               <div style={{ ...card, display: "flex", alignItems: "center", gap: 20 }}>
                 <div>
                   <p style={{ fontSize: 44, fontWeight: 800, lineHeight: 1, color: scoreColor(health.overall), fontFamily: "'Space Grotesk', sans-serif" }}>
-                    {health.overall ?? "—"}
+                    {health.overall ?? "-"}
                   </p>
                   <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>Overall</p>
                 </div>
@@ -176,7 +176,7 @@ export default async function PortalPage({ params }: { params: Promise<{ slug: s
                       <div key={p.label}>
                         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
                           <span style={{ fontSize: 11.5, color: "var(--text-secondary)" }}>{p.label}</span>
-                          <span style={{ fontSize: 11.5, fontWeight: 700, color: scoreColor(v) }}>{v ?? "—"}</span>
+                          <span style={{ fontSize: 11.5, fontWeight: 700, color: scoreColor(v) }}>{v ?? "-"}</span>
                         </div>
                         <div style={{ height: 6, background: "rgba(255,255,255,0.05)", borderRadius: 999, overflow: "hidden" }}>
                           <div style={{ width: `${Math.min(Number(v) || 0, 100)}%`, height: "100%", background: scoreColor(v), borderRadius: 999 }} />

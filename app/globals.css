@@ -657,7 +657,7 @@ main > div:last-child > div > *:nth-child(6) { animation-delay: 0.27s; }
 .v2-tile__label { font-size: 13px; font-weight: 600; line-height: 1.35; }
 .v2-icon-chip { width: 40px; height: 40px; border-radius: 999px; display: grid; place-items: center; background: color-mix(in srgb, var(--bg-card) 80%, transparent); color: var(--text-primary); flex-shrink: 0; }
 .v2-pills { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; border-radius: 999px; background: var(--bg-card); box-shadow: var(--v2-shadow); }
-.v2-pills > * { display: inline-flex; align-items: center; min-height: 40px; padding: 0 16px; border-radius: 999px; font-size: 14px; font-weight: 500; color: var(--text-secondary); background: transparent; border: 0; cursor: pointer; transition: background-color .2s ease-out, color .2s ease-out; }
+.v2-pills > * { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; white-space: nowrap; min-height: 40px; padding: 0 16px; border-radius: 999px; font-size: 14px; font-weight: 500; color: var(--text-secondary); background: transparent; border: 0; cursor: pointer; transition: background-color .2s ease-out, color .2s ease-out; }
 .v2-pills > *:hover { color: var(--text-primary); background: var(--bg-hover); }
 .v2-pills > [aria-current="page"], .v2-pills > [aria-selected="true"], .v2-pills > .is-active { background: var(--accent); color: #ffffff; font-weight: 600; }
 .v2-status { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
@@ -667,6 +667,13 @@ main > div:last-child > div > *:nth-child(6) { animation-delay: 0.27s; }
 .v2-status--info { color: var(--accent); background: var(--v2-tint-blue); }
 .v2-h { font-family: 'Space Grotesk', 'Inter', sans-serif; font-weight: 700; letter-spacing: -0.02em; color: var(--text-primary); }
 @media (max-width: 767px) { .v2-pills > * { min-height: 44px; } }
+/* Phone: a pill group is ONE scrollable row, never a wrapped rounded blob
+   (2026-09-28). gap on the pill itself keeps "Booked 2" from gluing into
+   "Booked2": flex drops the whitespace text node between label and count. */
+@media (max-width: 767px) {
+  .v2-pills { flex-wrap: nowrap; max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; }
+  .v2-pills::-webkit-scrollbar { display: none; }
+}
 @media (prefers-reduced-motion: reduce) { .v2-lift, .v2-pills > * { transition: none; } .v2-lift:hover { transform: none; } }
 .v2-rail-btn:hover .v2-rail-icon { background: var(--bg-hover); color: var(--text-primary); }
 .v2-rail-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 14px; }

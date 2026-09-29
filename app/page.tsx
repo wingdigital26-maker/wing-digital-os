@@ -292,7 +292,8 @@ export default function Home() {
       .then(r => r.json())
       .then(d => {
         if (d.error) { setRevenueData({ error: d.error }); setLoading(false); return; }
-        setRevenueData({
+        setRevenueData((prev: any) => ({
+          monthTotal: prev?.monthTotal,
           mrr: d.mrr,
           activeClientCount: d.activeClients,
           nextExpiry: d.nextExpiry ?? null,
@@ -306,10 +307,24 @@ export default function Home() {
               basisLabel: c.revenue?.label ?? "unknown",
               countsTowardMrr: !!c.revenue?.countsTowardMrr,
             })),
-        });
+        }));
         setLoading(false);
       })
       .catch(() => setLoading(false));
+    // "Making this month" = every invoice dated this calendar month (recurring
+    // and one-time together), from /api/invoices. Void/cancelled ones are left
+    // out. If invoices can't load, the tile falls back to MRR.
+    fetch("/api/invoices", { cache: "no-store" })
+      .then(r => r.json())
+      .then(d => {
+        if (!Array.isArray(d.items)) return;
+        const month = new Date().toISOString().slice(0, 7);
+        const cents = d.items
+          .filter((i: any) => (i.issued_on ?? "").slice(0, 7) === month && !/void|cancel/i.test(i.status ?? ""))
+          .reduce((s: number, i: any) => s + (Number(i.amount_cents) || 0), 0);
+        setRevenueData((prev: any) => ({ ...(prev ?? {}), monthTotal: cents / 100 }));
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -863,7 +878,9 @@ function CommandCenter({ data, loading }: { data: any; loading: boolean }) {
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>
           </div>
           <div>
-            {typeof data?.mrr === "number" ? (
+            {typeof data?.monthTotal === "number" && data.monthTotal > 0 ? (
+              <div className="v2-tile__num">${data.monthTotal.toLocaleString()}</div>
+            ) : typeof data?.mrr === "number" ? (
               <div className="v2-tile__num">${data.mrr.toLocaleString()}</div>
             ) : (
               <div className="v2-tile__num" style={{ fontSize: 22, color: "var(--text-muted)" }}>{loading ? "..." : "unavailable"}</div>

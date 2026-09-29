@@ -232,7 +232,7 @@ type Summary = {
   automations_active: number | null;
 };
 
-type TodayTile = { label: string; value: number | null; hint?: string | null } & (
+type TodayTile = { label: string; value: number | null; hint?: string | null; sub?: string | null } & (
   | { href: string; view?: undefined }
   | { view: string; href?: undefined }
 );
@@ -252,6 +252,9 @@ export function TodayStrip() {
   // Calls logged today (Central), from the same endpoint the Call Room strip
   // reads. null = the endpoint did not answer (shown as "not available").
   const [callsToday, setCallsToday] = useState<number | null>(null);
+  // Leads still waiting for a first call (Call Room "Not called yet"), so a
+  // 0 on the calls tile carries its next step instead of reading as a dead end.
+  const [waiting, setWaiting] = useState<number | null>(null);
   useEffect(() => {
     let alive = true;
     const load = () => {
@@ -264,6 +267,8 @@ export function TodayStrip() {
         .then((d) => {
           const n = Number(d?.today?.calls);
           if (alive) setCallsToday(d && Number.isFinite(n) ? n : null);
+          const w = Number(d?.funnel?.new);
+          if (alive) setWaiting(d && Number.isFinite(w) ? w : null);
         })
         .catch(() => { if (alive) setCallsToday(null); });
     };
@@ -294,7 +299,7 @@ export function TodayStrip() {
   // leads, calls and money at a glance, one click to act"); each tile opens
   // the screen where you act on it.
   const tiles: (TodayTile & { variant: "amber" | "blue" | "violet" | "green"; icon: IconKey })[] = [
-    { label: "Calls today", value: callsToday, view: "calls", variant: "green", icon: "phone" },
+    { label: "Calls today", value: callsToday, sub: waiting ? `${waiting.toLocaleString()} waiting to be called` : null, view: "calls", variant: "green", icon: "phone" },
     { label: "New leads this week", value: s.new_leads_7d, href: "/automations/runs", variant: "blue", icon: "inbox" },
     { label: "Tasks due today", value: s.tasks_due_today, hint: overdue ? `${overdue} overdue` : null, href: "/automations/tasks", variant: "amber", icon: "check" },
     { label: "Automations running", value: s.automations_active, href: "/automations", variant: "violet", icon: "zap" },
@@ -324,10 +329,11 @@ export function TodayStrip() {
               <span className="v2-tile__label" style={{ color: "var(--text-secondary)" }}>
                 {t.label}{t.hint ? <span style={{ color: "var(--orange)" }}> · {t.hint}</span> : null}
               </span>
+              {t.sub ? <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{t.sub} <span aria-hidden="true">&rarr;</span></span> : null}
             </>
           );
           const style: React.CSSProperties = {
-            display: "flex", flexDirection: "column", gap: 6, textAlign: "left", cursor: "pointer",
+            display: "flex", flexDirection: "column", justifyContent: "flex-start", gap: 6, textAlign: "left", cursor: "pointer",
             color: "inherit", textDecoration: "none", width: "100%",
           };
           return typeof t.view === "string" ? (

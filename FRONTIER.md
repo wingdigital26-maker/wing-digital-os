@@ -1,4 +1,4 @@
-﻿# FRONTIER.md - /visual loop on the Wing OS (route kit, pick = .visual/pick.png)
+# FRONTIER.md - /visual loop on the Wing OS (route kit, pick = .visual/pick.png)
 
 Broken first, then the look. Evidence = `.visual/round-0/` (1440 + 375, light) and a
 console/network/overflow probe. One item per round, max 4 rounds per item.
@@ -22,7 +22,7 @@ console/network/overflow probe. One item per round, max 4 rounds per item.
 | 15 | DONE | Dark theme (Obsidian) sweep of every view for contrast and pre-V2 leftovers | not yet captured | 1 |
 | 16 | DONE | Call Room lead cards use a heavy near-black 1px outline (pre-V2) instead of the soft v2-card surface | .visual/round-7/_hash_view-calls-1440 | 1 |
 | 17 | DONE | Em dashes left in visible copy across boards (and as empty-cell placeholders) | hard rule J3; grep of app/components | 1 |
-| 18 | OPEN | Home has no single filled primary action (judge A): e.g. a Wing-blue 'Call next lead' on the Calls tile | judge 2026-09-28, round-16 | 0 |
-| 19 | OPEN | Floating Da Boss chip, Nimbus orb (and dev N badge) overlap page content at the bottom of the viewport at 1440 and 375 | judge 2026-09-28; reserve a bottom gutter in the scroll area | 0 |
-| 20 | OPEN | Dark theme: accent-blue links and small accent text measure 4.0:1 on dark cards | round-11 contrast; brand hue, needs Jack's OK to lighten | 0 |
+| 18 | DONE | Home has no single filled primary action (judge A): e.g. a Wing-blue 'Call next lead' on the Calls tile | judge 2026-09-28, round-16. Done 5b03ac9: 'Call next lead' pill by the Today row, only when leads wait; .visual/round-17 | 1 |
+| 19 | DONE | Floating Da Boss chip, Nimbus orb (and dev N badge) overlap page content at the bottom of the viewport at 1440 and 375 | judge 2026-09-28; reserve a bottom gutter in the scroll area. Done 16685fd: 120px/136px bottom band, Da Boss chip stacked above More; .visual/round-19 (dev N badge is dev-only) | 1 |
+| 20 | DONE | Dark theme: accent-blue links and small accent text measure 4.0:1 on dark cards | round-11 contrast; brand hue, Jack approved. Done dbd366e: --accent-text #7B9AF7 dark only; .visual/round-18 | 1 |
 

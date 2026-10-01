@@ -92,13 +92,27 @@ async function tierColumn(): Promise<string | null> {
 // count queries so the pills are true even when only a page of rows is sent.
 const STATUSES = [
   "new",
+  "no_answer",
   "contacted",
   "callback",
   "booked",
   "not_interested",
   "bad_number",
   "dnc",
+  "signed",
 ] as const;
+
+// "No answer" never changes a lead's status (a business you could not reach is
+// still a business to call), so "status=new" alone mixed never-dialed leads
+// with ones a caller already tried. That is why a logged no-answer looked like
+// it had not registered: the lead sat in "Not called yet" unchanged. The two
+// are split on last_called_at, which every logged dial sets.
+const statusFilter = (s: string): string[] =>
+  s === "new"
+    ? ["status=eq.new", "last_called_at=is.null"]
+    : s === "no_answer"
+      ? ["status=eq.new", "last_called_at=not.is.null"]
+      : [`status=eq.${encodeURIComponent(s)}`];
 
 // True row count for a PostgREST filter, via a HEAD request with count=exact.
 // Returns null on failure so callers can fall back honestly.
@@ -207,7 +221,7 @@ export async function GET(req: Request) {
 
   const statusPart =
     status && status !== "all"
-      ? [`status=eq.${encodeURIComponent(status)}`, ...nameGate(status)]
+      ? [...statusFilter(status), ...nameGate(status)]
       : includeExcluded
         ? []
         : ["or=(contact_name.not.is.null,status.in.(booked,callback))"];
@@ -228,7 +242,7 @@ export async function GET(req: Request) {
     sbGet<Lead>("call_leads", rowParts.join("&")),
     sbCount("call_leads", ["select=id", ...base, ...statusPart].join("&")),
     ...STATUSES.map((s) =>
-      sbCount("call_leads", ["select=id", ...base, `status=eq.${s}`, ...nameGate(s)].join("&"))
+      sbCount("call_leads", ["select=id", ...base, ...statusFilter(s), ...nameGate(s)].join("&"))
     ),
     // Tier counts describe the current status/sheet/search view but ignore the
     // tier filter itself, so the pills never zero each other out.

@@ -201,6 +201,11 @@ type Activity = {
 type Today = {
   calls: number;
   booked: number;
+  // The signed-in caller's own numbers, so Maddox sees HIS dials, not the team's.
+  mine: number;
+  mineBooked: number;
+  // The last few logged calls, newest first, so a logged call visibly lands.
+  recent: { id: number; company: string | null; outcome: string; user_email: string | null; created_at: string }[];
   callbacksDue: number;
   callbacksOverdue: number;
 };
@@ -229,6 +234,7 @@ const QUICK: { key: string; short: string; tone: string }[] = [
 
 const FILTERS = [
   { key: "new", label: "Not called yet" },
+  { key: "no_answer", label: "No answer, try again" },
   { key: "callback", label: "Call backs" },
   { key: "contacted", label: "Spoken to" },
   { key: "booked", label: "Booked" },
@@ -238,6 +244,30 @@ const FILTERS = [
 
 const statusColor = (s: string) =>
   OUTCOMES.find((o) => o.key === s)?.tone ?? "var(--text-muted)";
+
+// A logged "no answer" keeps status "new" on purpose (the lead is still worth
+// calling), so status alone cannot tell a dialed lead from an untouched one.
+// last_called_at can: every logged dial sets it.
+const triedNoAnswer = (l: { status: string; last_called_at: string | null }) =>
+  l.status === "new" && Boolean(l.last_called_at);
+
+const cardStatus = (l: { status: string; last_called_at: string | null }) =>
+  triedNoAnswer(l)
+    ? "No answer"
+    : OUTCOMES.find((o) => o.key === l.status)?.label ?? "Not called yet";
+
+// "today 2:14 PM", "yesterday 4:02 PM", or "Sep 26" for anything older.
+const calledWhen = (iso: string): string => {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const time = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const day = new Date(d); day.setHours(0, 0, 0, 0);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const diff = Math.round((today.getTime() - day.getTime()) / 86_400_000);
+  if (diff === 0) return `today ${time}`;
+  if (diff === 1) return `yesterday ${time}`;
+  return d.toLocaleDateString([], { month: "short", day: "numeric" });
+};
 
 // Same "when is this due" phrasing as the Callbacks board, so a caller who
 // bounces between the two screens reads one language, not two.
@@ -334,6 +364,9 @@ export default function CallRoom() {
       setToday({
         calls: Number(d?.today?.calls ?? 0),
         booked: Number(d?.today?.booked ?? 0),
+        mine: Number(d?.me?.callsToday ?? 0),
+        mineBooked: Number(d?.me?.bookedToday ?? 0),
+        recent: Array.isArray(d?.activity) ? d.activity.slice(0, 6) : [],
         callbacksDue: callbacks.length,
         callbacksOverdue: callbacks.filter((c) => c.overdue).length,
       });
@@ -578,14 +611,18 @@ export default function CallRoom() {
             that jumps the list straight to the callback filter. */}
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 16, alignItems: "stretch" }}>
           <div style={miniStat}>
-            <span style={miniStatNum}>{today ? today.calls : "-"}</span>
-            <span style={miniStatLabel}>calls today</span>
+            <span style={miniStatNum}>{today ? today.mine : "-"}</span>
+            <span style={miniStatLabel}>
+              your calls today{today && today.calls !== today.mine ? ` · ${today.calls} team` : ""}
+            </span>
           </div>
           <div style={miniStat}>
-            <span style={{ ...miniStatNum, color: today && today.booked > 0 ? "var(--green)" : "var(--text-primary)" }}>
-              {today ? today.booked : "-"}
+            <span style={{ ...miniStatNum, color: today && today.mineBooked > 0 ? "var(--green)" : "var(--text-primary)" }}>
+              {today ? today.mineBooked : "-"}
             </span>
-            <span style={miniStatLabel}>booked today</span>
+            <span style={miniStatLabel}>
+              you booked today{today && today.booked !== today.mineBooked ? ` · ${today.booked} team` : ""}
+            </span>
           </div>
           {today && today.callbacksDue > 0 && (
             <button
@@ -618,6 +655,32 @@ export default function CallRoom() {
             </button>
           )}
         </div>
+
+        {/* Proof a call landed: the last few logged dials, newest first. A
+            caller who taps "No answer" sees the company appear here at once. */}
+        {today && today.recent.length > 0 && (
+          <div style={{ ...card, marginTop: 12, padding: "10px 14px" }}>
+            <span style={{ display: "block", fontSize: 10.5, textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 800, color: "var(--text-muted)", marginBottom: 6 }}>
+              Just logged
+            </span>
+            {today.recent.map((a) => (
+              <div key={a.id} style={{ display: "flex", gap: 10, alignItems: "baseline", fontSize: 13, padding: "3px 0" }}>
+                <span style={{ fontVariantNumeric: "tabular-nums", color: "var(--text-muted)", minWidth: 62 }}>
+                  {calledWhen(a.created_at)}
+                </span>
+                <span style={{ fontWeight: 700, flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {a.company ?? "Unknown lead"}
+                </span>
+                <span style={{ color: statusColor(a.outcome), fontWeight: 600, whiteSpace: "nowrap" }}>
+                  {OUTCOMES.find((o) => o.key === a.outcome)?.label ?? a.outcome}
+                </span>
+                <span style={{ color: "var(--text-muted)", whiteSpace: "nowrap" }}>
+                  {a.user_email && me && a.user_email === me.email ? "you" : a.user_email ? displayName(a.user_email) : ""}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
 
         {flash && (
           <div style={{ ...banner, background: "var(--v2-tint-green)", borderColor: "var(--green)", color: "var(--green)" }}>
@@ -789,7 +852,7 @@ export default function CallRoom() {
                     </span>
                   )}
                   <span style={{ ...pill, borderColor: statusColor(l.status), color: statusColor(l.status) }}>
-                    {OUTCOMES.find((o) => o.key === l.status)?.label ?? "Not called yet"}
+                    {cardStatus(l)}
                   </span>
                   {/* Overdue callbacks get the loudest treatment on the card,
                       matching the Callbacks board exactly (var(--red) solid
@@ -908,10 +971,11 @@ export default function CallRoom() {
                     </p>
                   </div>
                 )}
-                {l.call_count > 0 && (
-                  <p style={{ fontSize: 11.5, color: "var(--text-muted)", marginTop: 4 }}>
-                    {l.call_count} previous {l.call_count === 1 ? "attempt" : "attempts"}
-                    {l.last_called_at ? ` · last ${new Date(l.last_called_at).toLocaleDateString()}` : ""}
+                {(l.call_count > 0 || l.last_called_at) && (
+                  <p style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 4, fontWeight: 600 }}>
+                    Called {Math.max(l.call_count ?? 0, 1)}{" "}
+                    {Math.max(l.call_count ?? 0, 1) === 1 ? "time" : "times"}
+                    {l.last_called_at ? ` · last ${calledWhen(l.last_called_at)}` : ""}
                   </p>
                 )}
 
@@ -920,7 +984,7 @@ export default function CallRoom() {
                     stay in the panel. */}
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
                   {QUICK.map((o) => {
-                    const on = l.status === o.key;
+                    const on = l.status === o.key || (o.key === "no_answer" && triedNoAnswer(l));
                     return (
                       <button
                         key={o.key}

@@ -50,6 +50,21 @@ const LEAD_COLS =
   "id,company,contact_name,title,phone,city,state,vertical,score,signals,status," +
   "last_outcome,last_called_at,call_count,next_action_at,claimed_by_email,tier";
 
+// Midnight today in America/Chicago, as a real instant. Works across DST by
+// reading the zone's current offset instead of hardcoding -5 or -6.
+function centralMidnight(now: Date): Date {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/Chicago",
+      year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23",
+    }).formatToParts(now).map((p) => [p.type, p.value])
+  );
+  const wallAsUtc = Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour, +parts.minute, +parts.second);
+  const offset = wallAsUtc - Math.floor(now.getTime() / 1000) * 1000;
+  return new Date(Date.UTC(+parts.year, +parts.month - 1, +parts.day) - offset);
+}
+
 export async function GET() {
   const user = await requireCallUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -137,10 +152,11 @@ export async function GET() {
     company: a.lead_id ? nameById.get(a.lead_id) ?? null : null,
   }));
 
-  // Today = since local midnight on the server. Sent back as an ISO string so
-  // the UI can state exactly which window the numbers cover.
-  const midnight = new Date();
-  midnight.setHours(0, 0, 0, 0);
+  // Today = since midnight in Dallas. The server runs in UTC, so its own
+  // midnight is 7pm Central: "calls today" used to reset mid-evening and the
+  // morning count carried the previous night. Sent back as an ISO string so the
+  // UI can state exactly which window the numbers cover.
+  const midnight = centralMidnight(new Date());
   const todayRows =
     (await sbGet<Activity>(
       "call_activity",
@@ -160,8 +176,10 @@ export async function GET() {
     byPerson.set(key, row);
   }
 
+  const mine = byPerson.get(user.email) ?? { email: user.email, calls: 0, booked: 0 };
+
   return NextResponse.json({
-    me: { email: user.email, role: user.role, isAdmin: user.isAdmin },
+    me: { email: user.email, role: user.role, isAdmin: user.isAdmin, callsToday: mine.calls, bookedToday: mine.booked },
     dialable: leads.length,
     excluded: excludedRows === null ? null : excludedRows.length,
     funnel,

@@ -45,6 +45,9 @@ export const NAV_TREE: NavGroupDef[] = [
       // Dashboards (2026-09-13): the OS index of every built client dashboard,
       // opened inside the OS. Routed page (see EXTERNAL_SUB_LINKS).
       { id: "dashboards", label: "Dashboards", keywords: "reporting client dashboard" },
+      // Roof Command (2026-10-05): read-only view of the separate Roof Command
+      // Supabase project (coverage + roofer accounts). Routed page.
+      { id: "roof-command", label: "Roof Command", keywords: "roofing roofers hail storms coverage daily 50 pilot" },
     ],
   },
   {
@@ -192,6 +195,7 @@ export const EXTERNAL_SUB_LINKS: Record<string, string> = {
   // this map 2026-09-22 when the Activity tab was deleted; the page still
   // exists, but "activity" now aliases to Email (see LEGACY_VIEW_ALIAS).
   dashboards: "/dashboards",
+  "roof-command": "/roof-command",
 };
 
 // ── Routed pages ─────────────────────────────────────────────────────────────
@@ -243,6 +247,7 @@ export const ROUTED_PAGES: RoutedPage[] = [
   // activity board (what emails/texts are going out).
   { href: "/dashboards", label: "Client Dashboards", keywords: "reporting clients dashboard" },
   { href: "/activity", label: "Messaging Activity", keywords: "emails texts sent going out outbound queue" },
+  { href: "/roof-command", label: "Roof Command", keywords: "roofing roofers hail storms coverage daily 50 pilot" },
 ];
 
 /** Routed sections shown in SectionChrome's top switcher strip. */

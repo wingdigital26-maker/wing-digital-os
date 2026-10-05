@@ -1,0 +1,163 @@
+/* Roof Command (read-only view of the separate Roof Command project).
+   OS theme tokens only, same shapes as /activity and /dashboards. */
+
+.rc-page {
+  min-height: 100vh;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+.rc-wrap {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 40px 28px 64px;
+}
+.rc-head h1 {
+  font-size: 26px;
+  font-weight: 700;
+  margin: 0 0 6px;
+  letter-spacing: -0.01em;
+}
+.rc-head p {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin: 0 0 28px;
+  line-height: 1.55;
+  max-width: 760px;
+}
+
+.rc-section { margin-bottom: 32px; }
+.rc-section > h2 { font-size: 16px; margin: 0 0 3px; }
+.rc-tests h3 { font-size: 14px; margin: 22px 0 3px; color: var(--text-primary); }
+.rc-subline {
+  margin: 0 0 12px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.rc-note, .rc-empty {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 18px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+  background: var(--bg-card);
+  margin-bottom: 32px;
+}
+.rc-note strong { color: var(--text-primary); }
+.rc-note-err { border-left: 4px solid var(--red); }
+.rc-empty { border-style: dashed; background: transparent; margin-bottom: 0; }
+
+/* ── Coverage tiles ─────────────────────────────────────────────── */
+.rc-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+.rc-stat {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg-card);
+  padding: 16px 18px;
+  min-width: 0;
+}
+.rc-stat-l {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+.rc-stat-n {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 6px 0 4px;
+  font-variant-numeric: tabular-nums;
+}
+.rc-stat-s {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+/* ── Clients table ──────────────────────────────────────────────── */
+.rc-tablewrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-card); }
+table.rc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  min-width: 900px;
+}
+.rc-table th {
+  text-align: left;
+  padding: 9px 12px;
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.rc-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-secondary);
+  vertical-align: top;
+}
+.rc-table tr:last-child td { border-bottom: none; }
+.rc-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.rc-co { color: var(--text-primary); font-weight: 600; }
+.rc-funnel { white-space: nowrap; }
+.rc-sep { color: var(--text-muted); padding: 0 2px; }
+.rc-sub { display: block; font-size: 11.5px; color: var(--text-muted); margin-top: 3px; }
+.rc-when { white-space: nowrap; }
+
+.rc-badge {
+  display: inline-block;
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  white-space: nowrap;
+  text-transform: capitalize;
+  margin-right: 4px;
+  vertical-align: 1px;
+}
+.rc-badge-warn { color: var(--orange); border-color: var(--orange); }
+
+/* ── Links ──────────────────────────────────────────────────────── */
+.rc-links {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+.rc-link {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg-card);
+  text-decoration: none;
+  color: var(--text-primary);
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+a.rc-link:hover { border-color: var(--accent); transform: translateY(-2px); }
+.rc-link-t { font-size: 14.5px; font-weight: 650; }
+a.rc-link .rc-link-t { color: var(--accent); }
+.rc-link-s { font-size: 12.5px; color: var(--text-secondary); line-height: 1.5; }
+
+@media (max-width: 640px) {
+  .rc-wrap { padding: 24px 16px 48px; }
+  .rc-head h1 { font-size: 22px; }
+  .rc-stats { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .rc-stat { padding: 13px 14px; }
+  .rc-stat-n { font-size: 19px; }
+}

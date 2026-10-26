@@ -34,6 +34,16 @@ export const NAV_TREE: NavGroupDef[] = [
     ],
   },
   {
+    // Wing Command Center (2026-10-26): the phone-first team dashboard where
+    // Jack, Grant and Dylan run Wing day to day. Routed page (see
+    // EXTERNAL_SUB_LINKS); its own screen list is COMMAND_CENTER_PAGES below.
+    id: "team", label: "Team",
+    hint: "Wing Command Center: the team's daily dashboard",
+    subs: [
+      { id: "team-command", label: "Command Center", keywords: "team grant dylan pansh problems roofers calls check-ins" },
+    ],
+  },
+  {
     id: "clients", label: "Clients",
     hint: "Your clients, new leads, and storm alerts",
     // 2026-09-15 (Jack): trimmed to just Clients and Dashboards. Potential
@@ -196,6 +206,7 @@ export const EXTERNAL_SUB_LINKS: Record<string, string> = {
   // exists, but "activity" now aliases to Email (see LEGACY_VIEW_ALIAS).
   dashboards: "/dashboards",
   "roof-command": "/roof-command",
+  "team-command": "/command",
 };
 
 // ── Routed pages ─────────────────────────────────────────────────────────────
@@ -248,6 +259,28 @@ export const ROUTED_PAGES: RoutedPage[] = [
   { href: "/dashboards", label: "Client Dashboards", keywords: "reporting clients dashboard" },
   { href: "/activity", label: "Messaging Activity", keywords: "emails texts sent going out outbound queue" },
   { href: "/roof-command", label: "Roof Command", keywords: "roofing roofers hail storms coverage daily 50 pilot" },
+  { href: "/command", label: "Command Center", keywords: "team dashboard grant dylan problems roofers", inStrip: true },
+];
+
+// ── Wing Command Center screens ──────────────────────────────────────────────
+// The /command section's own menu (its bottom bar on a phone, its top tabs on
+// a laptop). Kept here so every nav list in the app lives in this one file.
+// `bar: true` = one of the five phone bottom-bar tabs; the rest sit under More.
+export type CommandPage = { href: string; label: string; short?: string; bar?: boolean; adminOnly?: boolean };
+
+export const COMMAND_CENTER_PAGES: CommandPage[] = [
+  { href: "/command", label: "Home", bar: true },
+  { href: "/command/clients", label: "Clients", bar: true },
+  { href: "/command/calls", label: "Cold calls", short: "Calls", bar: true },
+  { href: "/command/problems", label: "Problems", bar: true },
+  { href: "/command/roofers", label: "Roofer check-ins", short: "Roofers" },
+  { href: "/command/checks", label: "Daily checks", short: "Checks" },
+  { href: "/command/calendar", label: "Calendar" },
+  { href: "/command/pipeline", label: "Pipeline" },
+  { href: "/command/seo", label: "SEO" },
+  { href: "/command/websites", label: "Websites" },
+  { href: "/command/team", label: "Team" },
+  { href: "/command/setup", label: "Setup", adminOnly: true },
 ];
 
 /** Routed sections shown in SectionChrome's top switcher strip. */

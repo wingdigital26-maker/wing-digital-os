@@ -20,3 +20,7 @@ export const ONBOARDING: OnboardingItem[] = [
   { key: "dashboard", day: 12, who: "Jack", text: "Client dashboard link sent" },
   { key: "review", day: 14, who: "Dylan", text: "Day 14 review call: happy, any problems logged" },
 ];
+
+export const DEAL_STAGES = [
+  ["lead", "Lead"], ["meeting", "Meeting"], ["proposal", "Proposal"], ["onboarding", "Onboarding"], ["live", "Live"], ["lost", "Lost"],
+] as const;

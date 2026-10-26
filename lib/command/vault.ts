@@ -88,21 +88,23 @@ function section(md: string, heading: RegExp): string | null {
   return (end < 0 ? rest : rest.slice(0, end)).join("\n").trim();
 }
 
-/** Top-level numbered or bulleted items of a section, first line of each only. */
+/** Top-level numbered or bulleted items of a section, wrapped lines joined. */
 function items(body: string | null): string[] {
   if (!body) return [];
   const out: string[] = [];
   for (const l of body.split(/\r?\n/)) {
     const m = l.match(/^(?:\d+\.|-)\s+(.*)$/);
-    if (m) out.push(clean(m[1]));
+    if (m) out.push(m[1]);
+    else if (/^\s+\S/.test(l) && out.length) out[out.length - 1] += ` ${l.trim()}`;
   }
-  return out.filter((x) => x && !/^none( new)?\.?$/i.test(x));
+  return out.map(clean).filter((x) => x && !/^none( new)?\.?$/i.test(x));
 }
 
 /** Strip markdown emphasis and links down to readable text. */
 export function clean(s: string): string {
   return s
     .replace(/\*\*(.*?)\*\*/g, "$1")
+    .replace(/\*\*/g, "")
     .replace(/`([^`]*)`/g, "$1")
     .replace(/\[\[([^\]|]*\|)?([^\]]*)\]\]/g, "$2")
     .replace(/\[([^\]]*)\]\(([^)]*)\)/g, "$1")
@@ -118,7 +120,14 @@ function colorFrom(s: string): Health {
   return "unknown";
 }
 
-const SKIP = /(^_|-health\.md$|^index|^dashboard-links)/;
+// Not client pages: templates and indexes, and Wing's own page.
+const SKIP = /^(_|index|dashboard-links|wing-digital\.md$)/;
+
+/** A sentinel health page (by content, since a client slug can itself end in "-health"). */
+function isHealthPage(fm: Record<string, string | string[]>): boolean {
+  const tags = Array.isArray(fm.tags) ? fm.tags : [];
+  return tags.includes("sentinel") || /\s-\s*Health$/i.test(str(fm.title) ?? "");
+}
 
 export function slugify(s: string): string {
   return s.toLowerCase().replace(/['’]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -131,9 +140,7 @@ export async function vaultClients(): Promise<{ clients: VaultClient[]; error: s
     return { clients: [], error: "The vault could not be read (VAULT_SOURCE / GH_VAULT_TOKEN on this deployment)." };
   }
   const top = files.filter((f) => /^wiki\/clients\/[^/]+\.md$/.test(f));
-  const healthSlugs = new Set(
-    top.filter((f) => f.endsWith("-health.md")).map((f) => f.slice("wiki/clients/".length, -"-health.md".length))
-  );
+  const healthSlugs = new Set((await healthPages()).keys());
   const out: VaultClient[] = [];
   await Promise.all(
     top
@@ -142,6 +149,7 @@ export async function vaultClients(): Promise<{ clients: VaultClient[]; error: s
         const md = await readVaultFile(path);
         if (!md) return;
         const fm = frontmatter(md);
+        if (isHealthPage(fm)) return;
         const slug = path.slice("wiki/clients/".length, -3);
         const status = (str(fm.status) || "").toLowerCase();
         if (!status.startsWith("active")) return;
@@ -155,7 +163,7 @@ export async function vaultClients(): Promise<{ clients: VaultClient[]; error: s
           healthSlugs.has(slug);
         if (!isClient) return;
         const h1 = md.match(/^#\s+(.+)$/m)?.[1];
-        const name = str(fm.client_name) || (h1 ? clean(h1).replace(/\s+,\s+.*$/, "") : slug);
+        const name = str(fm.client_name) || (h1 ? clean(h1.split(/\s+--\s+/)[0]) : slug);
         const industry = str(fm.industry);
         const live = sentinel?.match(/live_site\W+\s*(https?:\/\/[^\s)`*]+)/i)?.[1] ?? null;
         const phase = sentinel?.match(/`?phase`?\W+\s*([a-z-]+)/i)?.[1] ?? null;
@@ -178,8 +186,11 @@ export async function vaultClients(): Promise<{ clients: VaultClient[]; error: s
         });
       })
   );
-  out.sort((a, b) => a.name.localeCompare(b.name));
-  return { clients: out, error: null };
+  // Project sub-pages ("renewal-health-site-v2") belong to their client, not the roster.
+  const slugs = out.map((c) => c.slug);
+  const roster = out.filter((c) => !slugs.some((o) => o !== c.slug && c.slug.startsWith(`${o}-`)));
+  roster.sort((a, b) => a.name.localeCompare(b.name));
+  return { clients: roster, error: null };
 }
 
 /** Every sentinel health page, keyed by client slug. */
@@ -192,6 +203,7 @@ export async function healthPages(): Promise<Map<string, HealthPage>> {
       if (!md) return;
       const slug = path.slice("wiki/clients/".length, -"-health.md".length);
       const fm = frontmatter(md);
+      if (!isHealthPage(fm)) return;
       const h1 = md.match(/^#\s+(.+)$/m)?.[1] ?? "";
       const updated = str(fm.updated);
       const t = updated ? Date.parse(updated) : NaN;

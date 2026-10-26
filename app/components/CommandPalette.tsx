@@ -111,10 +111,12 @@ export default function CommandPalette() {
   // different reason: it is the frameless hotkey window, ~520px wide, so the
   // mobile-width .cp-fab rule would render an OS button floating over the chat
   // card. That window is Nimbus alone, not the OS, so the palette has no place
-  // there. Every other route, phone widths included, is untouched.
+  // there. /command is the team's Command Center: Grant and Dylan cannot open
+  // the rest of the OS, and it has its own phone bottom bar the FAB would cover.
+  // Every other route, phone widths included, is untouched.
   useEffect(() => {
     const p = window.location.pathname;
-    const inert = ["/login", "/portal", "/d", "/nimbus"].some(
+    const inert = ["/login", "/portal", "/d", "/nimbus", "/command"].some(
       prefix => p === prefix || p.startsWith(prefix + "/")
     );
     setEnabled(!inert);

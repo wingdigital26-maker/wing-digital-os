@@ -41,7 +41,7 @@ export async function createProblem(p: {
     const [row] = await sql<{ id: number }[]>`
       insert into cc_problems (client_slug, reported_by, urgency, body, screenshot, source)
       values (${p.client_slug}, ${p.reported_by}, ${p.urgency}, ${p.body}, ${p.screenshot ?? null}, ${p.source ?? "manual"})
-      returning id`;
+      returning id::int`;
     return row.id;
   });
   if (!saved.ok) return saved;

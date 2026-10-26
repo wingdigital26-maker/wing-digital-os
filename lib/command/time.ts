@@ -60,3 +60,10 @@ export function money(n: number | string | null | undefined): string {
   const v = Number(n);
   return Number.isFinite(v) ? `$${v.toLocaleString("en-US", { maximumFractionDigits: 0 })}` : "Not recorded";
 }
+
+/** Midnight Central time on `day`, as an ISO instant (DST-aware). */
+export function ctStartIso(day: string): string {
+  const guess = new Date(`${day}T06:00:00Z`); // 00:00 CST, or 01:00 CDT
+  const h = Number(new Intl.DateTimeFormat("en-US", { timeZone: TZ, hour: "numeric", hourCycle: "h23" }).format(guess));
+  return new Date(guess.getTime() - h * 3600_000).toISOString();
+}

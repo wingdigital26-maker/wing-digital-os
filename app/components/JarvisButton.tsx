@@ -663,8 +663,9 @@ export default function JarvisButton() {
     };
   }, [stopAudio]);
 
-  // Hide on login page (after every hook so hook order never changes).
-  if (pathname === "/login") return null;
+  // Hide on login page (after every hook so hook order never changes), and in
+  // the team Command Center, where teammates have no access to the assistant.
+  if (pathname === "/login" || pathname === "/command" || pathname?.startsWith("/command/")) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

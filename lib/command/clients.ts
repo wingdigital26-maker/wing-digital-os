@@ -168,7 +168,6 @@ export async function loadClients(): Promise<{ clients: ClientRow[]; errors: str
       const since = r.lastTouch ? daysBetween(dayCT(r.lastTouch.at), today) : null;
       r.touchOverdue = since == null || since >= TOUCH_EVERY_DAYS;
       if (since != null && since >= QUIET_DAYS) r.atRisk.push(`No check-in for ${since} days`);
-      if (since == null && store.ok) r.atRisk.push("Never checked in");
       if (r.lastTouch?.mood === "unhappy") r.atRisk.push("Unhappy at the last check-in");
     }
     if (r.oldestOpenDays != null && r.oldestOpenDays > PROBLEM_RISK_DAYS) {

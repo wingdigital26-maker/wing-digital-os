@@ -44,6 +44,7 @@ export default function ProblemCard({ p, me }: { p: P; me: string }) {
       <div className="cc-muted">{name(p.reported_by)} reported it {p.created}. Owner: {name(p.owner)}.</div>
       {p.has_screenshot ? (
         <a href={`/api/command/problems/${p.id}/screenshot`} target="_blank" rel="noreferrer">
+          {/* eslint-disable-next-line @next/next/no-img-element -- gated private API image, not optimisable */}
           <img src={`/api/command/problems/${p.id}/screenshot`} alt="Screenshot" style={{ maxWidth: "100%", maxHeight: 240, borderRadius: 10, marginTop: 8, border: "1px solid var(--border)" }} />
         </a>
       ) : null}

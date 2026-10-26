@@ -24,9 +24,7 @@ import { COMMAND_SCHEMA_SQL } from "./schema";
 export type Sql = ReturnType<typeof postgres>;
 
 declare global {
-  // eslint-disable-next-line no-var
   var __ccSql: Sql | undefined;
-  // eslint-disable-next-line no-var
   var __ccSchemaReady: Promise<void> | undefined;
 }
 

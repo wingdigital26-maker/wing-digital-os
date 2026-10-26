@@ -8,7 +8,6 @@ import { USERS, type UserId } from "@/lib/command/team";
 // AUTH_SESSION_SECRET nobody can. Brute force is slowed per IP like /api/login.
 
 declare global {
-  // eslint-disable-next-line no-var
   var __ccLoginAttempts: Map<string, { count: number; first: number }> | undefined;
 }
 const WINDOW_MS = 15 * 60 * 1000;

@@ -2,6 +2,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- API bodies vary per route
 export type ActResult = { ok: boolean; data: Record<string, any>; error: string | null };
 
 export async function act(url: string, method: string, payload: unknown): Promise<ActResult> {
@@ -42,7 +43,7 @@ export function useAct() {
 }
 
 /** One line under a form saying what happened with the team text. */
-export function notifyLine(n: any): string {
+export function notifyLine(n: { off?: string | null; sent?: boolean } | null | undefined): string {
   if (!n) return "";
   if (n.off) return " Texts are off, so nobody was texted yet.";
   if (n.sent) return " The team was told.";

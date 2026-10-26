@@ -68,7 +68,7 @@ export default async function CommandHome() {
         <Stat
           l="Calls to make today"
           n={s ? s.due : "?"}
-          s={s ? `${s.made.n} made today, ${s.made.meetings} meetings` : undefined}
+          s={s ? `${s.made.n} made today, ${s.made.meetings} meeting${s.made.meetings === 1 ? "" : "s"}` : undefined}
           href="/command/calls"
         />
         <Stat l="New or changed SEO pages" n={seoWeek} s="This week, from client sitemaps" href="/command/seo" />

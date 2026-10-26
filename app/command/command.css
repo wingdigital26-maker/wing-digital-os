@@ -68,9 +68,11 @@
 .cc-h2 a { margin-left: auto; font-size: 13px; font-weight: 600; text-decoration: none; }
 
 .cc-grid { display: grid; gap: 12px; grid-template-columns: 1fr; }
+/* Stat rows stay two-up on a phone so the day fits on one screen. */
+.cc-grid.four, .cc-grid.three:has(> .cc-stat) { grid-template-columns: 1fr 1fr; gap: 10px; }
 @media (min-width: 640px) { .cc-grid.two { grid-template-columns: 1fr 1fr; } .cc-grid.three { grid-template-columns: repeat(3, 1fr); } }
 @media (min-width: 980px) { .cc-grid.four { grid-template-columns: repeat(4, 1fr); } }
-@media (min-width: 640px) and (max-width: 979px) { .cc-grid.four { grid-template-columns: 1fr 1fr; } }
+@media (min-width: 640px) { .cc-grid.three:has(> .cc-stat) { grid-template-columns: repeat(3, 1fr); } }
 
 .cc-card {
   background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px;
@@ -95,6 +97,8 @@
 
 /* Stat tiles */
 .cc-stat { display: block; text-decoration: none; color: inherit; }
+.cc a.cc-stat { color: var(--text-primary); }
+@media (max-width: 639px) { .cc-stat { padding: 12px 14px; } .cc-stat .n { font-size: 26px; } }
 .cc-stat .n { font-family: "Space Grotesk", Inter, sans-serif; font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
 .cc-stat .l { font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); font-weight: 700; }
 .cc-stat .s { font-size: 12.5px; color: var(--text-secondary); margin-top: 2px; }

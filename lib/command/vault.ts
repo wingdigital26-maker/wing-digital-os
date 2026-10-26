@@ -38,6 +38,8 @@ export type HealthPage = {
   reds: string[];
   yellows: string[];
   published: string | null;
+  /** The URL sentinel actually monitors, when the page names one. */
+  surface: string | null;
   path: string;
 };
 
@@ -109,7 +111,7 @@ export function clean(s: string): string {
     .replace(/\[\[([^\]|]*\|)?([^\]]*)\]\]/g, "$2")
     .replace(/\[([^\]]*)\]\(([^)]*)\)/g, "$1")
     .replace(/\s+--\s+/g, ", ")
-    .replace(/—/g, ", ")
+    .replace(/\u2014/g, ", ")
     .trim();
 }
 
@@ -216,6 +218,7 @@ export async function healthPages(): Promise<Map<string, HealthPage>> {
         reds: items(section(md, /Red flags/i)),
         yellows: items(section(md, /Recommendations/i)),
         published: section(md, /Published since/i)?.split(/\r?\n/).map(clean).join(" ").trim() || null,
+        surface: md.match(/Monitored surface:\s*(https?:\/\/[^\s)]+)/i)?.[1]?.replace(/[.,]$/, "") ?? null,
         path,
       });
     })

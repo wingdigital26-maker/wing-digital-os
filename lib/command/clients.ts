@@ -153,6 +153,8 @@ export async function loadClients(): Promise<{ clients: ClientRow[]; errors: str
       r.healthPage = h;
       r.health = h.color;
       r.checkedAt = h.checkedAt;
+      // Sentinel names the surface it really checks; trust that over the config.
+      if (h.surface) r.liveSite = h.surface;
     }
     r.stale = isStale(r.checkedAt, now);
     r.billing = billing.get(r.slug) ?? null;

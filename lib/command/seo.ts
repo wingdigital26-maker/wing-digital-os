@@ -69,7 +69,7 @@ export async function sitemapPages(site: string): Promise<SeoPage[] | null> {
   const seen = new Set<string>();
   return entries
     .filter((e) => (seen.has(e.loc) ? false : (seen.add(e.loc), true)))
-    .map((e) => ({ url: e.loc, lastmod: e.lastmod ? dayCT(e.lastmod) : null, kind: POST_RE.test(e.loc) ? "post" : "page" }));
+    .map((e) => ({ url: e.loc, lastmod: !e.lastmod ? null : /^\d{4}-\d{2}-\d{2}$/.test(e.lastmod) ? e.lastmod : dayCT(e.lastmod), kind: POST_RE.test(e.loc) ? "post" : "page" }));
 }
 
 export async function seoForClients(list: { slug: string; name: string; liveSite: string | null }[]): Promise<SeoClient[]> {

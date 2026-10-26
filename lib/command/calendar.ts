@@ -87,15 +87,16 @@ export async function listEvents(fromIso: string, toIso: string): Promise<{ ok: 
       cache: "no-store",
       signal: AbortSignal.timeout(10000),
     });
-    const j = (await r.json().catch(() => ({}))) as { items?: Record<string, any>[]; error?: { message?: string } };
+    type GEvent = { id: string; summary?: string; location?: string; htmlLink?: string; start?: { dateTime?: string; date?: string }; end?: { dateTime?: string; date?: string } };
+    const j = (await r.json().catch(() => ({}))) as { items?: GEvent[]; error?: { message?: string } };
     if (!r.ok) return { ok: false, reason: `Google Calendar said: ${j.error?.message ?? `HTTP ${r.status}`}` };
     return {
       ok: true,
       events: (j.items ?? []).map((e) => ({
         id: String(e.id),
         title: String(e.summary ?? "(no title)"),
-        start: e.start?.dateTime ?? e.start?.date,
-        end: e.end?.dateTime ?? e.end?.date,
+        start: e.start?.dateTime ?? e.start?.date ?? "",
+        end: e.end?.dateTime ?? e.end?.date ?? "",
         allDay: !e.start?.dateTime,
         where: e.location ?? null,
         link: e.htmlLink ?? null,

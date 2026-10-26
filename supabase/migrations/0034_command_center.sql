@@ -183,3 +183,21 @@ create table if not exists cc_notifications (
   result          jsonb,
   created_at      timestamptz not null default now()
 );
+
+-- Supabase serves every public table over its REST API to anyone holding the
+-- anon key. RLS on with NO policies shuts that door; the app connects as the
+-- table owner over the pooler, which RLS does not restrict. Idempotent.
+alter table cc_prospects enable row level security;
+alter table cc_call_outcomes enable row level security;
+alter table cc_client_meta enable row level security;
+alter table cc_roofer_touches enable row level security;
+alter table cc_problems enable row level security;
+alter table cc_problem_comments enable row level security;
+alter table cc_website_jobs enable row level security;
+alter table cc_deals enable row level security;
+alter table cc_onboarding enable row level security;
+alter table cc_billing enable row level security;
+alter table cc_checks enable row level security;
+alter table cc_agent_runs enable row level security;
+alter table cc_weekly_numbers enable row level security;
+alter table cc_notifications enable row level security;

@@ -23,7 +23,9 @@ export type NavGroupDef = {
 
 export const NAV_TREE: NavGroupDef[] = [
   {
-    id: "command", label: "Command Center",
+    // Label "Home" (2026-10-26): "Command Center" now names the team dashboard
+    // at /command, and the phone tab bar already called this group Home.
+    id: "command", label: "Home",
     hint: "Today's numbers, briefing, and quick actions",
     subs: [
       { id: "command", label: "Overview", keywords: "home dashboard" },
@@ -37,10 +39,10 @@ export const NAV_TREE: NavGroupDef[] = [
     // Wing Command Center (2026-10-26): the phone-first team dashboard where
     // Jack, Grant and Dylan run Wing day to day. Routed page (see
     // EXTERNAL_SUB_LINKS); its own screen list is COMMAND_CENTER_PAGES below.
-    id: "team", label: "Team",
+    id: "team", label: "Command Center",
     hint: "Wing Command Center: the team's daily dashboard",
     subs: [
-      { id: "team-command", label: "Command Center", keywords: "team grant dylan pansh problems roofers calls check-ins" },
+      { id: "team-command", label: "Team dashboard", keywords: "command center team grant dylan pansh problems roofers calls check-ins" },
     ],
   },
   {

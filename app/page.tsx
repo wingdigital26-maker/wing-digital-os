@@ -91,6 +91,7 @@ type NavGroup = {
 // command palette. Icons are React components, so the assignment stays here.
 const NAV_ICONS: Record<string, IconType> = {
   command: Bolt,
+  team: Radar,
   clients: Users,
   crm: Note,
   automate: Route,
@@ -625,6 +626,7 @@ function MobileNav({ active, onNavigate, newLeadCount }: {
   ];
   // In-shell items switch the mounted view; routed ones are plain links.
   const more: { label: string; hint: string; icon: IconType; view?: string; href?: string }[] = [
+    { label: "Command Center", hint: "The team's daily dashboard: problems, check-ins, calls", icon: Radar, href: "/command" },
     { label: "Clients", hint: "Who pays you and how their sites are doing", icon: Users, view: "clients" },
     { label: "Contacts", hint: "Every contact, deal and draft in one place", icon: Users, view: "contacts" },
     { label: "Agents", hint: "What the automated agents are doing", icon: Cpu, view: "agent" },

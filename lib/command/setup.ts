@@ -5,6 +5,8 @@ import { withStore, storeConfigured } from "./db";
 import { codeFor } from "./auth";
 import { notifyStatus } from "./notify";
 import { USERS } from "./team";
+import { existsSync } from "fs";
+import { VAULT_PATH } from "@/lib/vaultSource";
 
 /** A KEYED read against the OS Supabase project, reporting the real status
  *  (sbSelect would turn a 402 into an empty list). */
@@ -38,7 +40,9 @@ export async function setupStatus() {
     machineKey: Boolean(process.env.COMMAND_MACHINE_KEY && process.env.COMMAND_MACHINE_KEY.length >= 16),
     notify: notifyStatus(),
     calendar: { id: Boolean(calendarId()), api: calendarApiReady() },
-    vault: process.env.VAULT_SOURCE === "github" ? Boolean(process.env.GH_VAULT_TOKEN) : Boolean(process.env.VAULT_PATH),
+    // Local runs read the vault folder on disk (vaultSource default), so a present
+    // folder counts as wired even without VAULT_PATH set.
+    vault: process.env.VAULT_SOURCE === "github" ? Boolean(process.env.GH_VAULT_TOKEN) : existsSync(VAULT_PATH),
     roofCommand: Boolean(process.env.ROOF_SUPABASE_URL && process.env.ROOF_SUPABASE_SERVICE_KEY),
   };
 }

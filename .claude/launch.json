@@ -52,6 +52,18 @@
         "3111"
       ],
       "port": 3111
+    },
+    {
+      "name": "command-center-local",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "start",
+        "--",
+        "-p",
+        "4965"
+      ],
+      "port": 4965
     }
   ]
 }

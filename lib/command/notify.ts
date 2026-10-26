@@ -74,7 +74,8 @@ async function sendNtfy(title: string, body: string, urgent: boolean): Promise<N
   try {
     const r = await fetch(`${server}/${encodeURIComponent(topic)}`, {
       method: "POST",
-      headers: { Title: title, Priority: urgent ? "high" : "default", Tags: "wing" },
+      // Header values must be Latin-1; a curly quote in a client name would throw.
+      headers: { Title: title.replace(/[^\x20-\x7E]/g, ""), Priority: urgent ? "high" : "default", Tags: "wing" },
       body,
       signal: AbortSignal.timeout(10000),
     });

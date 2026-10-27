@@ -105,6 +105,16 @@ function isPublicPath(pathname: string): boolean {
     // Sequence-engine feed for the external sender. Bearer OUTBOUND_EXPORT_KEY
     // verified inside the route, fails closed, same contract as outbound/export.
     pathname === "/api/sequences/due" ||
+    // Wing Command Center: its own sign-in page (per-user codes) and the
+    // machine endpoints a daily routine / Jack's laptop call. Every one of
+    // these routes checks its own key or session inside and fails closed.
+    pathname === "/command/login" ||
+    pathname === "/api/command/login" ||
+    pathname === "/api/command/logout" ||
+    pathname === "/api/command/check" ||
+    pathname === "/api/command/digest" ||
+    pathname === "/api/command/prospects/sync" ||
+    pathname === "/api/command/agent-run" ||
     pathname.startsWith("/demo-freshco") ||
     pathname.startsWith("/demo-roofing") ||
     pathname.startsWith("/demo-clearhaul")
@@ -216,6 +226,24 @@ export async function proxy(req: NextRequest) {
       return NextResponse.redirect(url);
     }
 
+    // Member-role sessions (Grant, Dylan) reach the Wing Command Center and
+    // NOTHING else of the OS. Minted only by /api/command/login.
+    if (session.role === "member") {
+      if (
+        pathname === "/command" ||
+        pathname.startsWith("/command/") ||
+        pathname.startsWith("/api/command/")
+      ) {
+        return NextResponse.next();
+      }
+      if (pathname.startsWith("/api/")) {
+        return NextResponse.json({ error: "forbidden" }, { status: 403 });
+      }
+      const url = req.nextUrl.clone();
+      url.pathname = "/command";
+      return NextResponse.redirect(url);
+    }
+
     // Client-role sessions only ever reach their client portal. Everything
     // else -- admin pages AND admin API routes -- is blocked.
     if (pathname === "/portal" || pathname.startsWith("/portal/")) {
@@ -245,7 +273,7 @@ export async function proxy(req: NextRequest) {
       );
     }
     const url = req.nextUrl.clone();
-    url.pathname = "/login";
+    url.pathname = pathname === "/command" || pathname.startsWith("/command/") ? "/command/login" : "/login";
     return NextResponse.redirect(url);
   }
 
@@ -256,7 +284,9 @@ export async function proxy(req: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   const url = req.nextUrl.clone();
-  url.pathname = "/login";
+  // The Command Center has its own sign-in (per-user codes), so a signed-out
+  // teammate opening /command lands there instead of on Jack's OS login.
+  url.pathname = pathname === "/command" || pathname.startsWith("/command/") ? "/command/login" : "/login";
   return NextResponse.redirect(url);
 }
 

@@ -1,0 +1,37 @@
+# Wing Command Center morning routine. Weekdays after sentinel writes the
+# client health pages: record today's check per client (texts the team when a
+# client is red, missing or stale), then send the morning digest.
+# 12:41 UTC = 7:41am Central in daylight time, 6:41am in standard time.
+# Needs the repo secret COMMAND_MACHINE_KEY (same value as Vercel); skips if unset.
+name: command-center
+on:
+  schedule:
+    - cron: "41 12 * * 1-5"
+  workflow_dispatch: {}
+
+jobs:
+  morning:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      COMMAND_URL: https://wing-digital-os.vercel.app
+      COMMAND_MACHINE_KEY: ${{ secrets.COMMAND_MACHINE_KEY }}
+    steps:
+      - name: Daily check and digest
+        run: |
+          if [ -z "$COMMAND_MACHINE_KEY" ]; then
+            echo "COMMAND_MACHINE_KEY secret is not set; skipping."
+            exit 0
+          fi
+          fail=0
+          set +e
+          for step in check digest; do
+            # Status code only: this repo is public, so its Action logs are too,
+            # and the response bodies name clients and their problems.
+            code=$(curl -sS -o /dev/null -w '%{http_code}' -m 60 -X POST \
+              "$COMMAND_URL/api/command/$step" \
+              -H "Authorization: Bearer $COMMAND_MACHINE_KEY" || echo 000)
+            echo "$step -> HTTP $code"
+            [ "$code" = "200" ] || fail=1
+          done
+          exit $fail
